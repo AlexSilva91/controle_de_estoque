@@ -1,7 +1,7 @@
 
 # Sistema de Gestão de Vendas e Caixa
 
-Este projeto é um sistema web para gerenciamento de vendas, clientes, produtos e controle de caixa, desenvolvido com front-end em HTML, CSS, JavaScript e back-end em Flask (Python). 
+Este projeto é um sistema web para gerenciamento de vendas, clientes, produtos e controle de caixa, desenvolvido com front-end em HTML, CSS, JavaScript e back-end em Flask (Python).
 
 ## Funcionalidades
 
@@ -87,12 +87,14 @@ Este projeto é um sistema web para gerenciamento de vendas, clientes, produtos 
 ### Passos
 
 1. Clone o repositório:
+
 ```bash
 git clone https://github.com/seu_usuario/seu_repositorio.git
 cd seu_repositorio
 ```
 
 2. Crie e ative um ambiente virtual:
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate  # Linux/macOS
@@ -100,16 +102,19 @@ venv\Scripts\activate   # Windows
 ```
 
 3. Instale as dependências:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 4. Execute o servidor Flask:
+
 ```bash
 flask run
 ```
 
 5. Acesse no navegador:
+
 ```
 http://127.0.0.1:5000/
 ```
@@ -140,10 +145,9 @@ Este sistema é uma base para gerenciamento de vendas e controle de caixa simple
 
 Para dúvidas ou sugestões, abra uma issue ou entre em contato:
 
-- Email: alexalves9164@gmail.com
-- GitHub: https://github.com/AlexSilva91/
+- Email: <alexalves9164@gmail.com>
+- GitHub: <https://github.com/AlexSilva91/>
 
 ---
 
 **Licença:** MIT License
-
