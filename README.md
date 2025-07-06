@@ -24,17 +24,56 @@ Este projeto é um sistema web para gerenciamento de vendas, clientes, produtos 
 
 ```
 /
-├── app/
-│   ├── static/
-│   │   ├── css/
-│   │   └── js/
-│   ├── templates/
-│   ├── __init__.py
-│   ├── routes.py
-│   └── ...
-├── README.md
-├── requirements.txt
-└── run.py
+├─ README.md
+├─ app
+│  ├─ __init__.py
+│  ├─ bot
+│  │  └─ bot_movimentacao.py
+│  ├─ crud.py
+│  ├─ database.py
+│  ├─ init_db.py
+│  ├─ models
+│  │  ├─ __init__.py
+│  │  ├─ base.py
+│  │  └─ entities.py
+│  ├─ routes
+│  │  ├─ __init__.py
+│  │  ├─ admin.py
+│  │  ├─ auth.py
+│  │  └─ operador.py
+│  ├─ schemas.py
+│  ├─ static
+│  │  ├─ assets
+│  │  │  ├─ clients_icon.png
+│  │  │  ├─ clients_icon2.png
+│  │  │  ├─ logo.jpeg
+│  │  │  ├─ logo1.ico
+│  │  │  ├─ logo1.jpeg
+│  │  │  ├─ logo2.jpeg
+│  │  │  ├─ logout.png
+│  │  │  ├─ money_icon.png
+│  │  │  ├─ product_icon.png
+│  │  │  ├─ product_icon2.png
+│  │  │  ├─ products_icon.png
+│  │  │  ├─ sales_icon.png
+│  │  │  └─ user_icon.png
+│  │  ├─ css
+│  │  │  └─ styles_operador.css
+│  │  └─ js
+│  │     └─ script_operador.js
+│  └─ templates
+│     ├─ cadastro_cliente.html
+│     ├─ cadastro_produto.html
+│     ├─ dashboard_admin.html
+│     ├─ dashboard_operador.html
+│     └─ login.html
+├─ config.py
+├─ requirements.txt
+├─ tests
+│  ├─ add_user.py
+│  ├─ get_user_by_cpf.py
+│  └─ popular_banco.py
+└─ wsgi.py
 ```
 
 ## Como Executar o Projeto
