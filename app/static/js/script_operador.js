@@ -134,10 +134,15 @@ async function updateBalance() {
         if (!response.ok) throw new Error('Erro ao carregar saldo');
         
         const data = await response.json();
-        currentBalance = data.saldo;
-        
+        const currentBalance = Number(data.saldo);
+
+        const formatter = new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+        });
+
         balanceLabel.textContent = balanceVisible 
-            ? `Saldo do caixa hoje: R$ ${currentBalance.toFixed(2)}`
+            ? `Saldo do caixa hoje: ${formatter.format(currentBalance)}`
             : 'Saldo do caixa hoje: ******';
     } catch (error) {
         console.error('Error updating balance:', error);

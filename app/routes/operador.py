@@ -268,7 +268,10 @@ def api_get_saldo():
         else:
             saldo -= Decimal(str(lanc.valor))
 
-    return jsonify({'saldo': float(saldo)})
+    # Formata como string com 2 casas decimais e vírgula decimal:
+    saldo_formatado = f"{saldo:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+    return jsonify({'saldo': str(saldo), 'saldo_formatado': saldo_formatado})
 
 # ===== API FECHAMENTO DE CAIXA =====
 @operador_bp.route('/api/fechar-caixa', methods=['POST'])
