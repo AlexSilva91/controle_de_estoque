@@ -1,123 +1,88 @@
-from flask import Flask
-from app.models import db
-from app.models.entities import Produto, Cliente, UnidadeMedida
 from app import create_app
-from decimal import Decimal
-from datetime import datetime
+from app.models import db
+from app.models.entities import Usuario, TipoUsuario, Cliente, Produto, UnidadeMedida
+from passlib.context import CryptContext
 
 app = create_app()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 with app.app_context():
+    # Cria as tabelas se não existirem
     db.create_all()
 
-    # Produtos com todos os campos preenchidos
-    produtos = [
-        Produto(
-            codigo="RAC-001",
-            nome="Ração Cavalo 25kg",
-            tipo="ração",
-            marca="Haras Gold",
-            unidade=UnidadeMedida.saco,
-            valor_unitario=Decimal("98.50"),
-            estoque_quantidade=Decimal("120.000"),
-            ativo=True
-        ),
-        Produto(
-            codigo="MIL-060",
-            nome="Milho em grão 60kg",
-            tipo="grão",
-            marca="AgroFort",
-            unidade=UnidadeMedida.saco,
-            valor_unitario=Decimal("75.00"),
-            estoque_quantidade=Decimal("300.000"),
-            ativo=True
-        ),
-        Produto(
-            codigo="FAR-050",
-            nome="Farelo de soja 50kg",
-            tipo="farelo",
-            marca="NutriSoja",
-            unidade=UnidadeMedida.saco,
-            valor_unitario=Decimal("112.00"),
-            estoque_quantidade=Decimal("150.000"),
-            ativo=True
-        ),
-        Produto(
-            codigo="SAL-030",
-            nome="Sal mineral 30kg",
-            tipo="sal",
-            marca="MinerFort",
-            unidade=UnidadeMedida.saco,
-            valor_unitario=Decimal("47.90"),
-            estoque_quantidade=Decimal("200.000"),
-            ativo=True
-        ),
-        Produto(
-            codigo="CAS-020",
-            nome="Casquinha de soja 20kg",
-            tipo="farelo",
-            marca="SojaMix",
-            unidade=UnidadeMedida.saco,
-            valor_unitario=Decimal("39.50"),
-            estoque_quantidade=Decimal("180.000"),
-            ativo=True
-        ),
-        Produto(
-            codigo="RAC-015",
-            nome="Ração Canina 15kg",
-            tipo="ração",
-            marca="DogPremium",
-            unidade=UnidadeMedida.saco,
-            valor_unitario=Decimal("124.90"),
-            estoque_quantidade=Decimal("90.000"),
-            ativo=True
-        ),
-        Produto(
-            codigo="RAC-010",
-            nome="Ração Felina 10kg",
-            tipo="ração",
-            marca="CatMix",
-            unidade=UnidadeMedida.saco,
-            valor_unitario=Decimal("102.90"),
-            estoque_quantidade=Decimal("75.000"),
-            ativo=True
-        ),
-        Produto(
-            codigo="SUP-001",
-            nome="Suplemento vitamínico",
-            tipo="suplemento",
-            marca="VitaPlus",
-            unidade=UnidadeMedida.unidade,
-            valor_unitario=Decimal("55.00"),
-            estoque_quantidade=Decimal("350.000"),
-            ativo=True
-        ),
-        Produto(
-            codigo="RAC-005",
-            nome="Ração Pintinho 5kg",
-            tipo="ração",
-            marca="AvioStart",
-            unidade=UnidadeMedida.saco,
-            valor_unitario=Decimal("29.90"),
-            estoque_quantidade=Decimal("200.000"),
-            ativo=True
-        ),
-        Produto(
-            codigo="MIL-030T",
-            nome="Milho triturado 30kg",
-            tipo="grão",
-            marca="MilhoBom",
-            unidade=UnidadeMedida.saco,
-            valor_unitario=Decimal("60.00"),
-            estoque_quantidade=Decimal("400.000"),
-            ativo=True
-        ),
+    # --- USUÁRIOS ---
+    usuarios = [
+        {"nome": "Alex Alves", "cpf": "13166456491", "senha": "842695", "tipo": TipoUsuario.operador},
+        {"nome": "Alex Alves", "cpf": "13166456490", "senha": "842695", "tipo": TipoUsuario.admin},
     ]
 
-    for produto in produtos:
-        existe = Produto.query.filter_by(nome=produto.nome).first()
-        if not existe:
-            db.session.add(produto)
+    for u in usuarios:
+        if not Usuario.query.filter_by(cpf=u["cpf"]).first():
+            senha_hash = pwd_context.hash(u["senha"])
+            novo_usuario = Usuario(
+                nome=u["nome"],
+                cpf=u["cpf"],
+                senha_hash=senha_hash,
+                tipo=u["tipo"]
+            )
+            db.session.add(novo_usuario)
+        else:
+            print(f"Usuário com CPF {u['cpf']} já existe, pulando.")
 
+    # --- CLIENTES ---
+    clientes = [
+        {"nome": "Cliente 1", "documento": "12345678901", "telefone": "11999999991", "email": "cli1@example.com", "endereco": "Rua A, 100"},
+        {"nome": "Cliente 2", "documento": "12345678902", "telefone": "11999999992", "email": "cli2@example.com", "endereco": "Rua B, 200"},
+        {"nome": "Cliente 3", "documento": "12345678903", "telefone": "11999999993", "email": "cli3@example.com", "endereco": "Rua C, 300"},
+        {"nome": "Cliente 4", "documento": "12345678904", "telefone": "11999999994", "email": "cli4@example.com", "endereco": "Rua D, 400"},
+        {"nome": "Cliente 5", "documento": "12345678905", "telefone": "11999999995", "email": "cli5@example.com", "endereco": "Rua E, 500"},
+    ]
+
+    for c in clientes:
+        if not Cliente.query.filter_by(nome=c["nome"]).first():
+            novo_cliente = Cliente(
+                nome=c["nome"],
+                documento=c["documento"],
+                telefone=c["telefone"],
+                email=c["email"],
+                endereco=c["endereco"],
+                ativo=True
+            )
+            db.session.add(novo_cliente)
+        else:
+            print(f"Cliente {c['nome']} já existe, pulando.")
+
+    # --- PRODUTOS ---
+    produtos = [
+        {"codigo": "P0001", "nome": "Produto 1", "tipo": "tipo1", "marca": "Marca A", "unidade": UnidadeMedida.kg, "valor_unitario": 10.50, "estoque_quantidade": 100},
+        {"codigo": "P0002", "nome": "Produto 2", "tipo": "tipo1", "marca": "Marca A", "unidade": UnidadeMedida.saco, "valor_unitario": 20.00, "estoque_quantidade": 50},
+        {"codigo": "P0003", "nome": "Produto 3", "tipo": "tipo2", "marca": "Marca B", "unidade": UnidadeMedida.unidade, "valor_unitario": 5.00, "estoque_quantidade": 200},
+        {"codigo": "P0004", "nome": "Produto 4", "tipo": "tipo2", "marca": "Marca C", "unidade": UnidadeMedida.kg, "valor_unitario": 15.00, "estoque_quantidade": 80},
+        {"codigo": "P0005", "nome": "Produto 5", "tipo": "tipo3", "marca": "Marca C", "unidade": UnidadeMedida.saco, "valor_unitario": 12.00, "estoque_quantidade": 120},
+        {"codigo": "P0006", "nome": "Produto 6", "tipo": "tipo3", "marca": "Marca D", "unidade": UnidadeMedida.unidade, "valor_unitario": 3.50, "estoque_quantidade": 500},
+        {"codigo": "P0007", "nome": "Produto 7", "tipo": "tipo1", "marca": "Marca A", "unidade": UnidadeMedida.kg, "valor_unitario": 7.25, "estoque_quantidade": 150},
+        {"codigo": "P0008", "nome": "Produto 8", "tipo": "tipo2", "marca": "Marca B", "unidade": UnidadeMedida.saco, "valor_unitario": 22.00, "estoque_quantidade": 90},
+        {"codigo": "P0009", "nome": "Produto 9", "tipo": "tipo3", "marca": "Marca D", "unidade": UnidadeMedida.unidade, "valor_unitario": 9.99, "estoque_quantidade": 250},
+        {"codigo": "P0010", "nome": "Produto 10", "tipo": "tipo1", "marca": "Marca A", "unidade": UnidadeMedida.kg, "valor_unitario": 11.00, "estoque_quantidade": 300},
+    ]
+
+    for p in produtos:
+        if not Produto.query.filter_by(codigo=p["codigo"]).first():
+            novo_produto = Produto(
+                codigo=p["codigo"],
+                nome=p["nome"],
+                tipo=p["tipo"],
+                marca=p["marca"],
+                unidade=p["unidade"],
+                valor_unitario=p["valor_unitario"],
+                estoque_quantidade=p["estoque_quantidade"],
+                ativo=True
+            )
+            db.session.add(novo_produto)
+        else:
+            print(f"Produto com código {p['codigo']} já existe, pulando.")
+
+    # Commit das inserções
     db.session.commit()
-    print("✅ Produtos cadastrados com todos os campos preenchidos.")
+
+    print("✅ Usuários, clientes e produtos cadastrados com sucesso!")

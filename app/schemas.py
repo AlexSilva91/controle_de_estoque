@@ -1,4 +1,4 @@
-from pydantic import BaseModel, computed_field, constr, condecimal, Field
+from pydantic import BaseModel, constr, Field
 from typing import Optional, List
 from enum import Enum
 from datetime import datetime
@@ -35,6 +35,8 @@ class CategoriaFinanceira(str, Enum):
     despesa = "despesa"
     salario = "salario"
     outro = "outro"
+    abertura_caixa = "abertura_caixa"
+    fechamento_caixa = "fechamento_caixa"
 
 class UnidadeMedida(str, Enum):
     kg = "kg"
@@ -48,6 +50,7 @@ class UsuarioBase(BaseModel):
     nome: str
     cpf: CPFType
     tipo: TipoUsuario
+    observacoes: Optional[str] = None
 
 class UsuarioCreate(UsuarioBase):
     senha: str
@@ -57,10 +60,14 @@ class UsuarioUpdate(BaseModel):
     cpf: Optional[CPFType] = None
     tipo: Optional[TipoUsuario] = None
     senha: Optional[str] = None
+    observacoes: Optional[str] = None
+    ativo: Optional[bool] = None
 
 class UsuarioRead(UsuarioBase):
     id: int
     criado_em: datetime
+    ativo: bool
+    ultimo_acesso: Optional[datetime] = None
 
     class Config:
         orm_mode = True
@@ -74,21 +81,21 @@ class ProdutoBase(BaseModel):
     tipo: Optional[str] = Field(None, max_length=50)
     marca: Optional[str] = Field(None, max_length=100)
     unidade: Optional[UnidadeMedida] = None
-    valor_unitario: Optional[float] = None
-    estoque_quantidade: Optional[float] = None
+    valor_unitario: Optional[Decimal10_2] = None
+    estoque_quantidade: Optional[Decimal12_3] = None
     ativo: Optional[bool] = None
 
 class ProdutoCreate(ProdutoBase):
     nome: str = Field(..., max_length=150)
     tipo: str = Field(..., max_length=50)
     unidade: UnidadeMedida = Field(...)
-    valor_unitario: float = Field(...)
-    estoque_quantidade: float = Field(0.0)
+    valor_unitario: Decimal10_2 = Field(...)
+    estoque_quantidade: Decimal12_3 = Field(default=Decimal('0.0'))
 
 class ProdutoUpdate(ProdutoBase):
     pass
 
-class Produto(ProdutoBase):
+class ProdutoRead(ProdutoBase):
     id: int
     criado_em: datetime
     atualizado_em: datetime
@@ -119,18 +126,45 @@ class ClienteRead(ClienteBase):
         orm_mode = True
 
 # --------------------
-# Movimentação Estoque
+# Caixa
+# --------------------
+class StatusCaixa(str, Enum):
+    aberto = "aberto"
+    fechado = "fechado"
+
+class CaixaBase(BaseModel):
+    operador_id: int
+    valor_abertura: Decimal10_2
+    status: Optional[StatusCaixa] = StatusCaixa.aberto
+    observacoes: Optional[str] = None
+    data_abertura: Optional[datetime] = None
+    data_fechamento: Optional[datetime] = None
+    valor_fechamento: Optional[Decimal10_2] = None
+
+class CaixaCreate(CaixaBase):
+    pass
+
+class CaixaRead(CaixaBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+# --------------------
+# Movimentacao Estoque
 # --------------------
 class MovimentacaoEstoqueBase(BaseModel):
     produto_id: int
     usuario_id: int
     cliente_id: Optional[int] = None
+    caixa_id: int
     tipo: TipoMovimentacao
     quantidade: Decimal12_3
     valor_unitario: Decimal10_2
-    forma_pagamento: Optional[FormaPagamento] = None 
+    valor_recebido: Optional[Decimal10_2] = None
+    troco: Optional[Decimal10_2] = None
+    forma_pagamento: Optional[FormaPagamento] = None
     observacao: Optional[str] = None
-
 
 class MovimentacaoEstoqueCreate(MovimentacaoEstoqueBase):
     pass
@@ -165,16 +199,16 @@ class NotaFiscalItemRead(NotaFiscalItemBase):
 # --------------------
 class NotaFiscalBase(BaseModel):
     cliente_id: Optional[int]
-    data_emissao: Optional[datetime]
-    status: StatusNota
-    chave_acesso: Optional[str]
-    observacao: Optional[str]
-    
-    @computed_field
-    @property
-    def valor_total(self) -> Decimal10_2:
-        return Decimal(str(self.quantidade)) * Decimal(str(self.valor_unitario))
-
+    operador_id: int
+    caixa_id: int
+    data_emissao: Optional[datetime] = None
+    valor_total: Decimal10_2
+    status: StatusNota = StatusNota.emitida
+    chave_acesso: Optional[str] = None
+    observacao: Optional[str] = None
+    forma_pagamento: FormaPagamento
+    valor_recebido: Optional[Decimal10_2] = None
+    troco: Optional[Decimal10_2] = None
 
 class NotaFiscalCreate(NotaFiscalBase):
     itens: List[NotaFiscalItemCreate]
@@ -193,9 +227,11 @@ class FinanceiroBase(BaseModel):
     tipo: TipoMovimentacao
     categoria: CategoriaFinanceira
     valor: Decimal10_2
-    descricao: Optional[str]
+    descricao: Optional[str] = None
     data: Optional[datetime] = None
     nota_fiscal_id: Optional[int] = None
+    cliente_id: Optional[int] = None
+    caixa_id: Optional[int] = None
 
 class FinanceiroCreate(FinanceiroBase):
     pass

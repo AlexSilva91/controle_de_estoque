@@ -6,6 +6,8 @@ let products = [];
 let currentEditingClient = null;
 
 // DOM Elements
+const openingBalanceLabel = document.getElementById('opening-balance');
+const currentBalanceLabel = document.getElementById('current-balance');
 const currentDateElement = document.getElementById('current-date');
 const balanceLabel = document.getElementById('balance-label');
 const toggleBalanceBtn = document.getElementById('toggle-balance');
@@ -36,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateCurrentDate();
     loadClients();
     loadProducts();
-    updateBalance();
+    checkCaixaStatus();
     setupEventListeners();
 
     // Atualiza produtos a cada 10 segundos para refletir mudanças do servidor
@@ -76,6 +78,25 @@ function setupEventListeners() {
     document.addEventListener('click', handleRemoveClick);
     document.addEventListener('change', handleProductSelectChange);
     document.addEventListener('click', handleEditClientClick);
+}
+
+async function checkCaixaStatus() {
+    try {
+        const response = await fetch('/operador/api/saldo');
+        if (!response.ok) throw new Error('Erro ao verificar status do caixa');
+        
+        const data = await response.json();
+        
+        if (data.message === 'Nenhum caixa aberto encontrado') {
+            closeRegisterBtn.style.display = 'none';
+            balanceLabel.textContent = 'Nenhum caixa aberto';
+        } else {
+            closeRegisterBtn.style.display = 'block';
+            updateBalance();
+        }
+    } catch (error) {
+        console.error('Error checking caixa status:', error);
+    }
 }
 
 function handleQuantityInput(e) {
@@ -134,20 +155,34 @@ async function updateBalance() {
         if (!response.ok) throw new Error('Erro ao carregar saldo');
         
         const data = await response.json();
-        const currentBalance = Number(data.saldo);
+        
+        if (data.message === 'Nenhum caixa aberto encontrado') {
+            openingBalanceLabel.textContent = 'Caixa fechado';
+            currentBalanceLabel.textContent = '';
+            return;
+        }
 
-        const formatter = new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-        });
-
-        balanceLabel.textContent = balanceVisible 
-            ? `Saldo do caixa hoje: ${formatter.format(currentBalance)}`
-            : 'Saldo do caixa hoje: ******';
+        if (balanceVisible) {
+            openingBalanceLabel.textContent = `Abertura: ${formatCurrency(data.valor_abertura)}`;
+            currentBalanceLabel.textContent = `Saldo atual: ${data.saldo_formatado || 'R$ 0,00'}`;
+        } else {
+            openingBalanceLabel.textContent = 'Abertura: ******';
+            currentBalanceLabel.textContent = 'Saldo atual: ******';
+        }
     } catch (error) {
         console.error('Error updating balance:', error);
+        openingBalanceLabel.textContent = 'Erro ao carregar dados';
+        currentBalanceLabel.textContent = '';
     }
 }
+
+function formatCurrency(value) {
+    // Formata números simples para o formato de moeda
+    return 'R$ ' + parseFloat(value).toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+}
+
+// Inicializa
+updateBalance();
 
 function switchTab(tabId) {
     tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
@@ -389,7 +424,7 @@ async function registerSale() {
         totalSale += item.quantidade * item.valor_unitario;
     });
 
-    if (amountReceived < totalSale) {
+    if (amountReceived < totalSale && paymentMethod !== 'a_prazo') {
         return showMessage('Valor recebido menor que o total', 'error');
     }
 
@@ -407,6 +442,7 @@ async function registerSale() {
             body: JSON.stringify({
                 cliente_id: parseInt(clienteId),
                 forma_pagamento: paymentMethod,
+                valor_recebido: amountReceived,
                 observacao: notes,
                 itens: items
             })
@@ -447,10 +483,17 @@ function resetSaleForm() {
 }
 
 async function closeRegister() {
+    const valorFechamento = prompt('Informe o valor de fechamento do caixa:');
+    if (!valorFechamento || isNaN(valorFechamento)) {
+        return showMessage('Valor de fechamento inválido', 'error');
+    }
+
     if (confirm('Deseja realmente fechar o caixa?')) {
         try {
             const response = await fetch('/operador/api/fechar-caixa', {
-                method: 'POST'
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ valor_fechamento: parseFloat(valorFechamento) })
             });
             
             if (!response.ok) {
@@ -460,8 +503,7 @@ async function closeRegister() {
             
             const now = new Date();
             showMessage(`Caixa fechado às ${now.toLocaleTimeString('pt-BR')}`);
-            currentBalance = 0;
-            updateBalance();
+            await checkCaixaStatus();
         } catch (error) {
             showMessage(error.message, 'error');
         }
@@ -489,4 +531,10 @@ function showMessage(message, type = 'success') {
     icon.className = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
     
     setTimeout(() => notification.classList.remove('show'), 5000);
+}
+
+// Função para fechar o modal de troco (se necessário)
+function fecharModalTroco() {
+    const modal = document.getElementById('troco-modal');
+    if (modal) modal.style.display = 'none';
 }

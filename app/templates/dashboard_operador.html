@@ -12,9 +12,17 @@
         <!-- Header -->
         <div class="header">
             <img src="{{ url_for('static', filename='assets/logo.jpeg') }}" alt="Logo" class="logo">
-            <div class="user-info">
+            <div class="user-info">        
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% else %}
                 <div class="user-greeting">Bem-vindo, {{ nome_usuario }}</div>
-                <div class="current-date" id="current-date"></div>
+            {% endif %}
+            {% endwith %}
+            <div class="current-date" id="current-date"></div>
             </div>
             <button class="btn btn-secondary" id="logout-btn">
                 <i class="fas fa-sign-out-alt"></i> Sair
@@ -25,7 +33,10 @@
         <div class="status-bar">
             <div class="balance-info">
                 <i class="fas fa-wallet balance-icon"></i>
-                <div class="balance-label" id="balance-label">Saldo do caixa hoje: R$ 0.00</div>
+                <div class="balance-details">
+                    <div class="balance-label" id="opening-balance">Abertura: R$ 0.00</div>
+                    <div class="balance-label" id="current-balance">Saldo atual [vendas]: R$ 0.00</div>
+                </div>
             </div>
             <button class="btn btn-primary" id="toggle-balance">Ocultar saldo</button>
         </div>

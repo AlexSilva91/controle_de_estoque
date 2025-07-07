@@ -4,132 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cavalcanti Rações - Login</title>
-    <style>
-        :root {
-            --primary-color: #1D1D1B;
-            --secondary-color: #FEC629;
-            --background-color: #F5F5F5;
-            --text-color: #333;
-            --error-color: #e53935;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Arial, sans-serif;
-        }
-        
-        body {
-            background-color: var(--background-color);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .login-container {
-            width: 100%;
-            max-width: 400px;
-            background-color: white;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            padding: 30px;
-            text-align: center;
-        }
-        
-        .logo {
-            margin-bottom: 20px;
-        }
-        
-        .logo img {
-            max-width: 200px;
-            height: auto;
-        }
-        
-        .logo-text {
-            font-size: 24px;
-            font-weight: bold;
-            color: var(--primary-color);
-            background-color: var(--secondary-color);
-            border-radius: 10px;
-            padding: 15px;
-            margin: 0 auto 20px;
-            width: 200px;
-        }
-        
-        h1 {
-            font-size: 18px;
-            color: var(--primary-color);
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        
-        .subtitle {
-            font-size: 13px;
-            color: #444;
-            margin-bottom: 25px;
-        }
-        
-        .input-group {
-            margin-bottom: 15px;
-            text-align: left;
-        }
-        
-        input {
-            width: 100%;
-            height: 42px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 14px;
-            color: var(--primary-color);
-            background-color: white;
-            transition: border 0.3s;
-        }
-        
-        input:focus {
-            border: 2px solid var(--secondary-color);
-            outline: none;
-        }
-        
-        button {
-            width: 250px;
-            height: 46px;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            margin: 15px 0;
-            transition: background-color 0.3s, color 0.3s;
-        }
-        
-        button:hover {
-            background-color: var(--secondary-color);
-            color: var(--primary-color);
-        }
-        
-        .footer {
-            margin-top: 20px;
-            font-size: 12px;
-            color: #333;
-        }
-        
-        .footer p:last-child {
-            font-weight: bold;
-        }
-        
-        .error-message {
-            color: var(--error-color);
-            margin-top: 10px;
-            font-size: 13px;
-            display: none;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_login.css') }}">
 </head>
 <body>
     <div class="login-container">
@@ -137,127 +12,34 @@
             <img src="{{ url_for('static', filename='assets/logo1.jpeg') }}" alt="Cavalcanti Rações" id="logo-image">
             <div class="logo-text" id="logo-text" style="display: none;">Cavalcanti Rações</div>
         </div>
-        
+
         <h1>Bem-vindo ao Sistema</h1>
         <p class="subtitle">Faça login para continuar</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="flash-message flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
         <form method="POST" action="/">
-        <div class="input-group">
-            <input type="text" name="cpf" placeholder="CPF (somente números)" maxlength="11" required>
-        </div>
-        <div class="input-group">
-            <input type="password" name="senha" placeholder="Senha" required>
-        </div>
-            <button type="submit">Entrar</button>
+            <div class="input-group">
+                <input type="text" name="cpf" id="cpf" placeholder="CPF (somente números)" maxlength="11" required>
+            </div>
+            <div class="input-group">
+                <input type="password" name="senha" id="senha" placeholder="Senha" required>
+            </div>
+            <button type="submit" id="login-button">Entrar</button>
         </form>
+
         <div class="footer">
             <p>Problemas para acessar?</p>
             <p>Contate o administrador</p>
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Verifica se a imagem do logo existe
-            const logoImage = document.getElementById('logo-image');
-            logoImage.onerror = function() {
-                this.style.display = 'none';
-                document.getElementById('logo-text').style.display = 'block';
-            };
-            
-            // Validação do CPF
-            function validarCPF(cpf) {
-                return /^\d{11}$/.test(cpf);
-            }
-            
-            // Evento de login
-            document.getElementById('login-button').addEventListener('click', function() {
-                const cpf = document.getElementById('cpf').value.replace(/\D/g, '');
-                const senha = document.getElementById('senha').value;
-                const errorElement = document.getElementById('error-message');
-                
-                // Limpa mensagens de erro
-                errorElement.style.display = 'none';
-                
-                // Validações
-                if (!cpf || !senha) {
-                    showError("Por favor, preencha CPF e senha.");
-                    return;
-                }
-                
-                if (!validarCPF(cpf)) {
-                    showError("CPF inválido. Digite apenas números (11 dígitos).");
-                    return;
-                }
-                
-                // Simulação de login (substituir por chamada real à API)
-                fazerLogin(cpf, senha);
-            });
-            
-            function showError(message) {
-                const errorElement = document.getElementById('error-message');
-                errorElement.textContent = message;
-                errorElement.style.display = 'block';
-            }
-            
-            // Função simulada de login
-            function fazerLogin(cpf, senha) {
-                // Aqui você faria uma chamada à API para autenticar o usuário
-                console.log(`Tentando autenticar CPF: ${cpf}`);
-                
-                // Simulação de resposta da API
-                setTimeout(() => {
-                    // Usuários padrão para demonstração
-                    const usuariosPadrao = {
-                        "00000000000": {
-                            cpf: "00000000000",
-                            nome: "Admin Offline",
-                            senha: "admin123",
-                            tipo: "admin"
-                        },
-                        "11111111111": {
-                            cpf: "11111111111",
-                            nome: "Operador Offline",
-                            senha: "op123",
-                            tipo: "operador"
-                        }
-                    };
-                    
-                    const usuario = usuariosPadrao[cpf];
-                    
-                    if (!usuario) {
-                        showError("Usuário não encontrado.");
-                        return;
-                    }
-                    
-                    if (senha !== usuario.senha) {
-                        showError("Senha incorreta.");
-                        return;
-                    }
-                    
-                    // Login bem-sucedido - redireciona para o dashboard apropriado
-                    console.log(`Login bem-sucedido: ${usuario.nome} (${usuario.tipo})`);
-                    
-                    if (usuario.tipo === "admin") {
-                        window.location.href = "dashboard_admin.html";
-                    } else if (usuario.tipo === "operador") {
-                        window.location.href = "dashboard_operador.html";
-                    } else {
-                        showError("Tipo de usuário inválido.");
-                    }
-                    
-                    // Armazena o usuário na sessionStorage
-                    sessionStorage.setItem('usuario', JSON.stringify(usuario));
-                    
-                }, 500);
-            }
-            
-            // Permite pressionar Enter para fazer login
-            document.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    document.getElementById('login-button').click();
-                }
-            });
-        });
-    </script>
+    <script src="{{ url_for('static', filename='js/script_login.js') }}"></script>
 </body>
 </html>

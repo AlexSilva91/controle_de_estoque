@@ -1,3 +1,5 @@
+from zoneinfo import ZoneInfo
+from flask_login import current_user
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from app import schemas
@@ -7,7 +9,7 @@ from sqlalchemy import func
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 class TipoUsuario(str, Enum):
     admin = "admin"
@@ -21,12 +23,26 @@ class StatusNota(str, Enum):
     emitida = "emitida"
     cancelada = "cancelada"
 
+class StatusCaixa(str, Enum):
+    aberto = "aberto"
+    fechado = "fechado"
+
 class CategoriaFinanceira(str, Enum):
     venda = "venda"
     compra = "compra"
     despesa = "despesa"
     salario = "salario"
     outro = "outro"
+    abertura_caixa = "abertura_caixa"
+    fechamento_caixa = "fechamento_caixa"
+
+class FormaPagamento(str, Enum):
+    pix_fabiano = "pix_fabiano"
+    pix_maquineta = "pix_maquineta"
+    dinheiro = "dinheiro"
+    cartao_credito = "cartao_credito"
+    cartao_debito = "cartao_debito"
+    a_prazo = "a_prazo"
 
 class UnidadeMedida(str, Enum):
     kg = "kg"
@@ -49,6 +65,97 @@ def validar_documento(documento: str) -> bool:
     doc = ''.join(filter(str.isdigit, documento))
     return len(doc) in (11, 14)  # CPF tem 11, CNPJ tem 14
 
+# ===== Caixa =====
+def abrir_caixa(db: Session, operador_id: int, valor_abertura: Decimal, observacao: str = "") -> entities.Caixa:
+    """Abre um novo caixa com o valor de abertura especificado"""
+    if valor_abertura <= 0:
+        raise ValueError("Valor de abertura deve ser maior que zero")
+    
+    # Verifica se já existe caixa aberto
+    caixa_aberto = get_caixa_aberto(db)
+    if caixa_aberto:
+        raise ValueError("Já existe um caixa aberto")
+    
+    db_caixa = entities.Caixa(
+        operador_id=operador_id,
+        valor_abertura=valor_abertura,
+        status=StatusCaixa.aberto,
+        observacoes=observacao
+    )
+    
+    db.add(db_caixa)
+    try:
+        db.commit()
+        db.refresh(db_caixa)
+        
+        # Cria lançamento financeiro de abertura
+        create_lancamento_financeiro(db, {
+            "tipo": TipoMovimentacao.entrada,
+            "categoria": CategoriaFinanceira.abertura_caixa,
+            "valor": float(valor_abertura),
+            "descricao": f"Abertura de caixa - ID {db_caixa.id}",
+            "data": datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
+            "caixa_id": db_caixa.id
+        })
+        
+        return db_caixa
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise ValueError("Erro ao abrir caixa no banco de dados")
+
+def fechar_caixa(db: Session, operador_id: int, valor_fechamento: Decimal, observacao: str = "") -> entities.Caixa:
+    """Fecha o caixa atual com o valor de fechamento especificado"""
+    if valor_fechamento <= 0:
+        raise ValueError("Valor de fechamento deve ser maior que zero")
+    
+    caixa = get_caixa_aberto(db)
+    if not caixa:
+        raise ValueError("Nenhum caixa aberto encontrado")
+    
+    # Atualiza dados do caixa
+    caixa.operador_id = operador_id
+    caixa.valor_fechamento = valor_fechamento
+    caixa.data_fechamento = datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
+    caixa.status = StatusCaixa.fechado
+    caixa.observacoes = observacao
+    
+    try:
+        db.commit()
+        
+        # Cria lançamento financeiro de fechamento
+        create_lancamento_financeiro(db, {
+            "tipo": TipoMovimentacao.saida,
+            "categoria": CategoriaFinanceira.fechamento_caixa,
+            "valor": float(valor_fechamento),
+            "descricao": f"Fechamento de caixa - ID {caixa.id}",
+            "data": datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
+            "caixa_id": caixa.id
+        })
+        
+        return caixa
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise ValueError("Erro ao fechar caixa no banco de dados")
+
+def get_caixa_aberto(db: Session) -> Optional[entities.Caixa]:
+    """Retorna o caixa atualmente aberto, se existir"""
+    return db.query(entities.Caixa).filter(entities.Caixa.status == StatusCaixa.aberto).first()
+
+def get_caixa_by_id(db: Session, caixa_id: int) -> Optional[entities.Caixa]:
+    """Retorna um caixa pelo ID"""
+    return db.query(entities.Caixa).filter(entities.Caixa.id == caixa_id).first()
+
+def get_caixas(db: Session, skip: int = 0, limit: int = 100) -> List[entities.Caixa]:
+    """Lista todos os caixas"""
+    return db.query(entities.Caixa).order_by(entities.Caixa.data_abertura.desc()).offset(skip).limit(limit).all()
+
+def get_ultimo_caixa_fechado(db: Session) -> Optional[entities.Caixa]:
+    """Retorna o último caixa fechado"""
+    return db.query(entities.Caixa)\
+            .filter(entities.Caixa.status == StatusCaixa.fechado)\
+            .order_by(entities.Caixa.data_fechamento.desc())\
+            .first()
+            
 # ===== Usuários =====
 def get_user_by_cpf(db: Session, cpf: str):
     if not validar_cpf(cpf):
@@ -70,7 +177,6 @@ def get_usuarios(db: Session):
     return db.query(entities.Usuario).all()
 
 def create_user(db: Session, user: schemas.UsuarioCreate):
-    # Validações
     if not validar_cpf(user.cpf):
         raise ValueError("CPF inválido. Deve conter 11 dígitos.")
     
@@ -107,7 +213,6 @@ def get_produtos(db: Session):
     return db.query(entities.Produto).filter(entities.Produto.ativo == True).all()
 
 def create_produto(db: Session, produto: schemas.ProdutoCreate):
-    # Validações
     if produto.codigo:
         existing = db.query(entities.Produto).filter(entities.Produto.codigo == produto.codigo).first()
         if existing:
@@ -137,7 +242,6 @@ def update_produto(db: Session, produto_id: int, produto_data: schemas.ProdutoUp
     if not produto:
         raise ValueError("Produto não encontrado ou inativo.")
     
-    # Validações apenas para campos que estão sendo atualizados
     update_data = produto_data.dict(exclude_unset=True)
     
     if "unidade" in update_data and update_data["unidade"] not in [u.value for u in UnidadeMedida]:
@@ -152,7 +256,7 @@ def update_produto(db: Session, produto_id: int, produto_data: schemas.ProdutoUp
     for field, value in update_data.items():
         setattr(produto, field, value)
     
-    produto.atualizado_em = datetime.utcnow()
+    produto.atualizado_em = datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
     
     try:
         db.commit()
@@ -168,7 +272,7 @@ def delete_produto(db: Session, produto_id: int):
         raise ValueError("Produto não encontrado ou já inativo.")
     
     produto.ativo = False
-    produto.atualizado_em = datetime.utcnow()
+    produto.atualizado_em = datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
     try:
         db.commit()
         return True
@@ -178,7 +282,6 @@ def delete_produto(db: Session, produto_id: int):
 
 # ===== Movimentação Estoque =====
 def registrar_movimentacao(db: Session, mov: schemas.MovimentacaoEstoqueCreate):
-    # Validações básicas
     if mov.quantidade <= 0:
         raise ValueError("Quantidade deve ser maior que zero.")
     
@@ -201,7 +304,10 @@ def registrar_movimentacao(db: Session, mov: schemas.MovimentacaoEstoqueCreate):
         if not cliente:
             raise ValueError("Cliente não encontrado.")
     
-    # Lógica específica para tipo de movimentação
+    caixa = get_caixa_by_id(db, mov.caixa_id)
+    if not caixa:
+        raise ValueError("Caixa não encontrado.")
+    
     if mov.tipo == TipoMovimentacao.saida:
         if produto.estoque_quantidade < mov.quantidade:
             raise ValueError("Estoque insuficiente.")
@@ -209,7 +315,6 @@ def registrar_movimentacao(db: Session, mov: schemas.MovimentacaoEstoqueCreate):
     else:
         produto.estoque_quantidade += mov.quantidade
 
-    # Atualiza valor unitário se for entrada e valor diferente
     if mov.tipo == TipoMovimentacao.entrada and mov.valor_unitario != produto.valor_unitario:
         produto.valor_unitario = mov.valor_unitario
 
@@ -217,12 +322,15 @@ def registrar_movimentacao(db: Session, mov: schemas.MovimentacaoEstoqueCreate):
         produto_id=mov.produto_id,
         usuario_id=mov.usuario_id,
         cliente_id=mov.cliente_id,
+        caixa_id=mov.caixa_id,
         tipo=mov.tipo,
         quantidade=mov.quantidade,
         valor_unitario=mov.valor_unitario,
+        valor_recebido=mov.valor_recebido,
+        troco=mov.troco,
         forma_pagamento=mov.forma_pagamento,
         observacao=mov.observacao,
-        data=datetime.utcnow(),
+        data=datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
     )
     db.add(db_mov)
 
@@ -238,11 +346,12 @@ def registrar_movimentacao(db: Session, mov: schemas.MovimentacaoEstoqueCreate):
         create_lancamento_financeiro(db, {
             "tipo": tipo_financeiro,
             "categoria": categoria,
-            "valor": valor_total,
+            "valor": float(valor_total),
             "descricao": f"{mov.tipo} de produto - ID {db_mov.id}",
-            "data": datetime.utcnow(),
+            "data": datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
             "nota_fiscal_id": None,
-            "cliente_id": mov.cliente_id
+            "cliente_id": mov.cliente_id,
+            "caixa_id": mov.caixa_id
         })
         
         return db_mov
@@ -252,7 +361,6 @@ def registrar_movimentacao(db: Session, mov: schemas.MovimentacaoEstoqueCreate):
 
 # ===== Cliente =====
 def create_cliente(db: Session, cliente: schemas.ClienteCreate):
-    # Validações
     if cliente.documento and not validar_documento(cliente.documento):
         raise ValueError("Documento inválido. CPF deve ter 11 dígitos ou CNPJ 14 dígitos.")
     
@@ -277,13 +385,12 @@ def update_cliente(db: Session, cliente_id: int, cliente_data: schemas.ClienteBa
     if not cliente:
         raise ValueError("Cliente não encontrado ou inativo.")
     
-    # Validações
     if cliente_data.documento and not validar_documento(cliente_data.documento):
         raise ValueError("Documento inválido. CPF deve ter 11 dígitos ou CNPJ 14 dígitos.")
     
     for field, value in cliente_data.dict(exclude_unset=True).items():
         setattr(cliente, field, value)
-    cliente.atualizado_em = datetime.utcnow()
+    cliente.atualizado_em = datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
     try:
         db.commit()
         db.refresh(cliente)
@@ -298,7 +405,7 @@ def delete_cliente(db: Session, cliente_id: int):
         raise ValueError("Cliente não encontrado ou já inativo.")
     
     cliente.ativo = False
-    cliente.atualizado_em = datetime.utcnow()
+    cliente.atualizado_em = datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
     try:
         db.commit()
         return True
@@ -307,119 +414,40 @@ def delete_cliente(db: Session, cliente_id: int):
         raise ValueError("Erro ao desativar cliente no banco de dados.")
 
 # ===== Nota Fiscal =====
-# def create_nota_fiscal(db: Session, nota: schemas.NotaFiscalCreate):
-#     # Validações
-#     if nota.chave_acesso:
-#         existing = db.query(entities.NotaFiscal).filter(entities.NotaFiscal.chave_acesso == nota.chave_acesso).first()
-#         if existing:
-#             raise ValueError("Chave de acesso já cadastrada.")
-    
-#     if nota.status not in [s.value for s in StatusNota]:
-#         raise ValueError(f"Status inválido. Deve ser um dos: {[s.value for s in StatusNota]}")
-    
-#     if nota.valor_total <= 0:
-#         raise ValueError("Valor total deve ser maior que zero.")
-    
-#     cliente = get_cliente(db, nota.cliente_id)
-#     if not cliente:
-#         raise ValueError("Cliente não encontrado.")
-    
-#     db_nota = entities.NotaFiscal(
-#         cliente_id=nota.cliente_id,
-#         data_emissao=nota.data_emissao or datetime.utcnow(),
-#         valor_total=nota.valor_total,
-#         status=nota.status,
-#         chave_acesso=nota.chave_acesso,
-#         observacao=nota.observacao,
-#     )
-#     db.add(db_nota)
-#     try:
-#         db.commit()
-#         db.refresh(db_nota)
-
-#         # Valida e insere os itens da nota
-#         valor_total_calculado = Decimal('0')
-#         for item in nota.itens:
-#             produto = get_produto(db, item.produto_id)
-#             if not produto:
-#                 raise ValueError(f"Produto ID {item.produto_id} não encontrado.")
-            
-#             if item.quantidade <= 0:
-#                 raise ValueError(f"Quantidade inválida para produto {produto.nome}.")
-            
-#             if item.valor_unitario <= 0:
-#                 raise ValueError(f"Valor unitário inválido para produto {produto.nome}.")
-            
-#             # Verifica estoque para saída (venda)
-#             if produto.estoque_quantidade < item.quantidade:
-#                 raise ValueError(f"Estoque insuficiente para produto {produto.nome}.")
-
-#             # Atualiza estoque (saída)
-#             produto.estoque_quantidade -= item.quantidade
-
-#             valor_item = Decimal(str(item.quantidade)) * Decimal(str(item.valor_unitario))
-#             valor_total_calculado += valor_item
-
-#             db_item = entities.NotaFiscalItem(
-#                 nota_id=db_nota.id,
-#                 produto_id=item.produto_id,
-#                 quantidade=item.quantidade,
-#                 valor_unitario=item.valor_unitario,
-#                 valor_total=float(valor_item),
-#             )
-#             db.add(db_item)
-
-#         # Verifica se o valor total bate com a soma dos itens
-#         if abs(valor_total_calculado - Decimal(str(nota.valor_total))) > Decimal('0.01'):
-#             db.rollback()
-#             raise ValueError(f"Valor total da nota ({nota.valor_total}) não corresponde à soma dos itens ({float(valor_total_calculado)}).")
-
-#         db.commit()
-        
-#         # Cria lançamento financeiro para a venda
-#         create_lancamento_financeiro(db, {
-#             "tipo": "entrada",
-#             "categoria": "venda",
-#             "valor": float(valor_total_calculado),
-#             "descricao": f"Venda - Nota Fiscal {db_nota.id}",
-#             "data": db_nota.data_emissao,
-#             "nota_fiscal_id": db_nota.id,
-#             "cliente_id": nota.cliente_id
-#         })
-        
-#         return db_nota
-#     except SQLAlchemyError as e:
-#         db.rollback()
-#         raise ValueError("Erro ao criar nota fiscal no banco de dados.")
-
 def create_nota_fiscal(db: Session, nota: dict) -> entities.NotaFiscal:
-    """Cria uma nova nota fiscal"""
-    # Validações básicas
-    if nota["valor_total"] <= 0:
-        raise ValueError("Valor total deve ser maior que zero.")
-    
-    if nota.get("chave_acesso"):
-        existing = db.query(entities.NotaFiscal).filter(entities.NotaFiscal.chave_acesso == nota["chave_acesso"]).first()
-        if existing:
-            raise ValueError("Chave de acesso já cadastrada.")
-    
-    # Cria a nota fiscal
-    db_nota = entities.NotaFiscal(
-        cliente_id=nota["cliente_id"],
-        data_emissao=datetime.utcnow(),
-        valor_total=nota["valor_total"],
-        status="emitida",
-        chave_acesso=nota.get("chave_acesso"),
-        observacao=nota.get("observacao", ""),
-        forma_pagamento=nota.get("forma_pagamento")  # Este campo agora existe no modelo
-    )
-    
-    db.add(db_nota)
+    """Cria uma nova nota fiscal com os itens associados"""
     try:
+        # Validação básica
+        if nota["valor_total"] <= 0:
+            raise ValueError("Valor total deve ser maior que zero")
+            
+        if not nota.get("itens") or len(nota["itens"]) == 0:
+            raise ValueError("Nota fiscal deve conter pelo menos um item")
+
+        # Verifica caixa
+        caixa = get_caixa_by_id(db, nota["caixa_id"])
+        if not caixa:
+            raise ValueError("Caixa não encontrado")
+
+        # Cria a nota fiscal
+        db_nota = entities.NotaFiscal(
+            cliente_id=nota["cliente_id"],
+            operador_id=current_user.id,  # Usa o usuário atual
+            caixa_id=nota["caixa_id"],
+            data_emissao=datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
+            valor_total=nota["valor_total"],
+            status=StatusNota.emitida,
+            observacao=nota.get("observacao", ""),
+            forma_pagamento=nota["forma_pagamento"],
+            valor_recebido=nota.get("valor_recebido", nota["valor_total"]),
+            troco=nota.get("troco", 0)
+        )
+        
+        db.add(db_nota)
         db.commit()
         db.refresh(db_nota)
-        
-        # Adiciona os itens da nota fiscal
+
+        # Adiciona os itens
         for item in nota["itens"]:
             db_item = entities.NotaFiscalItem(
                 nota_id=db_nota.id,
@@ -432,9 +460,10 @@ def create_nota_fiscal(db: Session, nota: dict) -> entities.NotaFiscal:
         
         db.commit()
         return db_nota
-    except SQLAlchemyError as e:
+        
+    except Exception as e:
         db.rollback()
-        raise ValueError("Erro ao criar nota fiscal no banco de dados.")
+        raise ValueError(f"Erro ao criar nota fiscal no banco de dados: {str(e)}")
 
 def get_nota_fiscal(db: Session, nota_id: int):
     nota = db.query(entities.NotaFiscal).filter(entities.NotaFiscal.id == nota_id).first()
@@ -450,8 +479,6 @@ def get_notas_fiscais(db: Session):
 
 # ===== Financeiro =====
 def create_lancamento_financeiro(db: Session, lancamento: dict) -> entities.Financeiro:
-    """Cria um novo lançamento financeiro"""
-    # Validações
     if lancamento["valor"] <= 0:
         raise ValueError("Valor deve ser maior que zero.")
     
@@ -471,15 +498,20 @@ def create_lancamento_financeiro(db: Session, lancamento: dict) -> entities.Fina
         if not cliente:
             raise ValueError("Cliente não encontrado.")
     
-    # Cria o objeto Financeiro
+    if lancamento.get("caixa_id"):
+        caixa = get_caixa_by_id(db, lancamento["caixa_id"])
+        if not caixa:
+            raise ValueError("Caixa não encontrado.")
+    
     db_lancamento = entities.Financeiro(
         tipo=lancamento["tipo"],
         categoria=lancamento["categoria"],
         valor=lancamento["valor"],
         descricao=lancamento.get("descricao", ""),
-        data=lancamento.get("data", datetime.utcnow()),
+        data=lancamento.get("data", datetime.now(tz=ZoneInfo('America/Sao_Paulo'))),
         nota_fiscal_id=lancamento.get("nota_fiscal_id"),
         cliente_id=lancamento.get("cliente_id"),
+        caixa_id=lancamento.get("caixa_id")
     )
     
     db.add(db_lancamento)
@@ -492,7 +524,6 @@ def create_lancamento_financeiro(db: Session, lancamento: dict) -> entities.Fina
         raise ValueError("Erro ao criar lançamento financeiro no banco de dados.")
 
 def get_lancamento_financeiro(db: Session, lancamento_id: int) -> Optional[entities.Financeiro]:
-    """Obtém um lançamento financeiro pelo ID"""
     return db.query(entities.Financeiro).filter(entities.Financeiro.id == lancamento_id).first()
 
 def get_lancamentos_financeiros(
@@ -502,9 +533,9 @@ def get_lancamentos_financeiros(
     tipo: Optional[str] = None,
     categoria: Optional[str] = None,
     data_inicio: Optional[datetime] = None,
-    data_fim: Optional[datetime] = None
+    data_fim: Optional[datetime] = None,
+    caixa_id: Optional[int] = None
 ) -> List[entities.Financeiro]:
-    """Lista todos os lançamentos financeiros com filtros opcionais"""
     query = db.query(entities.Financeiro)
     
     if tipo:
@@ -515,20 +546,20 @@ def get_lancamentos_financeiros(
         query = query.filter(entities.Financeiro.data >= data_inicio)
     if data_fim:
         query = query.filter(entities.Financeiro.data <= data_fim)
+    if caixa_id:
+        query = query.filter(entities.Financeiro.caixa_id == caixa_id)
     
-    return query.offset(skip).limit(limit).all()
+    return query.order_by(entities.Financeiro.data.desc()).offset(skip).limit(limit).all()
 
 def update_lancamento_financeiro(
     db: Session, 
     lancamento_id: int, 
     lancamento_data: dict
 ) -> Optional[entities.Financeiro]:
-    """Atualiza um lançamento financeiro existente"""
     lancamento = get_lancamento_financeiro(db, lancamento_id)
     if not lancamento:
         return None
     
-    # Validações
     if lancamento_data.get("valor") and lancamento_data["valor"] <= 0:
         raise ValueError("Valor deve ser maior que zero.")
     
@@ -538,7 +569,6 @@ def update_lancamento_financeiro(
     if lancamento_data.get("categoria") and lancamento_data["categoria"] not in [c.value for c in CategoriaFinanceira]:
         raise ValueError(f"Categoria inválida. Deve ser um dos: {[c.value for c in CategoriaFinanceira]}")
     
-    # Atualiza os campos
     for field, value in lancamento_data.items():
         setattr(lancamento, field, value)
     
@@ -551,7 +581,6 @@ def update_lancamento_financeiro(
         raise ValueError("Erro ao atualizar lançamento financeiro no banco de dados.")
 
 def delete_lancamento_financeiro(db: Session, lancamento_id: int) -> bool:
-    """Remove um lançamento financeiro"""
     lancamento = get_lancamento_financeiro(db, lancamento_id)
     if not lancamento:
         return False

@@ -4,6 +4,8 @@ from decimal import Decimal
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db
+from zoneinfo import ZoneInfo
+from sqlalchemy.orm import Session
 from app.models import entities
 from app.schemas import (
     ClienteCreate,
@@ -11,9 +13,13 @@ from app.schemas import (
     MovimentacaoEstoqueCreate,
 )
 from app.crud import (
+    CategoriaFinanceira,
+    StatusCaixa,
     TipoMovimentacao,
+    create_lancamento_financeiro,
     get_produto,
     get_produtos,
+    get_ultimo_caixa_fechado,
     registrar_movimentacao,
     get_clientes,
     create_cliente,
@@ -21,13 +27,16 @@ from app.crud import (
     delete_cliente,
     create_nota_fiscal,
     get_lancamentos_financeiros,
+    get_caixa_aberto,
+    fechar_caixa,
+    abrir_caixa,
 )
 
 operador_bp = Blueprint('operador', __name__, url_prefix='/operador')
 
 @operador_bp.route('/dashboard')
 @login_required
-def dashboard_operador():
+def dashboard():
     return render_template('dashboard_operador.html', nome_usuario=current_user.nome)
 
 # ===== API CLIENTES =====
@@ -137,7 +146,7 @@ def api_registrar_venda():
     app.logger.info(f"Dados recebidos: {data}")
 
     # Validação básica
-    required_fields = ['cliente_id', 'forma_pagamento', 'itens']
+    required_fields = ['cliente_id', 'forma_pagamento', 'itens', 'valor_recebido']
     for field in required_fields:
         if field not in data:
             return jsonify({'error': f'Campo obrigatório faltando: {field}'}), 400
@@ -147,6 +156,11 @@ def api_registrar_venda():
         return jsonify({'error': 'Forma de pagamento inválida'}), 400
 
     try:
+        # Verificar caixa aberto
+        caixa = get_caixa_aberto(db.session)
+        if not caixa:
+            return jsonify({'error': 'Nenhum caixa aberto encontrado'}), 400
+
         # Validar itens
         if not isinstance(data['itens'], list) or len(data['itens']) == 0:
             return jsonify({'error': 'A lista de itens não pode estar vazia'}), 400
@@ -197,41 +211,48 @@ def api_registrar_venda():
                 validated_items.append({
                     'produto_id': int(item['produto_id']),
                     'quantidade': float(quantidade),
-                    'valor_unitario': float(valor_unitario)
+                    'valor_unitario': float(valor_unitario),
+                    'valor_total': float(valor_item)
                 })
             except (ValueError, TypeError) as e:
                 return jsonify({'error': f'Valores inválidos nos itens: {str(e)}'}), 400
 
-        # Criar nota fiscal (sem chave_acesso pois é opcional)
+        # Validar valor recebido
+        valor_recebido = Decimal(str(data['valor_recebido']))
+        if valor_recebido < valor_total and data['forma_pagamento'] != 'a_prazo':
+            return jsonify({'error': 'Valor recebido menor que o valor total'}), 400
+
+        # Calcular troco
+        troco = valor_recebido - valor_total if valor_recebido > valor_total else Decimal('0')
+
+        # Criar nota fiscal
         nota_data = {
             'cliente_id': int(data['cliente_id']),
             'valor_total': float(valor_total),
             'status': 'emitida',
             'observacao': data.get('observacao', ''),
-            'itens': [{
-                'produto_id': item['produto_id'],
-                'quantidade': item['quantidade'],
-                'valor_unitario': item['valor_unitario'],
-                'valor_total': item['quantidade'] * item['valor_unitario']
-            } for item in validated_items],
-            'forma_pagamento': data['forma_pagamento']
+            'itens': validated_items,
+            'forma_pagamento': data['forma_pagamento'],
+            'valor_recebido': float(valor_recebido),
+            'troco': float(troco),
+            'caixa_id': caixa.id
         }
 
-        print(f"Dados da nota fiscal: {nota_data}")
-
         db_nota = create_nota_fiscal(db.session, nota_data)
-        print(f"Nota fiscal criada: {db_nota.id}\nUSUÁRIO: {current_user.id}, {current_user.nome}")
 
-        # Registrar movimentação de estoque para cada item, convertendo dict para schema
+        # Registrar movimentação de estoque para cada item
         for item in validated_items:
             mov_data = MovimentacaoEstoqueCreate(
                 produto_id=item['produto_id'],
                 usuario_id=current_user.id,
                 cliente_id=data['cliente_id'],
-                tipo=TipoMovimentacao.saida,  # Enum para tipo 'saida'
+                caixa_id=caixa.id,
+                tipo=TipoMovimentacao.saida,
                 quantidade=Decimal(str(item['quantidade'])),
                 valor_unitario=Decimal(str(item['valor_unitario'])),
                 forma_pagamento=data['forma_pagamento'],
+                valor_recebido=valor_recebido,
+                troco=troco,
                 observacao=data.get('observacao', '')
             )
             registrar_movimentacao(db.session, mov_data)
@@ -239,7 +260,8 @@ def api_registrar_venda():
         return jsonify({
             'success': True,
             'nota_id': db_nota.id,
-            'valor_total': float(valor_total)
+            'valor_total': float(valor_total),
+            'troco': float(troco)
         }), 201
 
     except ValueError as e:
@@ -259,29 +281,131 @@ def api_registrar_venda():
 @operador_bp.route('/api/saldo', methods=['GET'])
 @login_required
 def api_get_saldo():
-    lancamentos = get_lancamentos_financeiros(db.session)
-    saldo = Decimal('0')
-
-    for lanc in lancamentos:
-        if lanc.tipo == 'entrada':
-            saldo += Decimal(str(lanc.valor))
-        else:
-            saldo -= Decimal(str(lanc.valor))
-
-    # Formata como string com 2 casas decimais e vírgula decimal:
-    saldo_formatado = f"{saldo:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-
-    return jsonify({'saldo': str(saldo), 'saldo_formatado': saldo_formatado})
-
-# ===== API FECHAMENTO DE CAIXA =====
-@operador_bp.route('/api/fechar-caixa', methods=['POST'])
-@login_required
-def api_fechar_caixa():
     try:
+        caixa = get_caixa_aberto(db.session)
+        
+        if not caixa:
+            ultimo_caixa = get_ultimo_caixa_fechado(db.session)
+            if ultimo_caixa:
+                return jsonify({
+                    'saldo': str(ultimo_caixa.valor_fechamento),
+                    'saldo_formatado': f"R$ {ultimo_caixa.valor_fechamento:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+                    'caixa_id': None,
+                    'valor_abertura': 0.00,
+                    'message': 'Nenhum caixa aberto encontrado (último fechamento)'
+                })
+            return jsonify({
+                'saldo': '0.00',
+                'saldo_formatado': 'R$ 0,00',
+                'caixa_id': None,
+                'valor_abertura': 0.00,
+                'message': 'Nenhum caixa aberto encontrado'
+            })
+        
+        # Calcula saldo baseado nos lançamentos
+        lancamentos = get_lancamentos_financeiros(db.session, caixa_id=caixa.id)
+        saldo = Decimal(str(caixa.valor_abertura))
+
+        for lanc in lancamentos:
+            if lanc.tipo == 'entrada' and lanc.categoria != CategoriaFinanceira.fechamento_caixa and lanc.categoria != CategoriaFinanceira.abertura_caixa:
+                saldo += Decimal(str(lanc.valor))
+            else:
+                saldo -= Decimal(str(lanc.valor))
+
+        # Formata o saldo para exibição
+        saldo_formatado = f"R$ {saldo:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+        return jsonify({
+            'saldo': str(saldo),
+            'saldo_formatado': saldo_formatado,
+            'caixa_id': caixa.id,
+            'valor_abertura': float(caixa.valor_abertura),
+            'message': 'Saldo atualizado com sucesso'
+        })
+
+    except Exception as e:
+        app.logger.error(f"Erro ao calcular saldo: {str(e)}")
+        return jsonify({
+            'error': 'Erro ao calcular saldo',
+            'details': str(e)
+        }), 500
+
+# ===== API ABERTURA DE CAIXA =====
+@operador_bp.route('/api/abrir-caixa', methods=['POST'])
+@login_required
+def api_abrir_caixa():
+    try:
+        data = request.get_json()
+        valor_abertura = Decimal(str(data.get('valor_abertura', 0)))
+        
+        if valor_abertura <= 0:
+            return jsonify({'error': 'Valor de abertura deve ser maior que zero'}), 400
+        
+        caixa = abrir_caixa(
+            db.session,
+            current_user.id,
+            valor_abertura,
+            data.get('observacao', '')
+        )
+        
         return jsonify({
             'success': True,
-            'message': 'Caixa fechado com sucesso',
-            'hora_fechamento': datetime.utcnow().isoformat()
+            'message': 'Caixa aberto com sucesso',
+            'caixa_id': caixa.id,
+            'valor_abertura': float(caixa.valor_abertura),
+            'data_abertura': caixa.data_abertura.isoformat()
         })
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ===== API FECHAMENTO DE CAIXA =====
+def fechar_caixa(db: Session, operador_id: int, valor_fechamento: Decimal, observacao: str = "") -> entities.Caixa:
+    """Fecha o caixa atual com o valor de fechamento especificado"""
+    try:
+        if valor_fechamento <= 0:
+            raise ValueError("Valor de fechamento deve ser maior que zero")
+        
+        caixa = get_caixa_aberto(db)
+        if not caixa:
+            raise ValueError("Nenhum caixa aberto encontrado")
+        
+        # Calcula saldo atual para verificação
+        lancamentos = get_lancamentos_financeiros(db, caixa_id=caixa.id)
+        saldo_calculado = caixa.valor_abertura
+        for lanc in lancamentos:
+            if lanc.tipo == 'entrada':
+                saldo_calculado += Decimal(str(lanc.valor))
+            else:
+                saldo_calculado -= Decimal(str(lanc.valor))
+
+        # Verifica se o valor de fechamento está próximo do saldo calculado (permite pequenas diferenças)
+        if abs(saldo_calculado - valor_fechamento) > Decimal('10.00'):  # Tolerância de R$10
+            raise ValueError(f"Valor de fechamento divergente do saldo calculado. Esperado: {saldo_calculado}, Informado: {valor_fechamento}")
+
+        # Atualiza dados do caixa
+        caixa.operador_id = operador_id
+        caixa.valor_fechamento = valor_fechamento
+        caixa.data_fechamento = datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
+        caixa.status = StatusCaixa.fechado
+        caixa.observacoes = observacao
+        
+        db.commit()
+        
+        # Cria lançamento financeiro de fechamento
+        create_lancamento_financeiro(db, {
+            "tipo": TipoMovimentacao.saida,
+            "categoria": CategoriaFinanceira.fechamento_caixa,
+            "valor": float(valor_fechamento),
+            "descricao": f"Fechamento de caixa - ID {caixa.id}",
+            "data": datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
+            "caixa_id": caixa.id
+        })
+        
+        return caixa
+        
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"Erro ao fechar caixa: {str(e)}")
+        raise ValueError(f"Erro ao fechar caixa: {str(e)}")

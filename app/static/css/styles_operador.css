@@ -475,3 +475,33 @@ select.form-control {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--primary);
 }
+
+.flash-message {
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.flash-success {
+    background-color: #c8e6c9;
+    color: #2e7d32;
+    border: 1px solid #2e7d32;
+}
+
+.flash-danger {
+    background-color: #ffcdd2;
+    color: #c62828;
+    border: 1px solid #c62828;
+}
+.balance-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.balance-label {
+    font-size: 14px;
+    line-height: 1.4;
+}
