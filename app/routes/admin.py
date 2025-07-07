@@ -1,9 +1,11 @@
+from zoneinfo import ZoneInfo
 from flask import Blueprint, render_template, request, jsonify, session, flash, redirect, url_for
 from flask_login import login_required, current_user
 from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import func
+from app import schemas
 from app.models import db
 from app.models import entities
 from app.crud import (
@@ -221,7 +223,8 @@ def criar_cliente():
             documento=data.get('documento'),
             telefone=data.get('telefone'),
             email=data.get('email'),
-            endereco=data.get('endereco')
+            endereco=data.get('endereco'),
+            criado_em=datetime.now(tz=ZoneInfo("America/Sao_Paulo"))
         )
         
         cliente = create_cliente(db.session, cliente_data)
@@ -263,6 +266,30 @@ def atualizar_cliente(cliente_id):
                 'documento': cliente.documento,
                 'telefone': cliente.telefone,
                 'email': cliente.email,
+                'status': 'Ativo' if cliente.ativo else 'Inativo'
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@admin_bp.route('/clientes/<int:cliente_id>', methods=['GET'])
+@login_required
+def obter_cliente(cliente_id):
+    try:
+        cliente = get_cliente(db.session, cliente_id)  # implemente essa função se necessário
+
+        if not cliente:
+            return jsonify({'success': False, 'message': 'Cliente não encontrado'}), 404
+
+        return jsonify({
+            'success': True,
+            'cliente': {
+                'id': cliente.id,
+                'nome': cliente.nome,
+                'documento': cliente.documento,
+                'telefone': cliente.telefone,
+                'email': cliente.email,
+                'endereco': cliente.endereco,
                 'status': 'Ativo' if cliente.ativo else 'Inativo'
             }
         })
@@ -369,6 +396,31 @@ def atualizar_produto(produto_id):
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
+@admin_bp.route('/produtos/<int:produto_id>', methods=['GET'])
+@login_required
+def obter_produto(produto_id):
+    try:
+        produto = get_produto(db.session, produto_id)
+        if not produto:
+            return jsonify({'success': False, 'message': 'Produto não encontrado'}), 404
+
+        return jsonify({
+            'success': True,
+            'produto': {
+                'id': produto.id,
+                'codigo': produto.codigo or '',
+                'nome': produto.nome,
+                'tipo': produto.tipo,
+                'marca': produto.marca or '',
+                'unidade': produto.unidade.value,
+                'valor_unitario': str(produto.valor_unitario),
+                'estoque_quantidade': str(produto.estoque_quantidade),
+                'ativo': produto.ativo
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @admin_bp.route('/produtos/<int:produto_id>', methods=['DELETE'])
 @login_required
 def remover_produto(produto_id):
@@ -458,13 +510,18 @@ def get_usuario(usuario_id):
             return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
         
         # Verifica e formata os campos de forma segura
-        ultimo_acesso = (usuario.ultimo_acesso.strftime('%d/%m/%Y %H:%M') 
-                        if hasattr(usuario, 'ultimo_acesso') and usuario.ultimo_acesso 
-                        else None)
-        
-        data_cadastro = (usuario.data_cadastro.strftime('%d/%m/%Y %H:%M') 
-                        if hasattr(usuario, 'data_cadastro') and usuario.data_cadastro 
-                        else None)
+        ultimo_acesso = (
+            usuario.ultimo_acesso.strftime('%d/%m/%Y %H:%M') 
+            if hasattr(usuario, 'ultimo_acesso') and usuario.ultimo_acesso 
+            else None
+        )
+
+        data_cadastro = (
+            usuario.criado_em.strftime('%d/%m/%Y %H:%M')
+            if hasattr(usuario, 'criado_em') and usuario.criado_em
+            else None
+        )
+
         
         response_data = {
             'success': True,
@@ -490,27 +547,30 @@ def get_usuario(usuario_id):
 def criar_usuario():
     try:
         data = request.get_json()
-        usuario_data = UsuarioCreate(
-            nome=data['nome'],
-            cpf=data['cpf'],
-            senha=data['senha'],
-            tipo=data['tipo']
-        )
-        
-        usuario = create_user(db.session, usuario_data)
+        print("Recebido:", data)
+
+        usuario_data = schemas.UsuarioCreate(**data)
+
+        # Cria o usuário usando a função centralizada do CRUD
+        novo_usuario = create_user(db.session, usuario_data)
+
         return jsonify({
             'success': True,
             'message': 'Usuário criado com sucesso',
             'usuario': {
-                'id': usuario.id,
-                'nome': usuario.nome,
-                'email': usuario.email,
-                'tipo': usuario.tipo.value.capitalize(),
-                'status': True
+                'id': novo_usuario.id,
+                'nome': novo_usuario.nome,
+                'cpf': novo_usuario.cpf,
+                'tipo': novo_usuario.tipo.value,
+                'status': novo_usuario.status,
+                'observacoes': novo_usuario.observacoes
             }
         })
+
     except Exception as e:
+        print("Erro ao criar usuário:", e)
         return jsonify({'success': False, 'message': str(e)}), 400
+
 
 @admin_bp.route('/usuarios/<int:usuario_id>', methods=['PUT'])
 @login_required
@@ -557,6 +617,19 @@ def atualizar_usuario(usuario_id):
         print(f"Erro ao atualizar usuário: {e}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
+@admin_bp.route('/usuarios/<int:usuario_id>', methods=['DELETE'])
+@login_required
+def remover_usuario(usuario_id):
+    try:
+        usuario = get_user_by_id(db.session, usuario_id)
+        if not usuario:
+            return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
+
+        db.session.delete(usuario)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Usuário removido com sucesso'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
 
 # ===== Financeiro Routes =====
 @admin_bp.route('/financeiro', methods=['GET'])

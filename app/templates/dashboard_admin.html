@@ -345,62 +345,6 @@
         </main>
     </div>
 
-    <!-- Modals -->
-    <!-- Modal Cliente -->
-    <div id="clienteModal" class="modal">
-        <div class="modal-overlay"></div>
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">
-                        <i class="fas fa-user-plus"></i>
-                        <span>Cadastrar Cliente</span>
-                    </h3>
-                    <button class="close-modal">&times;</button>
-                </div>
-                <form id="clienteForm">
-                    <div class="modal-body">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="clienteNome">Nome*</label>
-                                <input type="text" id="clienteNome" class="form-control" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="clienteDocumento">CPF/CNPJ*</label>
-                                <input type="text" id="clienteDocumento" class="form-control" required>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="clienteTelefone">Telefone</label>
-                                <input type="text" id="clienteTelefone" class="form-control">
-                            </div>
-                            <div class="form-group">
-                                <label for="clienteEmail">Email</label>
-                                <input type="email" id="clienteEmail" class="form-control">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="clienteEndereco">Endereço</label>
-                            <textarea id="clienteEndereco" class="form-control" rows="3"></textarea>
-                        </div>
-                        <div class="form-group form-check">
-                            <input type="checkbox" id="clienteAtivo" checked>
-                            <label for="clienteAtivo">Cliente ativo</label>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i>
-                            <span>Salvar</span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <!-- Modal Produto -->
     <div id="produtoModal" class="modal">
         <div class="modal-overlay"></div>
@@ -629,15 +573,19 @@
                                 <label for="usuarioNome">Nome Completo*</label>
                                 <input type="text" id="usuarioNome" class="form-control" required>
                             </div>
-                        </div>
-                        <div class="form-row">
                             <div class="form-group">
                                 <label for="usuarioCpf">CPF*</label>
                                 <input type="text" id="usuarioCpf" class="form-control" required>
                             </div>
-                            <div class="form-group" id="usuarioSenhaGroup">
+                        </div>
+                        <div class="form-row" id="usuarioSenhaGroup">
+                            <div class="form-group">
                                 <label for="usuarioSenha">Senha*</label>
-                                <input type="password" id="usuarioSenha" class="form-control" required>
+                                <input type="password" id="usuarioSenha" name="senha" class="form-control" required>
+                            </div>
+                            <div class="form-group" id="usuarioConfirmaSenhaGroup">
+                                <label for="usuarioConfirmaSenha">Confirmar Senha*</label>
+                                <input type="password" id="usuarioConfirmaSenha" name="confirma_senha" class="form-control" required>
                             </div>
                         </div>
                         <div class="form-row">
@@ -650,10 +598,10 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label for="usuarioStatus">Status</label>
-                                <select id="usuarioStatus" class="form-control">
-                                    <option value="ativo">Ativo</option>
-                                    <option value="inativo">Inativo</option>
+                                <label for="usuarioStatus">Status*</label>
+                                <select id="usuarioStatus" class="form-control" required>
+                                    <option value="true">Ativo</option>
+                                    <option value="false">Inativo</option>
                                 </select>
                             </div>
                         </div>
@@ -664,7 +612,7 @@
                     </div>
                     <div class="modal-footer">
                         <div class="footer-left" id="usuarioModalExtraActions">
-                            <!-- Ações extras como desativar/reativar serão colocadas aqui -->
+                            <!-- Ações extras como redefinir senha serão colocadas aqui -->
                         </div>
                         <div class="footer-right">
                             <button type="button" class="btn btn-outline close-modal">Cancelar</button>
@@ -709,12 +657,12 @@
                                 <span id="visualizarUsuarioCPF"></span>
                             </div>
                             <div class="detail-item">
-                                <label>Último Acesso:</label>
-                                <span id="visualizarUsuarioUltimoAcesso"></span>
-                            </div>
-                            <div class="detail-item">
                                 <label>Data de Cadastro:</label>
                                 <span id="visualizarUsuarioDataCadastro"></span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Último Acesso:</label>
+                                <span id="visualizarUsuarioUltimoAcesso"></span>
                             </div>
                             <div class="detail-item full-width">
                                 <label>Observações:</label>
@@ -726,6 +674,63 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline close-modal">Fechar</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cliente -->
+    <div id="clienteModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-user-edit"></i>
+                        <span id="clienteModalTitle">Cadastrar Cliente</span>
+                    </h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <form id="clienteForm">
+                    <div class="modal-body">
+                        <input type="hidden" id="clienteId">
+                        <div class="form-group">
+                            <label for="clienteNome">Nome*</label>
+                            <input type="text" id="clienteNome" class="form-control" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="clienteDocumento">Documento</label>
+                                <input type="text" id="clienteDocumento" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="clienteTelefone">Telefone</label>
+                                <input type="text" id="clienteTelefone" class="form-control">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="clienteEmail">E-mail</label>
+                            <input type="email" id="clienteEmail" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="clienteEndereco">Endereço</label>
+                            <textarea id="clienteEndereco" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="clienteStatus">Status*</label>
+                            <select id="clienteStatus" class="form-control" required>
+                                <option value="true">Ativo</option>
+                                <option value="false">Inativo</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i>
+                            <span id="clienteModalSubmitText">Salvar</span>
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

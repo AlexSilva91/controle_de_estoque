@@ -52,6 +52,9 @@ class UnidadeMedida(str, Enum):
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # ===== Utilitários =====
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -189,13 +192,18 @@ def create_user(db: Session, user: schemas.UsuarioCreate):
     if len(user.senha) < 6:
         raise ValueError("Senha deve ter pelo menos 6 caracteres.")
     
-    hashed_password = pwd_context.hash(user.senha)
+    hashed_password = hash_password(user.senha)
+
     db_user = entities.Usuario(
         nome=user.nome,
         cpf=user.cpf,
         senha_hash=hashed_password,
         tipo=user.tipo,
+        status=user.status if user.status is not None else True,
+        criado_em=datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
+        observacoes=user.observacoes or ""
     )
+
     db.add(db_user)
     try:
         db.commit()

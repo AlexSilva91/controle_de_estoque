@@ -61,7 +61,16 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Abrir modals principais
-    document.getElementById('addCliente').addEventListener('click', () => openModal('clienteModal'));
+    document.getElementById('addCliente').addEventListener('click', () => {
+        // Limpar formulário antes de abrir o modal
+        document.getElementById('clienteForm').reset();
+        document.getElementById('clienteId').value = '';
+        document.getElementById('clienteStatus').value = 'true';
+        document.getElementById('clienteModalTitle').textContent = 'Cadastrar Cliente';
+        document.getElementById('clienteModalSubmitText').textContent = 'Cadastrar';
+        openModal('clienteModal');
+    });
+    
     document.getElementById('addProduto').addEventListener('click', () => openModal('produtoModal'));
     document.getElementById('addUsuario').addEventListener('click', () => openEditarUsuarioModal());
 
@@ -181,21 +190,117 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Carregar dados de clientes
+    // Função para abrir modal de edição de cliente
+    async function openEditarClienteModal(clienteId) {
+        // Resetar todos os campos
+        const form = document.getElementById('clienteForm');
+        form.reset();
+        document.getElementById('clienteId').value = '';
+        document.getElementById('clienteStatus').value = 'true';
+
+        // Ajustar título e botão
+        document.getElementById('clienteModalTitle').textContent = 'Editar Cliente';
+        document.getElementById('clienteModalSubmitText').textContent = 'Atualizar';
+
+        try {
+            const response = await fetchWithErrorHandling(`/admin/clientes/${clienteId}`);
+            if (response.success) {
+                const cliente = response.cliente;
+                document.getElementById('clienteId').value = cliente.id;
+                document.getElementById('clienteNome').value = cliente.nome;
+                document.getElementById('clienteDocumento').value = cliente.documento || '';
+                document.getElementById('clienteTelefone').value = cliente.telefone || '';
+                document.getElementById('clienteEmail').value = cliente.email || '';
+                document.getElementById('clienteEndereco').value = cliente.endereco || '';
+                document.getElementById('clienteStatus').value = cliente.status === 'Ativo' ? 'true' : 'false';
+            } else {
+                showFlashMessage('error', 'Erro ao carregar dados do cliente');
+                return;
+            }
+        } catch (error) {
+            console.error('Erro ao carregar cliente:', error);
+            showFlashMessage('error', 'Erro ao carregar dados do cliente');
+            return;
+        }
+
+        // Abrir modal
+        openModal('clienteModal');
+    }
+
+    // Submissão do formulário de cliente
+    document.getElementById('clienteForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const clienteId = document.getElementById('clienteId').value;
+        const isEdit = clienteId !== '';
+
+        const formData = {
+            nome: document.getElementById('clienteNome').value,
+            documento: document.getElementById('clienteDocumento').value,
+            telefone: document.getElementById('clienteTelefone').value,
+            email: document.getElementById('clienteEmail').value,
+            endereco: document.getElementById('clienteEndereco').value,
+            status: document.getElementById('clienteStatus').value === 'true'
+        };
+
+        const url = isEdit ? `/admin/clientes/${clienteId}` : '/admin/clientes';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        try {
+            const response = await fetchWithErrorHandling(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            if (response.success) {
+                showFlashMessage('success', `Cliente ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
+                closeModal('clienteModal');
+                loadClientesData();
+            } else {
+                showFlashMessage('error', response.message || 'Erro ao salvar cliente');
+            }
+        } catch (error) {
+            console.error('Erro ao salvar cliente:', error);
+            showFlashMessage('error', 'Erro ao salvar cliente');
+        }
+    });
+
+    // Configurar ações dos botões editar e remover após carregar tabela
+    function setupClienteActions() {
+        document.querySelectorAll('.editar-cliente').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const clienteId = this.getAttribute('data-id');
+                openEditarClienteModal(clienteId);
+            });
+        });
+
+        document.querySelectorAll('.remover-cliente').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const clienteId = this.getAttribute('data-id');
+                document.getElementById('confirmarExclusaoTexto').textContent = `Tem certeza que deseja excluir o cliente ${clienteId}?`;
+                document.getElementById('confirmarExclusaoBtn').setAttribute('data-id', clienteId);
+                document.getElementById('confirmarExclusaoBtn').setAttribute('data-type', 'cliente');
+                openModal('confirmarExclusaoModal');
+            });
+        });
+    }
+
+    // Carregar dados de clientes e montar tabela
     async function loadClientesData() {
         try {
             const searchText = document.getElementById('searchCliente').value.toLowerCase();
             const data = await fetchWithErrorHandling('/admin/clientes');
-            
+
             if (data.success) {
                 const clientesTable = document.querySelector('#clientesTable tbody');
                 clientesTable.innerHTML = '';
-                
+
                 data.clientes.forEach(cliente => {
-                    if (searchText && !cliente.nome.toLowerCase().includes(searchText)) {
-                        return;
-                    }
-                    
+                    if (searchText && !cliente.nome.toLowerCase().includes(searchText)) return;
+
+                    const status = cliente.status === 'Ativo' ? 'Ativo' : 'Inativo';
+
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${cliente.id}</td>
@@ -203,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td>${cliente.documento || ''}</td>
                         <td>${cliente.telefone || ''}</td>
                         <td>${cliente.email || ''}</td>
-                        <td><span class="badge ${cliente.status === 'Ativo' ? 'badge-success' : 'badge-danger'}">${cliente.status}</span></td>
+                        <td><span class="badge ${status === 'Ativo' ? 'badge-success' : 'badge-danger'}">${status}</span></td>
                         <td>
                             <div class="table-actions">
                                 <button class="btn-icon btn-warning editar-cliente" data-id="${cliente.id}" title="Editar">
@@ -217,34 +322,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     `;
                     clientesTable.appendChild(row);
                 });
-                
-                // Adicionar eventos aos botões de ação
+
                 setupClienteActions();
             }
         } catch (error) {
             console.error('Erro ao carregar clientes:', error);
             showFlashMessage('error', 'Erro ao carregar lista de clientes');
         }
-    }
-
-    function setupClienteActions() {
-        document.querySelectorAll('.editar-cliente').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const clienteId = this.getAttribute('data-id');
-                // Implementar edição do cliente
-                alert(`Editar cliente ${clienteId}`);
-            });
-        });
-
-        document.querySelectorAll('.remover-cliente').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const clienteId = this.getAttribute('data-id');
-                document.getElementById('confirmarExclusaoTexto').textContent = `Tem certeza que deseja excluir o cliente ${clienteId}?`;
-                document.getElementById('confirmarExclusaoBtn').setAttribute('data-id', clienteId);
-                document.getElementById('confirmarExclusaoBtn').setAttribute('data-type', 'cliente');
-                openModal('confirmarExclusaoModal');
-            });
-        });
     }
 
     // Carregar dados de produtos
@@ -352,6 +436,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.success) {
                         const produto = data.produto;
                         const formBody = document.querySelector('#editarProdutoModal .modal-body');
+                        
+                        // Tratamento seguro para valor_unitario
+                        let valorUnitario = produto.valor_unitario;
+                        if (typeof valorUnitario === 'string') {
+                            // Remove formatação de moeda se existir
+                            valorUnitario = valorUnitario.replace(/[^\d,.-]/g, '').replace(',', '.');
+                        }
+                        
+                        // Tratamento seguro para estoque_quantidade
+                        let estoqueQuantidade = produto.estoque_quantidade;
+                        if (typeof estoqueQuantidade === 'string') {
+                            // Remove unidade de medida se existir
+                            estoqueQuantidade = estoqueQuantidade.split(' ')[0];
+                        }
+                        
                         formBody.innerHTML = `
                             <div class="form-row">
                                 <div class="form-group">
@@ -384,12 +483,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </div>
                                 <div class="form-group">
                                     <label for="editValor">Valor Unitário*</label>
-                                    <input type="number" id="editValor" class="form-control" value="${produto.valor.replace('R$ ', '')}" step="0.01" min="0" required>
+                                    <input type="number" id="editValor" class="form-control" value="${valorUnitario}" step="0.01" min="0" required>
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label for="editEstoque">Quantidade em Estoque*</label>
-                                <input type="number" id="editEstoque" class="form-control" value="${produto.estoque.split(' ')[0]}" step="0.001" min="0" required>
+                                <input type="number" id="editEstoque" class="form-control" value="${estoqueQuantidade}" step="0.001" min="0" required>
                             </div>
                         `;
                         
@@ -413,6 +512,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
 
     // Carregar dados financeiros
     async function loadFinanceiroData() {
@@ -456,80 +556,152 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Carregar dados de usuários
-    async function loadUsuariosData() {
-        try {
-            const searchText = document.getElementById('searchUsuario').value.toLowerCase();
-            const data = await fetchWithErrorHandling('/admin/usuarios');
-            
-            if (data.success) {
-                const usuariosTable = document.querySelector('#usuariosTable tbody');
-                usuariosTable.innerHTML = '';
-                
-                data.usuarios.forEach(usuario => {
-                    if (searchText && !usuario.nome.toLowerCase().includes(searchText)) {
-                        return;
-                    }
+    // Funções específicas para usuários
+    async function openEditarUsuarioModal(usuarioId = null) {
+        const isEdit = usuarioId !== null;
+        
+        // Configurar o modal conforme o modo (edição ou cadastro)
+        document.getElementById('usuarioModalTitle').textContent = isEdit ? 'Editar Usuário' : 'Cadastrar Usuário';
+        document.getElementById('usuarioModalSubmitText').textContent = isEdit ? 'Atualizar' : 'Cadastrar';
+        
+        // Mostrar/ocultar campo de senha conforme necessário
+        const senhaInput = document.getElementById('usuarioSenha');
+        const confirmaSenhaInput = document.getElementById('usuarioConfirmaSenha');
+
+        if (isEdit) {
+            senhaInput.required = false;
+            confirmaSenhaInput.required = false;
+            senhaInput.name = '';
+            confirmaSenhaInput.name = '';
+            senhaInput.value = '';
+            confirmaSenhaInput.value = '';
+        } else {
+            senhaInput.required = true;
+            confirmaSenhaInput.required = true;
+            senhaInput.name = 'senha';
+            confirmaSenhaInput.name = 'confirma_senha';
+        }
+        
+        // Limpar formulário se for novo usuário
+        if (!isEdit) {
+            document.getElementById('usuarioForm').reset();
+            document.getElementById('usuarioId').value = '';
+        }
+        
+        // Se for edição, carregar os dados do usuário
+        if (isEdit) {
+            try {
+                const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`);
+                if (response.success) {
+                    const usuario = response.usuario;
                     
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${usuario.id}</td>
-                        <td>${usuario.nome}</td>
-                        <td><span class="badge badge-${usuario.tipo.toLowerCase()}">${formatPerfil(usuario.tipo)}</span></td>
-                        <td><span class="badge badge-${usuario.status.toLowerCase()}">${formatStatus(usuario.status)}</span></td>
-                        <td>${usuario.ultimo_acesso}</td>
-                        <td>
-                            <div class="table-actions">
-                                <button class="btn-icon btn-primary visualizar-usuario" data-id="${usuario.id}" title="Visualizar">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button class="btn-icon btn-warning editar-usuario" data-id="${usuario.id}" title="Editar">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-icon ${usuario.status === 'Ativo' ? 'btn-danger' : 'btn-success'} alterar-status-usuario" 
-                                        data-id="${usuario.id}" 
-                                        data-status="${usuario.status}"
-                                        title="${usuario.status === 'Ativo' ? 'Desativar' : 'Reativar'}">
-                                    <i class="fas ${usuario.status === 'Ativo' ? 'fa-user-slash' : 'fa-user-check'}"></i>
-                                </button>
-                                <button class="btn-icon btn-danger remover-usuario" data-id="${usuario.id}" title="Remover">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    `;
-                    usuariosTable.appendChild(row);
-                });
-                
-                // Adicionar eventos aos botões de ação
-                setupUsuarioActions();
+                    document.getElementById('usuarioId').value = usuario.id;
+                    document.getElementById('usuarioNome').value = usuario.nome;
+                    document.getElementById('usuarioCpf').value = usuario.cpf;
+                    document.getElementById('usuarioPerfil').value = usuario.tipo.toLowerCase();
+                    document.getElementById('usuarioStatus').value = usuario.status ? 'true' : 'false';
+                    document.getElementById('usuarioObservacoes').value = usuario.observacoes || '';
+                }
+            } catch (error) {
+                console.error('Erro ao carregar dados do usuário:', error);
+                showFlashMessage('error', 'Erro ao carregar dados do usuário');
+            }
+        }
+        
+        openModal('usuarioModal');
+    }
+
+    // Formulário de usuário
+    document.getElementById('usuarioForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const isEdit = document.getElementById('usuarioId').value !== '';
+        const usuarioId = document.getElementById('usuarioId').value;
+        
+        // Verificar se as senhas coincidem (apenas para cadastro)
+        if (!isEdit) {
+            const senha = document.getElementById('usuarioSenha').value;
+            const confirmaSenha = document.getElementById('usuarioConfirmaSenha').value;
+            
+            if (senha !== confirmaSenha) {
+                showFlashMessage('error', 'As senhas não coincidem');
+                return;
+            }
+        }
+        
+        const formData = {
+            nome: document.getElementById('usuarioNome').value,
+            cpf: document.getElementById('usuarioCpf').value,
+            tipo: document.getElementById('usuarioPerfil').value,
+            status: document.getElementById('usuarioStatus').value === 'true',
+            observacoes: document.getElementById('usuarioObservacoes').value
+        };
+        
+        // Adicionar senha apenas para cadastro
+        if (!isEdit) {
+            formData.senha = document.getElementById('usuarioSenha').value;
+        }
+        
+        try {
+            const url = isEdit ? `/admin/usuarios/${usuarioId}` : '/admin/usuarios';
+            const method = isEdit ? 'PUT' : 'POST';
+            
+            const response = await fetchWithErrorHandling(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            if (response.success) {
+                showFlashMessage('success', `Usuário ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
+                closeModal('usuarioModal');
+                loadUsuariosData();
+            } else {
+                showFlashMessage('error', response.message || `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
             }
         } catch (error) {
-            console.error('Erro ao carregar usuários:', error);
-            showFlashMessage('error', 'Erro ao carregar lista de usuários');
+            console.error(`Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário:`, error);
+            showFlashMessage('error', `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
+        }
+    });
+
+    // Função para abrir modal de visualização de usuário
+    async function openVisualizarUsuarioModal(usuarioId) {
+        try {
+            const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`);
+            
+            if (response.success) {
+                const usuario = response.usuario;
+                
+                document.getElementById('visualizarUsuarioNome').textContent = usuario.nome;
+                document.getElementById('visualizarUsuarioCPF').textContent = usuario.cpf;
+                document.getElementById('visualizarUsuarioUltimoAcesso').textContent = usuario.ultimo_acesso || 'Nunca acessou';
+                document.getElementById('visualizarUsuarioDataCadastro').textContent = usuario.data_cadastro || 'Data não disponível';
+                document.getElementById('visualizarUsuarioObservacoes').textContent = usuario.observacoes || 'Nenhuma observação';
+                
+                // Configurar badge de perfil
+                const perfilBadge = document.getElementById('visualizarUsuarioPerfil');
+                perfilBadge.textContent = formatPerfil(usuario.tipo);
+                perfilBadge.className = 'badge';
+                perfilBadge.classList.add(`badge-${usuario.tipo.toLowerCase()}`);
+                
+                // Configurar badge de status
+                const statusBadge = document.getElementById('visualizarUsuarioStatus');
+                statusBadge.textContent = usuario.status ? 'Ativo' : 'Inativo';
+                statusBadge.className = 'badge';
+                statusBadge.classList.add(usuario.status ? 'badge-success' : 'badge-danger');
+
+                openModal('visualizarUsuarioModal');
+            }
+        } catch (error) {
+            console.error('Erro ao carregar dados do usuário:', error);
+            showFlashMessage('error', 'Erro ao carregar dados do usuário');
         }
     }
 
-    // Funções auxiliares para formatar texto
-    function formatPerfil(perfil) {
-        const perfis = {
-            'admin': 'Administrador',
-            'gerente': 'Gerente',
-            'operador': 'Operador',
-            'visualizador': 'Visualizador'
-        };
-        return perfis[perfil.toLowerCase()] || perfil;
-    }
-
-    function formatStatus(status) {
-        const statusMap = {
-            'ativo': 'Ativo',
-            'inativo': 'Inativo',
-            'bloqueado': 'Bloqueado'
-        };
-        return statusMap[status.toLowerCase()] || status;
-    }
-
+    // Configurar ações dos botões de usuário
     function setupUsuarioActions() {
         document.querySelectorAll('.visualizar-usuario').forEach(btn => {
             btn.addEventListener('click', function() {
@@ -548,21 +720,23 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.alterar-status-usuario').forEach(btn => {
             btn.addEventListener('click', async function() {
                 const usuarioId = this.getAttribute('data-id');
-                const currentStatus = this.getAttribute('data-status');
-                const newStatus = currentStatus === 'Ativo' ? 'inativo' : 'ativo';
+                const currentStatus = this.getAttribute('data-status') === 'Ativo';
+                const newStatus = !currentStatus;
                 
-                if (confirm(`Tem certeza que deseja ${currentStatus === 'Ativo' ? 'desativar' : 'reativar'} este usuário?`)) {
+                if (confirm(`Tem certeza que deseja ${currentStatus ? 'desativar' : 'ativar'} este usuário?`)) {
                     try {
-                        const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}/status`, {
+                        const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`, {
                             method: 'PUT',
                             headers: {
                                 'Content-Type': 'application/json'
                             },
-                            body: JSON.stringify({ status: newStatus })
+                            body: JSON.stringify({ 
+                                status: newStatus
+                            })
                         });
                         
                         if (response.success) {
-                            showFlashMessage('success', `Usuário ${currentStatus === 'Ativo' ? 'desativado' : 'reativado'} com sucesso`);
+                            showFlashMessage('success', `Usuário ${newStatus ? 'ativado' : 'desativado'} com sucesso`);
                             loadUsuariosData();
                         } else {
                             showFlashMessage('error', response.message || 'Erro ao alterar status do usuário');
@@ -586,183 +760,81 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Função para abrir modal de visualização de usuário
-    async function openVisualizarUsuarioModal(usuarioId) {
+    // Função para carregar dados de usuários
+    async function loadUsuariosData() {
         try {
-            const data = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`);
+            const searchText = document.getElementById('searchUsuario').value.toLowerCase();
+            const data = await fetchWithErrorHandling('/admin/usuarios');
             
             if (data.success) {
-                const usuario = data.usuario;
+                const usuariosTable = document.querySelector('#usuariosTable tbody');
+                usuariosTable.innerHTML = '';
                 
-                document.getElementById('visualizarUsuarioNome').textContent = usuario.nome;
-                document.getElementById('visualizarUsuarioCPF').textContent = usuario.cpf;
-                document.getElementById('visualizarUsuarioUltimoAcesso').textContent = usuario.ultimo_acesso;
-                document.getElementById('visualizarUsuarioDataCadastro').textContent = usuario.data_cadastro;
-                document.getElementById('visualizarUsuarioObservacoes').textContent = usuario.observacoes || 'Nenhuma observação';
+                data.usuarios.forEach(usuario => {
+                    if (searchText && !usuario.nome.toLowerCase().includes(searchText)) {
+                        return;
+                    }
+                    
+                    const statusBool = usuario.status === true || usuario.status === 'true' || usuario.status === 'Ativo';
+                    const status = statusBool ? 'Ativo' : 'Inativo';
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${usuario.id}</td>
+                        <td>${usuario.nome}</td>
+                        <td><span class="badge badge-${usuario.tipo.toLowerCase()}">${formatPerfil(usuario.tipo)}</span></td>
+                        <td><span class="badge ${statusBool ? 'badge-success' : 'badge-danger'}">${status}</span></td>
+                        <td>${usuario.ultimo_acesso || 'Nunca'}</td>
+                        <td>
+                            <div class="table-actions">
+                                <button class="btn-icon btn-primary visualizar-usuario" data-id="${usuario.id}" title="Visualizar">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn-icon btn-warning editar-usuario" data-id="${usuario.id}" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-icon ${statusBool ? 'btn-danger' : 'btn-success'} alterar-status-usuario" 
+                                        data-id="${usuario.id}" 
+                                        data-status="${status}"
+                                        title="${statusBool ? 'Desativar' : 'Ativar'}">
+                                    <i class="fas ${statusBool ? 'fa-user-slash' : 'fa-user-check'}"></i>
+                                </button>
+                                <button class="btn-icon btn-danger remover-usuario" data-id="${usuario.id}" title="Remover">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    usuariosTable.appendChild(row);
+                });
                 
-                // Configurar badge de perfil
-                const perfilBadge = document.getElementById('visualizarUsuarioPerfil');
-                perfilBadge.textContent = usuario.tipo;
-                perfilBadge.className = 'badge';
-                perfilBadge.classList.add(`badge-${usuario.tipo.toLowerCase()}`);
-                
-                // Configurar badge de status
-                const statusBadge = document.getElementById('visualizarUsuarioStatus');
-                statusBadge.textContent = usuario.status;
-                statusBadge.className = 'badge';
-                statusBadge.classList.add(`badge-${usuario.status.toLowerCase()}`);
-
-                openModal('visualizarUsuarioModal');
+                // Adicionar eventos aos botões de ação
+                setupUsuarioActions();
             }
         } catch (error) {
-            console.error('Erro ao carregar dados do usuário:', error);
-            showFlashMessage('error', 'Erro ao carregar dados do usuário');
+            console.error('Erro ao carregar usuários:', error);
+            showFlashMessage('error', 'Erro ao carregar lista de usuários');
         }
     }
 
-    // Função para abrir modal de edição/cadastro de usuário
-    function openEditarUsuarioModal(usuarioId = null) {
-        const isEdit = usuarioId !== null;
-        
-        // Configurar o modal conforme o modo (edição ou cadastro)
-        document.getElementById('usuarioModalTitle').textContent = isEdit ? 'Editar Usuário' : 'Cadastrar Usuário';
-        document.getElementById('usuarioModalSubmitText').textContent = isEdit ? 'Atualizar' : 'Cadastrar';
-        
-        // Mostrar/ocultar campo de senha conforme necessário
-        document.getElementById('usuarioSenhaGroup').style.display = isEdit ? 'none' : 'block';
-        if (!isEdit) {
-            document.getElementById('usuarioSenha').required = true;
-        }
-        
-        // Configurar ações extras para edição
-        const extraActions = document.getElementById('usuarioModalExtraActions');
-        extraActions.innerHTML = '';
-        
-        if (isEdit) {
-            // Carregar dados do usuário
-            fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`)
-                .then(data => {
-                    if (data.success) {
-                        const usuario = data.usuario;
-                        
-                        document.getElementById('usuarioId').value = usuario.id;
-                        document.getElementById('usuarioNome').value = usuario.nome;
-                        document.getElementById('usuarioCpf').value = usuario.cpf;
-                        document.getElementById('usuarioPerfil').value = usuario.tipo.toLowerCase();
-                        document.getElementById('usuarioStatus').value = usuario.status.toLowerCase();
-                        document.getElementById('usuarioObservacoes').value = usuario.observacoes || '';
-                        
-                        // Adicionar botão para redefinir senha
-                        const resetPasswordBtn = document.createElement('button');
-                        resetPasswordBtn.type = 'button';
-                        resetPasswordBtn.className = 'btn btn-secondary';
-                        resetPasswordBtn.innerHTML = '<i class="fas fa-key"></i> <span>Redefinir Senha</span>';
-                        resetPasswordBtn.addEventListener('click', function() {
-                            if (confirm(`Tem certeza que deseja redefinir a senha do usuário ${usuarioId}?`)) {
-                                fetchWithErrorHandling(`/admin/usuarios/${usuarioId}/reset-password`, {
-                                    method: 'POST'
-                                })
-                                .then(response => {
-                                    if (response.success) {
-                                        showFlashMessage('success', 'Senha redefinida com sucesso');
-                                    } else {
-                                        showFlashMessage('error', response.message || 'Erro ao redefinir senha');
-                                    }
-                                })
-                                .catch(error => {
-                                    console.error('Erro ao redefinir senha:', error);
-                                    showFlashMessage('error', 'Erro ao redefinir senha');
-                                });
-                            }
-                        });
-                        extraActions.appendChild(resetPasswordBtn);
-                        
-                        // Adicionar botão para bloquear/desbloquear se necessário
-                        if (usuario.status === 'Ativo' || usuario.status === 'Bloqueado') {
-                            const blockBtn = document.createElement('button');
-                            blockBtn.type = 'button';
-                            blockBtn.className = 'btn btn-warning';
-                            blockBtn.innerHTML = `<i class="fas ${usuario.status === 'Ativo' ? 'fa-lock' : 'fa-unlock'}"></i> <span>${usuario.status === 'Ativo' ? 'Bloquear' : 'Desbloquear'}</span>`;
-                            blockBtn.addEventListener('click', function() {
-                                const action = usuario.status === 'Ativo' ? 'bloquear' : 'desbloquear';
-                                if (confirm(`Tem certeza que deseja ${action} o usuário ${usuarioId}?`)) {
-                                    fetchWithErrorHandling(`/admin/usuarios/${usuarioId}/status`, {
-                                        method: 'PUT',
-                                        headers: {
-                                            'Content-Type': 'application/json'
-                                        },
-                                        body: JSON.stringify({ 
-                                            status: usuario.status === 'Ativo' ? 'bloqueado' : 'ativo'
-                                        })
-                                    })
-                                    .then(response => {
-                                        if (response.success) {
-                                            showFlashMessage('success', `Usuário ${action === 'bloquear' ? 'bloqueado' : 'desbloqueado'} com sucesso`);
-                                            loadUsuariosData();
-                                            closeModal('usuarioModal');
-                                        } else {
-                                            showFlashMessage('error', response.message || `Erro ao ${action} usuário`);
-                                        }
-                                    })
-                                    .catch(error => {
-                                        console.error(`Erro ao ${action} usuário:`, error);
-                                        showFlashMessage('error', `Erro ao ${action} usuário`);
-                                    });
-                                }
-                            });
-                            extraActions.appendChild(blockBtn);
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar dados do usuário:', error);
-                    showFlashMessage('error', 'Erro ao carregar dados do usuário');
-                });
-        } else {
-            // Limpar formulário para novo cadastro
-            document.getElementById('usuarioForm').reset();
-            document.getElementById('usuarioId').value = '';
-        }
-        
-        openModal('usuarioModal');
+    // Funções auxiliares para formatar texto
+    function formatPerfil(perfil) {
+        const perfis = {
+            'admin': 'Administrador',
+            'operador': 'Operador',
+        };
+        return perfis[perfil.toLowerCase()] || perfil;
+    }
+
+    function formatStatus(status) {
+        const statusMap = {
+            'ativo': 'Ativo',
+            'inativo': 'Inativo',
+        };
+        return statusMap[status.toLowerCase()] || status;
     }
 
     // ===== Formulários =====
-    
-    // Formulário de cliente
-    document.getElementById('clienteForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const formData = {
-            nome: document.getElementById('clienteNome').value,
-            documento: document.getElementById('clienteDocumento').value,
-            telefone: document.getElementById('clienteTelefone').value,
-            email: document.getElementById('clienteEmail').value,
-            endereco: document.getElementById('clienteEndereco').value
-        };
-        
-        try {
-            const response = await fetchWithErrorHandling('/admin/clientes', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            });
-            
-            if (response.success) {
-                showFlashMessage('success', 'Cliente cadastrado com sucesso');
-                closeModal('clienteModal');
-                loadClientesData();
-            } else {
-                showFlashMessage('error', response.message || 'Erro ao cadastrar cliente');
-            }
-        } catch (error) {
-            console.error('Erro ao cadastrar cliente:', error);
-            showFlashMessage('error', 'Erro ao cadastrar cliente');
-        }
-    });
-
     // Formulário de produto
     document.getElementById('produtoForm').addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -903,51 +975,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Erro ao atualizar produto:', error);
             showFlashMessage('error', 'Erro ao atualizar produto');
-        }
-    });
-
-    // Formulário de usuário
-    document.getElementById('usuarioForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const isEdit = document.getElementById('usuarioId').value !== '';
-        const usuarioId = document.getElementById('usuarioId').value;
-        
-        const formData = {
-            nome: document.getElementById('usuarioNome').value,
-            cpf: document.getElementById('usuarioCpf').value,
-            tipo: document.getElementById('usuarioPerfil').value,
-            status: document.getElementById('usuarioStatus').value,
-            observacoes: document.getElementById('usuarioObservacoes').value
-        };
-        
-        if (!isEdit) {
-            formData.senha = document.getElementById('usuarioSenha').value;
-            formData.cpf = document.getElementById('usuarioCpf').value;
-        }
-        
-        try {
-            const url = isEdit ? `/admin/usuarios/${usuarioId}` : '/admin/usuarios';
-            const method = isEdit ? 'PUT' : 'POST';
-            
-            const response = await fetchWithErrorHandling(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            });
-            
-            if (response.success) {
-                showFlashMessage('success', `Usuário ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
-                closeModal('usuarioModal');
-                loadUsuariosData();
-            } else {
-                showFlashMessage('error', response.message || `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
-            }
-        } catch (error) {
-            console.error(`Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário:`, error);
-            showFlashMessage('error', `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
         }
     });
 

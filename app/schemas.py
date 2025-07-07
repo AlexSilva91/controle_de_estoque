@@ -54,6 +54,7 @@ class UsuarioBase(BaseModel):
 
 class UsuarioCreate(UsuarioBase):
     senha: str
+    status: Optional[bool] = True
 
 class UsuarioUpdate(BaseModel):
     nome: Optional[str] = None
@@ -61,7 +62,7 @@ class UsuarioUpdate(BaseModel):
     tipo: Optional[TipoUsuario] = None
     senha: Optional[str] = None
     observacoes: Optional[str] = None
-    ativo: Optional[bool] = None
+    status: Optional[bool] = None
 
 class UsuarioRead(UsuarioBase):
     id: int
