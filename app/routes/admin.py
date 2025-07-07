@@ -29,7 +29,7 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 @admin_bp.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('dashboard_admin.html')
+    return render_template('dashboard_admin.html', nome_usuario=current_user.nome)
 
 @admin_bp.route('/dashboard/metrics')
 @login_required
