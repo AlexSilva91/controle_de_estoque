@@ -220,3 +220,17 @@ class Financeiro(Base):
 
     caixa_id = db.Column(db.Integer, db.ForeignKey('caixas.id'), nullable=True)
     caixa = relationship("Caixa", back_populates="financeiros")
+    
+    def to_raw_dict(self):
+        return {
+            'id': self.id,
+            'tipo': self.tipo.value if self.tipo else None,
+            'categoria': self.categoria.value if self.categoria else None,
+            'valor': float(self.valor),
+            'descricao': self.descricao,
+            'data': self.data.isoformat() if self.data else None,
+            'nota_fiscal_id': self.nota_fiscal_id,
+            'cliente_id': self.cliente_id,
+            'caixa_id': self.caixa_id
+        }
+    

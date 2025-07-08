@@ -41,8 +41,11 @@ document.addEventListener('DOMContentLoaded', () => {
     checkCaixaStatus();
     setupEventListeners();
 
-    // Atualiza produtos a cada 10 segundos para refletir mudanças do servidor
+    // Atualiza produtos a cada 10s
     setInterval(loadProducts, 10000);
+
+    // Atualiza saldo a cada 10s
+    setInterval(updateBalance, 10000);
 });
 
 function setupEventListeners() {

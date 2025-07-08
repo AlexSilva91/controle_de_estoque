@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify, current_app as app
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
@@ -278,12 +278,13 @@ def api_registrar_venda():
         return jsonify({'error': 'Erro interno ao processar a venda'}), 500
     
 # ===== API SALDO =====
+
 @operador_bp.route('/api/saldo', methods=['GET'])
 @login_required
 def api_get_saldo():
     try:
         caixa = get_caixa_aberto(db.session)
-        
+
         if not caixa:
             ultimo_caixa = get_ultimo_caixa_fechado(db.session)
             if ultimo_caixa:
@@ -301,19 +302,28 @@ def api_get_saldo():
                 'valor_abertura': 0.00,
                 'message': 'Nenhum caixa aberto encontrado'
             })
-        
-        # Calcula saldo baseado nos lançamentos
-        lancamentos = get_lancamentos_financeiros(db.session, caixa_id=caixa.id)
+
+        # Define início e fim do dia de hoje
+        inicio_hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        fim_hoje = inicio_hoje + timedelta(days=1)
+
+        # Busca lançamentos apenas do dia atual
+        lancamentos = db.session.query(entities.Financeiro).filter(
+            entities.Financeiro.caixa_id == caixa.id,
+            entities.Financeiro.data >= inicio_hoje,
+            entities.Financeiro.data < fim_hoje
+        ).all()
+
         saldo = Decimal(str(caixa.valor_abertura))
 
         for lanc in lancamentos:
-            if lanc.tipo == 'entrada' and lanc.categoria != CategoriaFinanceira.fechamento_caixa and lanc.categoria != CategoriaFinanceira.abertura_caixa:
+            if lanc.tipo == 'entrada' and lanc.categoria not in [CategoriaFinanceira.fechamento_caixa, CategoriaFinanceira.abertura_caixa]:
                 saldo += Decimal(str(lanc.valor))
             else:
                 saldo -= Decimal(str(lanc.valor))
 
-        # Formata o saldo para exibição
         saldo_formatado = f"R$ {saldo:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        print(f"Saldo calculado: {saldo}, Formato: {saldo_formatado}")
 
         return jsonify({
             'saldo': str(saldo),
@@ -329,6 +339,7 @@ def api_get_saldo():
             'error': 'Erro ao calcular saldo',
             'details': str(e)
         }), 500
+
 
 # ===== API ABERTURA DE CAIXA =====
 @operador_bp.route('/api/abrir-caixa', methods=['POST'])
@@ -361,51 +372,23 @@ def api_abrir_caixa():
         return jsonify({'error': str(e)}), 500
 
 # ===== API FECHAMENTO DE CAIXA =====
-def fechar_caixa(db: Session, operador_id: int, valor_fechamento: Decimal, observacao: str = "") -> entities.Caixa:
-    """Fecha o caixa atual com o valor de fechamento especificado"""
+@operador_bp.route('/api/fechar-caixa', methods=['POST'])
+@login_required
+def api_fechar_caixa():
     try:
-        if valor_fechamento <= 0:
-            raise ValueError("Valor de fechamento deve ser maior que zero")
-        
-        caixa = get_caixa_aberto(db)
-        if not caixa:
-            raise ValueError("Nenhum caixa aberto encontrado")
-        
-        # Calcula saldo atual para verificação
-        lancamentos = get_lancamentos_financeiros(db, caixa_id=caixa.id)
-        saldo_calculado = caixa.valor_abertura
-        for lanc in lancamentos:
-            if lanc.tipo == 'entrada':
-                saldo_calculado += Decimal(str(lanc.valor))
-            else:
-                saldo_calculado -= Decimal(str(lanc.valor))
+        data = request.get_json()
 
-        # Verifica se o valor de fechamento está próximo do saldo calculado (permite pequenas diferenças)
-        if abs(saldo_calculado - valor_fechamento) > Decimal('10.00'):  # Tolerância de R$10
-            raise ValueError(f"Valor de fechamento divergente do saldo calculado. Esperado: {saldo_calculado}, Informado: {valor_fechamento}")
+        operador_id = current_user.id
+        valor_fechamento = Decimal(str(data.get("valor_fechamento")))
+        observacao = data.get("observacao", "")
 
-        # Atualiza dados do caixa
-        caixa.operador_id = operador_id
-        caixa.valor_fechamento = valor_fechamento
-        caixa.data_fechamento = datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
-        caixa.status = StatusCaixa.fechado
-        caixa.observacoes = observacao
-        
-        db.commit()
-        
-        # Cria lançamento financeiro de fechamento
-        create_lancamento_financeiro(db, {
-            "tipo": TipoMovimentacao.saida,
-            "categoria": CategoriaFinanceira.fechamento_caixa,
-            "valor": float(valor_fechamento),
-            "descricao": f"Fechamento de caixa - ID {caixa.id}",
-            "data": datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
-            "caixa_id": caixa.id
+        caixa_fechado = fechar_caixa(db.session, operador_id, valor_fechamento, observacao)
+
+        return jsonify({
+            "message": "Caixa fechado com sucesso.",
+            "caixa_id": caixa_fechado.id,
+            "valor_fechamento": str(caixa_fechado.valor_fechamento)
         })
-        
-        return caixa
-        
+
     except Exception as e:
-        db.rollback()
-        app.logger.error(f"Erro ao fechar caixa: {str(e)}")
-        raise ValueError(f"Erro ao fechar caixa: {str(e)}")
+        return jsonify({"error": str(e)}), 400
