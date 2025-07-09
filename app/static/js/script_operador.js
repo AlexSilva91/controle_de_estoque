@@ -167,10 +167,10 @@ async function updateBalance() {
 
         if (balanceVisible) {
             openingBalanceLabel.textContent = `Abertura: ${formatCurrency(data.valor_abertura)}`;
-            currentBalanceLabel.textContent = `Saldo atual: ${data.saldo_formatado || 'R$ 0,00'}`;
+            currentBalanceLabel.textContent = `Saldo atual [vendas]: ${data.saldo_formatado || 'R$ 0,00'}`;
         } else {
             openingBalanceLabel.textContent = 'Abertura: ******';
-            currentBalanceLabel.textContent = 'Saldo atual: ******';
+            currentBalanceLabel.textContent = 'Saldo atual [vendas]: ******';
         }
     } catch (error) {
         console.error('Error updating balance:', error);

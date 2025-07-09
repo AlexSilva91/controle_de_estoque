@@ -278,7 +278,6 @@ def api_registrar_venda():
         return jsonify({'error': 'Erro interno ao processar a venda'}), 500
     
 # ===== API SALDO =====
-
 @operador_bp.route('/api/saldo', methods=['GET'])
 @login_required
 def api_get_saldo():
@@ -309,18 +308,15 @@ def api_get_saldo():
 
         # Busca lançamentos apenas do dia atual
         lancamentos = db.session.query(entities.Financeiro).filter(
-            entities.Financeiro.caixa_id == caixa.id,
             entities.Financeiro.data >= inicio_hoje,
             entities.Financeiro.data < fim_hoje
         ).all()
 
-        saldo = Decimal(str(caixa.valor_abertura))
+        saldo = Decimal("0.00")
 
         for lanc in lancamentos:
             if lanc.tipo == 'entrada' and lanc.categoria not in [CategoriaFinanceira.fechamento_caixa, CategoriaFinanceira.abertura_caixa]:
                 saldo += Decimal(str(lanc.valor))
-            else:
-                saldo -= Decimal(str(lanc.valor))
 
         saldo_formatado = f"R$ {saldo:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
         print(f"Saldo calculado: {saldo}, Formato: {saldo_formatado}")
@@ -339,7 +335,6 @@ def api_get_saldo():
             'error': 'Erro ao calcular saldo',
             'details': str(e)
         }), 500
-
 
 # ===== API ABERTURA DE CAIXA =====
 @operador_bp.route('/api/abrir-caixa', methods=['POST'])
