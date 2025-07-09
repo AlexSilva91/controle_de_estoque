@@ -35,36 +35,53 @@ def dashboard():
 @login_required
 def get_dashboard_metrics():
     try:
-        # Get current open cash register
+        # Caixa aberto
         caixa = get_caixa_aberto(db.session)
         
-        # Count clients - Correção aqui
+        # Contadores
         clientes_count = db.session.query(entities.Cliente).filter(entities.Cliente.ativo == True).count()
-        
-        # Count products - Correção aqui
         produtos_count = db.session.query(entities.Produto).filter(entities.Produto.ativo == True).count()
-        
-        # Count invoices - Correção aqui
         notas_count = db.session.query(entities.NotaFiscal).count()
-        
-        # Calculate total stock - Correção aqui
-        estoque_total = db.session.query(
+
+        # Estoque por unidade de medida
+        estoque_kg = db.session.query(
             func.sum(entities.Produto.estoque_quantidade)
-        ).filter(entities.Produto.ativo == True).scalar() or 0
-        
+        ).filter(
+            entities.Produto.unidade == entities.UnidadeMedida.kg,
+            entities.Produto.ativo == True
+        ).scalar() or 0
+
+        estoque_saco = db.session.query(
+            func.sum(entities.Produto.estoque_quantidade)
+        ).filter(
+            entities.Produto.unidade == entities.UnidadeMedida.saco,
+            entities.Produto.ativo == True
+        ).scalar() or 0
+
+        estoque_unidade = db.session.query(
+            func.sum(entities.Produto.estoque_quantidade)
+        ).filter(
+            entities.Produto.unidade == entities.UnidadeMedida.unidade,
+            entities.Produto.ativo == True
+        ).scalar() or 0
+
         return jsonify({
             'success': True,
             'metrics': [
                 {'title': "Clientes", 'value': clientes_count, 'icon': "users", 'color': "success"},
                 {'title': "Produtos", 'value': produtos_count, 'icon': "box", 'color': "info"},
                 {'title': "Notas Fiscais", 'value': notas_count, 'icon': "file-invoice", 'color': "warning"},
-                {'title': "Estoque Total", 'value': f"{estoque_total} kg", 'icon': "chart-bar", 'color': "secondary"}
+                {'title': "Estoque (kg)", 'value': f"{estoque_kg:.2f} kg", 'icon': "weight", 'color': "secondary"},
+                {'title': "Estoque (sacos)", 'value': f"{estoque_saco:.2f} sacos", 'icon': "shopping-bag", 'color': "secondary"},
+                {'title': "Estoque (unidades)", 'value': f"{estoque_unidade:.2f} un", 'icon': "cubes", 'color': "secondary"},
             ],
             'caixa_aberto': caixa is not None
         })
+
     except Exception as e:
         print(f"Error fetching dashboard metrics: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
+
     
 @admin_bp.route('/dashboard/movimentacoes')
 @login_required
