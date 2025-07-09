@@ -104,6 +104,7 @@ def api_delete_cliente(cliente_id):
 @login_required
 def api_get_produtos():
     produtos = get_produtos(db.session)
+
     return jsonify([{
         'id': produto.id,
         'nome': produto.nome,
@@ -114,7 +115,7 @@ def api_get_produtos():
         'valor_unitario': float(produto.valor_unitario),
         'estoque_quantidade': float(produto.estoque_quantidade),
         'ativo': produto.ativo
-    } for produto in produtos])
+    } for produto in produtos if produto.estoque_quantidade >= 1])
 
 @operador_bp.route('/api/produtos/<int:produto_id>', methods=['GET'])
 @login_required
