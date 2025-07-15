@@ -68,6 +68,7 @@ class Usuario(UserMixin, Base):
     status = Column(Boolean, default=True, nullable=False)
     ultimo_acesso = Column(DateTime, nullable=True)
     observacoes = Column(Text, nullable=True)
+    sincronizado = Column(Boolean, default=False, nullable=False)
 
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="usuario")
     notas_fiscais = relationship("NotaFiscal", back_populates="operador")
@@ -87,6 +88,7 @@ class Caixa(Base):
     valor_fechamento = Column(DECIMAL(12, 2), nullable=True)
     status = Column(Enum(StatusCaixa), nullable=False, default=StatusCaixa.aberto)
     observacoes = Column(Text, nullable=True)
+    sincronizado = Column(Boolean, default=False, nullable=False)
 
     operador = relationship("Usuario", back_populates="caixas")
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="caixa")
@@ -109,6 +111,7 @@ class Produto(Base):
     ativo = Column(Boolean, default=True, nullable=False)
     criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    sincronizado = Column(Boolean, default=False, nullable=False)
 
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="produto")
     itens_nf = relationship("NotaFiscalItem", back_populates="produto")
@@ -128,6 +131,7 @@ class Cliente(Base):
     ativo = Column(Boolean, default=True, nullable=False)
     criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    sincronizado = Column(Boolean, default=False, nullable=False)
 
     notas_fiscais = relationship("NotaFiscal", back_populates="cliente")
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="cliente")
@@ -152,6 +156,7 @@ class MovimentacaoEstoque(Base):
     forma_pagamento = Column(Enum(FormaPagamento), nullable=True)
     observacao = Column(Text, nullable=True)
     data = Column(DateTime, default=datetime.utcnow, nullable=False)
+    sincronizado = Column(Boolean, default=False, nullable=False)
 
     produto = relationship("Produto", back_populates="movimentacoes")
     usuario = relationship("Usuario", back_populates="movimentacoes")
@@ -176,7 +181,8 @@ class NotaFiscal(Base):
     forma_pagamento = Column(Enum(FormaPagamento), nullable=False)
     valor_recebido = Column(DECIMAL(12, 2), nullable=True)  # Novo campo
     troco = Column(DECIMAL(12, 2), nullable=True)  # Novo campo
-
+    sincronizado = Column(Boolean, default=False, nullable=False)
+    
     cliente = relationship("Cliente", back_populates="notas_fiscais")
     operador = relationship("Usuario", back_populates="notas_fiscais")
     caixa = relationship("Caixa")
@@ -195,7 +201,8 @@ class NotaFiscalItem(Base):
     quantidade = Column(DECIMAL(12, 3), nullable=False)
     valor_unitario = Column(DECIMAL(10, 2), nullable=False)
     valor_total = Column(DECIMAL(12, 2), nullable=False)
-
+    sincronizado = Column(Boolean, default=False, nullable=False)
+    
     nota = relationship("NotaFiscal", back_populates="itens")
     produto = relationship("Produto", back_populates="itens_nf")
 
@@ -211,7 +218,8 @@ class Financeiro(Base):
     valor = Column(DECIMAL(12, 2), nullable=False)
     descricao = Column(Text, nullable=True)
     data = Column(DateTime, default=datetime.utcnow, nullable=False)
-
+    sincronizado = Column(Boolean, default=False, nullable=False)
+    
     nota_fiscal_id = Column(Integer, ForeignKey("notas_fiscais.id"), nullable=True)
     nota_fiscal = relationship("NotaFiscal", back_populates="financeiros")
 

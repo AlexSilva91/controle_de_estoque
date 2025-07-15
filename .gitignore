@@ -3,3 +3,5 @@ __pycache__
 migrations
 
 nfce_bobina_corrigido.pdf
+
+firebase_key.json
