@@ -1,9 +1,9 @@
 import os
 import threading
 import webview
-from app import create_app  # <- importa a app configurada
+from app import create_app  
 
-app = create_app()  # <- aqui está a instância correta do Flask com db.init_app(app)
+app = create_app() 
 
 def start_flask():
     app.run(debug=False, use_reloader=False)
