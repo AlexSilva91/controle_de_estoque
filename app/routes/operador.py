@@ -1,3 +1,4 @@
+import threading
 from flask import Blueprint, render_template, request, jsonify, current_app as app
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -6,6 +7,7 @@ from flask_login import login_required, current_user
 from app import db
 from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
+from app.bot.bot_movimentacao import enviar_resumo_movimentacao_diaria
 from app.models import entities
 from app.schemas import (
     ClienteCreate,
@@ -379,7 +381,9 @@ def api_fechar_caixa():
         observacao = data.get("observacao", "")
 
         caixa_fechado = fechar_caixa(db.session, operador_id, valor_fechamento, observacao)
-
+        
+        threading.Thread(target=enviar_resumo_movimentacao_diaria).start()
+        
         return jsonify({
             "message": "Caixa fechado com sucesso.",
             "caixa_id": caixa_fechado.id,

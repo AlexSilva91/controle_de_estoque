@@ -5,8 +5,9 @@ import requests
 from dotenv import load_dotenv
 
 from app.database import SessionLocal
-from app.models import MovimentacaoEstoque, Produto, Usuario
-from app.models import TipoMovimentacao  # Importar o Enum
+from app.models.entities import MovimentacaoEstoque, Produto, Usuario
+from app.models.entities import TipoMovimentacao
+from app.models.entities import Financeiro
 
 load_dotenv()
 
@@ -21,6 +22,29 @@ def verificar_internet(url="https://www.google.com", timeout=3):
     except requests.RequestException:
         return False
 
+import os
+from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime
+import requests
+from dotenv import load_dotenv
+
+from app.database import SessionLocal
+from app.models.entities import MovimentacaoEstoque, Produto, Usuario
+from app.models.entities import TipoMovimentacao
+from app.models.entities import Financeiro
+
+load_dotenv()
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+
+
+def verificar_internet(url="https://www.google.com", timeout=3):
+    try:
+        requests.head(url, timeout=timeout)
+        return True
+    except requests.RequestException:
+        return False
 
 def enviar_resumo_movimentacao_diaria():
     try:
@@ -31,16 +55,14 @@ def enviar_resumo_movimentacao_diaria():
         hoje = datetime.utcnow().date()
         db = SessionLocal()
 
+        # === Movimentações de Estoque ===
         movimentacoes = (
             db.query(MovimentacaoEstoque)
             .filter(MovimentacaoEstoque.data >= datetime(hoje.year, hoje.month, hoje.day))
             .all()
         )
 
-        entradas = []
-        saidas = []
-        total_entradas = Decimal("0.00")
-        total_saidas = Decimal("0.00")
+        entradas, saidas = [], []
 
         for mov in movimentacoes:
             produto = mov.produto
@@ -65,10 +87,8 @@ def enviar_resumo_movimentacao_diaria():
 
             if mov.tipo == TipoMovimentacao.entrada:
                 entradas.append(item_formatado)
-                total_entradas += valor_total
             elif mov.tipo == TipoMovimentacao.saida:
                 saidas.append(item_formatado)
-                total_saidas += valor_total
 
         def formatar_lista(titulo, lista):
             if not lista:
@@ -85,18 +105,51 @@ def enviar_resumo_movimentacao_diaria():
                 )
             return texto
 
-        # INVERTENDO A ORDEM: SAÍDAS PRIMEIRO
         texto_saidas = formatar_lista("📤 Saídas", saidas)
         texto_entradas = formatar_lista("📥 Entradas", entradas)
 
+        # === Movimentações Financeiras ===
+        financeiros = (
+            db.query(Financeiro)
+            .filter(Financeiro.data >= datetime(hoje.year, hoje.month, hoje.day))
+            .all()
+        )
+
+        resumo_financeiro = {}
+        total_financeiro = Decimal("0.00")
+        total_entrada_financeiro = Decimal("0.00")
+        total_saida_financeiro = Decimal("0.00")
+
+        for fin in financeiros:
+            categoria = fin.categoria.value if fin.categoria else "Outro"
+            valor = Decimal(fin.valor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+            resumo_financeiro[categoria] = resumo_financeiro.get(categoria, Decimal("0.00")) + valor
+            total_financeiro += valor
+
+            if fin.tipo == TipoMovimentacao.entrada:
+                total_entrada_financeiro += valor
+            elif fin.tipo == TipoMovimentacao.saida:
+                total_saida_financeiro += valor
+
+        texto_financeiro = "<b>💰 Financeiro</b>\n"
+        if resumo_financeiro:
+            for cat, val in resumo_financeiro.items():
+                texto_financeiro += f"• {cat.capitalize()}: <b>R$ {val:.2f}</b>\n"
+        else:
+            texto_financeiro += "<i>Sem movimentações financeiras</i>\n"
+        texto_financeiro += f"\n<b>Total Financeiro: R$ {total_financeiro:.2f}</b>\n\n"
+
+        # === Mensagem final ===
         mensagem = (
             f"<b>📊 MOVIMENTAÇÃO DETALHADA - {hoje.strftime('%d/%m/%Y')}</b>\n\n"
             f"{texto_saidas}"
             f"{texto_entradas}"
-            f"<b>Resumo do dia:</b>\n"
-            f"• Total Saídas: <b>R$ {total_saidas:.2f}</b>\n"
-            f"• Total Entradas: <b>R$ {total_entradas:.2f}</b>\n"
-            f"• Saldo do Dia [Entradas - Saídas]: <b>R$ {(total_saidas - total_entradas):.2f}</b>\n\n"
+            f"{texto_financeiro}"
+            f"<b>Resumo do dia (baseado no financeiro):</b>\n"
+            f"• Total Saídas: <b>R$ {total_saida_financeiro:.2f}</b>\n"
+            f"• Total Entradas: <b>R$ {total_entrada_financeiro:.2f}</b>\n"
+            f"• Saldo do Dia [Entradas - Saídas]: <b>R$ {(total_entrada_financeiro - total_saida_financeiro):.2f}</b>\n\n"
             f"<i>Enviado automaticamente pelo sistema Cavalcanti Rações</i>"
         )
 
@@ -108,11 +161,11 @@ def enviar_resumo_movimentacao_diaria():
         }
 
         response = requests.post(url, json=payload)
-
         if response.status_code == 200:
             print("✅ Relatório detalhado enviado com sucesso!")
         else:
             print(f"❌ Erro ao enviar: {response.text}")
+
     except Exception as e:
         print("❌ Erro no envio do relatório:", str(e))
     finally:
