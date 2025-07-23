@@ -212,7 +212,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('clienteTelefone').value = cliente.telefone || '';
                 document.getElementById('clienteEmail').value = cliente.email || '';
                 document.getElementById('clienteEndereco').value = cliente.endereco || '';
-                document.getElementById('clienteStatus').value = cliente.status === 'Ativo' ? 'true' : 'false';
+                document.getElementById('clienteStatus').value = 
+                cliente.ativo === 'Ativo' || cliente.ativo === true ? 'true' : 'false';
             } else {
                 showFlashMessage('error', 'Erro ao carregar dados do cliente');
                 return;
@@ -240,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function() {
             telefone: document.getElementById('clienteTelefone').value,
             email: document.getElementById('clienteEmail').value,
             endereco: document.getElementById('clienteEndereco').value,
-            status: document.getElementById('clienteStatus').value === 'true'
+            ativo: document.getElementById('clienteStatus').value === 'true'
         };
 
         const url = isEdit ? `/admin/clientes/${clienteId}` : '/admin/clientes';
@@ -299,7 +300,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 data.clientes.forEach(cliente => {
                     if (searchText && !cliente.nome.toLowerCase().includes(searchText)) return;
 
-                    const status = cliente.status === 'Ativo' ? 'Ativo' : 'Inativo';
+                    const status = cliente.ativo === 'Ativo' ? 'Ativo' : 'Inativo';
 
                     const row = document.createElement('tr');
                     row.innerHTML = `

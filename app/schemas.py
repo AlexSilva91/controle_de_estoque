@@ -113,6 +113,7 @@ class ClienteBase(BaseModel):
     telefone: Optional[str]
     email: Optional[str]
     endereco: Optional[str]
+    ativo: bool
 
 class ClienteCreate(ClienteBase):
     pass

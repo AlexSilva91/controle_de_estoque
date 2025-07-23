@@ -383,10 +383,15 @@ def create_cliente(db: Session, cliente: schemas.ClienteCreate):
         raise ValueError("Erro ao criar cliente no banco de dados.")
 
 def get_cliente(db: Session, cliente_id: int):
-    return db.query(entities.Cliente).filter(entities.Cliente.id == cliente_id, entities.Cliente.ativo == True).first()
+    return db.query(entities.Cliente).filter(
+        entities.Cliente.id == cliente_id
+    ).first()
 
 def get_clientes(db: Session):
     return db.query(entities.Cliente).filter(entities.Cliente.ativo == True).all()
+
+def get_clientes_all(db: Session):
+    return db.query(entities.Cliente).all()
 
 def update_cliente(db: Session, cliente_id: int, cliente_data: schemas.ClienteBase):
     cliente = get_cliente(db, cliente_id)

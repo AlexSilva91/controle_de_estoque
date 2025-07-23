@@ -16,7 +16,7 @@ from app.crud import (
     update_cliente, delete_cliente, create_nota_fiscal, get_nota_fiscal, 
     get_notas_fiscais, create_lancamento_financeiro, get_lancamento_financeiro,
     get_lancamentos_financeiros, update_lancamento_financeiro, 
-    delete_lancamento_financeiro
+    delete_lancamento_financeiro, get_clientes_all
 )
 from app.schemas import (
     UsuarioCreate, ProdutoCreate, ProdutoUpdate, MovimentacaoEstoqueCreate,
@@ -208,24 +208,24 @@ def get_caixa_historico():
 def listar_clientes():
     try:
         search = request.args.get('search', '').lower()
-        clientes = get_clientes(db.session)
+        clientes = get_clientes_all(db.session)
         
         result = []
         for cliente in clientes:
             if search and (search not in cliente.nome.lower() and 
                           search not in (cliente.documento or '').lower()):
                 continue
-                
+            print(f'DADOS BRUTOS: \n{cliente.ativo}')
             result.append({
                 'id': cliente.id,
                 'nome': cliente.nome,
                 'documento': cliente.documento or '',
                 'telefone': cliente.telefone or '',
                 'email': cliente.email or '',
-                'status': 'Ativo' if cliente.ativo else 'Inativo',
+                'ativo': 'Ativo' if cliente.ativo else 'Inativo',
                 'endereco': cliente.endereco or ''
             })
-        
+            
         return jsonify({'success': True, 'clientes': result})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -241,7 +241,8 @@ def criar_cliente():
             telefone=data.get('telefone'),
             email=data.get('email'),
             endereco=data.get('endereco'),
-            criado_em=datetime.now(tz=ZoneInfo("America/Sao_Paulo"))
+            criado_em=datetime.now(tz=ZoneInfo("America/Sao_Paulo")),
+            ativo=True
         )
         
         cliente = create_cliente(db.session, cliente_data)
@@ -254,7 +255,7 @@ def criar_cliente():
                 'documento': cliente.documento,
                 'telefone': cliente.telefone,
                 'email': cliente.email,
-                'status': 'Ativo'
+                'ativo': 'Ativo' if cliente.ativo else 'Inativo'
             }
         })
     except Exception as e:
@@ -265,12 +266,14 @@ def criar_cliente():
 def atualizar_cliente(cliente_id):
     try:
         data = request.get_json()
+        
         cliente_data = ClienteBase(
             nome=data['nome'],
             documento=data.get('documento'),
             telefone=data.get('telefone'),
             email=data.get('email'),
-            endereco=data.get('endereco')
+            endereco=data.get('endereco'),
+            ativo=data['ativo']
         )
         
         cliente = update_cliente(db.session, cliente_id, cliente_data)
@@ -283,7 +286,7 @@ def atualizar_cliente(cliente_id):
                 'documento': cliente.documento,
                 'telefone': cliente.telefone,
                 'email': cliente.email,
-                'status': 'Ativo' if cliente.ativo else 'Inativo'
+                'ativo': 'Ativo' if cliente.ativo else 'Inativo'
             }
         })
     except Exception as e:
@@ -307,7 +310,7 @@ def obter_cliente(cliente_id):
                 'telefone': cliente.telefone,
                 'email': cliente.email,
                 'endereco': cliente.endereco,
-                'status': 'Ativo' if cliente.ativo else 'Inativo'
+                'ativo  ': 'Ativo' if cliente.ativo else 'Inativo'
             }
         })
     except Exception as e:
