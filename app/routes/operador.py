@@ -62,6 +62,7 @@ def api_create_cliente():
     data = request.get_json()
     try:
         cliente = ClienteCreate(**data)
+        cliente.ativo = True
         db_cliente = create_cliente(db.session, cliente)
         return jsonify({
             'id': db_cliente.id,
@@ -392,3 +393,66 @@ def api_fechar_caixa():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+    
+@operador_bp.route('/api/clientes/buscar', methods=['GET'])
+@login_required
+def api_buscar_clientes():
+    termo = request.args.get('q', '').strip().lower()
+    if not termo:
+        return jsonify([])
+    
+    clientes = get_clientes(db.session)
+    resultados = []
+    
+    for cliente in clientes:
+        if (termo in cliente.nome.lower() or 
+            (cliente.documento and termo in cliente.documento.lower()) or 
+            (cliente.telefone and termo in cliente.telefone.lower())):
+            
+            resultados.append({
+                'id': cliente.id,
+                'nome': cliente.nome,
+                'documento': cliente.documento,
+                'telefone': cliente.telefone,
+                'email': cliente.email
+            })
+    
+    return jsonify(resultados)
+
+@operador_bp.route('/api/produtos/buscar', methods=['GET'])
+@login_required
+def api_buscar_produtos():
+    termo = request.args.get('q', '').strip().lower()
+    if not termo:
+        return jsonify([])
+    
+    produtos = get_produtos(db.session)
+    resultados = []
+    
+    for produto in produtos:
+        if (termo in produto.nome.lower() or 
+            (produto.marca and termo in produto.marca.lower()) or 
+            (produto.codigo and termo in produto.codigo.lower())):
+            
+            resultados.append({
+                'id': produto.id,
+                'nome': produto.nome,
+                'codigo': produto.codigo,
+                'marca': produto.marca,
+                'unidade': produto.unidade,
+                'valor_unitario': float(produto.valor_unitario),
+                'estoque_quantidade': float(produto.estoque_quantidade),
+                'descricao': f"{produto.nome} ({produto.marca})" if produto.marca else produto.nome
+            })
+    
+    return jsonify(resultados)
+
+@operador_bp.route('/api/usuario', methods=['GET'])
+@login_required
+def api_get_usuario():
+    return jsonify({
+        'id': current_user.id,
+        'nome': current_user.nome,
+        'tipo': current_user.tipo
+    })
+    

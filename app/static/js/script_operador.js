@@ -4,20 +4,21 @@ let currentBalance = 0;
 let clients = [];
 let products = [];
 let currentEditingClient = null;
+let selectedClient = null;
+let selectedProducts = [];
 
 // DOM Elements
-const openingBalanceLabel = document.getElementById('opening-balance');
-const currentBalanceLabel = document.getElementById('current-balance');
+const openingBalanceLabel = document.getElementById('opening-balance').querySelector('.balance-value');
+const currentBalanceLabel = document.getElementById('current-balance').querySelector('.balance-value');
 const currentDateElement = document.getElementById('current-date');
-const balanceLabel = document.getElementById('balance-label');
 const toggleBalanceBtn = document.getElementById('toggle-balance');
-const tabBtns = document.querySelectorAll('.tab-btn');
+const tabBtns = document.querySelectorAll('.menu-item');
 const tabContents = document.querySelectorAll('.tab-content');
-const productsContainer = document.getElementById('products-container');
-const clientsContainer = document.getElementById('clients-container');
-const clientSelect = document.getElementById('client-select');
-const newClientBtn = document.getElementById('new-client-btn');
-const addClientBtn = document.getElementById('add-client-btn');
+const productsList = document.getElementById('products-list');
+const clientSearchInput = document.getElementById('client-search-input');
+const selectedClientInput = document.getElementById('selected-client');
+const selectedClientIdInput = document.getElementById('selected-client-id');
+const productSearchInput = document.getElementById('product-search-input');
 const addProductBtn = document.getElementById('add-product-btn');
 const registerSaleBtn = document.getElementById('register-sale-btn');
 const closeRegisterBtn = document.getElementById('close-register-btn');
@@ -26,12 +27,21 @@ const clientModalTitle = document.getElementById('client-modal-title');
 const clientForm = document.getElementById('client-form');
 const modalCloses = document.querySelectorAll('.modal-close, #cancel-client');
 const saleTotalElement = document.getElementById('sale-total');
+const subtotalValueElement = document.getElementById('subtotal-value');
+const changeValueElement = document.getElementById('change-value');
 const amountReceivedInput = document.getElementById('amount-received');
+const discountValueInput = document.getElementById('discount-value');
+const discountTypeSelect = document.getElementById('discount-type');
+const applyDiscountBtn = document.getElementById('apply-discount-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const notification = document.getElementById('notification');
 const notificationMessage = document.getElementById('notification-message');
 const clientSearch = document.getElementById('client-search');
 const searchClientBtn = document.getElementById('search-client-btn');
+const productSearchModal = document.getElementById('product-search-modal');
+const modalProductSearch = document.getElementById('modal-product-search');
+const productSearchResults = document.getElementById('product-search-results');
+const currentTabTitle = document.getElementById('current-tab-title');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -55,9 +65,18 @@ function setupEventListeners() {
         btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
     
-    newClientBtn.addEventListener('click', () => openClientModal());
-    addClientBtn.addEventListener('click', () => openClientModal());
-    addProductBtn.addEventListener('click', addProductRow);
+    document.getElementById('search-client-btn').addEventListener('click', searchClient);
+    clientSearchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') searchClient();
+    });
+    
+    document.getElementById('add-client-btn').addEventListener('click', () => openClientModal());
+    document.getElementById('search-product-btn').addEventListener('click', openProductSearchModal);
+    productSearchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') openProductSearchModal();
+    });
+    
+    addProductBtn.addEventListener('click', addEmptyProductRow);
     
     modalCloses.forEach(btn => {
         btn.addEventListener('click', closeModal);
@@ -77,10 +96,28 @@ function setupEventListeners() {
     });
     
     // Listeners para produtos
-    document.addEventListener('input', handleQuantityInput);
-    document.addEventListener('click', handleRemoveClick);
-    document.addEventListener('change', handleProductSelectChange);
-    document.addEventListener('click', handleEditClientClick);
+    productsList.addEventListener('input', (e) => {
+        if (e.target.classList.contains('quantity-input')) {
+            updateProductQuantity(e.target);
+            calculateSaleTotal();
+        }
+    });
+    
+    productsList.addEventListener('click', (e) => {
+        if (e.target.classList.contains('btn-remove')) {
+            removeProductRow(e.target);
+            calculateSaleTotal();
+        }
+    });
+    
+    amountReceivedInput.addEventListener('input', calculateSaleTotal);
+    applyDiscountBtn.addEventListener('click', applyDiscount);
+    
+    // Modal de busca de produtos
+    document.getElementById('modal-search-product-btn').addEventListener('click', searchProductsInModal);
+    modalProductSearch.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') searchProductsInModal();
+    });
 }
 
 async function checkCaixaStatus() {
@@ -92,46 +129,12 @@ async function checkCaixaStatus() {
         
         if (data.message === 'Nenhum caixa aberto encontrado') {
             closeRegisterBtn.style.display = 'none';
-            balanceLabel.textContent = 'Nenhum caixa aberto';
         } else {
             closeRegisterBtn.style.display = 'block';
             updateBalance();
         }
     } catch (error) {
         console.error('Error checking caixa status:', error);
-    }
-}
-
-function handleQuantityInput(e) {
-    if (e.target.classList.contains('quantity-input') && e.target.value.trim() !== '') {
-        const row = e.target.closest('.product-row');
-        if (row && row === productsContainer.lastElementChild) {
-            addProductRow();
-        }
-        calculateSaleTotal();
-    }
-}
-
-function handleRemoveClick(e) {
-    if (e.target.closest('.btn-remove')) {
-        const row = e.target.closest('.product-row');
-        if (row && productsContainer.children.length > 1) {
-            row.remove();
-            calculateSaleTotal();
-        }
-    }
-}
-
-function handleProductSelectChange(e) {
-    if (e.target.classList.contains('product-select')) {
-        calculateSaleTotal();
-    }
-}
-
-function handleEditClientClick(e) {
-    if (e.target.closest('.btn-edit-client')) {
-        const clientId = e.target.closest('.btn-edit-client').dataset.id;
-        editClient(clientId);
     }
 }
 
@@ -149,7 +152,7 @@ function updateCurrentDate() {
 function toggleBalance() {
     balanceVisible = !balanceVisible;
     updateBalance();
-    toggleBalanceBtn.textContent = balanceVisible ? 'Ocultar saldo' : 'Mostrar saldo';
+    toggleBalanceBtn.innerHTML = balanceVisible ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
 }
 
 async function updateBalance() {
@@ -166,30 +169,36 @@ async function updateBalance() {
         }
 
         if (balanceVisible) {
-            openingBalanceLabel.textContent = `Abertura: ${formatCurrency(data.valor_abertura)}`;
-            currentBalanceLabel.textContent = `Saldo atual [vendas]: ${data.saldo_formatado || 'R$ 0,00'}`;
+            openingBalanceLabel.textContent = formatCurrency(data.valor_abertura);
+            currentBalanceLabel.textContent = data.saldo_formatado || 'R$ 0,00';
         } else {
-            openingBalanceLabel.textContent = 'Abertura: ******';
-            currentBalanceLabel.textContent = 'Saldo atual [vendas]: ******';
+            openingBalanceLabel.textContent = '******';
+            currentBalanceLabel.textContent = '******';
         }
     } catch (error) {
         console.error('Error updating balance:', error);
-        openingBalanceLabel.textContent = 'Erro ao carregar dados';
+        openingBalanceLabel.textContent = 'Erro';
         currentBalanceLabel.textContent = '';
     }
 }
 
 function formatCurrency(value) {
-    // Formata números simples para o formato de moeda
-    return 'R$ ' + parseFloat(value).toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+    if (typeof value === 'string') {
+        value = parseFloat(value.replace(',', '.'));
+    }
+    return 'R$ ' + value.toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
 }
 
-// Inicializa
-updateBalance();
-
 function switchTab(tabId) {
+    // Atualiza a UI das abas
     tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
     tabContents.forEach(content => content.classList.toggle('active', content.id === tabId));
+    
+    // Atualiza o título da aba atual
+    const activeTabBtn = document.querySelector(`.menu-item[data-tab="${tabId}"]`);
+    if (activeTabBtn) {
+        currentTabTitle.textContent = activeTabBtn.querySelector('span').textContent;
+    }
 }
 
 async function loadClients() {
@@ -198,7 +207,6 @@ async function loadClients() {
         if (!response.ok) throw new Error('Erro ao carregar clientes');
         
         clients = await response.json();
-        updateClientSelect();
         renderClientCards();
     } catch (error) {
         showMessage(error.message, 'error');
@@ -211,66 +219,88 @@ async function loadProducts() {
         if (!response.ok) throw new Error('Erro ao carregar produtos');
         
         products = await response.json();
-        updateProductSelects();
-        calculateSaleTotal();
     } catch (error) {
         showMessage(error.message, 'error');
     }
 }
 
-function updateClientSelect() {
-    clientSelect.innerHTML = '<option value="">Selecione um cliente</option>';
-    clients.forEach(client => {
-        const option = document.createElement('option');
-        option.value = client.id;
-        option.textContent = client.nome;
-        clientSelect.appendChild(option);
-    });
+async function searchClient() {
+    const searchTerm = clientSearchInput.value.trim();
+    if (!searchTerm) {
+        showMessage('Digite um termo para busca', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/operador/api/clientes/buscar?q=${encodeURIComponent(searchTerm)}`);
+        if (!response.ok) throw new Error('Erro ao buscar clientes');
+        
+        const results = await response.json();
+        
+        if (results.length === 0) {
+            showMessage('Nenhum cliente encontrado', 'error');
+            return;
+        }
+        
+        if (results.length === 1) {
+            // Seleciona automaticamente se houver apenas um resultado
+            selectClient(results[0]);
+        } else {
+            // Mostra modal com resultados para seleção
+            showClientSearchResults(results);
+        }
+    } catch (error) {
+        showMessage(error.message, 'error');
+    }
 }
 
-function updateProductSelects() {
-    const productSelects = document.querySelectorAll('.product-select');
-    productSelects.forEach(select => {
-        const currentValue = select.value;
-        select.innerHTML = '<option value="">Selecione um produto</option>';
-        
-        products.forEach(product => {
-            const option = document.createElement('option');
-            option.value = product.id;
-            option.textContent = `${product.nome} (Estoque: ${product.estoque_quantidade} ${product.unidade})`;
-            select.appendChild(option);
-        });
-        
-        if (currentValue) select.value = currentValue;
-    });
+function selectClient(client) {
+    selectedClient = client;
+    selectedClientInput.value = client.nome;
+    selectedClientIdInput.value = client.id;
+    showMessage(`Cliente selecionado: ${client.nome}`);
+}
+
+function showClientSearchResults(clients) {
+    // Implementar modal de seleção de cliente se necessário
+    // Por enquanto, seleciona o primeiro
+    if (clients.length > 0) {
+        selectClient(clients[0]);
+    }
 }
 
 function renderClientCards(filteredClients = null) {
-    clientsContainer.innerHTML = '';
+    const container = document.getElementById('clients-container');
+    container.innerHTML = '';
     const clientsToRender = filteredClients || clients;
     
     clientsToRender.forEach(client => {
         const card = document.createElement('div');
-        card.className = 'card';
+        card.className = 'client-card';
         card.innerHTML = `
-            <div class="card-title">${client.nome}</div>
-            <div class="form-grid">
-                <div class="form-grid-label">Documento:</div>
+            <h4>${client.nome}</h4>
+            <div class="client-info">
+                <div class="client-info-label">Documento:</div>
                 <div>${client.documento || 'Não informado'}</div>
-                <div class="form-grid-label">Telefone:</div>
+                <div class="client-info-label">Telefone:</div>
                 <div>${client.telefone || 'Não informado'}</div>
-                <div class="form-grid-label">Email:</div>
+                <div class="client-info-label">Email:</div>
                 <div>${client.email || 'Não informado'}</div>
-                <div class="form-grid-label">Endereço:</div>
+                <div class="client-info-label">Endereço:</div>
                 <div>${client.endereco || 'Não informado'}</div>
             </div>
-            <div class="card-actions">
-                <button class="btn btn-primary btn-edit-client" data-id="${client.id}">
+            <div class="client-card-actions">
+                <button class="btn-primary btn-edit-client" data-id="${client.id}">
                     <i class="fas fa-edit"></i> Editar
                 </button>
             </div>
         `;
-        clientsContainer.appendChild(card);
+        container.appendChild(card);
+    });
+    
+    // Adiciona event listeners para os botões de edição
+    document.querySelectorAll('.btn-edit-client').forEach(btn => {
+        btn.addEventListener('click', () => editClient(btn.dataset.id));
     });
 }
 
@@ -297,42 +327,289 @@ function editClient(clientId) {
     }
 }
 
-function addProductRow() {
-    const row = document.createElement('div');
-    row.className = 'product-row';
-    row.innerHTML = `
-        <select class="form-control product-select">
-            <option value="">Selecione um produto</option>
-        </select>
-        <input type="number" class="form-control quantity-input" placeholder="Quantidade" min="1" step="1">
-        <button class="btn-remove">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    productsContainer.appendChild(row);
-    updateProductSelects();
+function openProductSearchModal() {
+    const searchTerm = productSearchInput.value.trim();
+    if (searchTerm) {
+        modalProductSearch.value = searchTerm;
+    }
+    openModal('product-search');
+    searchProductsInModal();
+}
+
+function searchProductsInModal() {
+    const searchTerm = modalProductSearch.value.trim().toLowerCase();
+    if (!searchTerm) {
+        productSearchResults.innerHTML = '<p>Digite um termo para busca</p>';
+        return;
+    }
+
+    const filteredProducts = products.filter(product => 
+        product.nome.toLowerCase().includes(searchTerm) ||
+        (product.marca && product.marca.toLowerCase().includes(searchTerm)) ||
+        (product.codigo && product.codigo.toLowerCase().includes(searchTerm))
+    );
+
+    displayProductSearchResults(filteredProducts);
+}
+
+function displayProductSearchResults(products) {
+    productSearchResults.innerHTML = '';
+    
+    if (products.length === 0) {
+        productSearchResults.innerHTML = '<p>Nenhum produto encontrado</p>';
+        return;
+    }
+    
+    products.forEach(product => {
+        const item = document.createElement('div');
+        item.className = 'search-result-item';
+        item.innerHTML = `
+            <h4>${product.nome}</h4>
+            <p>Marca: ${product.marca || 'Não informada'} | Código: ${product.codigo || 'Não informado'}</p>
+            <p>Preço: ${formatCurrency(product.valor_unitario)} | Estoque: ${product.estoque_quantidade} ${product.unidade}</p>
+        `;
+        item.addEventListener('click', () => {
+            addProductToSale(product);
+            closeModal();
+        });
+        productSearchResults.appendChild(item);
+    });
+}
+
+function addProductToSale(product) {
+    // Verifica se o produto já está na lista
+    const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
+    
+    if (existingProductIndex >= 0) {
+        // Aumenta a quantidade se o produto já estiver na lista
+        selectedProducts[existingProductIndex].quantity += 1;
+    } else {
+        // Adiciona novo produto à lista
+        selectedProducts.push({
+            id: product.id,
+            name: product.nome,
+            description: product.descricao || '',
+            price: product.valor_unitario,
+            quantity: 1,
+            unit: product.unidade,
+            stock: product.estoque_quantidade
+        });
+    }
+    
+    renderProductsList();
+    calculateSaleTotal();
+}
+
+function addEmptyProductRow() {
+    openProductSearchModal();
+}
+
+function renderProductsList() {
+    productsList.innerHTML = '';
+    
+    selectedProducts.forEach((product, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${product.name}</td>
+            <td>${product.description}</td>
+            <td>${formatCurrency(product.price)}</td>
+            <td>
+                <input type="number" class="quantity-input" 
+                       value="${product.quantity}" min="1" 
+                       max="${product.stock}" data-index="${index}">
+                <small>${product.unit}</small>
+            </td>
+            <td>${formatCurrency(product.price * product.quantity)}</td>
+            <td>
+                <button class="btn-remove" data-index="${index}">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        productsList.appendChild(row);
+    });
+}
+
+function updateProductQuantity(input) {
+    const index = parseInt(input.dataset.index);
+    const newQuantity = parseInt(input.value);
+    
+    if (index >= 0 && index < selectedProducts.length && !isNaN(newQuantity) && newQuantity > 0) {
+        selectedProducts[index].quantity = newQuantity;
+    }
+}
+
+function removeProductRow(button) {
+    const index = parseInt(button.dataset.index);
+    if (index >= 0 && index < selectedProducts.length) {
+        selectedProducts.splice(index, 1);
+        renderProductsList();
+    }
 }
 
 function calculateSaleTotal() {
-    let total = 0;
-    const rows = document.querySelectorAll('.product-row');
+    let subtotal = 0;
     
-    rows.forEach(row => {
-        const productSelect = row.querySelector('.product-select');
-        const quantityInput = row.querySelector('.quantity-input');
-        const productId = productSelect.value;
-        
-        if (productId && quantityInput.value) {
-            const product = products.find(p => p.id == productId);
-            const quantity = parseFloat(quantityInput.value);
-            
-            if (product && !isNaN(quantity)) {
-                total += quantity * product.valor_unitario;
-            }
-        }
+    // Calcula subtotal
+    selectedProducts.forEach(product => {
+        subtotal += product.price * product.quantity;
     });
     
-    saleTotalElement.textContent = `R$ ${total.toFixed(2)}`;
+    // Aplica desconto se existir
+    let total = subtotal;
+    let discount = parseFloat(discountValueInput.value) || 0;
+    
+    if (discount > 0) {
+        if (discountTypeSelect.value === 'percent') {
+            discount = subtotal * (discount / 100);
+        }
+        total = Math.max(0, subtotal - discount);
+    }
+    
+    // Calcula troco
+    let change = 0;
+    const amountReceived = parseFloat(amountReceivedInput.value) || 0;
+    
+    if (amountReceived > 0) {
+        change = Math.max(0, amountReceived - total);
+    }
+    
+    // Atualiza UI
+    subtotalValueElement.textContent = formatCurrency(subtotal);
+    saleTotalElement.textContent = formatCurrency(total);
+    changeValueElement.textContent = formatCurrency(change);
+}
+
+function applyDiscount() {
+    calculateSaleTotal();
+    showMessage('Desconto aplicado com sucesso');
+}
+
+async function registerSale() {
+    if (!selectedClientIdInput.value) {
+        showMessage('Selecione um cliente', 'error');
+        return;
+    }
+    
+    if (selectedProducts.length === 0) {
+        showMessage('Adicione pelo menos um produto', 'error');
+        return;
+    }
+    
+    const paymentMethod = document.getElementById('payment-method').value;
+    if (!paymentMethod) {
+        showMessage('Selecione a forma de pagamento', 'error');
+        return;
+    }
+    
+    const notes = document.getElementById('sale-notes').value;
+    const amountReceived = parseFloat(amountReceivedInput.value) || 0;
+    const total = parseFloat(saleTotalElement.textContent.replace('R$ ', '').replace('.', '').replace(',', '.'));
+    
+    if (paymentMethod !== 'a_prazo' && amountReceived < total) {
+        showMessage('Valor recebido menor que o total da venda', 'error');
+        return;
+    }
+    
+    // Preparar itens para envio
+    const items = selectedProducts.map(product => ({
+        produto_id: product.id,
+        quantidade: product.quantity,
+        valor_unitario: product.price
+    }));
+    
+    // Preparar dados do desconto
+    let discount = 0;
+    const discountValue = parseFloat(discountValueInput.value) || 0;
+    
+    if (discountValue > 0) {
+        discount = discountTypeSelect.value === 'percent' 
+            ? (discountValue / 100) * items.reduce((sum, item) => sum + (item.valor_unitario * item.quantidade), 0)
+            : discountValue;
+    }
+    
+    try {
+        const response = await fetch('/operador/api/vendas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                cliente_id: parseInt(selectedClientIdInput.value),
+                forma_pagamento: paymentMethod,
+                valor_recebido: amountReceived,
+                desconto: discount,
+                observacao: notes,
+                itens: items
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Erro ao registrar venda');
+        }
+        
+        const result = await response.json();
+        resetSaleForm();
+        await updateBalance();
+        showMessage(`Venda registrada! Total: ${formatCurrency(result.valor_total)}`);
+        await loadProducts();
+    } catch (error) {
+        showMessage(error.message, 'error');
+    }
+}
+
+function resetSaleForm() {
+    selectedClient = null;
+    selectedProducts = [];
+    selectedClientInput.value = '';
+    selectedClientIdInput.value = '';
+    productsList.innerHTML = '';
+    document.getElementById('payment-method').value = '';
+    document.getElementById('sale-notes').value = '';
+    amountReceivedInput.value = '';
+    discountValueInput.value = '';
+    discountTypeSelect.value = 'fixed';
+    calculateSaleTotal();
+}
+
+async function closeRegister() {
+    const valorFechamento = prompt('Informe o valor de fechamento do caixa:');
+    if (!valorFechamento || isNaN(valorFechamento)) {
+        return showMessage('Valor de fechamento inválido', 'error');
+    }
+
+    if (confirm('Deseja realmente fechar o caixa?')) {
+        try {
+            const response = await fetch('/operador/api/fechar-caixa', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ valor_fechamento: parseFloat(valorFechamento) })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Erro ao fechar caixa');
+            }
+            
+            const now = new Date();
+            showMessage(`Caixa fechado às ${now.toLocaleTimeString('pt-BR')}`);
+            await checkCaixaStatus();
+        } catch (error) {
+            showMessage(error.message, 'error');
+        }
+    }
+}
+
+function searchClients() {
+    const searchTerm = clientSearch.value.toLowerCase();
+    if (!searchTerm) return renderClientCards();
+    
+    const filteredClients = clients.filter(client => 
+        client.nome.toLowerCase().includes(searchTerm) ||
+        (client.documento && client.documento.toLowerCase().includes(searchTerm)) ||
+        (client.telefone && client.telefone.toLowerCase().includes(searchTerm))
+    );
+    
+    renderClientCards(filteredClients);
 }
 
 function openModal(type) {
@@ -381,163 +658,12 @@ async function saveClient() {
     }
 }
 
-async function registerSale() {
-    const clienteId = clientSelect.value;
-    const paymentMethod = document.getElementById('payment-method').value;
-    const notes = document.getElementById('sale-notes').value;
-    const amountReceivedRaw = amountReceivedInput.value.trim();
-    
-    // Validações básicas
-    if (!clienteId) return showMessage('Selecione um cliente', 'error');
-    if (!paymentMethod) return showMessage('Selecione a forma de pagamento', 'error');
-    if (!amountReceivedRaw) return showMessage('Informe o valor recebido', 'error');
-
-    const amountReceived = parseFloat(amountReceivedRaw.replace(',', '.'));
-    if (isNaN(amountReceived) || amountReceived < 0) return showMessage('Valor recebido inválido', 'error');
-    
-    // Preparar itens
-    const items = [];
-    const rows = document.querySelectorAll('.product-row');
-    
-    for (const row of rows) {
-        const productSelect = row.querySelector('.product-select');
-        const quantityInput = row.querySelector('.quantity-input');
-        const productId = productSelect.value;
-        const quantity = parseFloat(quantityInput.value);
-        
-        if (productId && quantity > 0) {
-            const product = products.find(p => p.id == productId);
-            if (product) {
-                items.push({
-                    produto_id: parseInt(productId),
-                    quantidade: quantity,
-                    valor_unitario: product.valor_unitario
-                });
-            }
-        }
-    }
-    
-    if (items.length === 0) {
-        return showMessage('Adicione pelo menos um produto', 'error');
-    }
-
-    // Calcula total da venda
-    let totalSale = 0;
-    items.forEach(item => {
-        totalSale += item.quantidade * item.valor_unitario;
-    });
-
-    if (amountReceived < totalSale && paymentMethod !== 'a_prazo') {
-        return showMessage('Valor recebido menor que o total', 'error');
-    }
-
-    const troco = (amountReceived - totalSale).toFixed(2);
-
-    // Confirma troco antes de finalizar
-    if (!confirm(`Troco: R$ ${troco}\nDeseja finalizar a venda?`)) {
-        return;
-    }
-
-    try {
-        const response = await fetch('/operador/api/vendas', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                cliente_id: parseInt(clienteId),
-                forma_pagamento: paymentMethod,
-                valor_recebido: amountReceived,
-                observacao: notes,
-                itens: items
-            })
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Erro ao registrar venda');
-        }
-        
-        const result = await response.json();
-        resetSaleForm();
-        await updateBalance();
-        showMessage(`Venda registrada! Total: R$ ${result.valor_total.toFixed(2)} | Troco: R$ ${troco}`);
-        await loadProducts();
-    } catch (error) {
-        showMessage(error.message, 'error');
-    }
-}
-
-function resetSaleForm() {
-    // Limpa todas as linhas exceto a primeira
-    while (productsContainer.children.length > 1) {
-        productsContainer.removeChild(productsContainer.lastChild);
-    }
-    
-    // Reseta a primeira linha
-    const firstRow = productsContainer.firstElementChild;
-    firstRow.querySelector('.product-select').value = '';
-    firstRow.querySelector('.quantity-input').value = '';
-    
-    // Reseta outros campos
-    clientSelect.value = '';
-    document.getElementById('payment-method').value = '';
-    document.getElementById('sale-notes').value = '';
-    amountReceivedInput.value = '';
-    saleTotalElement.textContent = 'R$ 0.00';
-}
-
-async function closeRegister() {
-    const valorFechamento = prompt('Informe o valor de fechamento do caixa:');
-    if (!valorFechamento || isNaN(valorFechamento)) {
-        return showMessage('Valor de fechamento inválido', 'error');
-    }
-
-    if (confirm('Deseja realmente fechar o caixa?')) {
-        try {
-            const response = await fetch('/operador/api/fechar-caixa', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ valor_fechamento: parseFloat(valorFechamento) })
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Erro ao fechar caixa');
-            }
-            
-            const now = new Date();
-            showMessage(`Caixa fechado às ${now.toLocaleTimeString('pt-BR')}`);
-            await checkCaixaStatus();
-        } catch (error) {
-            showMessage(error.message, 'error');
-        }
-    }
-}
-
-function searchClients() {
-    const searchTerm = clientSearch.value.toLowerCase();
-    if (!searchTerm) return renderClientCards();
-    
-    const filteredClients = clients.filter(client => 
-        client.nome.toLowerCase().includes(searchTerm) ||
-        (client.documento && client.documento.toLowerCase().includes(searchTerm)) ||
-        (client.telefone && client.telefone.toLowerCase().includes(searchTerm))
-    );
-    
-    renderClientCards(filteredClients);
-}
-
 function showMessage(message, type = 'success') {
     notification.className = `notification ${type} show`;
     notificationMessage.textContent = message;
     
-    const icon = notification.querySelector('i');
+    const icon = notification.querySelector('.notification-icon i');
     icon.className = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
     
     setTimeout(() => notification.classList.remove('show'), 5000);
-}
-
-// Função para fechar o modal de troco (se necessário)
-function fecharModalTroco() {
-    const modal = document.getElementById('troco-modal');
-    if (modal) modal.style.display = 'none';
 }

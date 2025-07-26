@@ -6,110 +6,170 @@
     <title>Painel do Operador</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_operador.css') }}">
+    <style>
+        /* Estilos para o comportamento das abas e mensagens */
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .flash-message {
+            transition: opacity 1s ease-out;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <img src="{{ url_for('static', filename='assets/logo.jpeg') }}" alt="Logo" class="logo">
-            <div class="user-info">        
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                <div class="flash-message flash-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% else %}
-                <div class="user-greeting">Bem-vindo, {{ nome_usuario }}</div>
-            {% endif %}
-            {% endwith %}
-            <div class="current-date" id="current-date"></div>
+    <div class="dashboard">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='assets/logo.jpeg') }}" alt="Logo" class="logo">
             </div>
-            <button class="btn btn-secondary" id="logout-btn">
-                <i class="fas fa-sign-out-alt"></i> Sair
+            
+            <div class="user-info">
+                <div class="user-greeting">Bem-vindo, {{ nome_usuario }}</div>
+                <div class="current-date" id="current-date"></div>
+            </div>
+            
+            <div class="balance-info">
+                <div class="balance-header">
+                    <i class="fas fa-wallet"></i>
+                    <span>Saldo do Caixa</span>
+                    <button class="toggle-balance" id="toggle-balance">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <div class="balance-details">
+                    <div class="balance-item" id="opening-balance">
+                        <span>Abertura:</span>
+                        <span class="balance-value">R$ 0.00</span>
+                    </div>
+                    <div class="balance-item" id="current-balance">
+                        <span>Saldo atual:</span>
+                        <span class="balance-value">R$ 0.00</span>
+                    </div>
+                </div>
+            </div>
+            
+            <nav class="main-menu">
+                <button class="menu-item active" id="sales-tab" data-tab="sales">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span>Vendas</span>
+                </button>
+                <button class="menu-item" id="clients-tab" data-tab="clients">
+                    <i class="fas fa-users"></i>
+                    <span>Clientes</span>
+                </button>
+            </nav>
+            
+            <button class="btn-logout" id="logout-btn">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Sair</span>
             </button>
         </div>
         
-        <!-- Status Bar -->
-        <div class="status-bar">
-            <div class="balance-info">
-                <i class="fas fa-wallet balance-icon"></i>
-                <div class="balance-details">
-                    <div class="balance-label" id="opening-balance">Abertura: R$ 0.00</div>
-                    <div class="balance-label" id="current-balance">Saldo atual [vendas]: R$ 0.00</div>
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Header -->
+            <div class="content-header">
+                <h1 id="current-tab-title">Vendas</h1>
+                <div class="actions">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                    {% endwith %}
                 </div>
             </div>
-            <button class="btn btn-primary" id="toggle-balance">Ocultar saldo</button>
-        </div>
-        
-        <!-- Tabs -->
-        <div class="tabs-container">
-            <div class="tab-header">
-                <button class="tab-btn active" data-tab="sales">
-                    <i class="fas fa-shopping-cart"></i> Vendas
-                </button>
-                <button class="tab-btn" data-tab="clients">
-                    <i class="fas fa-users"></i> Clientes
-                </button>
-            </div>
             
-            <!-- Sales Tab -->
+            <!-- Tab Contents -->
             <div class="tab-content active" id="sales">
-                <div class="scrollable-content">
-                    <!-- Client Section -->
-                    <div class="group-box">
-                        <div class="group-title">
-                            <i class="fas fa-user"></i> Informações do Cliente
-                        </div>
-                        <div class="form-row">
-                            <select class="form-control" id="client-select">
-                                <option value="">Selecione um cliente</option>
-                            </select>
-                            <button class="btn btn-primary" id="new-client-btn">
-                                <i class="fas fa-plus"></i> Novo Cliente
-                            </button>
+                <!-- Client Search Section -->
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-user"></i>
+                        <h3>Informações do Cliente</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="search-client-container">
+                            <div class="search-input-group">
+                                <input type="text" id="client-search-input" placeholder="Buscar por nome, CPF ou telefone...">
+                                <button class="btn-search" id="search-client-btn">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                            <div class="client-info-display">
+                                <input type="text" id="selected-client" placeholder="Cliente selecionado" readonly>
+                                <input type="hidden" id="selected-client-id">
+                            </div>
                         </div>
                     </div>
-                    
-                    <!-- Products Section -->
-                    <div class="group-box">
-                        <div class="group-title">
-                            <i class="fas fa-box-open"></i> Produtos da Venda
-                        </div>
-                        <div class="form-row" style="font-weight: bold;">
-                            <div style="flex: 2;">Produto</div>
-                            <div style="flex: 1; text-align: center;">Quantidade</div>
-                            <div style="width: 40px;"></div>
-                        </div>
-                        
-                        <div id="products-container">
-                            <div class="product-row">
-                                <select class="form-control product-select">
-                                    <option value="">Selecione um produto</option>
-                                </select>
-                                <input type="number" class="form-control quantity-input" placeholder="Quantidade" min="1" step="1">
-                                <button class="btn-remove">
-                                    <i class="fas fa-times"></i>
+                </div>
+                
+                <!-- Products Section -->
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-box-open"></i>
+                        <h3>Produtos da Venda</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="search-product-container">
+                            <div class="search-input-group">
+                                <input type="text" id="product-search-input" placeholder="Buscar por nome, marca ou código...">
+                                <button class="btn-search" id="search-product-btn">
+                                    <i class="fas fa-search"></i>
                                 </button>
                             </div>
                         </div>
                         
-                        <button class="btn btn-secondary" id="add-product-btn" style="margin-top: 10px;">
+                        <!-- Products List -->
+                        <div class="products-table-container">
+                            <table class="products-table">
+                                <thead>
+                                    <tr>
+                                        <th>Produto</th>
+                                        <th>Descrição</th>
+                                        <th>Valor Unitário</th>
+                                        <th>Quantidade</th>
+                                        <th>Total</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="products-list">
+                                    <!-- Products will be added here -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <button class="btn-add-product" id="add-product-btn">
                             <i class="fas fa-plus"></i> Adicionar Produto
                         </button>
                     </div>
-                    
-                    <!-- Payment Section -->
-                    <div class="group-box">
-                        <div class="group-title">
-                            <i class="fas fa-money-bill-wave"></i> Finalização da Venda
-                        </div>
-                        <div style="display: flex; gap: 20px;">
-                            <div style="flex: 1;">
-                                <div class="group-title" style="margin-bottom: 10px; font-size: 14px;">
-                                    Forma de Pagamento
-                                </div>
-                                <select class="form-control" id="payment-method">
-                                    <option value="">Selecione a forma de pagamento</option>
+                </div>
+                
+                <!-- Payment Section -->
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-money-bill-wave"></i>
+                        <h3>Finalização da Venda</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="payment-methods">
+                            <div class="form-group">
+                                <label for="payment-method">Forma de Pagamento</label>
+                                <select id="payment-method" class="form-control">
+                                    <option value="">Selecione...</option>
                                     <option value="pix_fabiano">Pix - Fabiano</option>
                                     <option value="pix_maquineta">Pix - Maquineta</option>
                                     <option value="dinheiro">Dinheiro</option>
@@ -118,58 +178,84 @@
                                     <option value="a_prazo">A Prazo [Fiado]</option>
                                 </select>
                             </div>
-                            <div style="flex: 1;">
-                                <div class="group-title" style="margin-bottom: 10px; font-size: 14px;">
-                                    Observações
-                                </div>
-                                <input type="text" class="form-control" id="sale-notes" placeholder="Observações sobre a venda (opcional)">
+                            
+                            <div class="form-group">
+                                <label for="sale-notes">Observações</label>
+                                <input type="text" id="sale-notes" class="form-control" placeholder="Observações sobre a venda (opcional)">
                             </div>
                         </div>
                         
                         <!-- Sale Summary -->
-                        <div class="sale-summary" style="margin-top: 20px;">
-                            <div class="sale-summary-item">
-                                <div class="sale-summary-label">Valor Total da Venda</div>
-                                <div class="sale-summary-value" id="sale-total">R$ 0.00</div>
+                        <div class="sale-summary">
+                            <div class="summary-row">
+                                <span>Subtotal:</span>
+                                <span id="subtotal-value">R$ 0.00</span>
                             </div>
-                            <div class="sale-summary-item">
-                                <div class="sale-summary-label">Valor Recebido</div>
-                                <input type="number" class="form-control" id="amount-received" placeholder="Digite o valor recebido" min="0" step="0.01">
+                            
+                            <div class="discount-row">
+                                <div class="form-group">
+                                    <label for="discount-value">Desconto:</label>
+                                    <div class="discount-input">
+                                        <input type="number" id="discount-value" class="form-control" placeholder="0.00" min="0" step="0.01">
+                                        <select id="discount-type" class="form-control">
+                                            <option value="fixed">R$</option>
+                                            <option value="percent">%</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button class="btn-apply-discount" id="apply-discount-btn">Aplicar</button>
+                            </div>
+                            
+                            <div class="summary-row total">
+                                <span>Total da Venda:</span>
+                                <span id="sale-total">R$ 0.00</span>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="amount-received">Valor Recebido</label>
+                                <input type="number" id="amount-received" class="form-control" placeholder="Digite o valor recebido" min="0" step="0.01">
+                            </div>
+                            
+                            <div class="summary-row change">
+                                <span>Troco:</span>
+                                <span id="change-value">R$ 0.00</span>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- Action Buttons -->
-                    <div class="action-buttons">
-                        <button class="btn btn-primary btn-large" id="register-sale-btn">
-                            <i class="fas fa-cash-register"></i> Registrar Venda
-                        </button>
-                        <button class="btn btn-secondary btn-large" id="close-register-btn">
-                            <i class="fas fa-lock"></i> Fechar Caixa
-                        </button>
+                        
+                        <!-- Action Buttons -->
+                        <div class="action-buttons">
+                            <button class="btn-primary" id="register-sale-btn">
+                                <i class="fas fa-cash-register"></i> Registrar Venda
+                            </button>
+                            <button class="btn-secondary" id="close-register-btn">
+                                <i class="fas fa-lock"></i> Fechar Caixa
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
             
             <!-- Clients Tab -->
             <div class="tab-content" id="clients">
-                <div class="scrollable-content">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-                        <h3 style="color: var(--secondary);">Clientes Cadastrados</h3>
-                        <button class="btn btn-primary" id="add-client-btn">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-users"></i>
+                        <h3>Clientes Cadastrados</h3>
+                        <button class="btn-primary" id="add-client-btn">
                             <i class="fas fa-plus"></i> Novo Cliente
                         </button>
                     </div>
-                    
-                    <div class="search-bar">
-                        <input type="text" class="search-input" id="client-search" placeholder="Pesquisar cliente...">
-                        <button class="btn btn-secondary" id="search-client-btn">
-                            <i class="fas fa-search"></i> Buscar
-                        </button>
-                    </div>
-                    
-                    <div id="clients-container">
-                        <!-- Client cards will be added here -->
+                    <div class="card-body">
+                        <div class="search-bar">
+                            <input type="text" class="search-input" id="client-search" placeholder="Pesquisar cliente...">
+                            <button class="btn-search" id="search-client-btn">
+                                <i class="fas fa-search"></i> Buscar
+                            </button>
+                        </div>
+                        
+                        <div class="clients-grid" id="clients-container">
+                            <!-- Client cards will be added here -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -180,67 +266,121 @@
     <div class="modal" id="client-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="modal-title" id="client-modal-title">Cadastrar Cliente</div>
-                <div class="modal-close">&times;</div>
+                <h3 id="client-modal-title">Cadastrar Cliente</h3>
+                <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="client-form">
                     <div class="form-group">
-                        <label class="form-label">Nome:</label>
-                        <input type="text" class="form-control" id="client-name" required>
+                        <label for="client-name">Nome:</label>
+                        <input type="text" id="client-name" class="form-control" required>
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label">Documento:</label>
-                        <input type="text" class="form-control" id="client-document" required>
+                        <label for="client-document">Documento:</label>
+                        <input type="text" id="client-document" class="form-control" required>
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label">Telefone:</label>
-                        <input type="text" class="form-control" id="client-phone">
+                        <label for="client-phone">Telefone:</label>
+                        <input type="text" id="client-phone" class="form-control">
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label">Email:</label>
-                        <input type="email" class="form-control" id="client-email">
+                        <label for="client-email">Email:</label>
+                        <input type="email" id="client-email" class="form-control">
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label">Endereço:</label>
-                        <input type="text" class="form-control" id="client-address">
+                        <label for="client-address">Endereço:</label>
+                        <input type="text" id="client-address" class="form-control">
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="cancel-client">Cancelar</button>
-                <button class="btn btn-primary" id="save-client">Salvar</button>
+                <button class="btn-secondary" id="cancel-client">Cancelar</button>
+                <button class="btn-primary" id="save-client">Salvar</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal de Troco -->
-    <div class="modal" id="troco-modal" style="display: none;">
-    <div class="modal-content">
-        <div class="modal-header">
-        <div class="modal-title">Confirmar Venda com Troco</div>
-        <div class="modal-close" onclick="fecharModalTroco()">&times;</div>
+    <!-- Product Search Modal -->
+    <div class="modal" id="product-search-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Selecionar Produto</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="search-input-group">
+                    <input type="text" id="modal-product-search" placeholder="Buscar por nome, marca ou código...">
+                    <button class="btn-search" id="modal-search-product-btn">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                
+                <div class="search-results" id="product-search-results">
+                    <!-- Search results will appear here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="cancel-product-search">Cancelar</button>
+            </div>
         </div>
-        <div class="modal-body">
-        <p id="troco-detalhes"></p>
-        </div>
-        <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="fecharModalTroco()">Cancelar</button>
-        <button class="btn btn-primary" id="confirmar-venda-btn">Confirmar</button>
-        </div>
-    </div>
     </div>
 
     <!-- Notification -->
     <div class="notification" id="notification">
-        <i class="fas fa-check-circle"></i>
-        <span id="notification-message"></span>
+        <div class="notification-icon">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="notification-content">
+            <span id="notification-message"></span>
+        </div>
     </div>
     
     <script src="{{ url_for('static', filename='js/script_operador.js') }}"></script>
+    <script>
+        // Comportamento das abas
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elementos das abas
+            const salesTab = document.getElementById('sales-tab');
+            const clientsTab = document.getElementById('clients-tab');
+            const salesContent = document.getElementById('sales');
+            const clientsContent = document.getElementById('clients');
+            const currentTabTitle = document.getElementById('current-tab-title');
+            
+            // Função para alternar entre abas
+            function switchTab(activeTab, inactiveTab, activeContent, inactiveContent, title) {
+                activeTab.classList.add('active');
+                inactiveTab.classList.remove('active');
+                activeContent.classList.add('active');
+                inactiveContent.classList.remove('active');
+                currentTabTitle.textContent = title;
+            }
+            
+            // Event listeners para as abas
+            salesTab.addEventListener('click', function() {
+                switchTab(salesTab, clientsTab, salesContent, clientsContent, 'Vendas');
+            });
+            
+            clientsTab.addEventListener('click', function() {
+                switchTab(clientsTab, salesTab, clientsContent, salesContent, 'Clientes');
+                // Carrega os clientes quando a aba é aberta
+                if (typeof loadClients === 'function') {
+                    loadClients();
+                }
+            });
+            
+            // Configura mensagens flash para desaparecer após 5 segundos
+            const flashMessages = document.querySelectorAll('.flash-message');
+            flashMessages.forEach(message => {
+                setTimeout(() => {
+                    message.style.opacity = '0';
+                    setTimeout(() => message.remove(), 1000);
+                }, 5000);
+            });
+        });
+    </script>
 </body>
 </html>
