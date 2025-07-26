@@ -165,6 +165,12 @@
                         <h3>Finalização da Venda</h3>
                     </div>
                     <div class="card-body">
+                        <!-- Adicione este botão abaixo dos métodos de pagamento -->
+                        <div class="form-group">
+                            <button class="btn-delivery" id="delivery-btn">
+                                <i class="fas fa-truck"></i> Adicionar Entrega
+                            </button>
+                        </div>
                         <div class="payment-methods">
                             <div class="form-group">
                                 <label for="payment-method">Forma de Pagamento</label>
@@ -325,6 +331,63 @@
             </div>
             <div class="modal-footer">
                 <button class="btn-secondary" id="cancel-product-search">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delivery Modal -->
+    <div class="modal" id="delivery-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Informações de Entrega</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="delivery-form">
+                    <div class="form-group">
+                        <label for="delivery-address">Endereço:</label>
+                        <input type="text" id="delivery-address" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="delivery-number">Número:</label>
+                        <input type="text" id="delivery-number" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="delivery-complement">Complemento:</label>
+                        <input type="text" id="delivery-complement" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="delivery-neighborhood">Bairro:</label>
+                        <input type="text" id="delivery-neighborhood" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="delivery-city">Cidade:</label>
+                        <input type="text" id="delivery-city" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="delivery-state">Estado:</label>
+                        <input type="text" id="delivery-state" class="form-control" required maxlength="2">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="delivery-zipcode">CEP:</label>
+                        <input type="text" id="delivery-zipcode" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="delivery-instructions">Instruções de entrega:</label>
+                        <textarea id="delivery-instructions" class="form-control" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="cancel-delivery">Cancelar</button>
+                <button class="btn-primary" id="save-delivery">Salvar Endereço</button>
             </div>
         </div>
     </div>

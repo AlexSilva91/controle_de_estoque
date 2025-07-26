@@ -6,6 +6,7 @@ let products = [];
 let currentEditingClient = null;
 let selectedClient = null;
 let selectedProducts = [];
+let deliveryAddress = null;
 
 // DOM Elements
 const openingBalanceLabel = document.getElementById('opening-balance').querySelector('.balance-value');
@@ -42,6 +43,10 @@ const productSearchModal = document.getElementById('product-search-modal');
 const modalProductSearch = document.getElementById('modal-product-search');
 const productSearchResults = document.getElementById('product-search-results');
 const currentTabTitle = document.getElementById('current-tab-title');
+const deliveryBtn = document.getElementById('delivery-btn');
+const deliveryModal = document.getElementById('delivery-modal');
+const saveDeliveryBtn = document.getElementById('save-delivery');
+const cancelDeliveryBtn = document.getElementById('cancel-delivery');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -104,9 +109,15 @@ function setupEventListeners() {
     });
     
     productsList.addEventListener('click', (e) => {
-        if (e.target.classList.contains('btn-remove')) {
-            removeProductRow(e.target);
+        if (e.target.closest('.btn-remove')) {
+            const button = e.target.closest('.btn-remove');
+            removeProductRow(button);
             calculateSaleTotal();
+        }
+        
+        if (e.target.closest('.btn-discount')) {
+            const button = e.target.closest('.btn-discount');
+            openDiscountModal(button.dataset.index);
         }
     });
     
@@ -118,89 +129,322 @@ function setupEventListeners() {
     modalProductSearch.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') searchProductsInModal();
     });
+    
+    // Botão de cancelar no modal de busca de produtos
+    document.getElementById('cancel-product-search').addEventListener('click', () => {
+        closeModal();
+        productSearchInput.value = ''; // Limpa o campo de busca
+    });
+    
+    // Entrega
+    deliveryBtn.addEventListener('click', openDeliveryModal);
+    saveDeliveryBtn.addEventListener('click', saveDeliveryAddress);
+    cancelDeliveryBtn.addEventListener('click', closeModal);
 }
 
-async function checkCaixaStatus() {
-    try {
-        const response = await fetch('/operador/api/saldo');
-        if (!response.ok) throw new Error('Erro ao verificar status do caixa');
-        
-        const data = await response.json();
-        
-        if (data.message === 'Nenhum caixa aberto encontrado') {
-            closeRegisterBtn.style.display = 'none';
-        } else {
-            closeRegisterBtn.style.display = 'block';
-            updateBalance();
-        }
-    } catch (error) {
-        console.error('Error checking caixa status:', error);
+// ==================== FUNÇÕES DE ENTREGA ====================
+function openDeliveryModal() {
+    // Preenche o formulário se já tiver endereço
+    if (deliveryAddress) {
+        document.getElementById('delivery-address').value = deliveryAddress.logradouro || '';
+        document.getElementById('delivery-number').value = deliveryAddress.numero || '';
+        document.getElementById('delivery-complement').value = deliveryAddress.complemento || '';
+        document.getElementById('delivery-neighborhood').value = deliveryAddress.bairro || '';
+        document.getElementById('delivery-city').value = deliveryAddress.cidade || '';
+        document.getElementById('delivery-state').value = deliveryAddress.estado || '';
+        document.getElementById('delivery-zipcode').value = deliveryAddress.cep || '';
+        document.getElementById('delivery-instructions').value = deliveryAddress.instrucoes || '';
     }
+    
+    openModal('delivery');
 }
 
-function updateCurrentDate() {
-    const now = new Date();
-    currentDateElement.textContent = now.toLocaleDateString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+function saveDeliveryAddress() {
+    const address = document.getElementById('delivery-address').value;
+    const number = document.getElementById('delivery-number').value;
+    
+    if (!address || !number) {
+        showMessage('Endereço e número são obrigatórios', 'error');
+        return;
+    }
+    
+    deliveryAddress = {
+        logradouro: address,
+        numero: number,
+        complemento: document.getElementById('delivery-complement').value,
+        bairro: document.getElementById('delivery-neighborhood').value,
+        cidade: document.getElementById('delivery-city').value,
+        estado: document.getElementById('delivery-state').value,
+        cep: document.getElementById('delivery-zipcode').value,
+        instrucoes: document.getElementById('delivery-instructions').value
+    };
+    
+    // Atualiza o botão para mostrar que tem entrega cadastrada
+    deliveryBtn.classList.add('has-delivery');
+    deliveryBtn.innerHTML = '<i class="fas fa-check-circle"></i> Endereço de Entrega Cadastrado';
+    
+    closeModal();
+    showMessage('Endereço de entrega salvo com sucesso!');
+    
+    // Mostra as informações resumidas
+    showDeliveryInfo();
+}
+
+function showDeliveryInfo() {
+    // Remove a info anterior se existir
+    const existingInfo = document.querySelector('.delivery-info');
+    if (existingInfo) existingInfo.remove();
+    
+    const deliveryInfo = document.createElement('div');
+    deliveryInfo.className = 'delivery-info';
+    deliveryInfo.innerHTML = `
+        <p><strong>Endereço de Entrega:</strong></p>
+        <p>${deliveryAddress.logradouro}, ${deliveryAddress.numero}${deliveryAddress.complemento ? ', ' + deliveryAddress.complemento : ''}</p>
+        <p>${deliveryAddress.bairro} - ${deliveryAddress.cidade}/${deliveryAddress.estado}</p>
+        <p>CEP: ${deliveryAddress.cep}</p>
+        ${deliveryAddress.instrucoes ? `<p><strong>Instruções:</strong> ${deliveryAddress.instrucoes}</p>` : ''}
+        <button class="btn-edit-delivery" id="edit-delivery-btn">
+            <i class="fas fa-edit"></i> Editar Endereço
+        </button>
+    `;
+    
+    // Insere após o botão de entrega
+    deliveryBtn.insertAdjacentElement('afterend', deliveryInfo);
+    
+    // Adiciona evento para editar
+    document.getElementById('edit-delivery-btn').addEventListener('click', openDeliveryModal);
+}
+
+// ==================== FUNÇÕES DE DESCONTO EM PRODUTOS ====================
+function openDiscountModal(productIndex) {
+    const product = selectedProducts[productIndex];
+    const totalOriginalValue = product.originalPrice * product.quantity;
+    
+    // Cria o modal de desconto
+    const discountModal = document.createElement('div');
+    discountModal.className = 'modal';
+    discountModal.id = 'discount-modal';
+    discountModal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Aplicar Desconto em ${product.name}</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="product-discount-value">Valor do Desconto:</label>
+                    <input type="number" id="product-discount-value" class="form-control" 
+                           value="${product.discountValue || 0}" min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label for="product-discount-type">Tipo de Desconto:</label>
+                    <select id="product-discount-type" class="form-control">
+                        <option value="fixed" ${product.discountType === 'fixed' ? 'selected' : ''}>Valor Fixo (R$)</option>
+                        <option value="percent" ${product.discountType === 'percent' ? 'selected' : ''}>Porcentagem (%)</option>
+                    </select>
+                </div>
+                <div class="price-preview">
+                    <p>Valor Original Total: ${formatCurrency(totalOriginalValue)} (${product.quantity} × ${formatCurrency(product.originalPrice)})</p>
+                    <p>Novo Valor Total: <span id="new-price-preview">${formatCurrency(product.price * product.quantity)}</span></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="cancel-discount">Cancelar</button>
+                <button class="btn-primary" id="apply-product-discount">Aplicar Desconto</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(discountModal);
+    openModal('discount');
+    
+    // Event listeners para o modal de desconto
+    const discountValueInput = document.getElementById('product-discount-value');
+    const discountTypeSelect = document.getElementById('product-discount-type');
+    
+    function updatePricePreview() {
+        const discountValue = parseFloat(discountValueInput.value) || 0;
+        const discountType = discountTypeSelect.value;
+        let newTotalValue = totalOriginalValue;
+        
+        if (discountValue > 0) {
+            if (discountType === 'percent') {
+                newTotalValue = totalOriginalValue * (1 - (discountValue / 100));
+            } else {
+                // Aplica o desconto fixo sobre o valor total
+                newTotalValue = totalOriginalValue - discountValue;
+            }
+            newTotalValue = Math.max(0, newTotalValue);
+        }
+        
+        // Calcula o novo preço unitário baseado no desconto total
+        const newUnitPrice = newTotalValue / product.quantity;
+        
+        document.getElementById('new-price-preview').textContent = formatCurrency(newTotalValue);
+    }
+    
+    discountValueInput.addEventListener('input', updatePricePreview);
+    discountTypeSelect.addEventListener('change', updatePricePreview);
+    
+    document.getElementById('apply-product-discount').addEventListener('click', () => {
+        const discountValue = parseFloat(discountValueInput.value) || 0;
+        const discountType = discountTypeSelect.value;
+        const totalOriginalValue = product.originalPrice * product.quantity;
+        let newTotalValue = totalOriginalValue;
+        
+        // Aplica o desconto ao produto
+        selectedProducts[productIndex].discountValue = discountValue;
+        selectedProducts[productIndex].discountType = discountType;
+        
+        // Calcula o novo valor total com desconto
+        if (discountValue > 0) {
+            if (discountType === 'percent') {
+                newTotalValue = totalOriginalValue * (1 - (discountValue / 100));
+            } else {
+                // Aplica o desconto fixo sobre o valor total
+                newTotalValue = totalOriginalValue - discountValue;
+            }
+            newTotalValue = Math.max(0, newTotalValue);
+        }
+        
+        // Calcula o novo preço unitário
+        selectedProducts[productIndex].price = newTotalValue / product.quantity;
+        
+        closeModal();
+        renderProductsList();
+        calculateSaleTotal();
+        showMessage('Desconto aplicado ao produto com sucesso!');
+    });
+    
+    document.querySelector('#discount-modal .modal-close').addEventListener('click', closeModal);
+    document.getElementById('cancel-discount').addEventListener('click', closeModal);
+}
+
+
+// ==================== FUNÇÕES DE PRODUTOS ====================
+function addProductToSale(product) {
+    const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
+    
+    if (existingProductIndex >= 0) {
+        selectedProducts[existingProductIndex].quantity += 1;
+    } else {
+        selectedProducts.push({
+            id: product.id,
+            name: product.nome,
+            description: product.descricao || '',
+            price: product.valor_unitario,
+            originalPrice: product.valor_unitario,
+            quantity: 1,
+            unit: product.unidade,
+            stock: product.estoque_quantidade,
+            discountValue: 0,
+            discountType: 'fixed'
+        });
+    }
+    
+    renderProductsList();
+    calculateSaleTotal();
+}
+
+function renderProductsList() {
+    productsList.innerHTML = '';
+    
+    selectedProducts.forEach((product, index) => {
+        const totalOriginalValue = product.originalPrice * product.quantity;
+        let totalWithDiscount = totalOriginalValue;
+        
+        if (product.discountValue > 0) {
+            if (product.discountType === 'percent') {
+                totalWithDiscount = totalOriginalValue * (1 - (product.discountValue / 100));
+            } else {
+                totalWithDiscount = totalOriginalValue - product.discountValue;
+            }
+            totalWithDiscount = Math.max(0, totalWithDiscount);
+        }
+        
+        const unitPriceWithDiscount = totalWithDiscount / product.quantity;
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${product.name}</td>
+            <td>${product.description}</td>
+            <td>
+                ${product.discountValue > 0 ? 
+                    `<span class="original-price">${formatCurrency(product.originalPrice)}</span> ` : ''}
+                ${formatCurrency(unitPriceWithDiscount)}
+                ${product.discountValue > 0 ? 
+                    `<span class="discount-badge">${product.discountValue}${product.discountType === 'percent' ? '%' : 'R$'}</span>` : ''}
+            </td>
+            <td>
+                <input type="number" class="quantity-input" 
+                       value="${product.quantity}" min="1" 
+                       max="${product.stock}" data-index="${index}">
+                <small>${product.unit}</small>
+            </td>
+            <td class="product-total">${formatCurrency(totalWithDiscount)}</td>
+            <td>
+                <button class="btn-discount" data-index="${index}" title="Aplicar desconto">
+                    <i class="fas fa-percentage"></i>
+                </button>
+                <button class="btn-remove" data-index="${index}" title="Remover produto">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        productsList.appendChild(row);
     });
 }
 
-function toggleBalance() {
-    balanceVisible = !balanceVisible;
-    updateBalance();
-    toggleBalanceBtn.innerHTML = balanceVisible ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
-}
-
-async function updateBalance() {
-    try {
-        const response = await fetch('/operador/api/saldo');
-        if (!response.ok) throw new Error('Erro ao carregar saldo');
-        
-        const data = await response.json();
-        
-        if (data.message === 'Nenhum caixa aberto encontrado') {
-            openingBalanceLabel.textContent = 'Caixa fechado';
-            currentBalanceLabel.textContent = '';
-            return;
-        }
-
-        if (balanceVisible) {
-            openingBalanceLabel.textContent = formatCurrency(data.valor_abertura);
-            currentBalanceLabel.textContent = data.saldo_formatado || 'R$ 0,00';
-        } else {
-            openingBalanceLabel.textContent = '******';
-            currentBalanceLabel.textContent = '******';
-        }
-    } catch (error) {
-        console.error('Error updating balance:', error);
-        openingBalanceLabel.textContent = 'Erro';
-        currentBalanceLabel.textContent = '';
-    }
-}
-
-function formatCurrency(value) {
-    if (typeof value === 'string') {
-        value = parseFloat(value.replace(',', '.'));
-    }
-    return 'R$ ' + value.toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
-}
-
-function switchTab(tabId) {
-    // Atualiza a UI das abas
-    tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
-    tabContents.forEach(content => content.classList.toggle('active', content.id === tabId));
+function calculateSaleTotal() {
+    let subtotal = 0;
     
-    // Atualiza o título da aba atual
-    const activeTabBtn = document.querySelector(`.menu-item[data-tab="${tabId}"]`);
-    if (activeTabBtn) {
-        currentTabTitle.textContent = activeTabBtn.querySelector('span').textContent;
+    selectedProducts.forEach((product, index) => {
+        const totalOriginalValue = product.originalPrice * product.quantity;
+        let totalWithDiscount = totalOriginalValue;
+        
+        if (product.discountValue > 0) {
+            if (product.discountType === 'percent') {
+                totalWithDiscount = totalOriginalValue * (1 - (product.discountValue / 100));
+            } else {
+                totalWithDiscount = totalOriginalValue - product.discountValue;
+            }
+            totalWithDiscount = Math.max(0, totalWithDiscount);
+        }
+        
+        subtotal += totalWithDiscount;
+        
+        const row = productsList.children[index];
+        if (row) {
+            const totalCell = row.querySelector('.product-total');
+            if (totalCell) {
+                totalCell.textContent = formatCurrency(totalWithDiscount);
+            }
+        }
+    });
+    
+    let total = subtotal;
+    let discount = parseFloat(discountValueInput.value) || 0;
+    
+    if (discount > 0) {
+        if (discountTypeSelect.value === 'percent') {
+            discount = subtotal * (discount / 100);
+        }
+        total = Math.max(0, subtotal - discount);
     }
+    
+    let change = 0;
+    const amountReceived = parseFloat(amountReceivedInput.value) || 0;
+    
+    if (amountReceived > 0) {
+        change = Math.max(0, amountReceived - total);
+    }
+    
+    subtotalValueElement.textContent = formatCurrency(subtotal);
+    saleTotalElement.textContent = formatCurrency(total);
+    changeValueElement.textContent = formatCurrency(change);
 }
 
+// ==================== FUNÇÕES DE CLIENTES ====================
 async function loadClients() {
     try {
         const response = await fetch('/operador/api/clientes');
@@ -208,17 +452,6 @@ async function loadClients() {
         
         clients = await response.json();
         renderClientCards();
-    } catch (error) {
-        showMessage(error.message, 'error');
-    }
-}
-
-async function loadProducts() {
-    try {
-        const response = await fetch('/operador/api/produtos');
-        if (!response.ok) throw new Error('Erro ao carregar produtos');
-        
-        products = await response.json();
     } catch (error) {
         showMessage(error.message, 'error');
     }
@@ -243,10 +476,8 @@ async function searchClient() {
         }
         
         if (results.length === 1) {
-            // Seleciona automaticamente se houver apenas um resultado
             selectClient(results[0]);
         } else {
-            // Mostra modal com resultados para seleção
             showClientSearchResults(results);
         }
     } catch (error) {
@@ -262,8 +493,6 @@ function selectClient(client) {
 }
 
 function showClientSearchResults(clients) {
-    // Implementar modal de seleção de cliente se necessário
-    // Por enquanto, seleciona o primeiro
     if (clients.length > 0) {
         selectClient(clients[0]);
     }
@@ -298,7 +527,6 @@ function renderClientCards(filteredClients = null) {
         container.appendChild(card);
     });
     
-    // Adiciona event listeners para os botões de edição
     document.querySelectorAll('.btn-edit-client').forEach(btn => {
         btn.addEventListener('click', () => editClient(btn.dataset.id));
     });
@@ -324,6 +552,53 @@ function editClient(clientId) {
         document.getElementById('client-address').value = client.endereco || '';
         
         openModal('client');
+    }
+}
+
+async function saveClient() {
+    const clientData = {
+        nome: document.getElementById('client-name').value,
+        documento: document.getElementById('client-document').value,
+        telefone: document.getElementById('client-phone').value,
+        email: document.getElementById('client-email').value,
+        endereco: document.getElementById('client-address').value
+    };
+    
+    try {
+        const url = currentEditingClient 
+            ? `/operador/api/clientes/${currentEditingClient.id}`
+            : '/operador/api/clientes';
+            
+        const method = currentEditingClient ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(clientData)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Erro ao salvar cliente');
+        }
+        
+        showMessage(currentEditingClient ? 'Cliente atualizado com sucesso!' : 'Cliente cadastrado com sucesso!');
+        await loadClients();
+        closeModal();
+    } catch (error) {
+        showMessage(error.message, 'error');
+    }
+}
+
+// ==================== FUNÇÕES DE PRODUTOS ====================
+async function loadProducts() {
+    try {
+        const response = await fetch('/operador/api/produtos');
+        if (!response.ok) throw new Error('Erro ao carregar produtos');
+        
+        products = await response.json();
+    } catch (error) {
+        showMessage(error.message, 'error');
     }
 }
 
@@ -376,58 +651,8 @@ function displayProductSearchResults(products) {
     });
 }
 
-function addProductToSale(product) {
-    // Verifica se o produto já está na lista
-    const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
-    
-    if (existingProductIndex >= 0) {
-        // Aumenta a quantidade se o produto já estiver na lista
-        selectedProducts[existingProductIndex].quantity += 1;
-    } else {
-        // Adiciona novo produto à lista
-        selectedProducts.push({
-            id: product.id,
-            name: product.nome,
-            description: product.descricao || '',
-            price: product.valor_unitario,
-            quantity: 1,
-            unit: product.unidade,
-            stock: product.estoque_quantidade
-        });
-    }
-    
-    renderProductsList();
-    calculateSaleTotal();
-}
-
 function addEmptyProductRow() {
     openProductSearchModal();
-}
-
-function renderProductsList() {
-    productsList.innerHTML = '';
-    
-    selectedProducts.forEach((product, index) => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${product.name}</td>
-            <td>${product.description}</td>
-            <td>${formatCurrency(product.price)}</td>
-            <td>
-                <input type="number" class="quantity-input" 
-                       value="${product.quantity}" min="1" 
-                       max="${product.stock}" data-index="${index}">
-                <small>${product.unit}</small>
-            </td>
-            <td>${formatCurrency(product.price * product.quantity)}</td>
-            <td>
-                <button class="btn-remove" data-index="${index}">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </td>
-        `;
-        productsList.appendChild(row);
-    });
 }
 
 function updateProductQuantity(input) {
@@ -447,44 +672,7 @@ function removeProductRow(button) {
     }
 }
 
-function calculateSaleTotal() {
-    let subtotal = 0;
-    
-    // Calcula subtotal
-    selectedProducts.forEach(product => {
-        subtotal += product.price * product.quantity;
-    });
-    
-    // Aplica desconto se existir
-    let total = subtotal;
-    let discount = parseFloat(discountValueInput.value) || 0;
-    
-    if (discount > 0) {
-        if (discountTypeSelect.value === 'percent') {
-            discount = subtotal * (discount / 100);
-        }
-        total = Math.max(0, subtotal - discount);
-    }
-    
-    // Calcula troco
-    let change = 0;
-    const amountReceived = parseFloat(amountReceivedInput.value) || 0;
-    
-    if (amountReceived > 0) {
-        change = Math.max(0, amountReceived - total);
-    }
-    
-    // Atualiza UI
-    subtotalValueElement.textContent = formatCurrency(subtotal);
-    saleTotalElement.textContent = formatCurrency(total);
-    changeValueElement.textContent = formatCurrency(change);
-}
-
-function applyDiscount() {
-    calculateSaleTotal();
-    showMessage('Desconto aplicado com sucesso');
-}
-
+// ==================== FUNÇÕES DE VENDA ====================
 async function registerSale() {
     if (!selectedClientIdInput.value) {
         showMessage('Selecione um cliente', 'error');
@@ -515,7 +703,9 @@ async function registerSale() {
     const items = selectedProducts.map(product => ({
         produto_id: product.id,
         quantidade: product.quantity,
-        valor_unitario: product.price
+        valor_unitario: product.price,
+        desconto_aplicado: product.discountValue,
+        tipo_desconto: product.discountType
     }));
     
     // Preparar dados do desconto
@@ -538,7 +728,17 @@ async function registerSale() {
                 valor_recebido: amountReceived,
                 desconto: discount,
                 observacao: notes,
-                itens: items
+                itens: items,
+                entrega: deliveryAddress ? {
+                    logradouro: deliveryAddress.logradouro,
+                    numero: deliveryAddress.numero,
+                    complemento: deliveryAddress.complemento,
+                    bairro: deliveryAddress.bairro,
+                    cidade: deliveryAddress.cidade,
+                    estado: deliveryAddress.estado,
+                    cep: deliveryAddress.cep,
+                    instrucoes: deliveryAddress.instrucoes
+                } : null
             })
         });
         
@@ -568,7 +768,58 @@ function resetSaleForm() {
     amountReceivedInput.value = '';
     discountValueInput.value = '';
     discountTypeSelect.value = 'fixed';
+    deliveryAddress = null;
+    deliveryBtn.classList.remove('has-delivery');
+    deliveryBtn.innerHTML = '<i class="fas fa-truck"></i> Adicionar Entrega';
+    const deliveryInfo = document.querySelector('.delivery-info');
+    if (deliveryInfo) deliveryInfo.remove();
     calculateSaleTotal();
+}
+
+// ==================== FUNÇÕES DE CAIXA ====================
+async function checkCaixaStatus() {
+    try {
+        const response = await fetch('/operador/api/saldo');
+        if (!response.ok) throw new Error('Erro ao verificar status do caixa');
+        
+        const data = await response.json();
+        
+        if (data.message === 'Nenhum caixa aberto encontrado') {
+            closeRegisterBtn.style.display = 'none';
+        } else {
+            closeRegisterBtn.style.display = 'block';
+            updateBalance();
+        }
+    } catch (error) {
+        console.error('Error checking caixa status:', error);
+    }
+}
+
+async function updateBalance() {
+    try {
+        const response = await fetch('/operador/api/saldo');
+        if (!response.ok) throw new Error('Erro ao carregar saldo');
+        
+        const data = await response.json();
+        
+        if (data.message === 'Nenhum caixa aberto encontrado') {
+            openingBalanceLabel.textContent = 'Caixa fechado';
+            currentBalanceLabel.textContent = '';
+            return;
+        }
+
+        if (balanceVisible) {
+            openingBalanceLabel.textContent = formatCurrency(data.valor_abertura);
+            currentBalanceLabel.textContent = data.saldo_formatado || 'R$ 0,00';
+        } else {
+            openingBalanceLabel.textContent = '******';
+            currentBalanceLabel.textContent = '******';
+        }
+    } catch (error) {
+        console.error('Error updating balance:', error);
+        openingBalanceLabel.textContent = 'Erro';
+        currentBalanceLabel.textContent = '';
+    }
 }
 
 async function closeRegister() {
@@ -599,6 +850,41 @@ async function closeRegister() {
     }
 }
 
+// ==================== FUNÇÕES UTILITÁRIAS ====================
+function updateCurrentDate() {
+    const now = new Date();
+    currentDateElement.textContent = now.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function toggleBalance() {
+    balanceVisible = !balanceVisible;
+    updateBalance();
+    toggleBalanceBtn.innerHTML = balanceVisible ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+}
+
+function formatCurrency(value) {
+    if (typeof value === 'string') {
+        value = parseFloat(value.replace(',', '.'));
+    }
+    return 'R$ ' + value.toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+}
+
+function switchTab(tabId) {
+    tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
+    tabContents.forEach(content => content.classList.toggle('active', content.id === tabId));
+    
+    const activeTabBtn = document.querySelector(`.menu-item[data-tab="${tabId}"]`);
+    if (activeTabBtn) {
+        currentTabTitle.textContent = activeTabBtn.querySelector('span').textContent;
+    }
+}
+
 function searchClients() {
     const searchTerm = clientSearch.value.toLowerCase();
     if (!searchTerm) return renderClientCards();
@@ -621,41 +907,16 @@ function closeModal() {
     document.querySelectorAll('.modal').forEach(modal => {
         modal.style.display = 'none';
     });
+    // Remove o modal de desconto se existir
+    const discountModal = document.getElementById('discount-modal');
+    if (discountModal) {
+        discountModal.remove();
+    }
 }
 
-async function saveClient() {
-    const clientData = {
-        nome: document.getElementById('client-name').value,
-        documento: document.getElementById('client-document').value,
-        telefone: document.getElementById('client-phone').value,
-        email: document.getElementById('client-email').value,
-        endereco: document.getElementById('client-address').value
-    };
-    
-    try {
-        const url = currentEditingClient 
-            ? `/operador/api/clientes/${currentEditingClient.id}`
-            : '/operador/api/clientes';
-            
-        const method = currentEditingClient ? 'PUT' : 'POST';
-        
-        const response = await fetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(clientData)
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Erro ao salvar cliente');
-        }
-        
-        showMessage(currentEditingClient ? 'Cliente atualizado com sucesso!' : 'Cliente cadastrado com sucesso!');
-        await loadClients();
-        closeModal();
-    } catch (error) {
-        showMessage(error.message, 'error');
-    }
+function applyDiscount() {
+    calculateSaleTotal();
+    showMessage('Desconto aplicado com sucesso');
 }
 
 function showMessage(message, type = 'success') {
