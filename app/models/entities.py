@@ -52,6 +52,27 @@ class UnidadeMedida(str, enum.Enum):
     saco = "saco"
     unidade = "unidade"
 
+class TipoDesconto(str, enum.Enum):
+    fixo = "fixo"
+    percentual = "percentual"
+
+# --------------------
+# Entrega/Delivery
+# --------------------
+class Entrega(Base):
+    __tablename__ = "entregas"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    logradouro = Column(String(200), nullable=False)
+    numero = Column(String(20), nullable=False)
+    complemento = Column(String(100), nullable=True)
+    bairro = Column(String(100), nullable=False)
+    cidade = Column(String(100), nullable=False)
+    estado = Column(String(2), nullable=False)
+    cep = Column(String(10), nullable=False)
+    instrucoes = Column(Text, nullable=True)
+    sincronizado = Column(Boolean, default=False, nullable=False)
+
 # --------------------
 # Usuário
 # --------------------
@@ -151,8 +172,8 @@ class MovimentacaoEstoque(Base):
     tipo = Column(Enum(TipoMovimentacao), nullable=False)
     quantidade = Column(DECIMAL(12, 3), nullable=False)
     valor_unitario = Column(DECIMAL(10, 2), nullable=False)
-    valor_recebido = Column(DECIMAL(12, 2), nullable=True)  # Novo campo
-    troco = Column(DECIMAL(12, 2), nullable=True)  # Novo campo
+    valor_recebido = Column(DECIMAL(12, 2), nullable=True)
+    troco = Column(DECIMAL(12, 2), nullable=True)
     forma_pagamento = Column(Enum(FormaPagamento), nullable=True)
     observacao = Column(Text, nullable=True)
     data = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -173,19 +194,23 @@ class NotaFiscal(Base):
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
     operador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     caixa_id = Column(Integer, ForeignKey("caixas.id"), nullable=False)
+    entrega_id = Column(Integer, ForeignKey("entregas.id"), nullable=True)
     data_emissao = Column(DateTime, default=datetime.utcnow, nullable=False)
     valor_total = Column(DECIMAL(12, 2), nullable=False)
+    valor_desconto = Column(DECIMAL(12, 2), nullable=False, default=0.00)
+    tipo_desconto = Column(Enum(TipoDesconto), nullable=True)
     status = Column(Enum(StatusNota), nullable=False, default=StatusNota.emitida)
     chave_acesso = Column(String(60), unique=True, nullable=True)
     observacao = Column(Text, nullable=True)
     forma_pagamento = Column(Enum(FormaPagamento), nullable=False)
-    valor_recebido = Column(DECIMAL(12, 2), nullable=True)  # Novo campo
-    troco = Column(DECIMAL(12, 2), nullable=True)  # Novo campo
+    valor_recebido = Column(DECIMAL(12, 2), nullable=True)
+    troco = Column(DECIMAL(12, 2), nullable=True)
     sincronizado = Column(Boolean, default=False, nullable=False)
     
     cliente = relationship("Cliente", back_populates="notas_fiscais")
     operador = relationship("Usuario", back_populates="notas_fiscais")
     caixa = relationship("Caixa")
+    entrega = relationship("Entrega")
     itens = relationship("NotaFiscalItem", back_populates="nota", cascade="all, delete-orphan")
     financeiros = relationship("Financeiro", back_populates="nota_fiscal", cascade="all, delete-orphan")
 
@@ -201,6 +226,8 @@ class NotaFiscalItem(Base):
     quantidade = Column(DECIMAL(12, 3), nullable=False)
     valor_unitario = Column(DECIMAL(10, 2), nullable=False)
     valor_total = Column(DECIMAL(12, 2), nullable=False)
+    desconto_aplicado = Column(DECIMAL(10, 2), nullable=True, default=0.00)
+    tipo_desconto = Column(Enum(TipoDesconto), nullable=True)
     sincronizado = Column(Boolean, default=False, nullable=False)
     
     nota = relationship("NotaFiscal", back_populates="itens")
@@ -216,6 +243,7 @@ class Financeiro(Base):
     tipo = Column(Enum(TipoMovimentacao), nullable=False)
     categoria = Column(Enum(CategoriaFinanceira), nullable=False)
     valor = Column(DECIMAL(12, 2), nullable=False)
+    valor_desconto = Column(DECIMAL(12, 2), nullable=True, default=0.00)
     descricao = Column(Text, nullable=True)
     data = Column(DateTime, default=datetime.utcnow, nullable=False)
     sincronizado = Column(Boolean, default=False, nullable=False)
@@ -235,10 +263,10 @@ class Financeiro(Base):
             'tipo': self.tipo.value if self.tipo else None,
             'categoria': self.categoria.value if self.categoria else None,
             'valor': float(self.valor),
+            'valor_desconto': float(self.valor_desconto) if self.valor_desconto else None,
             'descricao': self.descricao,
             'data': self.data.isoformat() if self.data else None,
             'nota_fiscal_id': self.nota_fiscal_id,
             'cliente_id': self.cliente_id,
             'caixa_id': self.caixa_id
         }
-    
