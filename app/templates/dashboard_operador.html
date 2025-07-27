@@ -25,6 +25,54 @@
         .flash-message {
             transition: opacity 1s ease-out;
         }
+        
+        /* Estilos para o status do caixa */
+        .status-container {
+            position: fixed;
+            top: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            z-index: 1000;
+            pointer-events: none;
+        }
+        
+        .caixa-status {
+            padding: 12px 25px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            display: inline-flex;
+            align-items: center;
+            pointer-events: auto;
+            animation: slideDown 0.5s ease-out;
+        }
+        
+        @keyframes slideDown {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .caixa-livre {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .caixa-operacao {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        
+        .caixa-status i {
+            margin-right: 10px;
+            font-size: 1.2rem;
+        }
+        
+        .content-header {
+            position: relative;
+        }
     </style>
 </head>
 <body>
@@ -90,6 +138,14 @@
                         {% endfor %}
                     {% endif %}
                     {% endwith %}
+                </div>
+            </div>
+            
+            <!-- Status do Caixa Centralizado -->
+            <div class="status-container">
+                <div id="caixa-status-display" class="caixa-status caixa-livre">
+                    <i class="fas fa-check-circle"></i>
+                    <span>CAIXA LIVRE</span>
                 </div>
             </div>
             
@@ -165,7 +221,6 @@
                         <h3>Finalização da Venda</h3>
                     </div>
                     <div class="card-body">
-                        <!-- Adicione este botão abaixo dos métodos de pagamento -->
                         <div class="form-group">
                             <button class="btn-delivery" id="delivery-btn">
                                 <i class="fas fa-truck"></i> Adicionar Entrega
@@ -443,7 +498,94 @@
                     setTimeout(() => message.remove(), 1000);
                 }, 5000);
             });
+            
+            // Monitora mudanças no cliente selecionado para atualizar o status do caixa
+            const selectedClientInput = document.getElementById('selected-client');
+            const caixaStatusDisplay = document.getElementById('caixa-status-display');
+            
+            // Função global para atualizar o status do caixa
+            window.updateCaixaStatus = function() {
+                if (selectedClientInput.value.trim() !== '') {
+                    caixaStatusDisplay.className = 'caixa-status caixa-operacao';
+                    caixaStatusDisplay.innerHTML = '<i class="fas fa-user-check"></i><span>CAIXA EM OPERAÇÃO</span>';
+                } else {
+                    caixaStatusDisplay.className = 'caixa-status caixa-livre';
+                    caixaStatusDisplay.innerHTML = '<i class="fas fa-check-circle"></i><span>CAIXA LIVRE</span>';
+                }
+            };
+            
+            // Observa mudanças no campo do cliente selecionado
+            selectedClientInput.addEventListener('input', updateCaixaStatus);
+            
+            // Configura o MutationObserver para detectar alterações programáticas no campo do cliente
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
+                        updateCaixaStatus();
+                    }
+                });
+            });
+            
+            observer.observe(selectedClientInput, {
+                attributes: true,
+                attributeFilter: ['value']
+            });
+            
+            // Atualiza o status inicial
+            updateCaixaStatus();
         });
+
+        // Função para selecionar cliente (deve estar no script_operador.js)
+        function selectClient(client) {
+            const selectedClientInput = document.getElementById('selected-client');
+            const selectedClientIdInput = document.getElementById('selected-client-id');
+            
+            selectedClientInput.value = client.nome;
+            selectedClientIdInput.value = client.id;
+            
+            // Dispara evento de input para garantir a atualização
+            const event = new Event('input', {
+                bubbles: true,
+                cancelable: true,
+            });
+            selectedClientInput.dispatchEvent(event);
+            
+            showMessage(`Cliente selecionado: ${client.nome}`);
+        }
+
+        // Função para resetar a venda (deve estar no script_operador.js)
+        function resetSaleForm() {
+            const selectedClientInput = document.getElementById('selected-client');
+            const selectedClientIdInput = document.getElementById('selected-client-id');
+            
+            selectedClientInput.value = '';
+            selectedClientIdInput.value = '';
+            
+            // Dispara evento de input para garantir a atualização
+            const event = new Event('input', {
+                bubbles: true,
+                cancelable: true,
+            });
+            selectedClientInput.dispatchEvent(event);
+            
+            // Restante da função resetSaleForm...
+            document.getElementById('products-list').innerHTML = '';
+            document.getElementById('payment-method').value = '';
+            document.getElementById('sale-notes').value = '';
+            document.getElementById('amount-received').value = '';
+            document.getElementById('discount-value').value = '';
+            document.getElementById('discount-type').value = 'fixed';
+            document.getElementById('subtotal-value').textContent = 'R$ 0.00';
+            document.getElementById('sale-total').textContent = 'R$ 0.00';
+            document.getElementById('change-value').textContent = 'R$ 0.00';
+            
+            // Remove entrega se existir
+            const deliveryBtn = document.getElementById('delivery-btn');
+            deliveryBtn.classList.remove('has-delivery');
+            deliveryBtn.innerHTML = '<i class="fas fa-truck"></i> Adicionar Entrega';
+            const deliveryInfo = document.querySelector('.delivery-info');
+            if (deliveryInfo) deliveryInfo.remove();
+        }
     </script>
 </body>
 </html>
