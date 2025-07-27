@@ -320,7 +320,6 @@ function openDiscountModal(productIndex) {
     document.getElementById('cancel-discount').addEventListener('click', closeModal);
 }
 
-
 // ==================== FUNÇÕES DE PRODUTOS ====================
 function addProductToSale(product) {
     const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
@@ -424,9 +423,10 @@ function calculateSaleTotal() {
     
     let total = subtotal;
     let discount = parseFloat(discountValueInput.value) || 0;
+    const discountType = discountTypeSelect.value;
     
     if (discount > 0) {
-        if (discountTypeSelect.value === 'percent') {
+        if (discountType === 'percent') {
             discount = subtotal * (discount / 100);
         }
         total = Math.max(0, subtotal - discount);
@@ -699,21 +699,23 @@ async function registerSale() {
         return;
     }
     
-    // Preparar itens para envio
+    // Preparar itens para envio garantindo tipos numéricos
     const items = selectedProducts.map(product => ({
         produto_id: product.id,
-        quantidade: product.quantity,
-        valor_unitario: product.price,
-        desconto_aplicado: product.discountValue,
-        tipo_desconto: product.discountType
+        quantidade: Number(product.quantity),
+        valor_unitario: Number(product.originalPrice),
+        valor_total: Number(product.price * product.quantity),
+        desconto_aplicado: Number(product.discountValue),
+        tipo_desconto: product.discountType === 'percent' ? 'percentual' : 'fixo'
     }));
-    
+
     // Preparar dados do desconto
     let discount = 0;
     const discountValue = parseFloat(discountValueInput.value) || 0;
+    const discountType = discountTypeSelect.value === 'percent' ? 'percentual' : 'fixo';
     
     if (discountValue > 0) {
-        discount = discountTypeSelect.value === 'percent' 
+        discount = discountType === 'percentual' 
             ? (discountValue / 100) * items.reduce((sum, item) => sum + (item.valor_unitario * item.quantidade), 0)
             : discountValue;
     }
@@ -727,18 +729,10 @@ async function registerSale() {
                 forma_pagamento: paymentMethod,
                 valor_recebido: amountReceived,
                 desconto: discount,
+                tipo_desconto: discountType,
                 observacao: notes,
                 itens: items,
-                entrega: deliveryAddress ? {
-                    logradouro: deliveryAddress.logradouro,
-                    numero: deliveryAddress.numero,
-                    complemento: deliveryAddress.complemento,
-                    bairro: deliveryAddress.bairro,
-                    cidade: deliveryAddress.cidade,
-                    estado: deliveryAddress.estado,
-                    cep: deliveryAddress.cep,
-                    instrucoes: deliveryAddress.instrucoes
-                } : null
+                entrega: deliveryAddress
             })
         });
         
@@ -753,6 +747,7 @@ async function registerSale() {
         showMessage(`Venda registrada! Total: ${formatCurrency(result.valor_total)}`);
         await loadProducts();
     } catch (error) {
+        console.error("Erro ao registrar venda:", error);
         showMessage(error.message, 'error');
     }
 }
@@ -869,10 +864,17 @@ function toggleBalance() {
 }
 
 function formatCurrency(value) {
-    if (typeof value === 'string') {
-        value = parseFloat(value.replace(',', '.'));
-    }
-    return 'R$ ' + value.toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+    const parsed = Number(
+        typeof value === 'string'
+            ? value.replace(',', '.')
+            : value
+    );
+    
+    if (isNaN(parsed)) return 'R$ 0,00';
+
+    return 'R$ ' + parsed.toFixed(2)
+        .replace('.', ',')
+        .replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
 function switchTab(tabId) {

@@ -49,6 +49,10 @@ class UnidadeMedida(str, Enum):
     saco = "saco"
     unidade = "unidade"
 
+class TipoDesconto(str, Enum):
+    fixo = "fixo"
+    percentual = "percentual"
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # ===== Utilitários =====
@@ -449,11 +453,14 @@ def create_nota_fiscal(db: Session, nota: dict) -> entities.NotaFiscal:
             caixa_id=nota["caixa_id"],
             data_emissao=datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
             valor_total=nota["valor_total"],
+            valor_desconto=nota.get("valor_desconto", 0),
+            tipo_desconto=nota.get("tipo_desconto"),
             status=StatusNota.emitida,
             observacao=nota.get("observacao", ""),
             forma_pagamento=nota["forma_pagamento"],
             valor_recebido=nota.get("valor_recebido", nota["valor_total"]),
-            troco=nota.get("troco", 0)
+            troco=nota.get("troco", 0),
+            entrega_id=nota.get("entrega_id")
         )
         
         db.add(db_nota)
@@ -467,7 +474,9 @@ def create_nota_fiscal(db: Session, nota: dict) -> entities.NotaFiscal:
                 produto_id=item["produto_id"],
                 quantidade=item["quantidade"],
                 valor_unitario=item["valor_unitario"],
-                valor_total=item["valor_total"]
+                valor_total=item["valor_total"],
+                desconto_aplicado=item.get("desconto_aplicado", 0),
+                tipo_desconto=item.get("tipo_desconto", "fixo")
             )
             db.add(db_item)
         
@@ -489,6 +498,25 @@ def get_notas_fiscais(db: Session):
     for nota in notas:
         nota.itens = db.query(entities.NotaFiscalItem).filter(entities.NotaFiscalItem.nota_id == nota.id).all()
     return notas
+
+# ===== Entrega =====
+def create_entrega(db: Session, entrega_data: dict) -> entities.Entrega:
+    """Cria um novo registro de entrega"""
+    try:
+        # Validação básica
+        required_fields = ['logradouro', 'numero', 'bairro', 'cidade', 'estado', 'cep']
+        for field in required_fields:
+            if field not in entrega_data:
+                raise ValueError(f"Campo obrigatório faltando: {field}")
+        
+        db_entrega = entities.Entrega(**entrega_data)
+        db.add(db_entrega)
+        db.commit()
+        db.refresh(db_entrega)
+        return db_entrega
+    except Exception as e:
+        db.rollback()
+        raise ValueError(f"Erro ao criar entrega: {str(e)}")
 
 # ===== Financeiro =====
 def create_lancamento_financeiro(db: Session, lancamento: dict) -> entities.Financeiro:
@@ -520,6 +548,7 @@ def create_lancamento_financeiro(db: Session, lancamento: dict) -> entities.Fina
         tipo=lancamento["tipo"],
         categoria=lancamento["categoria"],
         valor=lancamento["valor"],
+        valor_desconto=lancamento.get("valor_desconto", 0),
         descricao=lancamento.get("descricao", ""),
         data=lancamento.get("data", datetime.now(tz=ZoneInfo('America/Sao_Paulo'))),
         nota_fiscal_id=lancamento.get("nota_fiscal_id"),
@@ -605,3 +634,182 @@ def delete_lancamento_financeiro(db: Session, lancamento_id: int) -> bool:
     except SQLAlchemyError as e:
         db.rollback()
         raise ValueError("Erro ao remover lançamento financeiro no banco de dados.")
+
+# ===== Vendas =====
+def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_id: int):
+    try:
+        # ----------------------
+        # Salva Entrega (se houver)
+        # ----------------------
+        entrega = None
+        if 'entrega' in dados and dados['entrega']:
+            entrega_data = dados['entrega']
+            entrega = entities.Entrega(
+                logradouro=entrega_data['logradouro'],
+                numero=entrega_data['numero'],
+                complemento=entrega_data.get('complemento'),
+                bairro=entrega_data['bairro'],
+                cidade=entrega_data['cidade'],
+                estado=entrega_data['estado'],
+                cep=entrega_data['cep'],
+                instrucoes=entrega_data.get('instrucoes'),
+                sincronizado=False
+            )
+            db.add(entrega)
+            db.flush()
+
+        # ----------------------
+        # Verifica estoque antes de processar a venda
+        # ----------------------
+        produtos_para_atualizar = {}
+        for item in dados['itens']:
+            produto_id = item['produto_id']
+            quantidade = Decimal(str(item['quantidade']))
+            
+            produto = db.query(entities.Produto).filter(
+                entities.Produto.id == produto_id
+            ).with_for_update().one_or_none()
+            
+            if not produto:
+                raise ValueError(f"Produto com ID {produto_id} não encontrado.")
+            
+            if produto.estoque_quantidade < quantidade:
+                raise ValueError(
+                    f"Estoque insuficiente para o produto '{produto.nome}'. "
+                    f"Quantidade solicitada: {quantidade}, disponível: {produto.estoque_quantidade}"
+                )
+            
+            produtos_para_atualizar[produto_id] = {
+                'produto': produto,
+                'quantidade': quantidade
+            }
+
+        # ----------------------
+        # Calcula valores totais e descontos
+        # ----------------------
+        total_geral = Decimal("0.00")
+        total_descontos_itens = Decimal("0.00")  # Soma dos descontos aplicados nos itens
+        itens_processados = []
+
+        for item in dados['itens']:
+            quantidade = Decimal(str(item['quantidade']))
+            valor_unitario = Decimal(str(item['valor_unitario']))
+
+            # Aplica desconto por item
+            desconto_aplicado = Decimal(str(item.get('desconto_aplicado', 0)))
+            tipo_desconto = item.get('tipo_desconto')
+
+            if tipo_desconto == TipoDesconto.percentual:
+                desconto_aplicado = (valor_unitario * desconto_aplicado) / Decimal("100.00")
+
+            total_descontos_itens += desconto_aplicado * quantidade
+
+            valor_unitario_com_desconto = valor_unitario - desconto_aplicado
+            valor_total_item = valor_unitario_com_desconto * quantidade
+
+            total_geral += valor_total_item
+
+            itens_processados.append({
+                **item,
+                "valor_total": valor_total_item,
+                "valor_unitario": valor_unitario,
+                "desconto_aplicado": desconto_aplicado,
+                "tipo_desconto": tipo_desconto,
+                "quantidade": quantidade
+            })
+
+        # Desconto adicional (geral) da venda
+        valor_desconto_total = Decimal(str(dados.get("desconto", 0))) + total_descontos_itens
+        valor_recebido = Decimal(str(dados.get("valor_recebido", 0)))
+        troco = valor_recebido - (total_geral - valor_desconto_total)
+
+        # ----------------------
+        # Cria Nota Fiscal
+        # ----------------------
+        nota = entities.NotaFiscal(
+            cliente_id=dados['cliente_id'],
+            operador_id=operador_id,
+            caixa_id=caixa_id,
+            entrega_id=entrega.id if entrega else None,
+            valor_total=total_geral,
+            valor_desconto=valor_desconto_total,  # Aqui deve ir o desconto total (itens + desconto geral)
+            tipo_desconto=dados.get('tipo_desconto'),
+            status=StatusNota.emitida,
+            observacao=dados.get('observacao'),
+            forma_pagamento=dados['forma_pagamento'],
+            valor_recebido=valor_recebido,
+            troco=troco,
+            sincronizado=False,
+            data_emissao=datetime.now()
+        )
+        db.add(nota)
+        db.flush()
+
+        # ----------------------
+        # Processa cada item da nota
+        # ----------------------
+        for item in itens_processados:
+            produto_id = item['produto_id']
+            quantidade = item['quantidade']
+            desconto_aplicado = item['desconto_aplicado']
+            tipo_desconto = item['tipo_desconto']
+
+            # Salva item da nota
+            nota_item = entities.NotaFiscalItem(
+                nota_id=nota.id,
+                produto_id=produto_id,
+                quantidade=quantidade,
+                valor_unitario=item['valor_unitario'],
+                valor_total=item['valor_total'],
+                desconto_aplicado=desconto_aplicado,
+                tipo_desconto=tipo_desconto,
+                sincronizado=False
+            )
+            db.add(nota_item)
+
+            # Movimentação de estoque
+            movimentacao = entities.MovimentacaoEstoque(
+                produto_id=produto_id,
+                usuario_id=operador_id,
+                cliente_id=dados['cliente_id'],
+                caixa_id=caixa_id,
+                tipo=TipoMovimentacao.saida,
+                quantidade=quantidade,
+                valor_unitario=item['valor_unitario'],
+                valor_recebido=valor_recebido,
+                troco=troco,
+                forma_pagamento=dados['forma_pagamento'],
+                observacao=dados.get('observacao'),
+                sincronizado=False
+            )
+            db.add(movimentacao)
+
+            # Atualiza estoque do produto
+            produto_info = produtos_para_atualizar[produto_id]
+            produto_info['produto'].estoque_quantidade -= produto_info['quantidade']
+
+        # ----------------------
+        # Lançamento financeiro
+        # ----------------------
+        financeiro = entities.Financeiro(
+            tipo=TipoMovimentacao.entrada,
+            categoria=CategoriaFinanceira.venda,
+            valor=nota.valor_total,
+            valor_desconto=nota.valor_desconto,  # Usa o mesmo valor_desconto da nota fiscal
+            descricao=f"Venda para cliente ID {dados['cliente_id']}",
+            data=datetime.now(),
+            nota_fiscal_id=nota.id,
+            cliente_id=dados['cliente_id'],
+            caixa_id=caixa_id,
+            sincronizado=False
+        )
+        db.add(financeiro)
+
+        # Confirma todas as alterações
+        db.commit()
+        return nota.id
+
+    except Exception as e:
+        db.rollback()
+        print(f"Erro ao registrar venda: {str(e)}")
+        raise
