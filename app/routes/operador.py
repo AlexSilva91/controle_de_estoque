@@ -1,6 +1,6 @@
 import threading
 from flask import Blueprint, render_template, request, jsonify, current_app as app
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
@@ -16,6 +16,7 @@ from app.schemas import (
 )
 from app.crud import (
     StatusCaixa,
+    listar_despesas_do_dia,
     registrar_venda_completa,
     get_caixa_aberto,
     get_clientes,
@@ -199,7 +200,7 @@ def api_registrar_venda():
 def api_get_saldo():
     try:
         caixa = get_caixa_aberto(db.session)
-        
+
         if not caixa:
             return jsonify({
                 'saldo': 0.00,
@@ -208,28 +209,50 @@ def api_get_saldo():
                 'message': 'Nenhum caixa aberto encontrado'
             })
 
-        # Calcula apenas o total das vendas do dia (não inclui o valor de abertura)
+        # --- Total de VENDAS do dia (entrada, categoria 'venda') ---
         hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
-        lancamentos = get_lancamentos_financeiros(
-            db.session,
-            data_inicio=datetime.combine(hoje, datetime.min.time()),
-            data_fim=datetime.combine(hoje, datetime.max.time())
-        )
-        
+        data_inicio = datetime.combine(hoje, time.min).replace(tzinfo=ZoneInfo('America/Sao_Paulo'))
+        data_fim = datetime.combine(hoje, time.max).replace(tzinfo=ZoneInfo('America/Sao_Paulo'))
+
+        lancamentos = db.session.query(entities.Financeiro).filter(
+            entities.Financeiro.tipo == entities.TipoMovimentacao.entrada,
+            entities.Financeiro.categoria == entities.CategoriaFinanceira.venda,
+            entities.Financeiro.data >= data_inicio,
+            entities.Financeiro.data <= data_fim,
+            entities.Financeiro.caixa_id == caixa.id
+        ).all()
+
         total_vendas = Decimal('0.00')
-        
         for lanc in lancamentos:
-            if lanc.tipo == 'entrada' and lanc.categoria == 'venda':
-                total_vendas += Decimal(str(lanc.valor))
+            total_vendas += Decimal(str(lanc.valor))
+
+        # --- Total de DESPESAS do dia ---
+        despesas = listar_despesas_do_dia(db.session, fuso="America/Sao_Paulo")
+        print(f"Despesas do dia: {len(despesas)} registros encontrados\n{despesas}")
+        total_despesas = Decimal('0.00')
+        for desp in despesas:
+            if desp.caixa_id == caixa.id:
+                total_despesas += Decimal(str(desp.valor))
+                print(f"Despesa encontrada: {desp.descricao} - Valor: {desp.valor}")
+
+        print(f"Total Vendas: {total_vendas}, Total Despesas: {total_despesas}")
+
+        # --- Lógica do saldo: subtrai despesas das vendas (ou da abertura, se não houver venda) ---
+        abertura = Decimal(str(caixa.valor_abertura))
+        if total_vendas > 0:
+            saldo = total_vendas - total_despesas
+        else:
+            abertura = Decimal(str(caixa.valor_abertura)) - total_despesas
+            saldo = 0
 
         return jsonify({
-            'saldo': float(total_vendas),  # Agora retorna apenas o total das vendas
-            'saldo_formatado': f"R$ {total_vendas:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
-            'valor_abertura': float(caixa.valor_abertura),
+            'saldo': float(saldo),
+            'saldo_formatado': f"R$ {saldo:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+            'valor_abertura': float(abertura),
             'message': 'Saldo atualizado com sucesso',
             'caixa_id': caixa.id
         })
-    
+
     except Exception as e:
         app.logger.error(f"Erro ao calcular saldo: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -353,18 +376,21 @@ def registrar_despesa():
     descricao = data.get("descricao")
     valor = data.get("valor")
     observacao = data.get("observacao")
-    caixa_id = data.get("caixa_id")  # você deve enviar esse id do frontend
+    caixa_id = data.get("caixa_id")
 
     if not descricao or not valor or not caixa_id:
         return jsonify({"erro": "Descrição, valor e caixa_id são obrigatórios"}), 400
 
     try:
+        # Pega o horário atual no fuso America/Sao_Paulo (pode ajustar para Fortaleza ou outro)
+        agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+
         despesa = entities.Financeiro(
             tipo=entities.TipoMovimentacao.saida,
             categoria=entities.CategoriaFinanceira.despesa,
             valor=Decimal(valor),
             descricao=descricao,
-            data=datetime.utcnow(),
+            data=agora, 
             caixa_id=caixa_id,
             sincronizado=False
         )

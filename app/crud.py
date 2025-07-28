@@ -7,7 +7,7 @@ from app import schemas
 from app.models import entities
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import func
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 from enum import Enum
 from typing import List, Optional, Dict
@@ -552,7 +552,7 @@ def get_lancamento_financeiro(db: Session, lancamento_id: int) -> Optional[entit
 def get_lancamentos_financeiros(
     db: Session, 
     skip: int = 0, 
-    limit: int = 100,
+    limit: Optional[int] = None,
     tipo: Optional[str] = None,
     categoria: Optional[str] = None,
     data_inicio: Optional[datetime] = None,
@@ -572,7 +572,30 @@ def get_lancamentos_financeiros(
     if caixa_id:
         query = query.filter(entities.Financeiro.caixa_id == caixa_id)
     
-    return query.order_by(entities.Financeiro.data.desc()).offset(skip).limit(limit).all()
+    query = query.order_by(entities.Financeiro.data.desc()).offset(skip)
+    
+    if limit is not None:
+        query = query.limit(limit)
+        
+    return query.all()
+
+def listar_despesas_do_dia(db: Session, fuso: str = "America/Sao_Paulo"):
+    """
+    Retorna todas as despesas (tipo=saida, categoria=despesa) do dia atual.
+    """
+    agora = datetime.now(ZoneInfo(fuso))
+    inicio_dia = datetime.combine(agora.date(), time.min).replace(tzinfo=ZoneInfo(fuso))
+    fim_dia = datetime.combine(agora.date(), time.max).replace(tzinfo=ZoneInfo(fuso))
+
+    despesas = db.query(entities.Financeiro).filter(
+        entities.Financeiro.tipo == TipoMovimentacao.saida,
+        entities.Financeiro.categoria == CategoriaFinanceira.despesa,
+        entities.Financeiro.data >= inicio_dia,
+        entities.Financeiro.data <= fim_dia
+    ).all()
+
+    print(despesas)
+    return despesas
 
 def update_lancamento_financeiro(
     db: Session, 
