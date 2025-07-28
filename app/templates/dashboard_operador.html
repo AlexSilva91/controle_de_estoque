@@ -117,6 +117,9 @@
                     <i class="fas fa-users"></i>
                     <span>Clientes</span>
                 </button>
+                <button class="btn-danger" id="open-expense-modal-btn">
+                    <i class="fas fa-minus-circle"></i> Cadastrar Despesa
+                </button>
             </nav>
             
             <button class="btn-logout" id="logout-btn">
@@ -443,6 +446,36 @@
             <div class="modal-footer">
                 <button class="btn-secondary" id="cancel-delivery">Cancelar</button>
                 <button class="btn-primary" id="save-delivery">Salvar Endereço</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Expense Modal -->
+    <div class="modal" id="expense-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Nova Despesa</h3>
+                <button class="modal-close" onclick="closeExpenseModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="expense-form">
+                    <div class="form-group">
+                        <label for="expense-description">Descrição da Despesa:</label>
+                        <input type="text" id="expense-description" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="expense-amount">Valor:</label>
+                        <input type="number" id="expense-amount" class="form-control" min="0" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="expense-note">Observação:</label>
+                        <textarea id="expense-note" class="form-control" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeExpenseModal()">Cancelar</button>
+                <button class="btn-primary" onclick="saveExpense()">Salvar Despesa</button>
             </div>
         </div>
     </div>

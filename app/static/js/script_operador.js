@@ -7,6 +7,8 @@ let currentEditingClient = null;
 let selectedClient = null;
 let selectedProducts = [];
 let deliveryAddress = null;
+let currentCaixaId = null;
+let currentUser = null;
 
 // DOM Elements
 const openingBalanceLabel = document.getElementById('opening-balance').querySelector('.balance-value');
@@ -47,13 +49,19 @@ const deliveryBtn = document.getElementById('delivery-btn');
 const deliveryModal = document.getElementById('delivery-modal');
 const saveDeliveryBtn = document.getElementById('save-delivery');
 const cancelDeliveryBtn = document.getElementById('cancel-delivery');
+const openExpenseModalBtn = document.getElementById('open-expense-modal-btn');
+const expenseModal = document.getElementById('expense-modal');
+const expenseForm = document.getElementById('expense-form');
+const cancelExpenseBtn = document.getElementById('cancel-expense');
+const saveExpenseBtn = document.getElementById('save-expense');
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     updateCurrentDate();
-    loadClients();
-    loadProducts();
-    checkCaixaStatus();
+    await loadCurrentUser();
+    await loadClients();
+    await loadProducts();
+    await checkCaixaStatus();
     setupEventListeners();
 
     // Atualiza produtos a cada 10s
@@ -62,6 +70,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Atualiza saldo a cada 10s
     setInterval(updateBalance, 10000);
 });
+
+async function loadCurrentUser() {
+    try {
+        const response = await fetch('/operador/api/usuario');
+        if (!response.ok) throw new Error('Erro ao carregar dados do usuário');
+        
+        currentUser = await response.json();
+    } catch (error) {
+        showMessage(error.message, 'error');
+    }
+}
 
 function setupEventListeners() {
     toggleBalanceBtn.addEventListener('click', toggleBalance);
@@ -100,7 +119,6 @@ function setupEventListeners() {
         if (e.key === 'Enter') searchClients();
     });
     
-    // Listeners para produtos
     productsList.addEventListener('input', (e) => {
         if (e.target.classList.contains('quantity-input')) {
             updateProductQuantity(e.target);
@@ -124,27 +142,86 @@ function setupEventListeners() {
     amountReceivedInput.addEventListener('input', calculateSaleTotal);
     applyDiscountBtn.addEventListener('click', applyDiscount);
     
-    // Modal de busca de produtos
     document.getElementById('modal-search-product-btn').addEventListener('click', searchProductsInModal);
     modalProductSearch.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') searchProductsInModal();
     });
     
-    // Botão de cancelar no modal de busca de produtos
     document.getElementById('cancel-product-search').addEventListener('click', () => {
         closeModal();
-        productSearchInput.value = ''; // Limpa o campo de busca
+        productSearchInput.value = '';
     });
     
-    // Entrega
     deliveryBtn.addEventListener('click', openDeliveryModal);
     saveDeliveryBtn.addEventListener('click', saveDeliveryAddress);
     cancelDeliveryBtn.addEventListener('click', closeModal);
+    
+    openExpenseModalBtn.addEventListener('click', openExpenseModal);
+    cancelExpenseBtn.addEventListener('click', closeExpenseModal);
+    saveExpenseBtn.addEventListener('click', saveExpense);
+}
+
+// ==================== FUNÇÕES DE DESPESAS ====================
+function openExpenseModal() {
+    if (!currentCaixaId) {
+        showMessage('Nenhum caixa aberto encontrado', 'error');
+        return;
+    }
+    
+    expenseModal.style.display = 'flex';
+    document.getElementById('expense-description').focus();
+}
+
+function closeExpenseModal() {
+    expenseModal.style.display = 'none';
+    expenseForm.reset();
+}
+
+async function saveExpense() {
+    const description = document.getElementById('expense-description').value.trim();
+    const amount = document.getElementById('expense-amount').value;
+    const note = document.getElementById('expense-note').value.trim();
+    
+    if (!description) {
+        showMessage('Descrição da despesa é obrigatória', 'error');
+        return;
+    }
+    
+    if (!amount || parseFloat(amount) <= 0) {
+        showMessage('Valor da despesa deve ser maior que zero', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/operador/api/despesa', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                descricao: description,
+                valor: amount,
+                observacao: note,
+                caixa_id: currentCaixaId
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.erro || 'Erro ao registrar despesa');
+        }
+        
+        showMessage('Despesa registrada com sucesso!');
+        closeExpenseModal();
+        updateBalance();
+    } catch (error) {
+        showMessage(error.message, 'error');
+        console.error('Erro ao salvar despesa:', error);
+    }
 }
 
 // ==================== FUNÇÕES DE ENTREGA ====================
 function openDeliveryModal() {
-    // Preenche o formulário se já tiver endereço
     if (deliveryAddress) {
         document.getElementById('delivery-address').value = deliveryAddress.logradouro || '';
         document.getElementById('delivery-number').value = deliveryAddress.numero || '';
@@ -179,19 +256,15 @@ function saveDeliveryAddress() {
         instrucoes: document.getElementById('delivery-instructions').value
     };
     
-    // Atualiza o botão para mostrar que tem entrega cadastrada
     deliveryBtn.classList.add('has-delivery');
     deliveryBtn.innerHTML = '<i class="fas fa-check-circle"></i> Endereço de Entrega Cadastrado';
     
     closeModal();
     showMessage('Endereço de entrega salvo com sucesso!');
-    
-    // Mostra as informações resumidas
     showDeliveryInfo();
 }
 
 function showDeliveryInfo() {
-    // Remove a info anterior se existir
     const existingInfo = document.querySelector('.delivery-info');
     if (existingInfo) existingInfo.remove();
     
@@ -208,10 +281,7 @@ function showDeliveryInfo() {
         </button>
     `;
     
-    // Insere após o botão de entrega
     deliveryBtn.insertAdjacentElement('afterend', deliveryInfo);
-    
-    // Adiciona evento para editar
     document.getElementById('edit-delivery-btn').addEventListener('click', openDeliveryModal);
 }
 
@@ -220,7 +290,6 @@ function openDiscountModal(productIndex) {
     const product = selectedProducts[productIndex];
     const totalOriginalValue = product.originalPrice * product.quantity;
     
-    // Cria o modal de desconto
     const discountModal = document.createElement('div');
     discountModal.className = 'modal';
     discountModal.id = 'discount-modal';
@@ -258,7 +327,6 @@ function openDiscountModal(productIndex) {
     document.body.appendChild(discountModal);
     openModal('discount');
     
-    // Event listeners para o modal de desconto
     const discountValueInput = document.getElementById('product-discount-value');
     const discountTypeSelect = document.getElementById('product-discount-type');
     
@@ -271,14 +339,10 @@ function openDiscountModal(productIndex) {
             if (discountType === 'percent') {
                 newTotalValue = totalOriginalValue * (1 - (discountValue / 100));
             } else {
-                // Aplica o desconto fixo sobre o valor total
                 newTotalValue = totalOriginalValue - discountValue;
             }
             newTotalValue = Math.max(0, newTotalValue);
         }
-        
-        // Calcula o novo preço unitário baseado no desconto total
-        const newUnitPrice = newTotalValue / product.quantity;
         
         document.getElementById('new-price-preview').textContent = formatCurrency(newTotalValue);
     }
@@ -292,22 +356,18 @@ function openDiscountModal(productIndex) {
         const totalOriginalValue = product.originalPrice * product.quantity;
         let newTotalValue = totalOriginalValue;
         
-        // Aplica o desconto ao produto
         selectedProducts[productIndex].discountValue = discountValue;
         selectedProducts[productIndex].discountType = discountType;
         
-        // Calcula o novo valor total com desconto
         if (discountValue > 0) {
             if (discountType === 'percent') {
                 newTotalValue = totalOriginalValue * (1 - (discountValue / 100));
             } else {
-                // Aplica o desconto fixo sobre o valor total
                 newTotalValue = totalOriginalValue - discountValue;
             }
             newTotalValue = Math.max(0, newTotalValue);
         }
         
-        // Calcula o novo preço unitário
         selectedProducts[productIndex].price = newTotalValue / product.quantity;
         
         closeModal();
@@ -565,17 +625,20 @@ async function saveClient() {
     };
     
     try {
-        const url = currentEditingClient 
-            ? `/operador/api/clientes/${currentEditingClient.id}`
-            : '/operador/api/clientes';
-            
-        const method = currentEditingClient ? 'PUT' : 'POST';
-        
-        const response = await fetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(clientData)
-        });
+        let response;
+        if (currentEditingClient) {
+            response = await fetch(`/operador/api/clientes/${currentEditingClient.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(clientData)
+            });
+        } else {
+            response = await fetch('/operador/api/clientes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(clientData)
+            });
+        }
         
         if (!response.ok) {
             const errorData = await response.json();
@@ -709,17 +772,6 @@ async function registerSale() {
         tipo_desconto: product.discountType === 'percent' ? 'percentual' : 'fixo'
     }));
 
-    // Preparar dados do desconto
-    let discount = 0;
-    const discountValue = parseFloat(discountValueInput.value) || 0;
-    const discountType = discountTypeSelect.value === 'percent' ? 'percentual' : 'fixo';
-    
-    if (discountValue > 0) {
-        discount = discountType === 'percentual' 
-            ? (discountValue / 100) * items.reduce((sum, item) => sum + (item.valor_unitario * item.quantidade), 0)
-            : discountValue;
-    }
-    
     try {
         const response = await fetch('/operador/api/vendas', {
             method: 'POST',
@@ -728,11 +780,8 @@ async function registerSale() {
                 cliente_id: parseInt(selectedClientIdInput.value),
                 forma_pagamento: paymentMethod,
                 valor_recebido: amountReceived,
-                desconto: discount,
-                tipo_desconto: discountType,
-                observacao: notes,
                 itens: items,
-                entrega: deliveryAddress
+                observacao: notes
             })
         });
         
@@ -744,7 +793,7 @@ async function registerSale() {
         const result = await response.json();
         resetSaleForm();
         await updateBalance();
-        showMessage(`Venda registrada! Total: ${formatCurrency(result.valor_total)}`);
+        showMessage(`Venda registrada com sucesso! Nº Nota: ${result.nota_id}`);
         await loadProducts();
     } catch (error) {
         console.error("Erro ao registrar venda:", error);
@@ -781,8 +830,10 @@ async function checkCaixaStatus() {
         
         if (data.message === 'Nenhum caixa aberto encontrado') {
             closeRegisterBtn.style.display = 'none';
+            currentCaixaId = null;
         } else {
             closeRegisterBtn.style.display = 'block';
+            currentCaixaId = data.caixa_id;
             updateBalance();
         }
     } catch (error) {
@@ -909,7 +960,6 @@ function closeModal() {
     document.querySelectorAll('.modal').forEach(modal => {
         modal.style.display = 'none';
     });
-    // Remove o modal de desconto se existir
     const discountModal = document.getElementById('discount-modal');
     if (discountModal) {
         discountModal.remove();

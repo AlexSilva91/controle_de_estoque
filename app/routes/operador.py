@@ -201,14 +201,6 @@ def api_get_saldo():
         caixa = get_caixa_aberto(db.session)
         
         if not caixa:
-            ultimo_caixa = get_ultimo_caixa_fechado(db.session)
-            if ultimo_caixa:
-                return jsonify({
-                    'saldo': float(ultimo_caixa.valor_fechamento),
-                    'saldo_formatado': f"R$ {ultimo_caixa.valor_fechamento:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
-                    'valor_abertura': 0.00,
-                    'message': 'Nenhum caixa aberto encontrado'
-                })
             return jsonify({
                 'saldo': 0.00,
                 'saldo_formatado': 'R$ 0,00',
@@ -216,7 +208,7 @@ def api_get_saldo():
                 'message': 'Nenhum caixa aberto encontrado'
             })
 
-        # Calcula saldo baseado nas movimentações do dia
+        # Calcula apenas o total das vendas do dia (não inclui o valor de abertura)
         hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
         lancamentos = get_lancamentos_financeiros(
             db.session,
@@ -224,23 +216,24 @@ def api_get_saldo():
             data_fim=datetime.combine(hoje, datetime.max.time())
         )
         
-        saldo = Decimal(str(caixa.valor_abertura))
+        total_vendas = Decimal('0.00')
         
         for lanc in lancamentos:
             if lanc.tipo == 'entrada' and lanc.categoria == 'venda':
-                saldo += Decimal(str(lanc.valor))
-        
+                total_vendas += Decimal(str(lanc.valor))
+
         return jsonify({
-            'saldo': float(saldo),
-            'saldo_formatado': f"R$ {saldo:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+            'saldo': float(total_vendas),  # Agora retorna apenas o total das vendas
+            'saldo_formatado': f"R$ {total_vendas:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
             'valor_abertura': float(caixa.valor_abertura),
-            'message': 'Saldo atualizado com sucesso'
+            'message': 'Saldo atualizado com sucesso',
+            'caixa_id': caixa.id
         })
     
     except Exception as e:
         app.logger.error(f"Erro ao calcular saldo: {str(e)}")
         return jsonify({'error': str(e)}), 500
-
+    
 # ===== API ABERTURA DE CAIXA =====
 @operador_bp.route('/api/abrir-caixa', methods=['POST'])
 @login_required
@@ -351,3 +344,39 @@ def api_get_usuario():
         'nome': current_user.nome,
         'tipo': current_user.tipo
     })
+
+@operador_bp.route('/api/despesa', methods=['POST'])
+@login_required
+def registrar_despesa():
+    data = request.get_json()
+
+    descricao = data.get("descricao")
+    valor = data.get("valor")
+    observacao = data.get("observacao")
+    caixa_id = data.get("caixa_id")  # você deve enviar esse id do frontend
+
+    if not descricao or not valor or not caixa_id:
+        return jsonify({"erro": "Descrição, valor e caixa_id são obrigatórios"}), 400
+
+    try:
+        despesa = entities.Financeiro(
+            tipo=entities.TipoMovimentacao.saida,
+            categoria=entities.CategoriaFinanceira.despesa,
+            valor=Decimal(valor),
+            descricao=descricao,
+            data=datetime.utcnow(),
+            caixa_id=caixa_id,
+            sincronizado=False
+        )
+
+        if observacao:
+            despesa.descricao += f" - Obs: {observacao}"
+
+        db.session.add(despesa)
+        db.session.commit()
+
+        return jsonify({"mensagem": "Despesa registrada com sucesso"}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"erro": str(e)}), 500

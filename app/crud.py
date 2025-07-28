@@ -96,16 +96,6 @@ def abrir_caixa(db: Session, operador_id: int, valor_abertura: Decimal, observac
         db.commit()
         db.refresh(db_caixa)
         
-        # Cria lançamento financeiro de abertura
-        create_lancamento_financeiro(db, {
-            "tipo": TipoMovimentacao.entrada,
-            "categoria": CategoriaFinanceira.abertura_caixa,
-            "valor": float(valor_abertura),
-            "descricao": f"Abertura de caixa - ID {db_caixa.id}",
-            "data": datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
-            "caixa_id": db_caixa.id
-        })
-        
         return db_caixa
     except SQLAlchemyError as e:
         db.rollback()
@@ -129,16 +119,6 @@ def fechar_caixa(db: Session, operador_id: int, valor_fechamento: Decimal, obser
     
     try:
         db.commit()
-        
-        # Cria lançamento financeiro de fechamento
-        create_lancamento_financeiro(db, {
-            "tipo": TipoMovimentacao.saida,
-            "categoria": CategoriaFinanceira.fechamento_caixa,
-            "valor": float(valor_fechamento),
-            "descricao": f"Fechamento de caixa - ID {caixa.id}",
-            "data": datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
-            "caixa_id": caixa.id
-        })
         
         return caixa
     except SQLAlchemyError as e:
