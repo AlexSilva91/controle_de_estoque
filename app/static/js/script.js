@@ -615,7 +615,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${transf.data}</td>
-                        <td><span class="badge ${transf.tipo === 'entrada' ? 'badge-success' : transf.tipo === 'saida' ? 'badge-danger' : 'badge-info'}">${transf.tipo}</span></td>
+                        <td>${transf.observacao || '-'}</td>
                         <td>${transf.produto}</td>
                         <td>${transf.quantidade}</td>
                         <td>${transf.origem || '-'}</td>
@@ -684,25 +684,18 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('usuarioModalTitle').textContent = isEdit ? 'Editar Usuário' : 'Cadastrar Usuário';
         document.getElementById('usuarioModalSubmitText').textContent = isEdit ? 'Atualizar' : 'Cadastrar';
         
-        // Mostrar/ocultar campo de senha conforme necessário
+        // Configurar campos de senha
         const senhaInput = document.getElementById('usuarioSenha');
         const confirmaSenhaInput = document.getElementById('usuarioConfirmaSenha');
 
         if (isEdit) {
             senhaInput.required = false;
             confirmaSenhaInput.required = false;
-            // Mantemos os names para permitir envio, mas serão tratados no backend
-            senhaInput.name = 'senha';
-            confirmaSenhaInput.name = 'confirma_senha';
-            senhaInput.value = '';
-            confirmaSenhaInput.value = '';
             senhaInput.placeholder = "Deixe em branco para manter a senha atual";
             confirmaSenhaInput.placeholder = "Repita a nova senha se for alterar";
         } else {
             senhaInput.required = true;
             confirmaSenhaInput.required = true;
-            senhaInput.name = 'senha';
-            confirmaSenhaInput.name = 'confirma_senha';
             senhaInput.placeholder = "";
             confirmaSenhaInput.placeholder = "";
         }
@@ -717,28 +710,39 @@ document.addEventListener('DOMContentLoaded', function() {
         if (isEdit) {
             try {
                 const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`);
-                if (response.success) {
-                    const usuario = response.usuario;
-                    
-                    document.getElementById('usuarioId').value = usuario.id;
-                    document.getElementById('usuarioNome').value = usuario.nome;
-                    document.getElementById('usuarioCpf').value = usuario.cpf;
-                    document.getElementById('usuarioPerfil').value = usuario.tipo.toLowerCase();
-                    document.getElementById('usuarioStatus').value = usuario.status ? 'true' : 'false';
-                    document.getElementById('usuarioObservacoes').value = usuario.observacoes || '';
-                    
-                    // Adiciona máscara ao CPF após carregar o valor
-                    if (usuario.cpf) {
-                        $(document.getElementById('usuarioCpf')).mask('000.000.000-00');
-                    }
+                
+                if (!response.success) {
+                    throw new Error(response.message || 'Erro ao carregar usuário');
+                }
+
+                const usuario = response.usuario;
+                
+                // Preencher formulário
+                document.getElementById('usuarioId').value = usuario.id;
+                document.getElementById('usuarioNome').value = usuario.nome;
+                document.getElementById('usuarioCpf').value = usuario.cpf;
+                document.getElementById('usuarioPerfil').value = usuario.tipo.toLowerCase();
+                document.getElementById('usuarioStatus').value = usuario.status ? 'true' : 'false';
+                document.getElementById('usuarioObservacoes').value = usuario.observacoes || '';
+                
+                // Limpar campos de senha
+                document.getElementById('usuarioSenha').value = '';
+                document.getElementById('usuarioConfirmaSenha').value = '';
+                
+                // Aplicar máscara ao CPF
+                if (usuario.cpf && typeof $ !== 'undefined') {
+                    $(document.getElementById('usuarioCpf')).mask('000.000.000-00');
                 }
             } catch (error) {
                 console.error('Erro ao carregar dados do usuário:', error);
-                showFlashMessage('error', 'Erro ao carregar dados do usuário');
+                showFlashMessage('error', error.message || 'Erro ao carregar dados do usuário');
+                return; // Não abrir o modal se houver erro
             }
         } else {
-            // Aplica máscara ao CPF para novo usuário
-            $(document.getElementById('usuarioCpf')).mask('000.000.000-00');
+            // Aplicar máscara ao CPF para novo usuário
+            if (typeof $ !== 'undefined') {
+                $(document.getElementById('usuarioCpf')).mask('000.000.000-00');
+            }
         }
         
         openModal('usuarioModal');

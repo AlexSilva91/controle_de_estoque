@@ -534,7 +534,18 @@ def get_usuario(usuario_id):
     try:
         usuario = get_user_by_id(db.session, usuario_id)
         if not usuario:
-            return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
+            return jsonify({
+                'success': False, 
+                'message': 'Usuário não encontrado',
+                'error': 'not_found'
+            }), 404
+        
+        # Verificar se o tipo é um Enum antes de acessar .value
+        tipo_usuario = usuario.tipo.value if hasattr(usuario.tipo, 'value') else usuario.tipo
+        
+        # Formatar datas corretamente
+        ultimo_acesso = usuario.ultimo_acesso.strftime('%d/%m/%Y %H:%M') if usuario.ultimo_acesso else None
+        data_cadastro = usuario.criado_em.strftime('%d/%m/%Y %H:%M') if usuario.criado_em else None
         
         return jsonify({
             'success': True,
@@ -542,16 +553,20 @@ def get_usuario(usuario_id):
                 'id': usuario.id,
                 'nome': usuario.nome,
                 'cpf': usuario.cpf,
-                'tipo': usuario.tipo.value,
-                'status': usuario.status,
-                'ultimo_acesso': usuario.ultimo_acesso.strftime('%d/%m/%Y %H:%M') if usuario.ultimo_acesso else None,
-                'data_cadastro': usuario.criado_em.strftime('%d/%m/%Y %H:%M') if usuario.criado_em else None,
-                'observacoes': usuario.observacoes
+                'tipo': tipo_usuario,
+                'status': bool(usuario.status),  # Garantir que é booleano
+                'ultimo_acesso': ultimo_acesso,
+                'data_cadastro': data_cadastro,
+                'observacoes': usuario.observacoes or ''  # Garantir string vazia se None
             }
         })
     except Exception as e:
-        print(f"Error fetching user {usuario_id}: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
+        print(f"Erro ao buscar usuário {usuario_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Erro interno ao carregar dados do usuário',
+            'error': str(e)
+        }), 500
 
 @admin_bp.route('/usuarios', methods=['POST'])
 @login_required
@@ -934,7 +949,8 @@ def listar_transferencias():
                 'origem': transf.estoque_origem.value,
                 'destino': transf.estoque_destino.value,
                 'quantidade': str(transf.quantidade),
-                'usuario': transf.usuario.nome
+                'usuario': transf.usuario.nome, 
+                'observacao': transf.observacao or ''
             })
         
         return jsonify({'success': True, 'transferencias': result})

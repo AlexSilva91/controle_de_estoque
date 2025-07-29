@@ -387,7 +387,7 @@
                                     <thead>
                                         <tr>
                                             <th>Data</th>
-                                            <th>Tipo</th>
+                                            <th>Observação</th>
                                             <th>Produto</th>
                                             <th>Quantidade</th>
                                             <th>Origem</th>
@@ -910,7 +910,7 @@
                             const row = document.createElement('tr');
                             row.innerHTML = `
                                 <td>${transf.data}</td>
-                                <td><span class="badge ${transf.tipo === 'entrada' ? 'badge-success' : transf.tipo === 'saida' ? 'badge-danger' : 'badge-info'}">${transf.tipo}</span></td>
+                                <td>${transf.observacao}</td>
                                 <td>${transf.produto}</td>
                                 <td>${transf.quantidade}</td>
                                 <td>${transf.origem || '-'}</td>
