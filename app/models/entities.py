@@ -21,6 +21,7 @@ class TipoUsuario(str, enum.Enum):
 class TipoMovimentacao(str, enum.Enum):
     entrada = "entrada"
     saida = "saida"
+    transferencia = "transferencia"
 
 class StatusNota(str, enum.Enum):
     emitida = "emitida"
@@ -55,6 +56,16 @@ class UnidadeMedida(str, enum.Enum):
 class TipoDesconto(str, enum.Enum):
     fixo = "fixo"
     percentual = "percentual"
+
+class TipoEstoque(str, enum.Enum):
+    loja = "loja"
+    deposito = "deposito"
+    fabrica = "fabrica"
+
+class StatusPagamento(str, enum.Enum):
+    pendente = "pendente"
+    parcial = "parcial"
+    quitado = "quitado"
 
 # --------------------
 # Entrega/Delivery
@@ -94,6 +105,7 @@ class Usuario(UserMixin, Base):
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="usuario")
     notas_fiscais = relationship("NotaFiscal", back_populates="operador")
     caixas = relationship("Caixa", back_populates="operador")
+    transferencias = relationship("TransferenciaEstoque", back_populates="usuario")
 
 # --------------------
 # Caixa
@@ -114,6 +126,8 @@ class Caixa(Base):
     operador = relationship("Usuario", back_populates="caixas")
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="caixa")
     financeiros = relationship("Financeiro", back_populates="caixa")
+    notas_fiscais = relationship("NotaFiscal", back_populates="caixa")
+    pagamentos = relationship("PagamentoContaReceber", back_populates="caixa")
 
 # --------------------
 # Produto
@@ -128,7 +142,11 @@ class Produto(Base):
     marca = Column(String(100), nullable=True)
     unidade = Column(Enum(UnidadeMedida), nullable=False, default=UnidadeMedida.kg)
     valor_unitario = Column(DECIMAL(10, 2), nullable=False)
-    estoque_quantidade = Column(DECIMAL(12, 3), nullable=False, default=0.0)
+    estoque_loja = Column(DECIMAL(12, 3), nullable=False, default=0.0)
+    estoque_deposito = Column(DECIMAL(12, 3), nullable=False, default=0.0)
+    estoque_fabrica = Column(DECIMAL(12, 3), nullable=False, default=0.0)
+    estoque_minimo = Column(DECIMAL(12, 3), nullable=False, default=0.0)
+    estoque_maximo = Column(DECIMAL(12, 3), nullable=True)
     ativo = Column(Boolean, default=True, nullable=False)
     criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -136,6 +154,7 @@ class Produto(Base):
 
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="produto")
     itens_nf = relationship("NotaFiscalItem", back_populates="produto")
+    transferencias = relationship("TransferenciaEstoque", back_populates="produto")
 
 # --------------------
 # Cliente
@@ -149,6 +168,7 @@ class Cliente(Base):
     telefone = Column(String(20), nullable=True)
     email = Column(String(100), nullable=True)
     endereco = Column(Text, nullable=True)
+    limite_credito = Column(DECIMAL(12, 2), default=0.00, nullable=False)
     ativo = Column(Boolean, default=True, nullable=False)
     criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -157,6 +177,7 @@ class Cliente(Base):
     notas_fiscais = relationship("NotaFiscal", back_populates="cliente")
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="cliente")
     financeiros = relationship("Financeiro", back_populates="cliente")
+    contas_receber = relationship("ContaReceber", back_populates="cliente")
 
 # --------------------
 # Movimentação de Estoque
@@ -170,6 +191,8 @@ class MovimentacaoEstoque(Base):
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
     caixa_id = Column(Integer, ForeignKey("caixas.id"), nullable=False)
     tipo = Column(Enum(TipoMovimentacao), nullable=False)
+    estoque_origem = Column(Enum(TipoEstoque), nullable=True)
+    estoque_destino = Column(Enum(TipoEstoque), nullable=True)
     quantidade = Column(DECIMAL(12, 3), nullable=False)
     valor_unitario = Column(DECIMAL(10, 2), nullable=False)
     valor_recebido = Column(DECIMAL(12, 2), nullable=True)
@@ -183,6 +206,25 @@ class MovimentacaoEstoque(Base):
     usuario = relationship("Usuario", back_populates="movimentacoes")
     cliente = relationship("Cliente", back_populates="movimentacoes")
     caixa = relationship("Caixa", back_populates="movimentacoes")
+
+# --------------------
+# Transferência entre Estoques
+# --------------------
+class TransferenciaEstoque(Base):
+    __tablename__ = "transferencias_estoque"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    estoque_origem = Column(Enum(TipoEstoque), nullable=False)
+    estoque_destino = Column(Enum(TipoEstoque), nullable=False)
+    quantidade = Column(DECIMAL(12, 3), nullable=False)
+    data = Column(DateTime, default=datetime.utcnow, nullable=False)
+    observacao = Column(Text, nullable=True)
+    sincronizado = Column(Boolean, default=False, nullable=False)
+
+    produto = relationship("Produto", back_populates="transferencias")
+    usuario = relationship("Usuario", back_populates="transferencias")
 
 # --------------------
 # Nota Fiscal
@@ -205,14 +247,16 @@ class NotaFiscal(Base):
     forma_pagamento = Column(Enum(FormaPagamento), nullable=False)
     valor_recebido = Column(DECIMAL(12, 2), nullable=True)
     troco = Column(DECIMAL(12, 2), nullable=True)
+    a_prazo = Column(Boolean, default=False, nullable=False)
     sincronizado = Column(Boolean, default=False, nullable=False)
     
     cliente = relationship("Cliente", back_populates="notas_fiscais")
     operador = relationship("Usuario", back_populates="notas_fiscais")
-    caixa = relationship("Caixa")
+    caixa = relationship("Caixa", back_populates="notas_fiscais")
     entrega = relationship("Entrega")
     itens = relationship("NotaFiscalItem", back_populates="nota", cascade="all, delete-orphan")
     financeiros = relationship("Financeiro", back_populates="nota_fiscal", cascade="all, delete-orphan")
+    contas_receber = relationship("ContaReceber", back_populates="nota_fiscal", cascade="all, delete-orphan")
 
 # --------------------
 # Item da Nota Fiscal
@@ -223,6 +267,7 @@ class NotaFiscalItem(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     nota_id = Column(Integer, ForeignKey("notas_fiscais.id"), nullable=False)
     produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False)
+    estoque_origem = Column(Enum(TipoEstoque), nullable=False, default=TipoEstoque.loja)
     quantidade = Column(DECIMAL(12, 3), nullable=False)
     valor_unitario = Column(DECIMAL(10, 2), nullable=False)
     valor_total = Column(DECIMAL(12, 2), nullable=False)
@@ -232,6 +277,77 @@ class NotaFiscalItem(Base):
     
     nota = relationship("NotaFiscal", back_populates="itens")
     produto = relationship("Produto", back_populates="itens_nf")
+
+# --------------------
+# Contas a Receber
+# --------------------
+class ContaReceber(Base):
+    __tablename__ = "contas_receber"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
+    nota_fiscal_id = Column(Integer, ForeignKey("notas_fiscais.id"), nullable=True)
+    descricao = Column(Text, nullable=False)
+    valor_original = Column(DECIMAL(12, 2), nullable=False)
+    valor_aberto = Column(DECIMAL(12, 2), nullable=False)
+    data_vencimento = Column(DateTime, nullable=False)
+    data_emissao = Column(DateTime, default=datetime.utcnow, nullable=False)
+    status = Column(Enum(StatusPagamento), default=StatusPagamento.pendente, nullable=False)
+    observacoes = Column(Text, nullable=True)
+    sincronizado = Column(Boolean, default=False, nullable=False)
+
+    cliente = relationship("Cliente", back_populates="contas_receber")
+    nota_fiscal = relationship("NotaFiscal", back_populates="contas_receber")
+    pagamentos = relationship("PagamentoContaReceber", back_populates="conta", cascade="all, delete-orphan")
+
+    def registrar_pagamento(self, valor_pago, forma_pagamento, caixa_id=None, observacoes=None):
+        if valor_pago <= 0:
+            raise ValueError("Valor do pagamento deve ser positivo")
+        if valor_pago > self.valor_aberto:
+            raise ValueError("Valor do pagamento excede o valor em aberto")
+        
+        pagamento = PagamentoContaReceber(
+            conta_id=self.id,
+            caixa_id=caixa_id,
+            valor_pago=valor_pago,
+            forma_pagamento=forma_pagamento,
+            observacoes=observacoes
+        )
+        db.session.add(pagamento)
+        
+        self.valor_aberto -= valor_pago
+        self.status = StatusPagamento.quitado if self.valor_aberto == 0 else StatusPagamento.parcial
+        
+        financeiro = Financeiro(
+            tipo=TipoMovimentacao.entrada,
+            categoria=CategoriaFinanceira.venda,
+            valor=valor_pago,
+            conta_receber_id=self.id,
+            cliente_id=self.cliente_id,
+            caixa_id=caixa_id,
+            descricao=f"Pagamento conta #{self.id}"
+        )
+        db.session.add(financeiro)
+        
+        return pagamento
+
+# --------------------
+# Pagamentos de Contas a Receber
+# --------------------
+class PagamentoContaReceber(Base):
+    __tablename__ = "pagamentos_contas_receber"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    conta_id = Column(Integer, ForeignKey("contas_receber.id"), nullable=False)
+    caixa_id = Column(Integer, ForeignKey("caixas.id"), nullable=True)
+    valor_pago = Column(DECIMAL(12, 2), nullable=False)
+    data_pagamento = Column(DateTime, default=datetime.utcnow, nullable=False)
+    forma_pagamento = Column(Enum(FormaPagamento), nullable=False)
+    observacoes = Column(Text, nullable=True)
+    sincronizado = Column(Boolean, default=False, nullable=False)
+
+    conta = relationship("ContaReceber", back_populates="pagamentos")
+    caixa = relationship("Caixa", back_populates="pagamentos")
 
 # --------------------
 # Financeiro
@@ -254,8 +370,11 @@ class Financeiro(Base):
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
     cliente = relationship("Cliente", back_populates="financeiros")
 
-    caixa_id = db.Column(db.Integer, db.ForeignKey('caixas.id'), nullable=True)
+    caixa_id = Column(Integer, ForeignKey('caixas.id'), nullable=True)
     caixa = relationship("Caixa", back_populates="financeiros")
+    
+    conta_receber_id = Column(Integer, ForeignKey("contas_receber.id"), nullable=True)
+    conta_receber = relationship("ContaReceber")
     
     def to_raw_dict(self):
         return {
@@ -268,5 +387,6 @@ class Financeiro(Base):
             'data': self.data.isoformat() if self.data else None,
             'nota_fiscal_id': self.nota_fiscal_id,
             'cliente_id': self.cliente_id,
-            'caixa_id': self.caixa_id
+            'caixa_id': self.caixa_id,
+            'conta_receber_id': self.conta_receber_id
         }

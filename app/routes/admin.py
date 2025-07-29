@@ -10,7 +10,7 @@ from app.models import db
 from app.models import entities
 from app.crud import (
     get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id,
-    get_user_by_cpf, get_user_by_id, get_usuarios, create_user,
+    get_user_by_cpf, get_user_by_id, get_usuarios, create_user, update_user,
     get_produto, get_produtos, create_produto, update_produto, delete_produto,
     registrar_movimentacao, get_cliente, get_clientes, create_cliente, 
     update_cliente, delete_cliente, create_nota_fiscal, get_nota_fiscal, 
@@ -19,8 +19,8 @@ from app.crud import (
     delete_lancamento_financeiro, get_clientes_all
 )
 from app.schemas import (
-    UsuarioCreate, ProdutoCreate, ProdutoUpdate, MovimentacaoEstoqueCreate,
-    ClienteCreate, ClienteBase
+    UsuarioCreate, UsuarioUpdate, ProdutoCreate, ProdutoUpdate, MovimentacaoEstoqueCreate,
+    ClienteCreate, ClienteUpdate, FinanceiroCreate, FinanceiroUpdate
 )
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -45,21 +45,21 @@ def get_dashboard_metrics():
 
         # Estoque por unidade de medida
         estoque_kg = db.session.query(
-            func.sum(entities.Produto.estoque_quantidade)
+            func.sum(entities.Produto.estoque_loja)
         ).filter(
             entities.Produto.unidade == entities.UnidadeMedida.kg,
             entities.Produto.ativo == True
         ).scalar() or 0
 
         estoque_saco = db.session.query(
-            func.sum(entities.Produto.estoque_quantidade)
+            func.sum(entities.Produto.estoque_loja)
         ).filter(
             entities.Produto.unidade == entities.UnidadeMedida.saco,
             entities.Produto.ativo == True
         ).scalar() or 0
 
         estoque_unidade = db.session.query(
-            func.sum(entities.Produto.estoque_quantidade)
+            func.sum(entities.Produto.estoque_loja)
         ).filter(
             entities.Produto.unidade == entities.UnidadeMedida.unidade,
             entities.Produto.ativo == True
@@ -82,7 +82,6 @@ def get_dashboard_metrics():
         print(f"Error fetching dashboard metrics: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
-    
 @admin_bp.route('/dashboard/movimentacoes')
 @login_required
 def get_movimentacoes():
@@ -215,7 +214,7 @@ def listar_clientes():
             if search and (search not in cliente.nome.lower() and 
                           search not in (cliente.documento or '').lower()):
                 continue
-            print(f'DADOS BRUTOS: \n{cliente.ativo}')
+                
             result.append({
                 'id': cliente.id,
                 'nome': cliente.nome,
@@ -255,7 +254,7 @@ def criar_cliente():
                 'documento': cliente.documento,
                 'telefone': cliente.telefone,
                 'email': cliente.email,
-                'ativo': 'Ativo' if cliente.ativo else 'Inativo'
+                'ativo': cliente.ativo
             }
         })
     except Exception as e:
@@ -267,13 +266,13 @@ def atualizar_cliente(cliente_id):
     try:
         data = request.get_json()
         
-        cliente_data = ClienteBase(
-            nome=data['nome'],
+        cliente_data = ClienteUpdate(
+            nome=data.get('nome'),
             documento=data.get('documento'),
             telefone=data.get('telefone'),
             email=data.get('email'),
             endereco=data.get('endereco'),
-            ativo=data['ativo']
+            ativo=data.get('ativo')
         )
         
         cliente = update_cliente(db.session, cliente_id, cliente_data)
@@ -286,7 +285,7 @@ def atualizar_cliente(cliente_id):
                 'documento': cliente.documento,
                 'telefone': cliente.telefone,
                 'email': cliente.email,
-                'ativo': 'Ativo' if cliente.ativo else 'Inativo'
+                'ativo': cliente.ativo
             }
         })
     except Exception as e:
@@ -296,8 +295,7 @@ def atualizar_cliente(cliente_id):
 @login_required
 def obter_cliente(cliente_id):
     try:
-        cliente = get_cliente(db.session, cliente_id)  # implemente essa função se necessário
-
+        cliente = get_cliente(db.session, cliente_id)
         if not cliente:
             return jsonify({'success': False, 'message': 'Cliente não encontrado'}), 404
 
@@ -310,7 +308,7 @@ def obter_cliente(cliente_id):
                 'telefone': cliente.telefone,
                 'email': cliente.email,
                 'endereco': cliente.endereco,
-                'ativo  ': 'Ativo' if cliente.ativo else 'Inativo'
+                'ativo': cliente.ativo
             }
         })
     except Exception as e:
@@ -346,7 +344,7 @@ def listar_produtos():
                 'tipo': produto.tipo,
                 'unidade': produto.unidade.value,
                 'valor': f"R$ {produto.valor_unitario:,.2f}",
-                'estoque': f"{produto.estoque_quantidade} {produto.unidade.value}",
+                'estoque': f"{produto.estoque_loja} {produto.unidade.value}",
                 'marca': produto.marca or ''
             })
         
@@ -366,7 +364,10 @@ def criar_produto():
             marca=data.get('marca'),
             unidade=data['unidade'],
             valor_unitario=Decimal(data['valor_unitario']),
-            estoque_quantidade=Decimal(data['estoque_quantidade'])
+            estoque_loja=Decimal(data.get('estoque_quantidade', 0)),
+            estoque_deposito=Decimal(data.get('estoque_quantidade', 0)),
+            estoque_fabrica=Decimal(data.get('estoque_quantidade', 0)),
+            ativo=True
         )
         
         produto = create_produto(db.session, produto_data)
@@ -379,7 +380,7 @@ def criar_produto():
                 'tipo': produto.tipo,
                 'unidade': produto.unidade.value,
                 'valor': str(produto.valor_unitario),
-                'estoque': str(produto.estoque_quantidade)
+                'estoque': str(produto.estoque_loja)
             }
         })
     except Exception as e:
@@ -397,7 +398,7 @@ def atualizar_produto(produto_id):
             marca=data.get('marca'),
             unidade=data.get('unidade'),
             valor_unitario=Decimal(data['valor_unitario']) if 'valor_unitario' in data else None,
-            estoque_quantidade=Decimal(data['estoque_quantidade']) if 'estoque_quantidade' in data else None
+            estoque_loja=Decimal(data['estoque_quantidade']) if 'estoque_quantidade' in data else None
         )
         
         produto = update_produto(db.session, produto_id, produto_data)
@@ -410,7 +411,7 @@ def atualizar_produto(produto_id):
                 'tipo': produto.tipo,
                 'unidade': produto.unidade.value,
                 'valor': str(produto.valor_unitario),
-                'estoque': str(produto.estoque_quantidade)
+                'estoque': str(produto.estoque_loja)
             }
         })
     except Exception as e:
@@ -434,7 +435,7 @@ def obter_produto(produto_id):
                 'marca': produto.marca or '',
                 'unidade': produto.unidade.value,
                 'valor_unitario': str(produto.valor_unitario),
-                'estoque_quantidade': str(produto.estoque_quantidade),
+                'estoque_loja': str(produto.estoque_loja),
                 'ativo': produto.ativo
             }
         })
@@ -470,7 +471,9 @@ def registrar_movimentacao_produto(produto_id):
             valor_recebido=Decimal(data.get('valor_recebido', 0)),
             troco=Decimal(data.get('troco', 0)),
             forma_pagamento=data.get('forma_pagamento'),
-            observacao=data.get('observacao')
+            observacao=data.get('observacao'),
+            estoque_origem=data.get('estoque_origem', entities.TipoEstoque.loja),
+            estoque_destino=data.get('estoque_destino', entities.TipoEstoque.loja)
         )
         
         movimentacao = registrar_movimentacao(db.session, mov_data)
@@ -502,16 +505,12 @@ def listar_usuarios():
             if search and (search not in usuario.nome.lower() and 
                           search not in usuario.email.lower()):
                 continue
-            if usuario.status == True:
-                status = 'Ativo'
-            else:
-                status = 'Inativo'
                 
             result.append({
                 'id': usuario.id,
                 'nome': usuario.nome,
                 'tipo': usuario.tipo.value.capitalize(),
-                'status': status,
+                'status': 'Ativo' if usuario.status else 'Inativo',
                 'ultimo_acesso': usuario.ultimo_acesso.strftime('%d/%m/%Y %H:%M') if usuario.ultimo_acesso else 'Nunca',
                 'cpf': usuario.cpf
             })
@@ -529,35 +528,19 @@ def get_usuario(usuario_id):
         if not usuario:
             return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
         
-        # Verifica e formata os campos de forma segura
-        ultimo_acesso = (
-            usuario.ultimo_acesso.strftime('%d/%m/%Y %H:%M') 
-            if hasattr(usuario, 'ultimo_acesso') and usuario.ultimo_acesso 
-            else None
-        )
-
-        data_cadastro = (
-            usuario.criado_em.strftime('%d/%m/%Y %H:%M')
-            if hasattr(usuario, 'criado_em') and usuario.criado_em
-            else None
-        )
-
-        
-        response_data = {
+        return jsonify({
             'success': True,
             'usuario': {
                 'id': usuario.id,
                 'nome': usuario.nome,
                 'cpf': usuario.cpf,
-                'tipo': usuario.tipo.value if hasattr(usuario.tipo, 'value') else str(usuario.tipo),
-                'status': usuario.status.value if hasattr(usuario.status, 'value') else str(usuario.status),
-                'ultimo_acesso': ultimo_acesso,
-                'data_cadastro': data_cadastro,
-                'observacoes': getattr(usuario, 'observacoes', None)
+                'tipo': usuario.tipo.value,
+                'status': usuario.status,
+                'ultimo_acesso': usuario.ultimo_acesso.strftime('%d/%m/%Y %H:%M') if usuario.ultimo_acesso else None,
+                'data_cadastro': usuario.criado_em.strftime('%d/%m/%Y %H:%M') if usuario.criado_em else None,
+                'observacoes': usuario.observacoes
             }
-        }
-            
-        return jsonify(response_data)
+        })
     except Exception as e:
         print(f"Error fetching user {usuario_id}: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -569,9 +552,15 @@ def criar_usuario():
         data = request.get_json()
         print("Recebido:", data)
 
-        usuario_data = schemas.UsuarioCreate(**data)
+        usuario_data = UsuarioCreate(
+            nome=data['nome'],
+            cpf=data['cpf'],
+            senha=data['senha'],
+            tipo=data['tipo'],
+            status=data.get('status', True),
+            observacoes=data.get('observacoes')
+        )
 
-        # Cria o usuário usando a função centralizada do CRUD
         novo_usuario = create_user(db.session, usuario_data)
 
         return jsonify({
@@ -591,47 +580,33 @@ def criar_usuario():
         print("Erro ao criar usuário:", e)
         return jsonify({'success': False, 'message': str(e)}), 400
 
-
 @admin_bp.route('/usuarios/<int:usuario_id>', methods=['PUT'])
 @login_required
 def atualizar_usuario(usuario_id):
     try:
         data = request.get_json()
         
-        usuario = get_user_by_id(db.session, usuario_id)
-        if not usuario:
-            return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
+        usuario_data = UsuarioUpdate(
+            nome=data.get('nome'),
+            cpf=data.get('cpf'),
+            tipo=data.get('tipo'),
+            status=data.get('status'),
+            observacoes=data.get('observacoes')
+        )
         
-        # Atualiza nome e cpf
-        if 'nome' in data:
-            usuario.nome = data['nome']
-        if 'cpf' in data:
-            usuario.cpf = data['cpf']
-        
-        # Atualiza tipo - converte para enum TipoUsuario
-        if 'tipo' in data:
-            tipo_str = data['tipo'].lower()
-            if tipo_str in entities.TipoUsuario.__members__:
-                usuario.tipo = entities.TipoUsuario[tipo_str]
-            else:
-                return jsonify({'success': False, 'message': 'Tipo de usuário inválido'}), 400
-        
-        # Atualiza status (booleano)
-        if 'status' in data:
-            status_val = data['status']
-            if isinstance(status_val, bool):
-                usuario.status = status_val
-            else:
-                # Permitir strings 'ativo'/'inativo' (insensível)
-                usuario.status = (str(status_val).lower() == 'ativo')
-        
-        # Atualiza observações se enviado
-        if 'observacoes' in data:
-            usuario.observacoes = data['observacoes']
-        
-        db.session.commit()
-        
-        return jsonify({'success': True, 'message': 'Usuário atualizado com sucesso'})
+        usuario = update_user(db.session, usuario_id, usuario_data)
+        return jsonify({
+            'success': True,
+            'message': 'Usuário atualizado com sucesso',
+            'usuario': {
+                'id': usuario.id,
+                'nome': usuario.nome,
+                'cpf': usuario.cpf,
+                'tipo': usuario.tipo.value,
+                'status': usuario.status,
+                'observacoes': usuario.observacoes
+            }
+        })
     
     except Exception as e:
         print(f"Erro ao atualizar usuário: {e}")
@@ -710,6 +685,75 @@ def listar_financeiro():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@admin_bp.route('/financeiro', methods=['POST'])
+@login_required
+def criar_lancamento_financeiro():
+    try:
+        data = request.get_json()
+        
+        lancamento_data = FinanceiroCreate(
+            tipo=data['tipo'],
+            categoria=data['categoria'],
+            valor=Decimal(data['valor']),
+            descricao=data.get('descricao', ''),
+            data=datetime.now(tz=ZoneInfo("America/Sao_Paulo")),
+            nota_fiscal_id=data.get('nota_fiscal_id'),
+            cliente_id=data.get('cliente_id'),
+            caixa_id=data.get('caixa_id')
+        )
+        
+        lancamento = create_lancamento_financeiro(db.session, lancamento_data)
+        return jsonify({
+            'success': True,
+            'message': 'Lançamento financeiro criado com sucesso',
+            'lancamento': {
+                'id': lancamento.id,
+                'tipo': lancamento.tipo.value,
+                'categoria': lancamento.categoria.value,
+                'valor': str(lancamento.valor),
+                'descricao': lancamento.descricao
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@admin_bp.route('/financeiro/<int:lancamento_id>', methods=['PUT'])
+@login_required
+def atualizar_lancamento_financeiro(lancamento_id):
+    try:
+        data = request.get_json()
+        
+        lancamento_data = FinanceiroUpdate(
+            tipo=data.get('tipo'),
+            categoria=data.get('categoria'),
+            valor=Decimal(data['valor']) if 'valor' in data else None,
+            descricao=data.get('descricao')
+        )
+        
+        lancamento = update_lancamento_financeiro(db.session, lancamento_id, lancamento_data)
+        return jsonify({
+            'success': True,
+            'message': 'Lançamento financeiro atualizado com sucesso',
+            'lancamento': {
+                'id': lancamento.id,
+                'tipo': lancamento.tipo.value,
+                'categoria': lancamento.categoria.value,
+                'valor': str(lancamento.valor),
+                'descricao': lancamento.descricao
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@admin_bp.route('/financeiro/<int:lancamento_id>', methods=['DELETE'])
+@login_required
+def remover_lancamento_financeiro(lancamento_id):
+    try:
+        delete_lancamento_financeiro(db.session, lancamento_id)
+        return jsonify({'success': True, 'message': 'Lançamento financeiro removido com sucesso'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
 # ===== Nota Fiscal Routes =====
 @admin_bp.route('/notas-fiscais', methods=['POST'])
 @login_required
@@ -722,6 +766,7 @@ def criar_nota_fiscal():
             
         nota_data = {
             'cliente_id': data.get('cliente_id'),
+            'operador_id': current_user.id,
             'caixa_id': caixa.id,
             'valor_total': Decimal(data['valor_total']),
             'forma_pagamento': data['forma_pagamento'],

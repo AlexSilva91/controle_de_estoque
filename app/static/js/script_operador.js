@@ -704,7 +704,7 @@ function displayProductSearchResults(products) {
         item.innerHTML = `
             <h4>${product.nome}</h4>
             <p>Marca: ${product.marca || 'Não informada'} | Código: ${product.codigo || 'Não informado'}</p>
-            <p>Preço: ${formatCurrency(product.valor_unitario)} | Estoque: ${product.estoque_quantidade} ${product.unidade}</p>
+            <p>Preço: ${formatCurrency(product.valor_unitario)} | Estoque Loja: ${product.estoque_loja} ${product.unidade}</p>
         `;
         item.addEventListener('click', () => {
             addProductToSale(product);
@@ -772,17 +772,34 @@ async function registerSale() {
         tipo_desconto: product.discountType === 'percent' ? 'percentual' : 'fixo'
     }));
 
+    // Preparar dados da venda incluindo endereço de entrega se existir
+    const saleData = {
+        cliente_id: parseInt(selectedClientIdInput.value),
+        forma_pagamento: paymentMethod,
+        valor_recebido: amountReceived,
+        itens: items,
+        observacao: notes
+    };
+
+    // Adicionar dados de entrega se existirem
+    if (deliveryAddress) {
+        saleData.endereco_entrega = {
+            logradouro: deliveryAddress.logradouro,
+            numero: deliveryAddress.numero,
+            complemento: deliveryAddress.complemento || null,
+            bairro: deliveryAddress.bairro,
+            cidade: deliveryAddress.cidade,
+            estado: deliveryAddress.estado,
+            cep: deliveryAddress.cep,
+            instrucoes: deliveryAddress.instrucoes || null
+        };
+    }
+
     try {
         const response = await fetch('/operador/api/vendas', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                cliente_id: parseInt(selectedClientIdInput.value),
-                forma_pagamento: paymentMethod,
-                valor_recebido: amountReceived,
-                itens: items,
-                observacao: notes
-            })
+            body: JSON.stringify(saleData)
         });
         
         if (!response.ok) {

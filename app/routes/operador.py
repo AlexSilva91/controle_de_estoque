@@ -1,7 +1,7 @@
 import threading
 from flask import Blueprint, render_template, request, jsonify, current_app as app
 from datetime import datetime, time, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db
@@ -103,37 +103,76 @@ def api_delete_cliente(cliente_id):
 @operador_bp.route('/api/produtos', methods=['GET'])
 @login_required
 def api_get_produtos():
-    produtos = get_produtos(db.session)
-    return jsonify([{
-        'id': produto.id,
-        'nome': produto.nome,
-        'codigo': produto.codigo,
-        'tipo': produto.tipo,
-        'marca': produto.marca,
-        'unidade': produto.unidade,
-        'valor_unitario': float(produto.valor_unitario),
-        'estoque_quantidade': float(produto.estoque_quantidade),
-        'ativo': produto.ativo,
-        'descricao': f"{produto.nome} ({produto.marca})" if produto.marca else produto.nome
-    } for produto in produtos if produto.estoque_quantidade > 0])
+    try:
+        produtos = get_produtos(db.session)
+        
+        produtos_formatados = []
+        for produto in produtos:
+            # Calcula o estoque total somando todos os locais de estoque
+            estoque_total = produto.estoque_loja + produto.estoque_deposito + produto.estoque_fabrica
+            
+            # Filtra apenas produtos com estoque total positivo
+            if estoque_total > 0:
+                produto_data = {
+                    'id': produto.id,
+                    'nome': produto.nome,
+                    'codigo': produto.codigo,
+                    'tipo': produto.tipo,
+                    'marca': produto.marca,
+                    'unidade': produto.unidade.value if produto.unidade else None,  # Converte o Enum para valor
+                    'valor_unitario': float(produto.valor_unitario),
+                    'estoque_loja': float(produto.estoque_loja),
+                    'estoque_deposito': float(produto.estoque_deposito),
+                    'estoque_fabrica': float(produto.estoque_fabrica),
+                    'estoque_total': float(estoque_total),
+                    'estoque_minimo': float(produto.estoque_minimo) if produto.estoque_minimo else None,
+                    'estoque_maximo': float(produto.estoque_maximo) if produto.estoque_maximo else None,
+                    'ativo': produto.ativo,
+                    'descricao': f"{produto.nome} ({produto.marca})" if produto.marca else produto.nome,
+                    'criado_em': produto.criado_em.isoformat() if produto.criado_em else None,
+                    'atualizado_em': produto.atualizado_em.isoformat() if produto.atualizado_em else None
+                }
+                produtos_formatados.append(produto_data)
+        
+        return jsonify(produtos_formatados)
+    
+    except Exception as e:
+        app.logger.error(f"Erro ao obter produtos: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Erro interno ao buscar produtos'}), 500
 
 @operador_bp.route('/api/produtos/<int:produto_id>', methods=['GET'])
 @login_required
 def api_get_produto(produto_id):
-    produto = get_produto(db.session, produto_id)
-    if produto:
-        return jsonify({
-            'id': produto.id,
-            'nome': produto.nome,
-            'codigo': produto.codigo,
-            'tipo': produto.tipo,
-            'marca': produto.marca,
-            'unidade': produto.unidade,
-            'valor_unitario': float(produto.valor_unitario),
-            'estoque_quantidade': float(produto.estoque_quantidade),
-            'ativo': produto.ativo
-        })
-    return jsonify({'error': 'Produto não encontrado'}), 404
+    try:
+        produto = get_produto(db.session, produto_id)
+        if produto:
+            estoque_total = produto.estoque_loja + produto.estoque_deposito + produto.estoque_fabrica
+            
+            return jsonify({
+                'id': produto.id,
+                'nome': produto.nome,
+                'codigo': produto.codigo,
+                'tipo': produto.tipo,
+                'marca': produto.marca,
+                'unidade': produto.unidade.value if produto.unidade else None,
+                'valor_unitario': float(produto.valor_unitario),
+                'estoque_loja': float(produto.estoque_loja),
+                'estoque_deposito': float(produto.estoque_deposito),
+                'estoque_fabrica': float(produto.estoque_fabrica),
+                'estoque_total': float(estoque_total),
+                'estoque_minimo': float(produto.estoque_minimo) if produto.estoque_minimo else None,
+                'estoque_maximo': float(produto.estoque_maximo) if produto.estoque_maximo else None,
+                'ativo': produto.ativo,
+                'criado_em': produto.criado_em.isoformat() if produto.criado_em else None,
+                'atualizado_em': produto.atualizado_em.isoformat() if produto.atualizado_em else None,
+                'sincronizado': produto.sincronizado
+            })
+        
+        return jsonify({'error': 'Produto não encontrado'}), 404
+    
+    except Exception as e:
+        app.logger.error(f"Erro ao obter produto ID {produto_id}: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Erro interno ao buscar produto'}), 500
 
 # ===== API VENDAS =====
 @operador_bp.route('/api/vendas', methods=['POST'])
@@ -157,6 +196,10 @@ def api_registrar_venda():
 
         if not isinstance(data['itens'], list) or len(data['itens']) == 0:
             return jsonify({'error': 'Lista de itens inválida'}), 400
+
+        # Mapeia endereco_entrega para entrega se existir
+        if 'endereco_entrega' in data:
+            data['entrega'] = data.pop('endereco_entrega')
 
         for i, item in enumerate(data['itens']):
             if not isinstance(item, dict):
@@ -193,7 +236,7 @@ def api_registrar_venda():
         db.session.rollback()
         app.logger.error(f"Erro ao registrar venda: {str(e)}", exc_info=True)
         return jsonify({'error': 'Erro interno ao processar a venda'}), 500
-
+    
 # ===== API SALDO =====
 @operador_bp.route('/api/saldo', methods=['GET'])
 @login_required
@@ -290,11 +333,20 @@ def api_abrir_caixa():
 def api_fechar_caixa():
     try:
         data = request.get_json()
-        valor = Decimal(str(data.get('valor_fechamento', 0)))
         
-        if valor <= 0:
+        # Verificação mais robusta do valor
+        if 'valor_fechamento' not in data:
+            return jsonify({'error': 'Campo valor_fechamento é obrigatório'}), 400
+            
+        try:
+            valor = Decimal(str(data['valor_fechamento']))
+        except (TypeError, ValueError, InvalidOperation):
             return jsonify({'error': 'Valor de fechamento inválido'}), 400
         
+        if valor <= 0:
+            return jsonify({'error': 'Valor de fechamento deve ser positivo'}), 400
+        
+        # Restante da função permanece igual
         caixa = fechar_caixa(
             db.session,
             current_user.id,
@@ -302,7 +354,6 @@ def api_fechar_caixa():
             data.get('observacao', '')
         )
         
-        # Envia relatório em segundo plano
         threading.Thread(target=enviar_resumo_movimentacao_diaria).start()
         
         return jsonify({
@@ -339,25 +390,39 @@ def api_buscar_clientes():
 @operador_bp.route('/api/produtos/buscar', methods=['GET'])
 @login_required
 def api_buscar_produtos():
-    termo = request.args.get('q', '').lower()
-    produtos = get_produtos(db.session)
+    try:
+        termo = request.args.get('q', '').lower()
+        produtos = get_produtos(db.session)
+        
+        resultados = []
+        for produto in produtos:
+            # Verifica se o termo de busca está no nome, marca ou código
+            if (termo in produto.nome.lower() or 
+                (produto.marca and termo in produto.marca.lower()) or 
+                (produto.codigo and termo in produto.codigo.lower())):
+                
+                estoque_total = produto.estoque_loja + produto.estoque_deposito + produto.estoque_fabrica
+                
+                resultados.append({
+                    'id': produto.id,
+                    'nome': produto.nome,
+                    'marca': produto.marca,
+                    'codigo': produto.codigo,
+                    'unidade': produto.unidade.value if produto.unidade else None,
+                    'valor_unitario': float(produto.valor_unitario),
+                    'estoque_loja': float(produto.estoque_loja),
+                    'estoque_deposito': float(produto.estoque_deposito),
+                    'estoque_fabrica': float(produto.estoque_fabrica),
+                    'estoque_total': float(estoque_total),
+                    'descricao': f"{produto.nome} ({produto.marca})" if produto.marca else produto.nome,
+                    'disponivel': estoque_total > 0  # Indica se tem estoque disponível
+                })
+        
+        return jsonify(resultados)
     
-    resultados = []
-    for produto in produtos:
-        if (termo in produto.nome.lower() or 
-            (produto.marca and termo in produto.marca.lower()) or 
-            (produto.codigo and termo in produto.codigo.lower())):
-            
-            resultados.append({
-                'id': produto.id,
-                'nome': produto.nome,
-                'marca': produto.marca,
-                'valor_unitario': float(produto.valor_unitario),
-                'estoque_quantidade': float(produto.estoque_quantidade),
-                'descricao': f"{produto.nome} ({produto.marca})" if produto.marca else produto.nome
-            })
-    
-    return jsonify(resultados)
+    except Exception as e:
+        app.logger.error(f"Erro na busca de produtos: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Erro interno na busca de produtos'}), 500
 
 @operador_bp.route('/api/usuario', methods=['GET'])
 @login_required

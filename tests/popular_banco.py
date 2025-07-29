@@ -2,6 +2,7 @@ from app import create_app
 from app.models import db
 from app.models.entities import Usuario, TipoUsuario, Cliente, Produto, UnidadeMedida
 from passlib.context import CryptContext
+from datetime import datetime
 
 app = create_app()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -54,16 +55,16 @@ with app.app_context():
 
     # --- PRODUTOS ---
     produtos = [
-        {"codigo": "P0001", "nome": "Produto 1", "tipo": "tipo1", "marca": "Marca A", "unidade": UnidadeMedida.kg, "valor_unitario": 10.50, "estoque_quantidade": 100},
-        {"codigo": "P0002", "nome": "Produto 2", "tipo": "tipo1", "marca": "Marca A", "unidade": UnidadeMedida.saco, "valor_unitario": 20.00, "estoque_quantidade": 50},
-        {"codigo": "P0003", "nome": "Produto 3", "tipo": "tipo2", "marca": "Marca B", "unidade": UnidadeMedida.unidade, "valor_unitario": 5.00, "estoque_quantidade": 200},
-        {"codigo": "P0004", "nome": "Produto 4", "tipo": "tipo2", "marca": "Marca C", "unidade": UnidadeMedida.kg, "valor_unitario": 15.00, "estoque_quantidade": 80},
-        {"codigo": "P0005", "nome": "Produto 5", "tipo": "tipo3", "marca": "Marca C", "unidade": UnidadeMedida.saco, "valor_unitario": 12.00, "estoque_quantidade": 120},
-        {"codigo": "P0006", "nome": "Produto 6", "tipo": "tipo3", "marca": "Marca D", "unidade": UnidadeMedida.unidade, "valor_unitario": 3.50, "estoque_quantidade": 500},
-        {"codigo": "P0007", "nome": "Produto 7", "tipo": "tipo1", "marca": "Marca A", "unidade": UnidadeMedida.kg, "valor_unitario": 7.25, "estoque_quantidade": 150},
-        {"codigo": "P0008", "nome": "Produto 8", "tipo": "tipo2", "marca": "Marca B", "unidade": UnidadeMedida.saco, "valor_unitario": 22.00, "estoque_quantidade": 90},
-        {"codigo": "P0009", "nome": "Produto 9", "tipo": "tipo3", "marca": "Marca D", "unidade": UnidadeMedida.unidade, "valor_unitario": 9.99, "estoque_quantidade": 250},
-        {"codigo": "P0010", "nome": "Produto 10", "tipo": "tipo1", "marca": "Marca A", "unidade": UnidadeMedida.kg, "valor_unitario": 11.00, "estoque_quantidade": 300},
+        {"codigo": "P0001", "nome": "Produto 1", "tipo": "tipo1", "marca": "Marca A", "unidade": UnidadeMedida.kg, "valor_unitario": 10.50, "estoque_loja": 100},
+        {"codigo": "P0002", "nome": "Produto 2", "tipo": "tipo1", "marca": "Marca A", "unidade": UnidadeMedida.saco, "valor_unitario": 20.00, "estoque_loja": 50},
+        {"codigo": "P0003", "nome": "Produto 3", "tipo": "tipo2", "marca": "Marca B", "unidade": UnidadeMedida.unidade, "valor_unitario": 5.00, "estoque_loja": 200},
+        {"codigo": "P0004", "nome": "Produto 4", "tipo": "tipo2", "marca": "Marca C", "unidade": UnidadeMedida.kg, "valor_unitario": 15.00, "estoque_loja": 80},
+        {"codigo": "P0005", "nome": "Produto 5", "tipo": "tipo3", "marca": "Marca C", "unidade": UnidadeMedida.saco, "valor_unitario": 12.00, "estoque_loja": 120},
+        {"codigo": "P0006", "nome": "Produto 6", "tipo": "tipo3", "marca": "Marca D", "unidade": UnidadeMedida.unidade, "valor_unitario": 3.50, "estoque_loja": 500},
+        {"codigo": "P0007", "nome": "Produto 7", "tipo": "tipo1", "marca": "Marca A", "unidade": UnidadeMedida.kg, "valor_unitario": 7.25, "estoque_loja": 150},
+        {"codigo": "P0008", "nome": "Produto 8", "tipo": "tipo2", "marca": "Marca B", "unidade": UnidadeMedida.saco, "valor_unitario": 22.00, "estoque_loja": 90},
+        {"codigo": "P0009", "nome": "Produto 9", "tipo": "tipo3", "marca": "Marca D", "unidade": UnidadeMedida.unidade, "valor_unitario": 9.99, "estoque_loja": 250},
+        {"codigo": "P0010", "nome": "Produto 10", "tipo": "tipo1", "marca": "Marca A", "unidade": UnidadeMedida.kg, "valor_unitario": 11.00, "estoque_loja": 300},
     ]
 
     for p in produtos:
@@ -75,7 +76,10 @@ with app.app_context():
                 marca=p["marca"],
                 unidade=p["unidade"],
                 valor_unitario=p["valor_unitario"],
-                estoque_quantidade=p["estoque_quantidade"],
+                estoque_loja=p["estoque_loja"],
+                estoque_deposito=0,
+                estoque_fabrica=0,
+                estoque_minimo=0,
                 ativo=True
             )
             db.session.add(novo_produto)
@@ -84,5 +88,4 @@ with app.app_context():
 
     # Commit das inserções
     db.session.commit()
-
     print("✅ Usuários, clientes e produtos cadastrados com sucesso!")
