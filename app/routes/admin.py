@@ -9,8 +9,8 @@ from app import schemas
 from app.models import db
 from app.models import entities
 from app.crud import (
-    get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id,
-    get_user_by_cpf, get_user_by_id, get_usuarios, create_user, update_user,
+    TipoEstoque, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, get_transferencias,
+    get_user_by_cpf, get_user_by_id, get_usuarios, create_user, registrar_transferencia, update_user,
     get_produto, get_produtos, create_produto, update_produto, delete_produto,
     registrar_movimentacao, get_cliente, get_clientes, create_cliente, 
     update_cliente, delete_cliente, create_nota_fiscal, get_nota_fiscal, 
@@ -344,7 +344,9 @@ def listar_produtos():
                 'tipo': produto.tipo,
                 'unidade': produto.unidade.value,
                 'valor': f"R$ {produto.valor_unitario:,.2f}",
-                'estoque': f"{produto.estoque_loja} {produto.unidade.value}",
+                'estoque_loja': f"{produto.estoque_loja:,.2f}",
+                'estoque_deposito': f"{produto.estoque_deposito:,.2f}",
+                'estoque_fabrica': f"{produto.estoque_fabrica:,.2f}",
                 'marca': produto.marca or ''
             })
         
@@ -357,6 +359,8 @@ def listar_produtos():
 def criar_produto():
     try:
         data = request.get_json()
+        print("Dados recebidos:", data)
+        
         produto_data = ProdutoCreate(
             codigo=data.get('codigo'),
             nome=data['nome'],
@@ -364,9 +368,11 @@ def criar_produto():
             marca=data.get('marca'),
             unidade=data['unidade'],
             valor_unitario=Decimal(data['valor_unitario']),
-            estoque_loja=Decimal(data.get('estoque_quantidade', 0)),
-            estoque_deposito=Decimal(data.get('estoque_quantidade', 0)),
-            estoque_fabrica=Decimal(data.get('estoque_quantidade', 0)),
+            estoque_loja=Decimal(data.get('estoque_loja', 0)),
+            estoque_deposito=Decimal(data.get('estoque_deposito', 0)),
+            estoque_fabrica=Decimal(data.get('estoque_fabrica', 0)),
+            estoque_minimo=Decimal(0),  # Valor padrão
+            estoque_maximo=None,       # Valor padrão
             ativo=True
         )
         
@@ -380,7 +386,9 @@ def criar_produto():
                 'tipo': produto.tipo,
                 'unidade': produto.unidade.value,
                 'valor': str(produto.valor_unitario),
-                'estoque': str(produto.estoque_loja)
+                'estoque_loja': str(produto.estoque_loja),
+                'estoque_deposito': str(produto.estoque_deposito),
+                'estoque_fabrica': str(produto.estoque_fabrica)
             }
         })
     except Exception as e:
@@ -585,14 +593,19 @@ def criar_usuario():
 def atualizar_usuario(usuario_id):
     try:
         data = request.get_json()
+        print(data)
         
-        usuario_data = UsuarioUpdate(
-            nome=data.get('nome'),
-            cpf=data.get('cpf'),
-            tipo=data.get('tipo'),
-            status=data.get('status'),
-            observacoes=data.get('observacoes')
-        )
+        # Verificar se foi enviada senha e confirmação
+        if 'senha' in data or 'confirma_senha' in data:
+            if 'senha' not in data or 'confirma_senha' not in data:
+                raise ValueError("Para alterar a senha, ambos os campos 'senha' e 'confirma_senha' devem ser enviados")
+            if data['senha'] != data['confirma_senha']:
+                raise ValueError("As senhas não coincidem")
+        
+        # Criar o objeto de atualização removendo campos não relevantes
+        update_data = {k: v for k, v in data.items() if k not in ['confirma_senha']}
+        
+        usuario_data = UsuarioUpdate(**update_data)
         
         usuario = update_user(db.session, usuario_id, usuario_data)
         return jsonify({
@@ -845,3 +858,86 @@ def detalhar_nota_fiscal(nota_id):
         })
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+    
+@admin_bp.route('/transferencias', methods=['POST'])
+@login_required
+def criar_transferencia():
+    try:
+        data = request.get_json()
+        print("Dados recebidos:", data)
+        
+        # Validação dos dados recebidos
+        if not all(key in data for key in ['produto_id', 'estoque_origem', 'estoque_destino', 'quantidade']):
+            return jsonify({'success': False, 'message': 'Dados incompletos para a transferência'}), 400
+        
+        try:
+            # Converter para os tipos corretos
+            produto_id = int(data['produto_id'])
+            quantidade = Decimal(str(data['quantidade']))
+            
+            # Converter strings para enum TipoEstoque
+            estoque_origem = TipoEstoque(data['estoque_origem'])
+            estoque_destino = TipoEstoque(data['estoque_destino'])
+            
+            observacao = data.get('observacao', '')
+        except (ValueError, KeyError) as e:
+            return jsonify({'success': False, 'message': f'Dados inválidos: {str(e)}'}), 400
+        
+        # Validar quantidade
+        if quantidade <= 0:
+            return jsonify({'success': False, 'message': 'Quantidade deve ser maior que zero'}), 400
+        
+        # Validar estoques diferentes
+        if estoque_origem == estoque_destino:
+            return jsonify({'success': False, 'message': 'Estoque de origem e destino devem ser diferentes'}), 400
+        
+        # Criar objeto de transferência
+        transferencia_data = {
+            'produto_id': produto_id,
+            'usuario_id': current_user.id,
+            'estoque_origem': estoque_origem,
+            'estoque_destino': estoque_destino,
+            'quantidade': quantidade,
+            'observacao': observacao
+        }
+        
+        # Registrar transferência
+        transferencia = registrar_transferencia(db.session, transferencia_data)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Transferência realizada com sucesso',
+            'transferencia': {
+                'id': transferencia.id,
+                'data': transferencia.data.strftime('%d/%m/%Y %H:%M'),
+                'produto': transferencia.produto.nome,
+                'origem': transferencia.estoque_origem.value,
+                'destino': transferencia.estoque_destino.value,
+                'quantidade': str(transferencia.quantidade)
+            }
+        })
+    except Exception as e:
+        print(f"Erro ao registrar transferência: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 400
+    
+@admin_bp.route('/transferencias')
+@login_required
+def listar_transferencias():
+    try:
+        transferencias = get_transferencias(db.session)
+        result = []
+        for transf in transferencias:
+            result.append({
+                'id': transf.id,
+                'data': transf.data.strftime('%d/%m/%Y %H:%M'),
+                'produto': transf.produto.nome,
+                'origem': transf.estoque_origem.value,
+                'destino': transf.estoque_destino.value,
+                'quantidade': str(transf.quantidade),
+                'usuario': transf.usuario.nome
+            })
+        
+        return jsonify({'success': True, 'transferencias': result})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+    

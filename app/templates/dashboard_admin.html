@@ -59,6 +59,10 @@
                         <i class="fas fa-chart-line"></i>
                         <span>Financeiro</span>
                     </li>
+                    <li data-tab="estoque">
+                        <i class="fas fa-exchange-alt"></i>
+                        <span>Movimentações</span>
+                    </li>
                 </ul>
             </nav>
         </aside>
@@ -245,7 +249,9 @@
                                             <th>Tipo</th>
                                             <th>Unidade</th>
                                             <th>Valor</th>
-                                            <th>Estoque</th>
+                                            <th>Estoque Deposito</th>
+                                            <th>Estoque Loja</th>
+                                            <th>Estoque Fabrica</th>
                                             <th>Ações</th>
                                         </tr>
                                     </thead>
@@ -337,6 +343,66 @@
                         </div>
                     </div>
                 </div>
+
+                <div id="estoque" class="tab-content">
+                    <div class="action-bar">
+                        <div class="filter-container">
+                            <div class="filter-group">
+                                <label for="movimentacaoDateInicio">De:</label>
+                                <input type="date" id="movimentacaoDateInicio" class="form-control">
+                            </div>
+                            <div class="filter-group">
+                                <label for="movimentacaoDateFim">Até:</label>
+                                <input type="date" id="movimentacaoDateFim" class="form-control">
+                            </div>
+                            <div class="filter-group">
+                                <label for="movimentacaoTipo">Tipo:</label>
+                                <select id="movimentacaoTipo" class="form-control">
+                                    <option value="">Todos</option>
+                                    <option value="entrada">Entrada</option>
+                                    <option value="saida">Saída</option>
+                                    <option value="transferencia">Transferência</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" id="filterMovimentacoes">
+                                <i class="fas fa-filter"></i>
+                                <span>Filtrar</span>
+                            </button>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn btn-secondary" id="exportMovimentacoes">
+                                <i class="fas fa-file-export"></i>
+                                <span>Exportar</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-exchange-alt"></i> Histórico de Movimentações</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table id="movimentacoesEstoqueTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Tipo</th>
+                                            <th>Produto</th>
+                                            <th>Quantidade</th>
+                                            <th>Origem</th>
+                                            <th>Destino</th>
+                                            <th>Usuário</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Dados serão preenchidos via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <footer>
@@ -393,9 +459,19 @@
                                 <input type="number" id="produtoValor" class="form-control" step="0.01" min="0" required>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label for="produtoEstoque">Quantidade em Estoque*</label>
-                            <input type="number" id="produtoEstoque" class="form-control" step="0.001" min="0" required>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="produtoEstoqueTipo">Tipo de Estoque*</label>
+                                <select id="produtoEstoqueTipo" class="form-control" required>
+                                    <option value="loja">Loja</option>
+                                    <option value="deposito">Depósito</option>
+                                    <option value="fabrica">Fábrica</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="produtoEstoque">Quantidade em Estoque*</label>
+                                <input type="number" id="produtoEstoque" class="form-control" step="0.001" min="0" required>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -492,6 +568,65 @@
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-check"></i>
                             <span>Confirmar</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Transferência de Estoque -->
+    <div id="transferenciaModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-exchange-alt"></i>
+                        <span>Transferir Estoque</span>
+                    </h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <form id="transferenciaForm">
+                    <input type="hidden" id="transferenciaProdutoId">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>Produto</label>
+                            <div class="form-control-static" id="transferenciaProdutoNome"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="transferenciaOrigem">Origem*</label>
+                                <select id="transferenciaOrigem" class="form-control" required>
+                                    <option value="loja">Loja</option>
+                                    <option value="deposito">Depósito</option>
+                                    <option value="fabrica">Fábrica</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="transferenciaDestino">Destino*</label>
+                                <select id="transferenciaDestino" class="form-control" required>
+                                    <option value="loja">Loja</option>
+                                    <option value="deposito">Depósito</option>
+                                    <option value="fabrica">Fábrica</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="transferenciaQuantidade">Quantidade*</label>
+                            <input type="number" id="transferenciaQuantidade" class="form-control" step="0.001" min="0.001" required>
+                            <small class="text-muted" id="transferenciaEstoqueDisponivel"></small>
+                        </div>
+                        <div class="form-group">
+                            <label for="transferenciaObservacao">Observação</label>
+                            <textarea id="transferenciaObservacao" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-check"></i>
+                            <span>Confirmar Transferência</span>
                         </button>
                     </div>
                 </form>
@@ -735,5 +870,243 @@
         </div>
     </div>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Adicionar nova aba de movimentações
+            const navItems = document.querySelectorAll('.sidebar-nav li');
+            navItems.forEach(item => {
+                if (item.getAttribute('data-tab') === 'estoque') {
+                    item.addEventListener('click', function() {
+                        loadMovimentacoesData();
+                    });
+                }
+            });
+
+            // Função para carregar dados de movimentações
+            async function loadMovimentacoesData() {
+                try {
+                    const dateInicio = document.getElementById('movimentacaoDateInicio').value;
+                    const dateFim = document.getElementById('movimentacaoDateFim').value;
+                    const tipo = document.getElementById('movimentacaoTipo').value;
+                    
+                    let url = '/admin/transferencias';
+                    const params = new URLSearchParams();
+                    
+                    if (dateInicio) params.append('data_inicio', dateInicio);
+                    if (dateFim) params.append('data_fim', dateFim);
+                    if (tipo) params.append('tipo', tipo);
+                    
+                    if (params.toString()) {
+                        url += `?${params.toString()}`;
+                    }
+                    
+                    const data = await fetchWithErrorHandling(url);
+                    
+                    if (data.success) {
+                        const table = document.querySelector('#movimentacoesEstoqueTable tbody');
+                        table.innerHTML = '';
+                        
+                        data.transferencias.forEach(transf => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${transf.data}</td>
+                                <td><span class="badge ${transf.tipo === 'entrada' ? 'badge-success' : transf.tipo === 'saida' ? 'badge-danger' : 'badge-info'}">${transf.tipo}</span></td>
+                                <td>${transf.produto}</td>
+                                <td>${transf.quantidade}</td>
+                                <td>${transf.origem || '-'}</td>
+                                <td>${transf.destino || '-'}</td>
+                                <td>${transf.usuario}</td>
+                            `;
+                            table.appendChild(row);
+                        });
+                    }
+                } catch (error) {
+                    console.error('Erro ao carregar movimentações:', error);
+                    showFlashMessage('error', 'Erro ao carregar histórico de movimentações');
+                }
+            }
+
+            // Configurar filtro de movimentações
+            document.getElementById('filterMovimentacoes').addEventListener('click', loadMovimentacoesData);
+
+            // Função para abrir modal de transferência
+            async function openTransferenciaModal(produtoId) {
+                try {
+                    const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
+                    if (response.success) {
+                        const produto = response.produto;
+                        
+                        document.getElementById('transferenciaProdutoId').value = produtoId;
+                        document.getElementById('transferenciaProdutoNome').textContent = produto.nome;
+                        
+                        // Resetar valores
+                        document.getElementById('transferenciaOrigem').value = 'loja';
+                        document.getElementById('transferenciaDestino').value = 'deposito';
+                        document.getElementById('transferenciaQuantidade').value = '';
+                        document.getElementById('transferenciaObservacao').value = '';
+                        
+                        openModal('transferenciaModal');
+                        updateEstoqueDisponivel();
+                    }
+                } catch (error) {
+                    console.error('Erro ao abrir modal de transferência:', error);
+                    showFlashMessage('error', 'Erro ao carregar dados do produto');
+                }
+            }
+
+            // Atualizar estoque disponível quando mudar a origem
+            document.getElementById('transferenciaOrigem').addEventListener('change', updateEstoqueDisponivel);
+            
+            function updateEstoqueDisponivel() {
+                const produtoId = document.getElementById('transferenciaProdutoId').value;
+                const origem = document.getElementById('transferenciaOrigem').value;
+                
+                // Buscar estoque atual do produto
+                fetchWithErrorHandling(`/admin/produtos/${produtoId}`)
+                    .then(response => {
+                        if (response.success) {
+                            const produto = response.produto;
+                            let estoque = 0;
+                            
+                            if (origem === 'loja') estoque = produto.estoque_loja;
+                            else if (origem === 'deposito') estoque = produto.estoque_deposito;
+                            else if (origem === 'fabrica') estoque = produto.estoque_fabrica;
+                            
+                            document.getElementById('transferenciaEstoqueDisponivel').textContent = 
+                                `Disponível: ${estoque} ${produto.unidade}`;
+                            
+                            // Definir valor máximo para o campo de quantidade
+                            document.getElementById('transferenciaQuantidade').max = estoque;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao buscar estoque:', error);
+                    });
+            }
+
+            // Formulário de transferência
+            document.getElementById('transferenciaForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const produtoId = document.getElementById('transferenciaProdutoId').value;
+                const origem = document.getElementById('transferenciaOrigem').value;
+                const destino = document.getElementById('transferenciaDestino').value;
+                const quantidade = document.getElementById('transferenciaQuantidade').value;
+                const observacao = document.getElementById('transferenciaObservacao').value;
+                
+                if (origem === destino) {
+                    showFlashMessage('error', 'Origem e destino não podem ser iguais');
+                    return;
+                }
+                
+                try {
+                    const response = await fetchWithErrorHandling('/admin/transferencias', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            produto_id: produtoId,
+                            estoque_origem: origem,
+                            estoque_destino: destino,
+                            quantidade: quantidade,
+                            observacao: observacao
+                        })
+                    });
+                    
+                    if (response.success) {
+                        showFlashMessage('success', 'Transferência realizada com sucesso');
+                        closeModal('transferenciaModal');
+                        loadProdutosData();
+                        loadMovimentacoesData();
+                    } else {
+                        showFlashMessage('error', response.message || 'Erro ao realizar transferência');
+                    }
+                } catch (error) {
+                    console.error('Erro ao realizar transferência:', error);
+                    showFlashMessage('error', 'Erro ao realizar transferência');
+                }
+            });
+
+            // Modificar setupProdutoActions para incluir o botão de transferência
+            function setupProdutoActions() {
+                document.querySelectorAll('.editar-produto').forEach(btn => {
+                    btn.addEventListener('click', async function() {
+                        const produtoId = this.getAttribute('data-id');
+                        // ... código existente ...
+                    });
+                });
+
+                document.querySelectorAll('.remover-produto').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const produtoId = this.getAttribute('data-id');
+                        // ... código existente ...
+                    });
+                });
+
+                document.querySelectorAll('.movimentar-estoque').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const produtoId = this.getAttribute('data-id');
+                        openTransferenciaModal(produtoId);
+                    });
+                });
+            }
+
+            // Atualizar a função loadProdutosData para incluir o botão de transferência
+            async function loadProdutosData() {
+                try {
+                    const searchText = document.getElementById('searchProduto').value.toLowerCase();
+                    const data = await fetchWithErrorHandling('/admin/produtos');
+                    
+                    if (data.success) {
+                        const produtosTable = document.querySelector('#produtosTable tbody');
+                        produtosTable.innerHTML = '';
+                        
+                        data.produtos.forEach(produto => {
+                            if (searchText && !produto.nome.toLowerCase().includes(searchText)) {
+                                return;
+                            }
+                            
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${produto.id}</td>
+                                <td>${produto.nome}</td>
+                                <td>${produto.tipo}</td>
+                                <td>${produto.unidade}</td>
+                                <td>${produto.valor}</td>
+                                <td>${produto.estoque_deposito}</td>
+                                <td>${produto.estoque_loja}</td>
+                                <td>${produto.estoque_fabrica}</td>
+                                <td>
+                                    <div class="table-actions">
+                                        <button class="btn-icon btn-info movimentar-estoque" data-id="${produto.id}" title="Transferir entre estoques">
+                                            <i class="fas fa-exchange-alt"></i>
+                                        </button>
+                                        <button class="btn-icon btn-warning editar-produto" data-id="${produto.id}" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn-icon btn-danger remover-produto" data-id="${produto.id}" title="Remover">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            `;
+                            produtosTable.appendChild(row);
+                        });
+                        
+                        setupProdutoActions();
+                    }
+                } catch (error) {
+                    console.error('Erro ao carregar produtos:', error);
+                    showFlashMessage('error', 'Erro ao carregar lista de produtos');
+                }
+            }
+
+            // Inicializar a aba de movimentações
+            if (document.querySelector('.sidebar-nav li[data-tab="estoque"].active')) {
+                loadMovimentacoesData();
+            }
+        });
+    </script>
 </body>
 </html>

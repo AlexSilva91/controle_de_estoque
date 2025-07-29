@@ -464,63 +464,62 @@ def get_movimentacoes(db: Session, skip: int = 0, limit: int = 100):
             .offset(skip).limit(limit).all()
 
 # ===== Transferência Estoque =====
-def registrar_transferencia(db: Session, transf: schemas.TransferenciaEstoqueCreate):
-    if transf.quantidade <= 0:
-        raise ValueError("Quantidade deve ser maior que zero.")
-    
-    if transf.estoque_origem == transf.estoque_destino:
-        raise ValueError("Estoque de origem e destino devem ser diferentes.")
-    
-    produto = get_produto(db, transf.produto_id)
+def registrar_transferencia(db: Session, transf: dict):
+    # Verificar se o produto existe
+    produto = db.query(entities.Produto).filter(entities.Produto.id == transf['produto_id']).first()
     if not produto:
-        raise ValueError("Produto não encontrado.")
+        raise ValueError("Produto não encontrado")
     
-    usuario = get_user_by_id(db, transf.usuario_id)
+    # Verificar se o usuário existe
+    usuario = db.query(entities.Usuario).filter(entities.Usuario.id == transf['usuario_id']).first()
     if not usuario:
-        raise ValueError("Usuário não encontrado.")
+        raise ValueError("Usuário não encontrado")
     
-    # Verifica estoque na origem
-    if transf.estoque_origem == TipoEstoque.loja and produto.estoque_loja < transf.quantidade:
-        raise ValueError("Estoque insuficiente na loja.")
-    elif transf.estoque_origem == TipoEstoque.deposito and produto.estoque_deposito < transf.quantidade:
-        raise ValueError("Estoque insuficiente no depósito.")
-    elif transf.estoque_origem == TipoEstoque.fabrica and produto.estoque_fabrica < transf.quantidade:
-        raise ValueError("Estoque insuficiente na fábrica.")
+    # Verificar estoque na origem
+    estoque_origem = transf['estoque_origem']
+    quantidade = transf['quantidade']
     
-    # Atualiza estoques
-    if transf.estoque_origem == TipoEstoque.loja:
-        produto.estoque_loja -= transf.quantidade
-    elif transf.estoque_origem == TipoEstoque.deposito:
-        produto.estoque_deposito -= transf.quantidade
-    elif transf.estoque_origem == TipoEstoque.fabrica:
-        produto.estoque_fabrica -= transf.quantidade
+    estoque_disponivel = {
+        TipoEstoque.loja: produto.estoque_loja,
+        TipoEstoque.deposito: produto.estoque_deposito,
+        TipoEstoque.fabrica: produto.estoque_fabrica
+    }.get(estoque_origem, 0)
     
-    if transf.estoque_destino == TipoEstoque.loja:
-        produto.estoque_loja += transf.quantidade
-    elif transf.estoque_destino == TipoEstoque.deposito:
-        produto.estoque_deposito += transf.quantidade
-    elif transf.estoque_destino == TipoEstoque.fabrica:
-        produto.estoque_fabrica += transf.quantidade
-
+    if estoque_disponivel < quantidade:
+        raise ValueError(f"Estoque insuficiente no {estoque_origem.value}. Disponível: {estoque_disponivel}")
+    
+    # Atualizar estoques
+    if estoque_origem == TipoEstoque.loja:
+        produto.estoque_loja -= quantidade
+    elif estoque_origem == TipoEstoque.deposito:
+        produto.estoque_deposito -= quantidade
+    elif estoque_origem == TipoEstoque.fabrica:
+        produto.estoque_fabrica -= quantidade
+    
+    estoque_destino = transf['estoque_destino']
+    if estoque_destino == TipoEstoque.loja:
+        produto.estoque_loja += quantidade
+    elif estoque_destino == TipoEstoque.deposito:
+        produto.estoque_deposito += quantidade
+    elif estoque_destino == TipoEstoque.fabrica:
+        produto.estoque_fabrica += quantidade
+    
+    # Criar registro de transferência
     db_transf = entities.TransferenciaEstoque(
-        produto_id=transf.produto_id,
-        usuario_id=transf.usuario_id,
-        estoque_origem=transf.estoque_origem,
-        estoque_destino=transf.estoque_destino,
-        quantidade=transf.quantidade,
-        observacao=transf.observacao,
-        data=datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
-        sincronizado=False
+        produto_id=transf['produto_id'],
+        usuario_id=transf['usuario_id'],
+        estoque_origem=estoque_origem,
+        estoque_destino=estoque_destino,
+        quantidade=quantidade,
+        observacao=transf.get('observacao', ''),
+        data=datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
     )
-    db.add(db_transf)
 
-    try:
-        db.commit()
-        db.refresh(db_transf)
-        return db_transf
-    except SQLAlchemyError as e:
-        db.rollback()
-        raise ValueError("Erro ao registrar transferência no banco de dados.")
+    db.add(db_transf)
+    db.commit()
+    db.refresh(db_transf)
+    
+    return db_transf
 
 def get_transferencia_by_id(db: Session, transf_id: int):
     return db.query(entities.TransferenciaEstoque).filter(entities.TransferenciaEstoque.id == transf_id).first()
