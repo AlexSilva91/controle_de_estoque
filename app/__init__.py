@@ -1,15 +1,16 @@
 from flask import Flask
-from config import Config
 from flask_migrate import Migrate
 from flask_login import LoginManager
-
+from config import config
 from .models import db
 from .routes import init_app
 from app.models.entities import Usuario
 
-def create_app():
+def create_app(config_name='development'):
     app = Flask(__name__)
-    app.config.from_object(Config)
+    
+    # Carrega a configuração apropriada
+    app.config.from_object(config[config_name])
 
     # Inicializa banco e migrações
     db.init_app(app)
