@@ -1,3 +1,4 @@
+from functools import wraps
 import threading
 from flask import Blueprint, render_template, request, jsonify, current_app as app
 from datetime import datetime, time, timedelta, timezone
@@ -33,14 +34,27 @@ from app.crud import (
 
 operador_bp = Blueprint('operador', __name__, url_prefix='/operador')
 
+def operador_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return jsonify({'success': False, 'message': 'Acesso não autorizado'}), 401
+        if current_user.tipo != 'operador':  # Supondo que 'tipo' seja o campo que define o tipo de usuário
+            return jsonify({'success': False, 'message': 'Acesso restrito a operadores'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 @operador_bp.route('/dashboard')
 @login_required
+@operador_required
 def dashboard():
     return render_template('dashboard_operador.html', nome_usuario=current_user.nome)
 
 # ===== API CLIENTES =====
 @operador_bp.route('/api/clientes', methods=['GET'])
 @login_required
+@operador_required
 def api_get_clientes():
     clientes = get_clientes(db.session)
     return jsonify([{
@@ -55,6 +69,7 @@ def api_get_clientes():
 
 @operador_bp.route('/api/clientes', methods=['POST'])
 @login_required
+@operador_required
 def api_create_cliente():
     data = request.get_json()
     try:
@@ -74,6 +89,7 @@ def api_create_cliente():
 
 @operador_bp.route('/api/clientes/<int:cliente_id>', methods=['PUT'])
 @login_required
+@operador_required
 def api_update_cliente(cliente_id):
     data = request.get_json()
     try:
@@ -92,6 +108,7 @@ def api_update_cliente(cliente_id):
 
 @operador_bp.route('/api/clientes/<int:cliente_id>', methods=['DELETE'])
 @login_required
+@operador_required
 def api_delete_cliente(cliente_id):
     try:
         success = delete_cliente(db.session, cliente_id)
@@ -102,6 +119,7 @@ def api_delete_cliente(cliente_id):
 # ===== API PRODUTOS =====
 @operador_bp.route('/api/produtos', methods=['GET'])
 @login_required
+@operador_required
 def api_get_produtos():
     try:
         produtos = get_produtos(db.session)
@@ -142,6 +160,7 @@ def api_get_produtos():
 
 @operador_bp.route('/api/produtos/<int:produto_id>', methods=['GET'])
 @login_required
+@operador_required
 def api_get_produto(produto_id):
     try:
         produto = get_produto(db.session, produto_id)
@@ -177,6 +196,7 @@ def api_get_produto(produto_id):
 # ===== API VENDAS =====
 @operador_bp.route('/api/vendas', methods=['POST'])
 @login_required
+@operador_required
 def api_registrar_venda():
     """Endpoint para registrar vendas"""
     try:
@@ -240,6 +260,7 @@ def api_registrar_venda():
 # ===== API SALDO =====
 @operador_bp.route('/api/saldo', methods=['GET'])
 @login_required
+@operador_required
 def api_get_saldo():
     try:
         caixa = get_caixa_aberto(db.session)
@@ -303,6 +324,7 @@ def api_get_saldo():
 # ===== API ABERTURA DE CAIXA =====
 @operador_bp.route('/api/abrir-caixa', methods=['POST'])
 @login_required
+@operador_required
 def api_abrir_caixa():
     try:
         data = request.get_json()
@@ -330,6 +352,7 @@ def api_abrir_caixa():
 # ===== API FECHAMENTO DE CAIXA =====
 @operador_bp.route('/api/fechar-caixa', methods=['POST'])
 @login_required
+@operador_required
 def api_fechar_caixa():
     try:
         data = request.get_json()
@@ -368,6 +391,7 @@ def api_fechar_caixa():
 # ===== API BUSCAS =====
 @operador_bp.route('/api/clientes/buscar', methods=['GET'])
 @login_required
+@operador_required
 def api_buscar_clientes():
     termo = request.args.get('q', '').lower()
     clientes = get_clientes(db.session)
@@ -389,6 +413,7 @@ def api_buscar_clientes():
 
 @operador_bp.route('/api/produtos/buscar', methods=['GET'])
 @login_required
+@operador_required
 def api_buscar_produtos():
     try:
         termo = request.args.get('q', '').lower()
@@ -426,6 +451,7 @@ def api_buscar_produtos():
 
 @operador_bp.route('/api/usuario', methods=['GET'])
 @login_required
+@operador_required
 def api_get_usuario():
     return jsonify({
         'id': current_user.id,
@@ -435,6 +461,7 @@ def api_get_usuario():
 
 @operador_bp.route('/api/despesa', methods=['POST'])
 @login_required
+@operador_required
 def registrar_despesa():
     data = request.get_json()
 

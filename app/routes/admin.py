@@ -1,3 +1,4 @@
+from functools import wraps
 from zoneinfo import ZoneInfo
 from flask import Blueprint, render_template, request, jsonify, session, flash, redirect, url_for
 from flask_login import login_required, current_user
@@ -25,14 +26,26 @@ from app.schemas import (
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return jsonify({'success': False, 'message': 'Acesso não autorizado'}), 401
+        if current_user.tipo != 'admin':  # Supondo que 'tipo' seja o campo que define o tipo de usuário
+            return jsonify({'success': False, 'message': 'Acesso restrito a administradores'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
 # ===== Dashboard Routes =====
 @admin_bp.route('/dashboard')
 @login_required
+@admin_required
 def dashboard():
     return render_template('dashboard_admin.html', nome_usuario=current_user.nome)
 
 @admin_bp.route('/dashboard/metrics')
 @login_required
+@admin_required
 def get_dashboard_metrics():
     try:
         # Caixa aberto
@@ -84,6 +97,7 @@ def get_dashboard_metrics():
 
 @admin_bp.route('/dashboard/movimentacoes')
 @login_required
+@admin_required
 def get_movimentacoes():
     try:
         movimentacoes = db.session.query(entities.MovimentacaoEstoque)\
@@ -108,6 +122,7 @@ def get_movimentacoes():
 # ===== Caixa Routes =====
 @admin_bp.route('/caixa/abrir', methods=['POST'])
 @login_required
+@admin_required
 def abrir_caixa_route():
     try:
         data = request.get_json()
@@ -135,6 +150,7 @@ def abrir_caixa_route():
 
 @admin_bp.route('/caixa/fechar', methods=['POST'])
 @login_required
+@admin_required
 def fechar_caixa_route():
     try:
         data = request.get_json()
@@ -162,6 +178,7 @@ def fechar_caixa_route():
 
 @admin_bp.route('/caixa/status')
 @login_required
+@admin_required
 def get_caixa_status():
     try:
         caixa = get_caixa_aberto(db.session)
@@ -183,6 +200,7 @@ def get_caixa_status():
 
 @admin_bp.route('/caixa/historico')
 @login_required
+@admin_required
 def get_caixa_historico():
     try:
         caixas = get_caixas(db.session)
@@ -204,6 +222,7 @@ def get_caixa_historico():
 # ===== Cliente Routes =====
 @admin_bp.route('/clientes', methods=['GET'])
 @login_required
+@admin_required
 def listar_clientes():
     try:
         search = request.args.get('search', '').lower()
@@ -231,6 +250,7 @@ def listar_clientes():
 
 @admin_bp.route('/clientes', methods=['POST'])
 @login_required
+@admin_required
 def criar_cliente():
     try:
         data = request.get_json()
@@ -262,6 +282,7 @@ def criar_cliente():
 
 @admin_bp.route('/clientes/<int:cliente_id>', methods=['PUT'])
 @login_required
+@admin_required
 def atualizar_cliente(cliente_id):
     try:
         data = request.get_json()
@@ -293,6 +314,7 @@ def atualizar_cliente(cliente_id):
 
 @admin_bp.route('/clientes/<int:cliente_id>', methods=['GET'])
 @login_required
+@admin_required
 def obter_cliente(cliente_id):
     try:
         cliente = get_cliente(db.session, cliente_id)
@@ -316,6 +338,7 @@ def obter_cliente(cliente_id):
 
 @admin_bp.route('/clientes/<int:cliente_id>', methods=['DELETE'])
 @login_required
+@admin_required
 def remover_cliente(cliente_id):
     try:
         delete_cliente(db.session, cliente_id)
@@ -326,6 +349,7 @@ def remover_cliente(cliente_id):
 # ===== Produto Routes =====
 @admin_bp.route('/produtos', methods=['GET'])
 @login_required
+@admin_required
 def listar_produtos():
     try:
         search = request.args.get('search', '').lower()
@@ -356,6 +380,7 @@ def listar_produtos():
 
 @admin_bp.route('/produtos', methods=['POST'])
 @login_required
+@admin_required
 def criar_produto():
     try:
         data = request.get_json()
@@ -396,6 +421,7 @@ def criar_produto():
 
 @admin_bp.route('/produtos/<int:produto_id>', methods=['PUT'])
 @login_required
+@admin_required
 def atualizar_produto(produto_id):
     try:
         data = request.get_json()
@@ -427,6 +453,7 @@ def atualizar_produto(produto_id):
 
 @admin_bp.route('/produtos/<int:produto_id>', methods=['GET'])
 @login_required
+@admin_required
 def obter_produto(produto_id):
     try:
         produto = get_produto(db.session, produto_id)
@@ -452,6 +479,7 @@ def obter_produto(produto_id):
 
 @admin_bp.route('/produtos/<int:produto_id>', methods=['DELETE'])
 @login_required
+@admin_required
 def remover_produto(produto_id):
     try:
         delete_produto(db.session, produto_id)
@@ -461,6 +489,7 @@ def remover_produto(produto_id):
 
 @admin_bp.route('/produtos/<int:produto_id>/movimentacao', methods=['POST'])
 @login_required
+@admin_required
 def registrar_movimentacao_produto(produto_id):
     try:
         data = request.get_json()
@@ -503,6 +532,7 @@ def registrar_movimentacao_produto(produto_id):
 # ===== Usuário Routes =====
 @admin_bp.route('/usuarios', methods=['GET'])
 @login_required
+@admin_required
 def listar_usuarios():
     try:
         search = request.args.get('search', '').lower()
@@ -530,6 +560,7 @@ def listar_usuarios():
 
 @admin_bp.route('/usuarios/<int:usuario_id>', methods=['GET'])
 @login_required
+@admin_required
 def get_usuario(usuario_id):
     try:
         usuario = get_user_by_id(db.session, usuario_id)
@@ -570,6 +601,7 @@ def get_usuario(usuario_id):
 
 @admin_bp.route('/usuarios', methods=['POST'])
 @login_required
+@admin_required
 def criar_usuario():
     try:
         data = request.get_json()
@@ -605,6 +637,7 @@ def criar_usuario():
 
 @admin_bp.route('/usuarios/<int:usuario_id>', methods=['PUT'])
 @login_required
+@admin_required
 def atualizar_usuario(usuario_id):
     try:
         data = request.get_json()
@@ -642,6 +675,7 @@ def atualizar_usuario(usuario_id):
 
 @admin_bp.route('/usuarios/<int:usuario_id>', methods=['DELETE'])
 @login_required
+@admin_required
 def remover_usuario(usuario_id):
     try:
         usuario = get_user_by_id(db.session, usuario_id)
@@ -657,6 +691,7 @@ def remover_usuario(usuario_id):
 # ===== Financeiro Routes =====
 @admin_bp.route('/financeiro', methods=['GET'])
 @login_required
+@admin_required
 def listar_financeiro():
     try:
         data_inicio = request.args.get('data_inicio')
@@ -715,6 +750,7 @@ def listar_financeiro():
 
 @admin_bp.route('/financeiro', methods=['POST'])
 @login_required
+@admin_required
 def criar_lancamento_financeiro():
     try:
         data = request.get_json()
@@ -747,6 +783,7 @@ def criar_lancamento_financeiro():
 
 @admin_bp.route('/financeiro/<int:lancamento_id>', methods=['PUT'])
 @login_required
+@admin_required
 def atualizar_lancamento_financeiro(lancamento_id):
     try:
         data = request.get_json()
@@ -775,6 +812,7 @@ def atualizar_lancamento_financeiro(lancamento_id):
 
 @admin_bp.route('/financeiro/<int:lancamento_id>', methods=['DELETE'])
 @login_required
+@admin_required
 def remover_lancamento_financeiro(lancamento_id):
     try:
         delete_lancamento_financeiro(db.session, lancamento_id)
@@ -821,6 +859,7 @@ def criar_nota_fiscal():
 
 @admin_bp.route('/notas-fiscais', methods=['GET'])
 @login_required
+@admin_required
 def listar_notas_fiscais():
     try:
         notas = get_notas_fiscais(db.session)
@@ -841,6 +880,7 @@ def listar_notas_fiscais():
 
 @admin_bp.route('/notas-fiscais/<int:nota_id>', methods=['GET'])
 @login_required
+@admin_required
 def detalhar_nota_fiscal(nota_id):
     try:
         nota = get_nota_fiscal(db.session, nota_id)
@@ -876,6 +916,7 @@ def detalhar_nota_fiscal(nota_id):
     
 @admin_bp.route('/transferencias', methods=['POST'])
 @login_required
+@admin_required
 def criar_transferencia():
     try:
         data = request.get_json()
@@ -937,6 +978,7 @@ def criar_transferencia():
     
 @admin_bp.route('/transferencias')
 @login_required
+@admin_required
 def listar_transferencias():
     try:
         transferencias = get_transferencias(db.session)
