@@ -84,24 +84,6 @@ class Entrega(Base):
     instrucoes = Column(Text, nullable=True)
     sincronizado = Column(Boolean, default=False, nullable=False)
 
-    # Relacionamento com clientes (através da tabela de associação)
-    clientes = relationship("ClienteEndereco", back_populates="entrega")
-
-# --------------------
-# Tabela de Associação Cliente-Endereço
-# --------------------
-class ClienteEndereco(Base):
-    __tablename__ = "clientes_enderecos"
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
-    entrega_id = Column(Integer, ForeignKey("entregas.id"), nullable=False)
-    principal = Column(Boolean, default=False, nullable=False)  # Indica se é o endereço principal
-    sincronizado = Column(Boolean, default=False, nullable=False)
-    
-    cliente = relationship("Cliente", back_populates="enderecos_associados")
-    entrega = relationship("Entrega", back_populates="clientes")
-
 # --------------------
 # Usuário
 # --------------------
@@ -175,7 +157,7 @@ class Produto(Base):
     transferencias = relationship("TransferenciaEstoque", back_populates="produto")
 
 # --------------------
-# Cliente (Atualizado)
+# Cliente
 # --------------------
 class Cliente(Base):
     __tablename__ = "clientes"
@@ -185,51 +167,17 @@ class Cliente(Base):
     documento = Column(String(20), nullable=True)
     telefone = Column(String(20), nullable=True)
     email = Column(String(100), nullable=True)
-    endereco = Column(Text, nullable=True)  # Mantido para compatibilidade
+    endereco = Column(Text, nullable=True)
     limite_credito = Column(DECIMAL(12, 2), default=0.00, nullable=False)
     ativo = Column(Boolean, default=True, nullable=False)
     criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     sincronizado = Column(Boolean, default=False, nullable=False)
 
-    # Relacionamentos
     notas_fiscais = relationship("NotaFiscal", back_populates="cliente")
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="cliente")
     financeiros = relationship("Financeiro", back_populates="cliente")
     contas_receber = relationship("ContaReceber", back_populates="cliente")
-    enderecos_associados = relationship("ClienteEndereco", back_populates="cliente", cascade="all, delete-orphan")
-
-    # Propriedades para facilitar o acesso
-    @property
-    def enderecos(self):
-        """Retorna todos os endereços do cliente"""
-        return [assoc.entrega for assoc in self.enderecos_associados]
-    
-    @property
-    def endereco_principal(self):
-        """Retorna o endereço principal ou o primeiro cadastrado"""
-        principal = next((assoc.entrega for assoc in self.enderecos_associados if assoc.principal), None)
-        return principal or (self.enderecos[0] if self.enderecos else None)
-    
-    def adicionar_endereco(self, entrega, principal=False):
-        """Adiciona um novo endereço ao cliente"""
-        if principal:
-            # Desmarca outros endereços principais
-            for assoc in self.enderecos_associados:
-                assoc.principal = False
-        
-        nova_associacao = ClienteEndereco(
-            cliente_id=self.id,
-            entrega_id=entrega.id,
-            principal=principal
-        )
-        db.session.add(nova_associacao)
-        return nova_associacao
-    
-    def definir_endereco_principal(self, entrega_id):
-        """Define um endereço como principal"""
-        for assoc in self.enderecos_associados:
-            assoc.principal = (assoc.entrega_id == entrega_id)
 
 # --------------------
 # Movimentação de Estoque
@@ -279,7 +227,7 @@ class TransferenciaEstoque(Base):
     usuario = relationship("Usuario", back_populates="transferencias")
 
 # --------------------
-# Nota Fiscal (Atualizada com métodos para endereço)
+# Nota Fiscal
 # --------------------
 class NotaFiscal(Base):
     __tablename__ = "notas_fiscais"
@@ -309,37 +257,6 @@ class NotaFiscal(Base):
     itens = relationship("NotaFiscalItem", back_populates="nota", cascade="all, delete-orphan")
     financeiros = relationship("Financeiro", back_populates="nota_fiscal", cascade="all, delete-orphan")
     contas_receber = relationship("ContaReceber", back_populates="nota_fiscal", cascade="all, delete-orphan")
-
-    def definir_endereco_entrega(self, entrega_id=None, usar_principal=True):
-        """
-        Define o endereço de entrega da nota fiscal
-        :param entrega_id: ID do endereço específico a ser usado
-        :param usar_principal: Se True e entrega_id não for especificado, usa o endereço principal do cliente
-        """
-        if entrega_id:
-            # Verifica se o endereço pertence ao cliente
-            if self.cliente_id:
-                endereco_cliente = any(
-                    assoc.entrega_id == entrega_id 
-                    for assoc in self.cliente.enderecos_associados
-                )
-                if not endereco_cliente:
-                    raise ValueError("Endereço não pertence ao cliente")
-            
-            self.entrega_id = entrega_id
-        elif usar_principal and self.cliente_id:
-            principal = self.cliente.endereco_principal
-            if principal:
-                self.entrega_id = principal.id
-
-    @property
-    def endereco_entrega(self):
-        """Retorna o endereço de entrega da nota fiscal"""
-        if self.entrega_id:
-            return self.entrega
-        elif self.cliente_id:
-            return self.cliente.endereco_principal
-        return None
 
 # --------------------
 # Item da Nota Fiscal
