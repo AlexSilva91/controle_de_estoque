@@ -747,7 +747,7 @@ function showSearchResults(results, containerId, type) {
             resultItem.innerHTML = `
                 <h4>${item.nome}</h4>
                 <p>Código: ${item.codigo || 'Não informado'} | Marca: ${item.marca || 'Não informada'}</p>
-                <p>Preço: ${formatCurrency(item.valor_unitario)} | Estoque: ${item.estoque_loja} ${item.unidade || 'un'}</p>
+                <p>Preço: ${formatCurrency(item.valor_unitario)} | Estoque loja: ${item.estoque_loja} ${item.unidade || 'un'} | Estoque depósito: ${item.estoque_deposito || 0} ${item.unidade || 'un'}</p>
             `;
             
             resultItem.addEventListener('click', () => {
