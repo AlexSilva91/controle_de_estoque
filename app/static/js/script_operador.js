@@ -82,6 +82,26 @@ async function loadCurrentUser() {
     }
 }
 
+document.getElementById("remove-selected-client-btn").addEventListener("click", function () {
+    // Limpa os campos de cliente selecionado
+    document.getElementById("selected-client").value = "";
+    document.getElementById("selected-client-id").value = "";
+
+    // Atualiza o status do caixa
+    window.updateCaixaStatus();
+});
+
+
+window.updateCaixaStatus = function() {
+    if (selectedClientInput.value.trim() !== '') {
+        caixaStatusDisplay.className = 'caixa-status caixa-operacao';
+        caixaStatusDisplay.innerHTML = '<i class="fas fa-user-check"></i><span>CAIXA EM OPERAÇÃO</span>';
+    } else {
+        caixaStatusDisplay.className = 'caixa-status caixa-livre';
+        caixaStatusDisplay.innerHTML = '<i class="fas fa-check-circle"></i><span>CAIXA LIVRE</span>';
+    }
+};
+
 function setupEventListeners() {
     toggleBalanceBtn.addEventListener('click', toggleBalance);
     
@@ -1032,22 +1052,40 @@ async function registerSale() {
 }
 
 function resetSaleForm() {
+    // Limpa dados do cliente
     selectedClient = null;
-    selectedProducts = [];
     selectedClientInput.value = '';
     selectedClientIdInput.value = '';
+
+    // Limpa produtos
+    selectedProducts = [];
     productsList.innerHTML = '';
+
+    // Limpa formas de pagamento e valores
     document.getElementById('payment-method').value = '';
     document.getElementById('sale-notes').value = '';
     amountReceivedInput.value = '';
     discountValueInput.value = '';
     discountTypeSelect.value = 'fixed';
+
+    // Limpa entrega
     deliveryAddress = null;
     deliveryBtn.classList.remove('has-delivery');
     deliveryBtn.innerHTML = '<i class="fas fa-truck"></i> Adicionar Entrega';
     const deliveryInfo = document.querySelector('.delivery-info');
     if (deliveryInfo) deliveryInfo.remove();
+
+    // Limpa resultado de busca de clientes, se houver
+    const clientSearchResults = document.getElementById('client-search-results');
+    if (clientSearchResults) clientSearchResults.innerHTML = '';
+
+    // Atualiza total
     calculateSaleTotal();
+
+    // Atualiza status do caixa
+    if (typeof updateCaixaStatus === 'function') {
+        updateCaixaStatus();
+    }
 }
 
 // ==================== FUNÇÕES DE CAIXA ====================
