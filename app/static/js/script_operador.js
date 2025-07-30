@@ -33,9 +33,6 @@ const saleTotalElement = document.getElementById('sale-total');
 const subtotalValueElement = document.getElementById('subtotal-value');
 const changeValueElement = document.getElementById('change-value');
 const amountReceivedInput = document.getElementById('amount-received');
-const discountValueInput = document.getElementById('discount-value');
-const discountTypeSelect = document.getElementById('discount-type');
-const applyDiscountBtn = document.getElementById('apply-discount-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const notification = document.getElementById('notification');
 const notificationMessage = document.getElementById('notification-message');
@@ -55,7 +52,16 @@ const expenseForm = document.getElementById('expense-form');
 const cancelExpenseBtn = document.getElementById('cancel-expense');
 const saveExpenseBtn = document.getElementById('save-expense');
 
-// Initialize
+// Configuração para prevenir cache
+const preventCacheConfig = {
+    headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+    }
+};
+
+// Initialize com prevenção de cache
 document.addEventListener('DOMContentLoaded', async () => {
     updateCurrentDate();
     await loadCurrentUser();
@@ -64,16 +70,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     await checkCaixaStatus();
     setupEventListeners();
 
-    // Atualiza produtos a cada 10s
-    setInterval(loadProducts, 10000);
+    // Atualiza produtos a cada 10s com prevenção de cache
+    setInterval(() => loadProducts(true), 10000);
 
-    // Atualiza saldo a cada 10s
-    setInterval(updateBalance, 10000);
+    // Atualiza saldo a cada 10s com prevenção de cache
+    setInterval(() => updateBalance(true), 10000);
 });
 
 async function loadCurrentUser() {
     try {
-        const response = await fetch('/operador/api/usuario');
+        const response = await fetch('/operador/api/usuario', {
+            ...preventCacheConfig,
+            method: 'GET'
+        });
         if (!response.ok) throw new Error('Erro ao carregar dados do usuário');
         
         currentUser = await response.json();
@@ -91,8 +100,8 @@ document.getElementById("remove-selected-client-btn").addEventListener("click", 
     window.updateCaixaStatus();
 });
 
-
 window.updateCaixaStatus = function() {
+    const caixaStatusDisplay = document.querySelector('.caixa-status');
     if (selectedClientInput.value.trim() !== '') {
         caixaStatusDisplay.className = 'caixa-status caixa-operacao';
         caixaStatusDisplay.innerHTML = '<i class="fas fa-user-check"></i><span>CAIXA EM OPERAÇÃO</span>';
@@ -131,7 +140,8 @@ function setupEventListeners() {
     closeRegisterBtn.addEventListener('click', closeRegister);
 
     logoutBtn.addEventListener('click', () => {
-        window.location.href = '/logout';
+        // Forçar recarregamento sem cache
+        window.location.href = '/logout?' + new Date().getTime();
     });
     
     searchClientBtn.addEventListener('click', searchClients);
@@ -152,15 +162,9 @@ function setupEventListeners() {
             removeProductRow(button);
             calculateSaleTotal();
         }
-        
-        if (e.target.closest('.btn-discount')) {
-            const button = e.target.closest('.btn-discount');
-            openDiscountModal(button.dataset.index);
-        }
     });
     
     amountReceivedInput.addEventListener('input', calculateSaleTotal);
-    applyDiscountBtn.addEventListener('click', applyDiscount);
     
     document.getElementById('modal-search-product-btn').addEventListener('click', searchProductsInModal);
     modalProductSearch.addEventListener('keypress', (e) => {
@@ -214,6 +218,7 @@ async function saveExpense() {
     
     try {
         const response = await fetch('/operador/api/despesa', {
+            ...preventCacheConfig,
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -233,7 +238,7 @@ async function saveExpense() {
         
         showMessage('Despesa registrada com sucesso!');
         closeExpenseModal();
-        updateBalance();
+        updateBalance(true); // Forçar atualização sem cache
     } catch (error) {
         showMessage(error.message, 'error');
         console.error('Erro ao salvar despesa:', error);
@@ -305,162 +310,53 @@ function showDeliveryInfo() {
     document.getElementById('edit-delivery-btn').addEventListener('click', openDeliveryModal);
 }
 
-// ==================== FUNÇÕES DE DESCONTO EM PRODUTOS ====================
-function openDiscountModal(productIndex) {
-    const product = selectedProducts[productIndex];
-    const totalOriginalValue = product.originalPrice * product.quantity;
-    
-    const discountModal = document.createElement('div');
-    discountModal.className = 'modal';
-    discountModal.id = 'discount-modal';
-    discountModal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Aplicar Desconto em ${product.name}</h3>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="product-discount-value">Valor do Desconto:</label>
-                    <input type="number" id="product-discount-value" class="form-control" 
-                           value="${product.discountValue || 0}" min="0" step="0.01">
-                </div>
-                <div class="form-group">
-                    <label for="product-discount-type">Tipo de Desconto:</label>
-                    <select id="product-discount-type" class="form-control">
-                        <option value="fixed" ${product.discountType === 'fixed' ? 'selected' : ''}>Valor Fixo (R$)</option>
-                        <option value="percent" ${product.discountType === 'percent' ? 'selected' : ''}>Porcentagem (%)</option>
-                    </select>
-                </div>
-                <div class="price-preview">
-                    <p>Valor Original Total: ${formatCurrency(totalOriginalValue)} (${product.quantity} × ${formatCurrency(product.originalPrice)})</p>
-                    <p>Novo Valor Total: <span id="new-price-preview">${formatCurrency(product.price * product.quantity)}</span></p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" id="cancel-discount">Cancelar</button>
-                <button class="btn-primary" id="apply-product-discount">Aplicar Desconto</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(discountModal);
-    openModal('discount');
-    
-    const discountValueInput = document.getElementById('product-discount-value');
-    const discountTypeSelect = document.getElementById('product-discount-type');
-    
-    function updatePricePreview() {
-        const discountValue = parseFloat(discountValueInput.value) || 0;
-        const discountType = discountTypeSelect.value;
-        let newTotalValue = totalOriginalValue;
-        
-        if (discountValue > 0) {
-            if (discountType === 'percent') {
-                newTotalValue = totalOriginalValue * (1 - (discountValue / 100));
-            } else {
-                newTotalValue = totalOriginalValue - discountValue;
-            }
-            newTotalValue = Math.max(0, newTotalValue);
-        }
-        
-        document.getElementById('new-price-preview').textContent = formatCurrency(newTotalValue);
-    }
-    
-    discountValueInput.addEventListener('input', updatePricePreview);
-    discountTypeSelect.addEventListener('change', updatePricePreview);
-    
-    document.getElementById('apply-product-discount').addEventListener('click', () => {
-        const discountValue = parseFloat(discountValueInput.value) || 0;
-        const discountType = discountTypeSelect.value;
-        const totalOriginalValue = product.originalPrice * product.quantity;
-        let newTotalValue = totalOriginalValue;
-        
-        selectedProducts[productIndex].discountValue = discountValue;
-        selectedProducts[productIndex].discountType = discountType;
-        
-        if (discountValue > 0) {
-            if (discountType === 'percent') {
-                newTotalValue = totalOriginalValue * (1 - (discountValue / 100));
-            } else {
-                newTotalValue = totalOriginalValue - discountValue;
-            }
-            newTotalValue = Math.max(0, newTotalValue);
-        }
-        
-        selectedProducts[productIndex].price = newTotalValue / product.quantity;
-        
-        closeModal();
-        renderProductsList();
-        calculateSaleTotal();
-        showMessage('Desconto aplicado ao produto com sucesso!');
-    });
-    
-    document.querySelector('#discount-modal .modal-close').addEventListener('click', closeModal);
-    document.getElementById('cancel-discount').addEventListener('click', closeModal);
-}
-
 // ==================== FUNÇÕES DE PRODUTOS ====================
 function addProductToSale(product) {
+    // Verifica se o produto já está na lista
     const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
     
     if (existingProductIndex >= 0) {
+        // Se já existe, apenas incrementa a quantidade
         selectedProducts[existingProductIndex].quantity += 1;
     } else {
+        // Se não existe, adiciona o produto à lista
         selectedProducts.push({
             id: product.id,
             name: product.nome,
             description: product.descricao || '',
             price: product.valor_unitario,
-            originalPrice: product.valor_unitario,
             quantity: 1,
             unit: product.unidade,
-            stock: product.estoque_quantidade,
-            discountValue: 0,
-            discountType: 'fixed'
+            stock: product.estoque_quantidade
         });
     }
     
+    // Atualiza a exibição da lista de produtos
     renderProductsList();
+    // Recalcula o total da venda
     calculateSaleTotal();
 }
 
 function renderProductsList() {
+    // Limpa a lista de produtos
     productsList.innerHTML = '';
     
+    // Adiciona cada produto à lista
     selectedProducts.forEach((product, index) => {
-        const totalOriginalValue = product.originalPrice * product.quantity;
-        let totalWithDiscount = totalOriginalValue;
-        
-        if (product.discountValue > 0) {
-            if (product.discountType === 'percent') {
-                totalWithDiscount = totalOriginalValue * (1 - (product.discountValue / 100));
-            } else {
-                totalWithDiscount = totalOriginalValue - product.discountValue;
-            }
-            totalWithDiscount = Math.max(0, totalWithDiscount);
-        }
-        
-        const unitPriceWithDiscount = totalWithDiscount / product.quantity;
+        const totalValue = product.price * product.quantity;
         
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${product.name}</td>
             <td>${product.description}</td>
-            <td>
-                ${product.discountValue > 0 ? 
-                    `<span class="original-price">${formatCurrency(product.originalPrice)}</span> ` : ''}
-                ${formatCurrency(unitPriceWithDiscount)}
-                ${product.discountValue > 0 ? 
-                    `<span class="discount-badge">${product.discountValue}${product.discountType === 'percent' ? '%' : 'R$'}</span>` : ''}
-            </td>
+            <td>${formatCurrency(product.price)}</td>
             <td>
                 <input type="number" class="quantity-input" 
                        value="${product.quantity}" min="1" 
                        max="${product.stock}" data-index="${index}">
                 <small>${product.unit}</small>
             </td>
-            <td class="product-total">${formatCurrency(totalWithDiscount)}</td>
+            <td class="product-total">${formatCurrency(totalValue)}</td>
             <td>
                 <button class="btn-remove" data-index="${index}" title="Remover produto">
                     <i class="fas fa-trash"></i>
@@ -474,48 +370,31 @@ function renderProductsList() {
 function calculateSaleTotal() {
     let subtotal = 0;
     
+    // Calcula o subtotal baseado nos produtos selecionados
     selectedProducts.forEach((product, index) => {
-        const totalOriginalValue = product.originalPrice * product.quantity;
-        let totalWithDiscount = totalOriginalValue;
+        const totalValue = product.price * product.quantity;
+        subtotal += totalValue;
         
-        if (product.discountValue > 0) {
-            if (product.discountType === 'percent') {
-                totalWithDiscount = totalOriginalValue * (1 - (product.discountValue / 100));
-            } else {
-                totalWithDiscount = totalOriginalValue - product.discountValue;
-            }
-            totalWithDiscount = Math.max(0, totalWithDiscount);
-        }
-        
-        subtotal += totalWithDiscount;
-        
+        // Atualiza o valor total na linha do produto
         const row = productsList.children[index];
         if (row) {
             const totalCell = row.querySelector('.product-total');
             if (totalCell) {
-                totalCell.textContent = formatCurrency(totalWithDiscount);
+                totalCell.textContent = formatCurrency(totalValue);
             }
         }
     });
     
     let total = subtotal;
-    let discount = parseFloat(discountValueInput.value) || 0;
-    const discountType = discountTypeSelect.value;
-    
-    if (discount > 0) {
-        if (discountType === 'percent') {
-            discount = subtotal * (discount / 100);
-        }
-        total = Math.max(0, subtotal - discount);
-    }
-    
     let change = 0;
     const amountReceived = parseFloat(amountReceivedInput.value) || 0;
     
+    // Calcula o troco se houver valor recebido
     if (amountReceived > 0) {
         change = Math.max(0, amountReceived - total);
     }
     
+    // Atualiza os valores na interface
     subtotalValueElement.textContent = formatCurrency(subtotal);
     saleTotalElement.textContent = formatCurrency(total);
     changeValueElement.textContent = formatCurrency(change);
@@ -524,7 +403,10 @@ function calculateSaleTotal() {
 // ==================== FUNÇÕES DE CLIENTES ====================
 async function loadClients() {
     try {
-        const response = await fetch('/operador/api/clientes');
+        const response = await fetch('/operador/api/clientes', {
+            ...preventCacheConfig,
+            method: 'GET'
+        });
         if (!response.ok) throw new Error('Erro ao carregar clientes');
         
         clients = await response.json();
@@ -542,7 +424,10 @@ async function searchClient() {
     }
 
     try {
-        const response = await fetch(`/operador/api/clientes/buscar?q=${encodeURIComponent(searchTerm)}`);
+        const response = await fetch(`/operador/api/clientes/buscar?q=${encodeURIComponent(searchTerm)}&timestamp=${new Date().getTime()}`, {
+            ...preventCacheConfig,
+            method: 'GET'
+        });
         if (!response.ok) throw new Error('Erro ao buscar clientes');
         
         const results = await response.json();
@@ -567,6 +452,7 @@ function selectClient(client) {
     selectedClientInput.value = client.nome;
     selectedClientIdInput.value = client.id;
     showMessage(`Cliente selecionado: ${client.nome}`);
+    updateCaixaStatus();
 }
 
 function showClientSearchResults(clients) {
@@ -645,12 +531,14 @@ async function saveClient() {
         let response;
         if (currentEditingClient) {
             response = await fetch(`/operador/api/clientes/${currentEditingClient.id}`, {
+                ...preventCacheConfig,
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(clientData)
             });
         } else {
             response = await fetch('/operador/api/clientes', {
+                ...preventCacheConfig,
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(clientData)
@@ -671,9 +559,16 @@ async function saveClient() {
 }
 
 // ==================== FUNÇÕES DE PRODUTOS ====================
-async function loadProducts() {
+async function loadProducts(forceUpdate = false) {
     try {
-        const response = await fetch('/operador/api/produtos');
+        const url = forceUpdate 
+            ? `/operador/api/produtos?timestamp=${new Date().getTime()}`
+            : '/operador/api/produtos';
+            
+        const response = await fetch(url, {
+            ...preventCacheConfig,
+            method: 'GET'
+        });
         if (!response.ok) throw new Error('Erro ao carregar produtos');
         
         products = await response.json();
@@ -730,6 +625,7 @@ function displayProductSearchResults(products) {
         productSearchResults.appendChild(item);
     });
 }
+
 // Variáveis globais para controle dos dropdowns
 let clientSearchTimeout;
 let productSearchTimeout;
@@ -787,7 +683,10 @@ function showSearchResults(results, containerId, type) {
 // Função para buscar clientes
 async function searchClients(searchTerm) {
     try {
-        const response = await fetch(`/operador/api/clientes/buscar?q=${encodeURIComponent(searchTerm)}`);
+        const response = await fetch(`/operador/api/clientes/buscar?q=${encodeURIComponent(searchTerm)}&timestamp=${new Date().getTime()}`, {
+            ...preventCacheConfig,
+            method: 'GET'
+        });
         if (!response.ok) throw new Error('Erro ao buscar clientes');
 
         const results = await response.json();
@@ -801,7 +700,10 @@ async function searchClients(searchTerm) {
 // Função para buscar produtos
 async function searchProducts(searchTerm) {
     try {
-        const response = await fetch(`/operador/api/produtos/buscar?q=${encodeURIComponent(searchTerm)}`);
+        const response = await fetch(`/operador/api/produtos/buscar?q=${encodeURIComponent(searchTerm)}&timestamp=${new Date().getTime()}`, {
+            ...preventCacheConfig,
+            method: 'GET'
+        });
         if (!response.ok) throw new Error('Erro ao buscar produtos');
         
         const results = await response.json();
@@ -905,45 +807,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Função para selecionar cliente (já existente, mantida para compatibilidade)
-function selectClient(client) {
-    const selectedClientInput = document.getElementById('selected-client');
-    const selectedClientIdInput = document.getElementById('selected-client-id');
-    
-    selectedClientInput.value = client.nome;
-    selectedClientIdInput.value = client.id;
-    selectedClient = client;
-    
-    showMessage(`Cliente selecionado: ${client.nome}`);
-    updateCaixaStatus();
-}
-
-// Função para adicionar produto (já existente, mantida para compatibilidade)
-function addProductToSale(product) {
-    const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
-    
-    if (existingProductIndex >= 0) {
-        selectedProducts[existingProductIndex].quantity += 1;
-    } else {
-        selectedProducts.push({
-            id: product.id,
-            name: product.nome,
-            description: product.descricao || '',
-            price: product.valor_unitario,
-            originalPrice: product.valor_unitario,
-            quantity: 1,
-            unit: product.unidade,
-            stock: product.estoque_total,
-            discountValue: 0,
-            discountType: 'fixed'
-        });
-    }
-    
-    renderProductsList();
-    calculateSaleTotal();
-    showMessage(`Produto adicionado: ${product.nome}`);
-}
-
 function addEmptyProductRow() {
     openProductSearchModal();
 }
@@ -996,10 +859,8 @@ async function registerSale() {
     const items = selectedProducts.map(product => ({
         produto_id: product.id,
         quantidade: Number(product.quantity),
-        valor_unitario: Number(product.originalPrice),
-        valor_total: Number(product.price * product.quantity),
-        desconto_aplicado: Number(product.discountValue),
-        tipo_desconto: product.discountType === 'percent' ? 'percentual' : 'fixo'
+        valor_unitario: Number(product.price),
+        valor_total: Number(product.price * product.quantity)
     }));
 
     // Preparar dados da venda incluindo endereço de entrega se existir
@@ -1027,6 +888,7 @@ async function registerSale() {
 
     try {
         const response = await fetch('/operador/api/vendas', {
+            ...preventCacheConfig,
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(saleData)
@@ -1038,26 +900,33 @@ async function registerSale() {
         }
         
         const result = await response.json();
+        
+        // LIMPEZA COMPLETA APÓS A VENDA
         resetSaleForm();
-        await updateBalance();
-        await loadProducts();
+        
+        await updateBalance(true); // Forçar atualização sem cache
+        await loadProducts(true); // Forçar atualização sem cache
+        
         showMessage('Registrando venda...');
         showMessage(`Venda registrada com sucesso! Nº Nota: ${result.nota_id}`);
         showMessage('Gerando comprovante...');
-        window.open(`/operador/pdf/nota/${result.nota_id}`, '_blank');
+        
+        // Abrir comprovante em nova aba sem cache
+        window.open(`/operador/pdf/nota/${result.nota_id}?timestamp=${new Date().getTime()}`, '_blank');
     } catch (error) {
         console.error("Erro ao registrar venda:", error);
         showMessage(error.message, 'error');
     }
 }
 
+// Função para resetar completamente o formulário de venda
 function resetSaleForm() {
     // Limpa dados do cliente
     selectedClient = null;
     selectedClientInput.value = '';
     selectedClientIdInput.value = '';
 
-    // Limpa produtos
+    // LIMPEZA COMPLETA DA LISTA DE PRODUTOS
     selectedProducts = [];
     productsList.innerHTML = '';
 
@@ -1065,8 +934,6 @@ function resetSaleForm() {
     document.getElementById('payment-method').value = '';
     document.getElementById('sale-notes').value = '';
     amountReceivedInput.value = '';
-    discountValueInput.value = '';
-    discountTypeSelect.value = 'fixed';
 
     // Limpa entrega
     deliveryAddress = null;
@@ -1077,21 +944,50 @@ function resetSaleForm() {
 
     // Limpa resultado de busca de clientes, se houver
     const clientSearchResults = document.getElementById('client-search-results');
-    if (clientSearchResults) clientSearchResults.innerHTML = '';
+    if (clientSearchResults) {
+        clientSearchResults.innerHTML = '';
+        clientSearchResults.style.display = 'none';
+    }
 
-    // Atualiza total
+    // Limpa resultado de busca de produtos, se houver
+    const productSearchResults = document.getElementById('product-search-results');
+    if (productSearchResults) {
+        productSearchResults.innerHTML = '';
+        productSearchResults.style.display = 'none';
+    }
+
+    // Limpa os campos de busca
+    const clientSearchInput = document.getElementById('client-search-input');
+    const productSearchInput = document.getElementById('product-search-input');
+    if (clientSearchInput) clientSearchInput.value = '';
+    if (productSearchInput) productSearchInput.value = '';
+
+    // Fecha todos os dropdowns de busca
+    closeAllDropdowns();
+
+    // Atualiza total (vai zerar todos os valores)
     calculateSaleTotal();
 
     // Atualiza status do caixa
     if (typeof updateCaixaStatus === 'function') {
         updateCaixaStatus();
     }
+
+    // Dispara evento de input para garantir a atualização do status
+    const event = new Event('input', {
+        bubbles: true,
+        cancelable: true,
+    });
+    selectedClientInput.dispatchEvent(event);
 }
 
 // ==================== FUNÇÕES DE CAIXA ====================
 async function checkCaixaStatus() {
     try {
-        const response = await fetch('/operador/api/saldo');
+        const response = await fetch('/operador/api/saldo', {
+            ...preventCacheConfig,
+            method: 'GET'
+        });
         if (!response.ok) throw new Error('Erro ao verificar status do caixa');
         
         const data = await response.json();
@@ -1102,16 +998,23 @@ async function checkCaixaStatus() {
         } else {
             closeRegisterBtn.style.display = 'block';
             currentCaixaId = data.caixa_id;
-            updateBalance();
+            updateBalance(true); // Forçar atualização sem cache
         }
     } catch (error) {
         console.error('Error checking caixa status:', error);
     }
 }
 
-async function updateBalance() {
+async function updateBalance(forceUpdate = false) {
     try {
-        const response = await fetch('/operador/api/saldo');
+        const url = forceUpdate 
+            ? `/operador/api/saldo?timestamp=${new Date().getTime()}`
+            : '/operador/api/saldo';
+            
+        const response = await fetch(url, {
+            ...preventCacheConfig,
+            method: 'GET'
+        });
         if (!response.ok) throw new Error('Erro ao carregar saldo');
         
         const data = await response.json();
@@ -1145,6 +1048,7 @@ async function closeRegister() {
     if (confirm('Deseja realmente fechar o caixa?')) {
         try {
             const response = await fetch('/operador/api/fechar-caixa', {
+                ...preventCacheConfig,
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ valor_fechamento: parseFloat(valorFechamento) })
@@ -1215,15 +1119,6 @@ function closeModal() {
     document.querySelectorAll('.modal').forEach(modal => {
         modal.style.display = 'none';
     });
-    const discountModal = document.getElementById('discount-modal');
-    if (discountModal) {
-        discountModal.remove();
-    }
-}
-
-function applyDiscount() {
-    calculateSaleTotal();
-    showMessage('Desconto aplicado com sucesso');
 }
 
 function showMessage(message, type = 'success') {
@@ -1234,4 +1129,21 @@ function showMessage(message, type = 'success') {
     icon.className = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
     
     setTimeout(() => notification.classList.remove('show'), 5000);
+}
+
+// Função para forçar recarregamento sem cache em todas as requisições
+function forceNoCacheFetch(url, options = {}) {
+    const timestamp = new Date().getTime();
+    const separator = url.includes('?') ? '&' : '?';
+    const noCacheUrl = `${url}${separator}_=${timestamp}`;
+    
+    return fetch(noCacheUrl, {
+        ...options,
+        headers: {
+            ...options.headers,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
+    });
 }
