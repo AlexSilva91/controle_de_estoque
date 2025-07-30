@@ -262,20 +262,6 @@
                                 <span id="subtotal-value">R$ 0.00</span>
                             </div>
                             
-                            <div class="discount-row">
-                                <div class="form-group">
-                                    <label for="discount-value">Desconto:</label>
-                                    <div class="discount-input">
-                                        <input type="number" id="discount-value" class="form-control" placeholder="0.00" min="0" step="0.01">
-                                        <select id="discount-type" class="form-control">
-                                            <option value="fixed">R$</option>
-                                            <option value="percent">%</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <button class="btn-apply-discount" id="apply-discount-btn">Aplicar</button>
-                            </div>
-                            
                             <div class="summary-row total">
                                 <span>Total da Venda:</span>
                                 <span id="sale-total">R$ 0.00</span>
@@ -590,40 +576,6 @@
             selectedClientInput.dispatchEvent(event);
             
             showMessage(`Cliente selecionado: ${client.nome}`);
-        }
-
-        // Função para resetar a venda (deve estar no script_operador.js)
-        function resetSaleForm() {
-            const selectedClientInput = document.getElementById('selected-client');
-            const selectedClientIdInput = document.getElementById('selected-client-id');
-            
-            selectedClientInput.value = '';
-            selectedClientIdInput.value = '';
-            
-            // Dispara evento de input para garantir a atualização
-            const event = new Event('input', {
-                bubbles: true,
-                cancelable: true,
-            });
-            selectedClientInput.dispatchEvent(event);
-            
-            // Restante da função resetSaleForm...
-            document.getElementById('products-list').innerHTML = '';
-            document.getElementById('payment-method').value = '';
-            document.getElementById('sale-notes').value = '';
-            document.getElementById('amount-received').value = '';
-            document.getElementById('discount-value').value = '';
-            document.getElementById('discount-type').value = 'fixed';
-            document.getElementById('subtotal-value').textContent = 'R$ 0.00';
-            document.getElementById('sale-total').textContent = 'R$ 0.00';
-            document.getElementById('change-value').textContent = 'R$ 0.00';
-            
-            // Remove entrega se existir
-            const deliveryBtn = document.getElementById('delivery-btn');
-            deliveryBtn.classList.remove('has-delivery');
-            deliveryBtn.innerHTML = '<i class="fas fa-truck"></i> Adicionar Entrega';
-            const deliveryInfo = document.querySelector('.delivery-info');
-            if (deliveryInfo) deliveryInfo.remove();
         }
     </script>
 </body>
