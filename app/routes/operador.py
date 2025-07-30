@@ -279,11 +279,21 @@ def visualizar_pdf_venda(nota_id):
         ]
     }
 
-    endereco_entrega = ""
+    endereco_entrega = None
     if nota.entrega:
         e = nota.entrega
-        endereco_entrega = f"{e.logradouro}, {e.numero} {e.complemento or ''} - {e.bairro} - {e.cidade}/{e.estado} - CEP: {e.cep}"
-
+        endereco_entrega = {
+            "logradouro": e.logradouro,
+            "numero": e.numero,
+            "complemento": e.complemento,
+            "bairro": e.bairro,
+            "cidade": e.cidade,
+            "estado": e.estado,
+            "cep": e.cep,
+            "instrucoes": e.instrucoes
+        }
+        print(f"instrucoes: {e.instrucoes}")
+        
     pdf_buffer = gerar_nfce_pdf_bobina_bytesio(
         dados_nota,
         nome_operador=nota.operador.nome,

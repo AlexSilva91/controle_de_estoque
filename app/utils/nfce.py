@@ -7,47 +7,120 @@ from io import BytesIO
 from datetime import datetime
 from textwrap import wrap
 
-
 def formatar_endereco_entrega(endereco) -> str:
-    """Formata o endereço de entrega em um formato legível."""
+    """
+    Formata o endereço de entrega no formato padrão:
+    Linha 1: Logradouro, número - complemento (se houver)
+    Linha 2: Bairro: nome_do_bairro (se diferente do complemento)
+    Linha 3: Cidade/Estado - CEP: xxxxx-xxx
+    Linha 4: Instruções: texto (se houver)
+    """
     if not endereco:
         return ""
     
-    # Se for string, retorna diretamente
+    # Se for string, tenta converter para dicionário
     if isinstance(endereco, str):
-        return endereco
+        endereco = endereco.replace("Endereco de entrega:", "").strip()
+        parts = [p.strip() for p in endereco.split('-') if p.strip()]
+        
+        if len(parts) >= 3:
+            # Parse da string para estrutura de dados
+            logradouro_numero_comp = parts[0]
+            bairro = parts[1]
+            cidade_estado_cep = parts[2]
+            
+            logradouro_parts = logradouro_numero_comp.split(',')
+            logradouro = logradouro_parts[0].strip() if logradouro_parts else ""
+            numero_comp = logradouro_parts[1].strip() if len(logradouro_parts) > 1 else ""
+            
+            numero = numero_comp.split(' ')[0] if numero_comp else ""
+            complemento = ' '.join(numero_comp.split(' ')[1:]) if len(numero_comp.split(' ')) > 1 else ""
+            
+            cidade_estado = cidade_estado_cep.split('- CEP:')[0].strip()
+            cep = cidade_estado_cep.split('- CEP:')[1].strip() if '- CEP:' in cidade_estado_cep else ""
+            
+            cidade = cidade_estado.split('/')[0].strip() if '/' in cidade_estado else ""
+            estado = cidade_estado.split('/')[1].strip() if '/' in cidade_estado else ""
+            
+            # Converte para dicionário para processamento uniforme
+            endereco = {
+                "logradouro": logradouro,
+                "numero": numero,
+                "complemento": complemento if complemento else None,
+                "bairro": bairro,
+                "cidade": cidade,
+                "estado": estado,
+                "cep": cep
+            }
+        else:
+            return endereco
     
-    # Se for dicionário, formata adequadamente
+    # Processa dicionário
     partes = []
-    # Linha 1: Logradouro, número e complemento
-    linha1 = []
-    if endereco.get("logradouro"):
-        linha1.append(endereco["logradouro"])
-    if endereco.get("numero"):
-        linha1.append(f", {endereco['numero']}")
-    if endereco.get("complemento"):
-        linha1.append(f" - {endereco['complemento']}")
-    if linha1:
-        partes.append("".join(linha1))
     
-    # Linha 2: Bairro
-    if endereco.get("bairro"):
-        partes.append(f"Bairro: {endereco['bairro']}")
+    # Linha 1: Logradouro, número - complemento
+    if endereco.get("logradouro") and endereco.get("numero"):
+        linha1 = f"{endereco['logradouro']}, {endereco['numero']}"
+        if endereco.get("complemento") and endereco["complemento"].strip():
+            linha1 += f" - {endereco['complemento']}"
+        partes.append(linha1)
+    elif endereco.get("logradouro"):
+        linha1 = endereco["logradouro"]
+        if endereco.get("numero"):
+            linha1 += f", {endereco['numero']}"
+        if endereco.get("complemento") and endereco["complemento"].strip():
+            linha1 += f" - {endereco['complemento']}"
+        partes.append(linha1)
     
-    # Linha 3: Cidade, estado e CEP
-    linha3 = []
-    if endereco.get("cidade"):
-        linha3.append(endereco["cidade"])
-    if endereco.get("estado"):
-        linha3.append(f"/{endereco['estado']}")
-    if endereco.get("cep"):
-        linha3.append(f" - CEP: {endereco['cep']}")
-    if linha3:
-        partes.append("".join(linha3))
+    # Linha 2: Bairro (somente se existir e for diferente do complemento)
+    bairro = endereco.get("bairro", "").strip()
+    complemento = endereco.get("complemento", "").strip()
     
-    # Linha 4: Instruções
-    if endereco.get("instrucoes"):
-        partes.append(f"Instruções: {endereco['instrucoes']}")
+    if bairro and bairro.lower() != complemento.lower():
+        partes.append(f"Bairro: {bairro}")
+    
+    # Linha 3: Cidade/Estado - CEP
+    cidade = endereco.get("cidade", "").strip()
+    estado = endereco.get("estado", "").strip()
+    cep = endereco.get("cep", "").strip()
+    
+    if cidade or estado or cep:
+        linha3_parts = []
+        
+        # Cidade/Estado
+        if cidade and estado:
+            estado_upper = estado.upper() if len(estado) == 2 else estado
+            linha3_parts.append(f"{cidade}/{estado_upper}")
+        elif cidade:
+            linha3_parts.append(cidade)
+        elif estado:
+            estado_upper = estado.upper() if len(estado) == 2 else estado
+            linha3_parts.append(estado_upper)
+        
+        # CEP formatado
+        if cep:
+            # Remove caracteres não numéricos
+            cep_numeros = ''.join(filter(str.isdigit, cep))
+            if len(cep_numeros) == 8:
+                cep_formatado = f"{cep_numeros[:5]}-{cep_numeros[5:]}"
+            else:
+                cep_formatado = cep
+            
+            if linha3_parts:
+                linha3_parts.append(f" - CEP: {cep_formatado}")
+            else:
+                linha3_parts.append(f"CEP: {cep_formatado}")
+        
+        if linha3_parts:
+            partes.append("".join(linha3_parts))
+    
+    # Linha 4: Instruções (se existirem)
+    instrucoes = endereco.get("instrucoes", "").strip()
+    if instrucoes:
+        instrucoes_linhas = wrap(instrucoes, width=48)
+        partes.append("Instruções:")
+        partes.extend([f"  {linha}" for linha in instrucoes_linhas])
+
     
     return "\n".join(partes)
 
@@ -166,9 +239,10 @@ def gerar_nfce_pdf_bobina_bytesio(
         c.drawString(5 * mm, y, f"Cliente: {nome_cliente}")
         y -= 6 * mm
 
-    # Endereço de entrega (agora trata string ou dicionário)
+    # Endereço de entrega formatado conforme solicitado
     if endereco_entrega:
         endereco_formatado = formatar_endereco_entrega(endereco_entrega)
+        print(f"Endereço formatado: {endereco_formatado}")
         c.setFont("Helvetica-Bold", 7)
         c.drawString(5 * mm, y, "Endereço de entrega:")
         y -= 4 * mm
