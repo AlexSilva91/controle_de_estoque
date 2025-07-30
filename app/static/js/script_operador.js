@@ -713,6 +713,219 @@ function displayProductSearchResults(products) {
         productSearchResults.appendChild(item);
     });
 }
+// Variáveis globais para controle dos dropdowns
+let clientSearchTimeout;
+let productSearchTimeout;
+let activeSearchDropdown = null;
+
+// Função para mostrar os resultados da busca
+function showSearchResults(results, containerId, type) {
+    const resultsContainer = document.getElementById(containerId);
+    resultsContainer.innerHTML = '';
+
+    if (results.length === 0) {
+        resultsContainer.innerHTML = '<div class="no-results">Nenhum resultado encontrado</div>';
+        resultsContainer.style.display = 'block';
+        return;
+    }
+
+    results.forEach(item => {
+        const resultItem = document.createElement('div');
+        resultItem.className = 'search-result-item';
+        resultItem.dataset.id = item.id;
+        
+        if (type === 'client') {
+            resultItem.innerHTML = `
+                <h4>${item.nome}</h4>
+                <p>Documento: ${item.documento || 'Não informado'}</p>
+                <p>Telefone: ${item.telefone || 'Não informado'}</p>
+            `;
+            
+            resultItem.addEventListener('click', () => {
+                selectClient(item);
+                resultsContainer.style.display = 'none';
+                document.getElementById('client-search-input').value = '';
+            });
+        } else if (type === 'product') {
+            resultItem.innerHTML = `
+                <h4>${item.nome}</h4>
+                <p>Código: ${item.codigo || 'Não informado'} | Marca: ${item.marca || 'Não informada'}</p>
+                <p>Preço: ${formatCurrency(item.valor_unitario)} | Estoque: ${item.estoque_total} ${item.unidade || 'un'}</p>
+            `;
+            
+            resultItem.addEventListener('click', () => {
+                addProductToSale(item);
+                resultsContainer.style.display = 'none';
+                document.getElementById('product-search-input').value = '';
+            });
+        }
+        
+        resultsContainer.appendChild(resultItem);
+    });
+
+    resultsContainer.style.display = 'block';
+    activeSearchDropdown = resultsContainer;
+}
+
+// Função para buscar clientes
+async function searchClients(searchTerm) {
+    try {
+        const response = await fetch(`/operador/api/clientes/buscar?q=${encodeURIComponent(searchTerm)}`);
+        if (!response.ok) throw new Error('Erro ao buscar clientes');
+
+        const results = await response.json();
+        showSearchResults(results, 'client-search-results', 'client');
+    } catch (error) {
+        console.error('Erro na busca de clientes:', error);
+        showMessage(error.message, 'error');
+    }
+}
+
+// Função para buscar produtos
+async function searchProducts(searchTerm) {
+    try {
+        const response = await fetch(`/operador/api/produtos/buscar?q=${encodeURIComponent(searchTerm)}`);
+        if (!response.ok) throw new Error('Erro ao buscar produtos');
+        
+        const results = await response.json();
+        showSearchResults(results, 'product-search-results', 'product');
+    } catch (error) {
+        console.error('Erro na busca de produtos:', error);
+        showMessage(error.message, 'error');
+    }
+}
+
+// Função para fechar todos os dropdowns
+function closeAllDropdowns() {
+    document.querySelectorAll('.search-results-dropdown').forEach(dropdown => {
+        dropdown.style.display = 'none';
+    });
+    activeSearchDropdown = null;
+}
+
+// Event listeners para os campos de busca
+document.addEventListener('DOMContentLoaded', function() {
+    // Configuração do campo de busca de clientes
+    const clientSearchInput = document.getElementById('client-search-input');
+    clientSearchInput.addEventListener('input', function(e) {
+        clearTimeout(clientSearchTimeout);
+        const searchTerm = e.target.value.trim();
+        
+        if (searchTerm.length >= 2) {
+            clientSearchTimeout = setTimeout(() => {
+                searchClients(searchTerm);
+            }, 300);
+        } else if (searchTerm.length === 0) {
+            // Mostra todos os clientes quando o campo está vazio
+            searchClients('');
+        } else {
+            closeAllDropdowns();
+        }
+    });
+    
+    clientSearchInput.addEventListener('focus', async function () {
+        await searchClients(''); // Executa toda vez que o campo for focado
+    });
+
+    // Configuração do campo de busca de produtos
+    const productSearchInput = document.getElementById('product-search-input');
+    productSearchInput.addEventListener('input', function(e) {
+        clearTimeout(productSearchTimeout);
+        const searchTerm = e.target.value.trim();
+        
+        if (searchTerm.length >= 2) {
+            productSearchTimeout = setTimeout(() => {
+                searchProducts(searchTerm);
+            }, 300);
+        } else if (searchTerm.length === 0) {
+            // Mostra todos os produtos quando o campo está vazio
+            searchProducts('');
+        } else {
+            closeAllDropdowns();
+        }
+    });
+    
+    productSearchInput.addEventListener('focus', function() {
+        if (productSearchInput.value.trim().length >= 2) {
+            searchProducts(productSearchInput.value.trim());
+        } else {
+            // Mostra todos os produtos quando o campo recebe foco
+            searchProducts('');
+        }
+    });
+    
+    // Fecha os dropdowns quando clicar fora
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.search-container') && activeSearchDropdown) {
+            closeAllDropdowns();
+        }
+    });
+    
+    // Fecha os dropdowns ao pressionar Esc
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && activeSearchDropdown) {
+            closeAllDropdowns();
+        }
+    });
+    
+    // Botões de busca (opcional - mantém a funcionalidade original)
+    document.getElementById('search-client-btn').addEventListener('click', function() {
+        const searchTerm = clientSearchInput.value.trim();
+        if (searchTerm.length >= 2) {
+            searchClients(searchTerm);
+        } else {
+            searchClients('');
+        }
+    });
+    
+    document.getElementById('search-product-btn').addEventListener('click', function() {
+        const searchTerm = productSearchInput.value.trim();
+        if (searchTerm.length >= 2) {
+            searchProducts(searchTerm);
+        } else {
+            searchProducts('');
+        }
+    });
+});
+
+// Função para selecionar cliente (já existente, mantida para compatibilidade)
+function selectClient(client) {
+    const selectedClientInput = document.getElementById('selected-client');
+    const selectedClientIdInput = document.getElementById('selected-client-id');
+    
+    selectedClientInput.value = client.nome;
+    selectedClientIdInput.value = client.id;
+    selectedClient = client;
+    
+    showMessage(`Cliente selecionado: ${client.nome}`);
+    updateCaixaStatus();
+}
+
+// Função para adicionar produto (já existente, mantida para compatibilidade)
+function addProductToSale(product) {
+    const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
+    
+    if (existingProductIndex >= 0) {
+        selectedProducts[existingProductIndex].quantity += 1;
+    } else {
+        selectedProducts.push({
+            id: product.id,
+            name: product.nome,
+            description: product.descricao || '',
+            price: product.valor_unitario,
+            originalPrice: product.valor_unitario,
+            quantity: 1,
+            unit: product.unidade,
+            stock: product.estoque_total,
+            discountValue: 0,
+            discountType: 'fixed'
+        });
+    }
+    
+    renderProductsList();
+    calculateSaleTotal();
+    showMessage(`Produto adicionado: ${product.nome}`);
+}
 
 function addEmptyProductRow() {
     openProductSearchModal();
@@ -953,19 +1166,6 @@ function switchTab(tabId) {
     if (activeTabBtn) {
         currentTabTitle.textContent = activeTabBtn.querySelector('span').textContent;
     }
-}
-
-function searchClients() {
-    const searchTerm = clientSearch.value.toLowerCase();
-    if (!searchTerm) return renderClientCards();
-    
-    const filteredClients = clients.filter(client => 
-        client.nome.toLowerCase().includes(searchTerm) ||
-        (client.documento && client.documento.toLowerCase().includes(searchTerm)) ||
-        (client.telefone && client.telefone.toLowerCase().includes(searchTerm))
-    );
-    
-    renderClientCards(filteredClients);
 }
 
 function openModal(type) {

@@ -161,13 +161,14 @@
                         <h3>Informações do Cliente</h3>
                     </div>
                     <div class="card-body">
-                        <div class="search-client-container">
+                        <div class="search-container">
                             <div class="search-input-group">
-                                <input type="text" id="client-search-input" placeholder="Buscar por nome, CPF ou telefone...">
+                                <input type="text" id="client-search-input" class="search-input" placeholder="Buscar por nome, CPF ou telefone..." autocomplete="off">
                                 <button class="btn-search" id="search-client-btn">
                                     <i class="fas fa-search"></i>
                                 </button>
                             </div>
+                            <div class="search-results-dropdown" id="client-search-results"></div>
                             <div class="client-info-display">
                                 <input type="text" id="selected-client" placeholder="Cliente selecionado" readonly>
                                 <input type="hidden" id="selected-client-id">
@@ -183,13 +184,14 @@
                         <h3>Produtos da Venda</h3>
                     </div>
                     <div class="card-body">
-                        <div class="search-product-container">
+                        <div class="search-container">
                             <div class="search-input-group">
-                                <input type="text" id="product-search-input" placeholder="Buscar por nome, marca ou código...">
+                                <input type="text" id="product-search-input" class="search-input" placeholder="Buscar por nome, marca ou código..." autocomplete="off">
                                 <button class="btn-search" id="search-product-btn">
                                     <i class="fas fa-search"></i>
                                 </button>
                             </div>
+                            <div class="search-results-dropdown" id="product-search-results"></div>
                         </div>
                         
                         <!-- Products List -->

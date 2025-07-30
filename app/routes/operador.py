@@ -406,7 +406,9 @@ def api_buscar_clientes():
                 'id': cliente.id,
                 'nome': cliente.nome,
                 'documento': cliente.documento,
-                'telefone': cliente.telefone
+                'telefone': cliente.telefone,
+                'email': cliente.email,
+                'endereco': cliente.endereco
             })
     
     return jsonify(resultados)
