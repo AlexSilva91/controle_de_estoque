@@ -9,6 +9,8 @@ from app import db
 from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 from app.bot.bot_movimentacao import enviar_resumo_movimentacao_diaria
+from flask import send_file
+from app.utils.nfce import gerar_nfce_pdf_bobina_bytesio
 from app.models import entities
 from app.schemas import (
     ClienteCreate,
@@ -256,7 +258,45 @@ def api_registrar_venda():
         db.session.rollback()
         app.logger.error(f"Erro ao registrar venda: {str(e)}", exc_info=True)
         return jsonify({'error': 'Erro interno ao processar a venda'}), 500
-    
+
+@operador_bp.route('/pdf/nota/<int:nota_id>', methods=['GET'])
+@login_required
+@operador_required
+def visualizar_pdf_venda(nota_id):
+    nota = entities.NotaFiscal.query.get_or_404(nota_id)
+
+    dados_nota = {
+        "data_emissao": nota.data_emissao,
+        "forma_pagamento": nota.forma_pagamento,
+        "itens": [
+            {
+                "descricao": item.produto.nome,
+                "quantidade": item.quantidade,
+                "valor_unitario": item.valor_unitario,
+                "valor_total": item.valor_total
+            }
+            for item in nota.itens
+        ]
+    }
+
+    endereco_entrega = ""
+    if nota.entrega:
+        e = nota.entrega
+        endereco_entrega = f"{e.logradouro}, {e.numero} {e.complemento or ''} - {e.bairro} - {e.cidade}/{e.estado} - CEP: {e.cep}"
+
+    pdf_buffer = gerar_nfce_pdf_bobina_bytesio(
+        dados_nota,
+        nome_operador=nota.operador.nome,
+        nome_cliente=nota.cliente.nome,
+        endereco_entrega=endereco_entrega
+    )
+
+    return send_file(
+        pdf_buffer,
+        as_attachment=False,
+        download_name=f'nota_{nota.id}.pdf',
+        mimetype='application/pdf'
+    )
 # ===== API SALDO =====
 @operador_bp.route('/api/saldo', methods=['GET'])
 @login_required

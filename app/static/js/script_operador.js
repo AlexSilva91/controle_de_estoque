@@ -1020,8 +1020,11 @@ async function registerSale() {
         const result = await response.json();
         resetSaleForm();
         await updateBalance();
-        showMessage(`Venda registrada com sucesso! Nº Nota: ${result.nota_id}`);
         await loadProducts();
+        showMessage('Registrando venda...');
+        showMessage(`Venda registrada com sucesso! Nº Nota: ${result.nota_id}`);
+        showMessage('Gerando comprovante...');
+        window.open(`/operador/pdf/nota/${result.nota_id}`, '_blank');
     } catch (error) {
         console.error("Erro ao registrar venda:", error);
         showMessage(error.message, 'error');
