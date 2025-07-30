@@ -442,9 +442,6 @@ function renderProductsList() {
             </td>
             <td class="product-total">${formatCurrency(totalWithDiscount)}</td>
             <td>
-                <button class="btn-discount" data-index="${index}" title="Aplicar desconto">
-                    <i class="fas fa-percentage"></i>
-                </button>
                 <button class="btn-remove" data-index="${index}" title="Remover produto">
                     <i class="fas fa-trash"></i>
                 </button>
