@@ -129,7 +129,7 @@ def api_get_produtos():
         produtos_formatados = []
         for produto in produtos:
             # Calcula o estoque total somando todos os locais de estoque
-            estoque_total = produto.estoque_loja + produto.estoque_deposito + produto.estoque_fabrica
+            estoque_total = produto.estoque_loja
             
             # Filtra apenas produtos com estoque total positivo
             if estoque_total > 0:
@@ -167,7 +167,7 @@ def api_get_produto(produto_id):
     try:
         produto = get_produto(db.session, produto_id)
         if produto:
-            estoque_total = produto.estoque_loja + produto.estoque_deposito + produto.estoque_fabrica
+            estoque_total = produto.estoque_loja
             
             return jsonify({
                 'id': produto.id,
