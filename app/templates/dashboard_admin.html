@@ -1135,7 +1135,7 @@
                         <div class="details-section">
                             <div class="section-header">
                                 <h4><i class="fas fa-percentage"></i> Descontos</h4>
-                                <button class="btn btn-sm btn-primary" id="addDescontoBtn">
+                                <button class="btn btn-sm btn-primary" id="addDescontoBtn" data-produto-id="">
                                     <i class="fas fa-plus"></i> Adicionar Desconto
                                 </button>
                             </div>
@@ -1152,7 +1152,9 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <!-- Dados serão preenchidos via JavaScript -->
+                                        <tr class="no-data">
+                                            <td colspan="6">Nenhum desconto cadastrado para este produto</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
