@@ -492,6 +492,8 @@
                                 <table id="descontosTable">
                                     <thead>
                                         <tr>
+                                            <th>Identificador</th>
+                                            <th>Observação</th>
                                             <th>Qtd. Mínima</th>
                                             <th>Qtd. Máxima</th>
                                             <th>Valor c/ Desc.</th>
@@ -606,95 +608,6 @@
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-save"></i>
                             <span>Salvar</span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Entrada de Produto -->
-    <div id="entradaModal" class="modal">
-        <div class="modal-overlay"></div>
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">
-                        <i class="fas fa-plus-circle"></i>
-                        <span>Registrar Entrada</span>
-                    </h3>
-                    <button class="close-modal" aria-label="Fechar">&times;</button>
-                </div>
-                <form id="entradaForm">
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label>Produto</label>
-                            <div class="form-control-static" id="entradaProdutoNome"></div>
-                        </div>
-                        <div class="form-group">
-                            <label for="entradaQuantidade">Quantidade*</label>
-                            <input type="number" id="entradaQuantidade" class="form-control" step="0.001" min="0.001" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="entradaValor">Valor Unitário (R$)*</label>
-                            <input type="number" id="entradaValor" class="form-control" step="0.01" min="0" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="entradaNota">Número da Nota Fiscal</label>
-                            <input type="text" id="entradaNota" class="form-control">
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-check"></i>
-                            <span>Confirmar</span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Saída de Produto -->
-    <div id="saidaModal" class="modal">
-        <div class="modal-overlay"></div>
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">
-                        <i class="fas fa-minus-circle"></i>
-                        <span>Registrar Saída</span>
-                    </h3>
-                    <button class="close-modal" aria-label="Fechar">&times;</button>
-                </div>
-                <form id="saidaForm">
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label>Produto</label>
-                            <div class="form-control-static" id="saidaProdutoNome"></div>
-                        </div>
-                        <div class="form-group">
-                            <label for="saidaQuantidade">Quantidade*</label>
-                            <input type="number" id="saidaQuantidade" class="form-control" step="0.001" min="0.001" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="saidaCliente">Cliente (opcional)</label>
-                            <select id="saidaCliente" class="form-control">
-                                <option value="">Selecione um cliente</option>
-                                <!-- Opções serão preenchidas via JavaScript -->
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="saidaValor">Valor Unitário (R$)*</label>
-                            <input type="number" id="saidaValor" class="form-control" step="0.01" min="0" required>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-check"></i>
-                            <span>Confirmar</span>
                         </button>
                     </div>
                 </form>

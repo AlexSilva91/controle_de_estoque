@@ -1118,15 +1118,17 @@ document.addEventListener('DOMContentLoaded', function() {
               descontosTable.innerHTML = '';
               
               data.descontos.forEach(desconto => {
-                  if (searchText && !desconto.produto_nome.toLowerCase().includes(searchText)) {
+                  if (searchText && !(desconto.identificador || '').toLowerCase().includes(searchText)) {
                       return;
                   }
                   
                   const row = document.createElement('tr');
                   row.innerHTML = `
+                      <td>${desconto.identificador || '-'}</td>
+                      <td>${desconto.descricao || '-'}</td>
                       <td>${desconto.quantidade_minima}</td>
                       <td>${desconto.quantidade_maxima}</td>
-                      <td>${desconto.valor_unitario_com_desconto}</td>
+                      <td>${desconto.valor_unitario_com_desconto || '0,00'}</td>
                       <td>${desconto.valido_ate || '-'}</td>
                       <td><span class="badge ${desconto.ativo ? 'badge-success' : 'badge-danger'}">${desconto.ativo ? 'Ativo' : 'Inativo'}</span></td>
                       <td>

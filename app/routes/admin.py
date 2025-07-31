@@ -1079,6 +1079,7 @@ def criar_desconto_route():
         session = Session(db.engine)
         desconto = criar_desconto(session, dados)
         return jsonify({
+            'success': True,
             'mensagem': 'Desconto criado com sucesso',
             'desconto': {
                 'id': desconto.id,
@@ -1129,7 +1130,6 @@ def buscar_descontos_produto_route(produto_id):
 def atualizar_desconto_route(desconto_id):
     dados = request.get_json()
 
-    print(dados)
     try:
         session = Session(db.engine)
         desconto = atualizar_desconto(session, desconto_id, dados)
@@ -1146,6 +1146,8 @@ def atualizar_desconto_route(desconto_id):
             'desconto': {
                 'id': desconto.id,
                 'produto_id': desconto.produto_id,
+                'identificador': desconto.identificador if desconto.identificador else '-',
+                'descricao': desconto.descricao if desconto.descricao else '-',
                 'quantidade_minima': float(desconto.quantidade_minima),
                 'quantidade_maxima': float(desconto.quantidade_maxima),
                 'valor_unitario_com_desconto': float(desconto.valor_unitario_com_desconto),
@@ -1170,14 +1172,25 @@ def atualizar_desconto_route(desconto_id):
 def deletar_desconto_route(desconto_id):
     try:
         session = Session(db.engine)
+        
         sucesso = deletar_desconto(session, desconto_id)
         
-        if not sucesso:
-            return jsonify({'erro': 'Desconto não encontrado'}), 404
+        if sucesso:
+            return jsonify({
+                'success': True,
+                'message': 'Desconto deletado com sucesso'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Desconto não encontrado'
+            }), 404
             
-        return jsonify({'mensagem': 'Desconto deletado com sucesso'}), 200
     except Exception as e:
-        return jsonify({'erro': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
     finally:
         session.close()
 
@@ -1195,11 +1208,12 @@ def listar_descontos_route():
             'descontos': [{
                 'id': d.id,
                 'produto_id': d.produto_id,
-                'produto_nome': d.produto.nome if d.produto else '',
+                'identificador': d.identificador if d.identificador else '-',
+                'descricao': d.descricao if d.descricao else '-',
                 'quantidade_minima': float(d.quantidade_minima),
                 'quantidade_maxima': float(d.quantidade_maxima),
                 'valor_unitario_com_desconto': formatar_valor_br(d.valor_unitario_com_desconto),
-                'valido_ate': formatar_data_br(d.valido_ate),
+                'valido_ate': formatar_data_br(d.valido_ate) if d.valido_ate else '-',
                 'ativo': d.ativo,
                 'criado_em': formatar_data_br(d.criado_em)
             } for d in descontos]

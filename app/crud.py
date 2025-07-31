@@ -1373,6 +1373,7 @@ def atualizar_desconto(session: Session, desconto_id: int, novos_dados: dict) ->
 # DELETAR desconto
 def deletar_desconto(session: Session, desconto_id: int) -> bool:
     desconto = session.query(entities.DescontoProduto).get(desconto_id)
+    
     if not desconto:
         return False
     session.delete(desconto)
