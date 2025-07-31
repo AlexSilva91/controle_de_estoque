@@ -178,7 +178,28 @@ class Produto(Base):
         foreign_keys="[TransferenciaEstoque.produto_destino_id]",
         back_populates="produto_destino"
     )
+    descontos = relationship("DescontoProduto", back_populates="produto", cascade="all, delete-orphan")
+    
 
+class DescontoProduto(Base):
+    __tablename__ = "descontos_produto"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False)
+
+    quantidade_minima = Column(DECIMAL(12, 3), nullable=False)
+    quantidade_maxima = Column(DECIMAL(12, 3), nullable=False)
+    valor_unitario_com_desconto = Column(DECIMAL(10, 2), nullable=False)
+
+    descricao = Column(String(255), nullable=True)
+    valido_ate = Column(DateTime, nullable=True)
+    ativo = Column(Boolean, default=True, nullable=False)
+    sincronizado = Column(Boolean, default=False, nullable=False)
+
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    produto = relationship("Produto", back_populates="descontos")
 
 # --------------------
 # Cliente

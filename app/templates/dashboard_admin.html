@@ -51,6 +51,7 @@
                 </button>
             </div>
             
+            <!-- No sidebar-nav, adicione o novo item após "Movimentações" -->
             <nav class="sidebar-nav">
                 <ul>
                     <li class="active" data-tab="dashboard">
@@ -65,16 +66,22 @@
                             <span class="nav-text">Clientes</span>
                         </a>
                     </li>
-                    <li data-tab="usuarios">
-                        <a href="#usuarios" class="nav-link">
-                            <i class="fas fa-user-cog"></i>
-                            <span class="nav-text">Usuários</span>
-                        </a>
-                    </li>
                     <li data-tab="produtos">
                         <a href="#produtos" class="nav-link">
                             <i class="fas fa-boxes"></i>
                             <span class="nav-text">Produtos</span>
+                        </a>
+                    </li>
+                    <li data-tab="descontos">
+                        <a href="#descontos" class="nav-link">
+                            <i class="fas fa-percentage"></i>
+                            <span class="nav-text">Descontos</span>
+                        </a>
+                    </li>
+                    <li data-tab="estoque">
+                        <a href="#estoque" class="nav-link">
+                            <i class="fas fa-exchange-alt"></i>
+                            <span class="nav-text">Movimentações</span>
                         </a>
                     </li>
                     <li data-tab="financeiro">
@@ -83,10 +90,10 @@
                             <span class="nav-text">Financeiro</span>
                         </a>
                     </li>
-                    <li data-tab="estoque">
-                        <a href="#estoque" class="nav-link">
-                            <i class="fas fa-exchange-alt"></i>
-                            <span class="nav-text">Movimentações</span>
+                    <li data-tab="usuarios">
+                        <a href="#usuarios" class="nav-link">
+                            <i class="fas fa-user-cog"></i>
+                            <span class="nav-text">Usuários</span>
                         </a>
                     </li>
                 </ul>
@@ -390,7 +397,7 @@
                         </div>
                     </div>
                 </div>
-
+                
                 <div id="estoque" class="tab-content">
                     <div class="action-bar">
                         <div class="filter-container">
@@ -440,6 +447,58 @@
                                             <th>Origem</th>
                                             <th>Destino</th>
                                             <th>Usuário</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Dados serão preenchidos via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Adicione esta div com as outras tab contents -->
+                <div id="descontos" class="tab-content">
+                    <div class="action-bar">
+                        <div class="search-container">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="searchDesconto" class="form-control" placeholder="Buscar desconto...">
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn btn-primary" id="addDesconto">
+                                <i class="fas fa-plus"></i>
+                                <span>Novo Desconto</span>
+                            </button>
+                            <button class="btn btn-outline" id="refreshDescontos" aria-label="Atualizar">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-percentage"></i> Descontos Cadastrados</h3>
+                            <div class="card-actions">
+                                <button class="btn-icon" title="Exportar" aria-label="Exportar">
+                                    <i class="fas fa-file-export"></i>
+                                </button>
+                                <button class="btn-icon" title="Filtrar" aria-label="Filtrar">
+                                    <i class="fas fa-filter"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table id="descontosTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Produto</th>
+                                            <th>Qtd. Mínima</th>
+                                            <th>Qtd. Máxima</th>
+                                            <th>Valor c/ Desc.</th>
+                                            <th>Validade</th>
+                                            <th>Status</th>
+                                            <th>Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -953,7 +1012,159 @@
             </div>
         </div>
     </div>
-
+    <!-- Modal Desconto Produto -->
+    <div id="descontoModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-percentage"></i>
+                        <span id="descontoModalTitle">Cadastrar Desconto</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <form id="descontoForm">
+                    <input type="hidden" id="descontoId">
+                    <input type="hidden" id="descontoProdutoId">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>Produto</label>
+                            <div class="form-control-static" id="descontoProdutoNome"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="descontoQuantidadeMinima">Quantidade Mínima*</label>
+                                <input type="number" id="descontoQuantidadeMinima" class="form-control" step="0.001" min="0.001" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="descontoQuantidadeMaxima">Quantidade Máxima*</label>
+                                <input type="number" id="descontoQuantidadeMaxima" class="form-control" step="0.001" min="0.001" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="descontoValorUnitario">Valor Unitário com Desconto*</label>
+                                <input type="number" id="descontoValorUnitario" class="form-control" step="0.01" min="0" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="descontoValidoAte">Válido até</label>
+                                <input type="date" id="descontoValidoAte" class="form-control">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="descontoDescricao">Descrição</label>
+                            <textarea id="descontoDescricao" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="descontoAtivo">Status*</label>
+                            <select id="descontoAtivo" class="form-control" required>
+                                <option value="true">Ativo</option>
+                                <option value="false">Inativo</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i>
+                            <span>Salvar</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- Modal Visualizar Produto -->
+    <div id="visualizarProdutoModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-box-open"></i>
+                        <span>Detalhes do Produto</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="product-details">
+                        <div class="details-header">
+                            <div class="product-info">
+                                <h2 id="visualizarProdutoNome"></h2>
+                                <div class="product-meta">
+                                    <span id="visualizarProdutoCodigo"></span> | 
+                                    <span id="visualizarProdutoTipo"></span> | 
+                                    <span id="visualizarProdutoUnidade"></span>
+                                </div>
+                            </div>
+                            <div class="product-values">
+                                <div class="value-item">
+                                    <label>Valor Unitário:</label>
+                                    <span id="visualizarProdutoValor"></span>
+                                </div>
+                                <div class="value-item">
+                                    <label>Valor Compra:</label>
+                                    <span id="visualizarProdutoValorCompra"></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="details-section">
+                            <h4><i class="fas fa-warehouse"></i> Estoque</h4>
+                            <div class="inventory-grid">
+                                <div class="inventory-item">
+                                    <label>Depósito:</label>
+                                    <span id="visualizarProdutoEstoqueDeposito"></span>
+                                </div>
+                                <div class="inventory-item">
+                                    <label>Loja:</label>
+                                    <span id="visualizarProdutoEstoqueLoja"></span>
+                                </div>
+                                <div class="inventory-item">
+                                    <label>Fábrica:</label>
+                                    <span id="visualizarProdutoEstoqueFabrica"></span>
+                                </div>
+                                <div class="inventory-item">
+                                    <label>Estoque Mínimo:</label>
+                                    <span id="visualizarProdutoEstoqueMinimo"></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="details-section">
+                            <div class="section-header">
+                                <h4><i class="fas fa-percentage"></i> Descontos</h4>
+                                <button class="btn btn-sm btn-primary" id="addDescontoBtn">
+                                    <i class="fas fa-plus"></i> Adicionar Desconto
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table id="produtoDescontosTable" class="compact-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Qtd. Mínima</th>
+                                            <th>Qtd. Máxima</th>
+                                            <th>Valor c/ Desc.</th>
+                                            <th>Válido até</th>
+                                            <th>Status</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Dados serão preenchidos via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>

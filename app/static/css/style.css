@@ -1534,3 +1534,86 @@ footer {
 ::-ms-input-placeholder {
   color: var(--text-muted);
 }
+/* Estilos para a seção de descontos */
+.details-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.compact-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.compact-table th, .compact-table td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+}
+
+.compact-table th {
+    background-color: #f5f5f5;
+    font-weight: 500;
+}
+
+.product-details .details-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.product-info h2 {
+    margin: 0;
+    color: #333;
+}
+
+.product-meta {
+    color: #666;
+    font-size: 0.9em;
+}
+
+.product-values {
+    display: flex;
+    gap: 20px;
+}
+
+.value-item {
+    text-align: right;
+}
+
+.value-item label {
+    display: block;
+    font-weight: 500;
+    color: #666;
+}
+
+.value-item span {
+    font-weight: 600;
+    color: #333;
+}
+
+.inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+}
+
+.inventory-item label {
+    display: block;
+    font-weight: 500;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.inventory-item span {
+    font-weight: 600;
+    color: #333;
+    font-size: 1.1em;
+}
