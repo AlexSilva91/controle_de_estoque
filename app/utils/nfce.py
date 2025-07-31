@@ -170,8 +170,12 @@ def gerar_nfce_pdf_bobina_bytesio(
     # Cabeçalho
     c.setFont("Helvetica-Bold", 12)
     c.drawCentredString(largura / 2, y, "CAVALCANTI RAÇÕES")
-    y -= 5 * mm
-
+    y -= 3 * mm
+    
+    c.setFont("Helvetica", 7)
+    c.drawCentredString(largura / 2, y, "Contato: (87) 9 8152-1788")
+    y -= 3 * mm
+    
     c.setFont("Helvetica", 7)
     c.drawCentredString(largura / 2, y, "Av. Fernando Bezerra, 123 - Centro - Ouricuri-PE")
     y -= 10 * mm
