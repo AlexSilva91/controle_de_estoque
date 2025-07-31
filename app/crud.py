@@ -1203,17 +1203,6 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
                 raise ValueError(f"Produto com ID {produto_id} não encontrado.")
             
             estoque_origem = item.get("estoque_origem", TipoEstoque.loja)
-            estoque_disponivel = {
-                TipoEstoque.loja: produto.estoque_loja,
-                TipoEstoque.deposito: produto.estoque_deposito,
-                TipoEstoque.fabrica: produto.estoque_fabrica
-            }.get(estoque_origem, 0)
-
-            if estoque_disponivel < quantidade:
-                raise ValueError(
-                    f"Estoque insuficiente ({estoque_origem.value}) para '{produto.nome}'. "
-                    f"Solicitado: {quantidade}, Disponível: {estoque_disponivel}"
-                )
 
             produtos_para_atualizar[produto_id] = {
                 "produto": produto,
@@ -1254,7 +1243,7 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
             produto_id = item["produto_id"]
             produto_info = produtos_para_atualizar[produto_id]
             
-            # Atualiza estoque
+            # Atualiza estoque (agora permite valores negativos)
             if produto_info["estoque_origem"] == TipoEstoque.loja:
                 produto_info["produto"].estoque_loja -= produto_info["quantidade"]
             elif produto_info["estoque_origem"] == TipoEstoque.deposito:
