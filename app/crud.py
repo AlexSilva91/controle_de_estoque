@@ -320,7 +320,6 @@ def create_produto(db: Session, produto: schemas.ProdutoCreate):
         return db_produto
     except SQLAlchemyError as e:
         db.rollback()
-        print("Erro detalhado no banco:", str(e))
         raise ValueError("Erro ao criar produto no banco de dados.")
 
 def update_produto(db: Session, produto_id: int, produto_data: schemas.ProdutoUpdate):
@@ -352,7 +351,6 @@ def update_produto(db: Session, produto_id: int, produto_data: schemas.ProdutoUp
         return produto
     except SQLAlchemyError as e:
         db.rollback()
-        print("Erro detalhado no banco:", str(e))
         raise ValueError("Erro ao atualizar produto no banco de dados.")
 
 def delete_produto(db: Session, produto_id: int):
@@ -1169,7 +1167,6 @@ def delete_lancamento_financeiro(db: Session, lancamento_id: int) -> bool:
 # ===== Vendas =====
 def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_id: int):
     try:
-        print(f"\nRecebendo dados da venda:\n{json.dumps(dados, indent=2)}\n")
 
         # Verificação dos campos obrigatórios básicos da venda
         if 'cliente_id' not in dados:
@@ -1341,5 +1338,4 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
     except Exception as e:
         db.rollback()
         import traceback
-        print(f"[ERRO] Falha ao registrar venda: {str(e)}\n{traceback.format_exc()}")
         raise

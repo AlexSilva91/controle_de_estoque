@@ -94,7 +94,6 @@ def get_dashboard_metrics():
         })
 
     except Exception as e:
-        print(f"Error fetching dashboard metrics: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/dashboard/movimentacoes')
@@ -386,7 +385,6 @@ def listar_produtos():
 def criar_produto():
     try:
         data = request.get_json()
-        print("Dados recebidos:", data)
 
         produto_data = ProdutoCreate(
             codigo=data.get('codigo'),
@@ -445,7 +443,6 @@ def to_decimal_or_none(value):
 def atualizar_produto(produto_id):
     try:
         data = request.get_json()
-        print("Dados recebidos para atualização:", data)
 
         update_fields = {}
         for campo in ['codigo', 'nome', 'tipo', 'marca', 'unidade', 'ativo',
@@ -478,7 +475,6 @@ def atualizar_produto(produto_id):
             }
         })
     except Exception as e:
-        print("Erro ao atualizar produto:", e)
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -616,7 +612,6 @@ def listar_usuarios():
         
         return jsonify({'success': True, 'usuarios': result})
     except Exception as e:
-        print(f"Error fetching users: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/usuarios/<int:usuario_id>', methods=['GET'])
@@ -653,7 +648,6 @@ def get_usuario(usuario_id):
             }
         })
     except Exception as e:
-        print(f"Erro ao buscar usuário {usuario_id}: {str(e)}")
         return jsonify({
             'success': False,
             'message': 'Erro interno ao carregar dados do usuário',
@@ -666,7 +660,6 @@ def get_usuario(usuario_id):
 def criar_usuario():
     try:
         data = request.get_json()
-        print("Recebido:", data)
 
         usuario_data = UsuarioCreate(
             nome=data['nome'],
@@ -693,7 +686,6 @@ def criar_usuario():
         })
 
     except Exception as e:
-        print("Erro ao criar usuário:", e)
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/usuarios/<int:usuario_id>', methods=['PUT'])
@@ -702,7 +694,6 @@ def criar_usuario():
 def atualizar_usuario(usuario_id):
     try:
         data = request.get_json()
-        print(data)
         
         # Verificar se foi enviada senha e confirmação
         if 'senha' in data or 'confirma_senha' in data:
@@ -731,7 +722,6 @@ def atualizar_usuario(usuario_id):
         })
     
     except Exception as e:
-        print(f"Erro ao atualizar usuário: {e}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -757,8 +747,6 @@ def remover_usuario(usuario_id):
 
     except Exception as e:
         db.session.rollback()
-        # Isso é opcional — para você ver os detalhes no terminal/log
-        print("Erro inesperado ao excluir usuário:")
         traceback.print_exc()
         return jsonify({
             'success': False,
@@ -998,8 +986,6 @@ def detalhar_nota_fiscal(nota_id):
 def criar_transferencia():
     try:
         data = request.get_json()
-        print("Dados recebidos:", data)
-
         # Campos obrigatórios básicos
         required_keys = [
             'produto_id', 'estoque_origem', 'estoque_destino', 
@@ -1051,7 +1037,6 @@ def criar_transferencia():
             }
         })
     except Exception as e:
-        print(f"Erro ao registrar transferência: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
     
 @admin_bp.route('/transferencias')
