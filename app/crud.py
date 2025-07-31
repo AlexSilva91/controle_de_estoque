@@ -1143,38 +1143,53 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
     try:
         print(f"\nRecebendo dados da venda:\n{json.dumps(dados, indent=2)}\n")
 
+        # Verificação dos campos obrigatórios básicos da venda
+        if 'cliente_id' not in dados:
+            raise ValueError('Campo obrigatório faltando: cliente_id')
+        if 'forma_pagamento' not in dados:
+            raise ValueError('Campo obrigatório faltando: forma_pagamento')
+        if 'itens' not in dados or not isinstance(dados['itens'], list) or len(dados['itens']) == 0:
+            raise ValueError('Lista de itens inválida ou vazia')
+
+        # Processamento do endereço de entrega (com tratamento para campos nulos)
         entrega = None
         if dados.get("entrega"):
             entrega_data = dados["entrega"]
-            # Verifica campos obrigatórios do endereço
-            required_fields = ["logradouro", "numero", "bairro", "cidade", "estado", "cep"]
-            for field in required_fields:
-                if field not in entrega_data or not entrega_data[field]:
-                    raise ValueError(f"Campo obrigatório do endereço faltando: {field}")
+            
+            # Cria o objeto de entrega apenas se algum campo foi preenchido
+            if any(v for k, v in entrega_data.items() if v):
+                entrega = entities.Entrega(
+                    logradouro=entrega_data.get("logradouro") or "",
+                    numero=entrega_data.get("numero") or "",
+                    complemento=entrega_data.get("complemento") or "",
+                    bairro=entrega_data.get("bairro") or "",
+                    cidade=entrega_data.get("cidade") or "",
+                    estado=entrega_data.get("estado") or "",
+                    cep=entrega_data.get("cep") or "",
+                    instrucoes=entrega_data.get("instrucoes") or "",
+                    sincronizado=False,
+                )
+                db.add(entrega)
+                db.flush()
 
-            entrega = entities.Entrega(
-                logradouro=entrega_data["logradouro"],
-                numero=entrega_data["numero"],
-                complemento=entrega_data.get("complemento"),
-                bairro=entrega_data["bairro"],
-                cidade=entrega_data["cidade"],
-                estado=entrega_data["estado"],
-                cep=entrega_data["cep"],
-                instrucoes=entrega_data.get("instrucoes"),
-                sincronizado=False,
-            )
-            db.add(entrega)
-            db.flush()  # Isso gera o ID da entrega
-
+        # Processamento dos itens da venda
         produtos_para_atualizar = {}
         valor_total = Decimal("0.00")
         valor_desconto_total = Decimal("0.00")
 
         for item in dados["itens"]:
+            # Verificação dos campos obrigatórios dos itens
+            required_fields = ['produto_id', 'quantidade', 'valor_unitario']
+            for field in required_fields:
+                if field not in item:
+                    raise ValueError(f'Item da venda está faltando o campo: {field}')
+
             produto_id = item["produto_id"]
             quantidade = Decimal(str(item["quantidade"]))
             valor_unitario = Decimal(str(item["valor_unitario"]))
-            valor_total_item = Decimal(str(item["valor_total"]))
+            
+            # Correção da sintaxe aqui - parênteses balanceados
+            valor_total_item = Decimal(str(item.get("valor_total", float(valor_unitario) * float(quantidade))))
 
             produto = db.query(entities.Produto).filter(
                 entities.Produto.id == produto_id
@@ -1183,23 +1198,17 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
             if not produto:
                 raise ValueError(f"Produto com ID {produto_id} não encontrado.")
             
-            # Verifica estoque conforme origem (padrão para loja se não especificado)
             estoque_origem = item.get("estoque_origem", TipoEstoque.loja)
-            
-            if estoque_origem == TipoEstoque.loja and produto.estoque_loja < quantidade:
+            estoque_disponivel = {
+                TipoEstoque.loja: produto.estoque_loja,
+                TipoEstoque.deposito: produto.estoque_deposito,
+                TipoEstoque.fabrica: produto.estoque_fabrica
+            }.get(estoque_origem, 0)
+
+            if estoque_disponivel < quantidade:
                 raise ValueError(
-                    f"Estoque insuficiente na loja para o produto '{produto.nome}'. "
-                    f"Solicitado: {quantidade}, Disponível: {produto.estoque_loja}"
-                )
-            elif estoque_origem == TipoEstoque.deposito and produto.estoque_deposito < quantidade:
-                raise ValueError(
-                    f"Estoque insuficiente no depósito para o produto '{produto.nome}'. "
-                    f"Solicitado: {quantidade}, Disponível: {produto.estoque_deposito}"
-                )
-            elif estoque_origem == TipoEstoque.fabrica and produto.estoque_fabrica < quantidade:
-                raise ValueError(
-                    f"Estoque insuficiente na fábrica para o produto '{produto.nome}'. "
-                    f"Solicitado: {quantidade}, Disponível: {produto.estoque_fabrica}"
+                    f"Estoque insuficiente ({estoque_origem.value}) para '{produto.nome}'. "
+                    f"Solicitado: {quantidade}, Disponível: {estoque_disponivel}"
                 )
 
             produtos_para_atualizar[produto_id] = {
@@ -1208,21 +1217,14 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
                 "estoque_origem": estoque_origem
             }
 
-            # Acumula totais
             valor_total += valor_total_item
-
-            # Calcula desconto por item
-            valor_bruto_item = valor_unitario * quantidade
-            desconto_item = valor_bruto_item - valor_total_item
-            valor_desconto_total += desconto_item
+            valor_desconto_total += (valor_unitario * quantidade) - valor_total_item
 
         valor_recebido = Decimal(str(dados.get("valor_recebido", 0)))
-        troco = valor_recebido - valor_total
-        a_prazo = dados.get("forma_pagamento") == "a_prazo"  # Verifica se é fiado
+        troco = max(valor_recebido - valor_total, Decimal("0.00"))
+        a_prazo = dados["forma_pagamento"] == "a_prazo"
 
-        # -------------------------
-        # Criar nota fiscal
-        # -------------------------
+        # Criação da nota fiscal
         nota = entities.NotaFiscal(
             cliente_id=dados["cliente_id"],
             operador_id=operador_id,
@@ -1230,9 +1232,9 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
             entrega_id=entrega.id if entrega else None,
             valor_total=valor_total,
             valor_desconto=valor_desconto_total,
-            tipo_desconto=TipoDesconto.fixo,  # sempre "fixo" para a nota
+            tipo_desconto=TipoDesconto.fixo,
             status=StatusNota.emitida,
-            observacao=dados.get("observacao"),
+            observacao=dados.get("observacao", ""),
             forma_pagamento=dados["forma_pagamento"],
             valor_recebido=valor_recebido,
             troco=troco,
@@ -1241,66 +1243,56 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
             data_emissao=datetime.now(ZoneInfo("America/Sao_Paulo")),
         )
         db.add(nota)
-        db.flush()  # Isso gera o ID da nota fiscal
+        db.flush()
 
-        # -------------------------
-        # Criar itens + movimentações
-        # -------------------------
+        # Processa itens e movimentações de estoque
         for item in dados["itens"]:
             produto_id = item["produto_id"]
-            quantidade = Decimal(str(item["quantidade"]))
-            valor_unitario = Decimal(str(item["valor_unitario"]))
-            valor_total_item = Decimal(str(item["valor_total"]))
-            desconto_aplicado = Decimal(str(item.get("desconto_aplicado", 0)))
-            tipo_desconto = item.get("tipo_desconto")
-            estoque_origem = item.get("estoque_origem", TipoEstoque.loja)
-
+            produto_info = produtos_para_atualizar[produto_id]
+            
             # Atualiza estoque
-            if estoque_origem == TipoEstoque.loja:
-                produtos_para_atualizar[produto_id]["produto"].estoque_loja -= quantidade
-            elif estoque_origem == TipoEstoque.deposito:
-                produtos_para_atualizar[produto_id]["produto"].estoque_deposito -= quantidade
-            elif estoque_origem == TipoEstoque.fabrica:
-                produtos_para_atualizar[produto_id]["produto"].estoque_fabrica -= quantidade
+            if produto_info["estoque_origem"] == TipoEstoque.loja:
+                produto_info["produto"].estoque_loja -= produto_info["quantidade"]
+            elif produto_info["estoque_origem"] == TipoEstoque.deposito:
+                produto_info["produto"].estoque_deposito -= produto_info["quantidade"]
+            elif produto_info["estoque_origem"] == TipoEstoque.fabrica:
+                produto_info["produto"].estoque_fabrica -= produto_info["quantidade"]
 
-            # Nota item
+            # Cria item da nota
             nota_item = entities.NotaFiscalItem(
                 nota_id=nota.id,
                 produto_id=produto_id,
-                estoque_origem=estoque_origem,
-                quantidade=quantidade,
+                estoque_origem=produto_info["estoque_origem"],
+                quantidade=produto_info["quantidade"],
                 valor_unitario=valor_unitario,
-                valor_total=valor_total_item,
-                desconto_aplicado=desconto_aplicado,
-                tipo_desconto=tipo_desconto,
+                valor_total=Decimal(str(item.get("valor_total", float(item["valor_unitario"]) * float(produto_info["quantidade"])))),
+                desconto_aplicado=Decimal(str(item.get("desconto_aplicado", 0))),
+                tipo_desconto=item.get("tipo_desconto"),
                 sincronizado=False,
             )
             db.add(nota_item)
 
-            # Movimentação de estoque
-            movimentacao = entities.MovimentacaoEstoque(
+            # Registra movimentação de estoque
+            db.add(entities.MovimentacaoEstoque(
                 produto_id=produto_id,
                 usuario_id=operador_id,
                 cliente_id=dados["cliente_id"],
                 caixa_id=caixa_id,
                 tipo=TipoMovimentacao.saida,
-                estoque_origem=estoque_origem,
-                quantidade=quantidade,
+                estoque_origem=produto_info["estoque_origem"],
+                quantidade=produto_info["quantidade"],
                 valor_unitario=valor_unitario,
                 valor_recebido=valor_recebido,
                 troco=troco,
                 forma_pagamento=dados["forma_pagamento"],
-                observacao=dados.get("observacao"),
+                observacao=dados.get("observacao", ""),
                 sincronizado=False,
                 data=datetime.now(ZoneInfo("America/Sao_Paulo")),
-            )
-            db.add(movimentacao)
+            ))
 
-        # -------------------------
-        # Lançamento financeiro (se não for a prazo)
-        # -------------------------
+        # Lançamento financeiro
         if not a_prazo:
-            financeiro = entities.Financeiro(
+            db.add(entities.Financeiro(
                 tipo=TipoMovimentacao.entrada,
                 categoria=CategoriaFinanceira.venda,
                 valor=valor_total,
@@ -1311,28 +1303,26 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
                 cliente_id=dados["cliente_id"],
                 caixa_id=caixa_id,
                 sincronizado=False,
-            )
-            db.add(financeiro)
+            ))
         else:
-            # Se for a prazo, cria conta a receber
-            conta_receber = entities.ContaReceber(
+            db.add(entities.ContaReceber(
                 cliente_id=dados["cliente_id"],
                 nota_fiscal_id=nota.id,
-                descricao=f"Venda a prazo - Nota Fiscal #{nota.id}",
+                descricao=f"Venda a prazo - Nota #{nota.id}",
                 valor_original=valor_total,
                 valor_aberto=valor_total,
                 data_vencimento=datetime.now(ZoneInfo("America/Sao_Paulo")) + timedelta(days=30),
                 data_emissao=datetime.now(ZoneInfo("America/Sao_Paulo")),
                 status=StatusPagamento.pendente,
-                observacoes=dados.get("observacao"),
+                observacoes=dados.get("observacao", ""),
                 sincronizado=False
-            )
-            db.add(conta_receber)
+            ))
 
         db.commit()
         return nota.id
 
     except Exception as e:
         db.rollback()
-        print(f"[ERRO] Falha ao registrar venda: {str(e)}")
+        import traceback
+        print(f"[ERRO] Falha ao registrar venda: {str(e)}\n{traceback.format_exc()}")
         raise

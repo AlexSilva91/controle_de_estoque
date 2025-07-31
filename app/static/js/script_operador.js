@@ -74,6 +74,7 @@ const productSearchResults = document.getElementById('product-search-results');
 
 // Elementos de entrega
 const deliveryBtn = document.getElementById('delivery-btn');
+const useClientAddressBtn = document.getElementById('use-client-address-btn');
 const deliveryModal = document.getElementById('delivery-modal');
 const saveDeliveryBtn = document.getElementById('save-delivery');
 const cancelDeliveryBtn = document.getElementById('cancel-delivery');
@@ -462,7 +463,7 @@ function addProductToSale(product) {
 }
 
 /**
- * Renderiza a lista de produtos selecionados para venda
+ * Renderiza la lista de productos seleccionados para la venta
  */
 function renderProductsList() {
     if (!productsList) return;
@@ -575,13 +576,13 @@ async function registerSale() {
 
     if (deliveryAddress) {
         saleData.endereco_entrega = {
-            logradouro: deliveryAddress.logradouro,
-            numero: deliveryAddress.numero,
+            logradouro: deliveryAddress.logradouro || null,
+            numero: deliveryAddress.numero || null,
             complemento: deliveryAddress.complemento || null,
-            bairro: deliveryAddress.bairro,
-            cidade: deliveryAddress.cidade,
-            estado: deliveryAddress.estado,
-            cep: deliveryAddress.cep,
+            bairro: deliveryAddress.bairro || null,
+            cidade: deliveryAddress.cidade || null,
+            estado: deliveryAddress.estado || null,
+            cep: deliveryAddress.cep || null,
             instrucoes: deliveryAddress.instrucoes || null
         };
     }
@@ -728,32 +729,100 @@ function openDeliveryModal() {
  * Salva o endereço de entrega
  */
 function saveDeliveryAddress() {
-    const address = document.getElementById('delivery-address')?.value;
-    const number = document.getElementById('delivery-number')?.value;
-    
-    if (!address || !number) {
-        showMessage('Endereço e número são obrigatórios', 'error');
-        return;
-    }
-    
+    // Remova as validações obrigatórias
     deliveryAddress = {
-        logradouro: address,
-        numero: number,
+        logradouro: document.getElementById('delivery-address')?.value || '',
+        numero: document.getElementById('delivery-number')?.value || '',
         complemento: document.getElementById('delivery-complement')?.value || '',
         bairro: document.getElementById('delivery-neighborhood')?.value || '',
         cidade: document.getElementById('delivery-city')?.value || '',
         estado: document.getElementById('delivery-state')?.value || '',
         cep: document.getElementById('delivery-zipcode')?.value || '',
-        instrucoes: document.getElementById('delivery-instructions')?.value || ''
+        instrucoes: document.getElementById('delivery-instructions')?.value || '',
+        endereco_completo: `${document.getElementById('delivery-address')?.value || ''}, ${document.getElementById('delivery-number')?.value || ''}`
     };
     
+    updateDeliveryUI();
+    closeModal();
+    showMessage('Endereço de entrega salvo com sucesso!');
+}
+
+/**
+ * Função para capturar e processar o endereço do cliente selecionado
+ */
+function useClientAddress() {
+    if (!selectedClientIdInput || !selectedClientIdInput.value) {
+        showMessage('Nenhum cliente selecionado', 'error');
+        return;
+    }
+
+    const clientId = selectedClientIdInput.value;
+    const client = clients.find(c => c.id == clientId);
+    
+    if (!client || (!client.endereco && !client.endereco_completo)) {
+        showMessage('Cliente não possui endereço cadastrado', 'error');
+        return;
+    }
+
+    // Verifica se já existe um endereço estruturado no cliente
+    if (client.logradouro && client.numero && client.bairro && client.cidade && client.estado) {
+        deliveryAddress = {
+            logradouro: client.logradouro,
+            numero: client.numero,
+            complemento: client.complemento || '',
+            bairro: client.bairro,
+            cidade: client.cidade,
+            estado: client.estado,
+            cep: client.cep || '',
+            instrucoes: '',
+            endereco_completo: `${client.logradouro}, ${client.numero}, ${client.bairro}, ${client.cidade}-${client.estado}`
+        };
+    } else {
+        // Caso o endereço esteja em uma string única
+        const addressString = client.endereco || client.endereco_completo;
+        const addressRegex = /^(.*?)(?:,\s*(?:nº|no|numero|número)\s*(\d+))?(?:,\s*(.*?))?(?:,\s*(.*?)\s*-\s*([A-Z]{2}))?$/i;
+        const matches = addressString.match(addressRegex);
+        
+        deliveryAddress = {
+            endereco_completo: addressString,
+            logradouro: matches[1]?.trim() || '',
+            numero: matches[2]?.trim() || '',
+            complemento: '',
+            bairro: matches[3]?.trim() || '',
+            cidade: matches[4]?.trim() || '',
+            estado: matches[5]?.trim() || '',
+            cep: '',
+            instrucoes: ''
+        };
+
+        // Fallback para extrair cidade/estado
+        if (!deliveryAddress.cidade && !deliveryAddress.estado && matches[3]) {
+            const cityStateMatch = matches[3].match(/(.*?)\s*-\s*([A-Z]{2})$/i);
+            if (cityStateMatch) {
+                deliveryAddress.bairro = '';
+                deliveryAddress.cidade = cityStateMatch[1]?.trim() || '';
+                deliveryAddress.estado = cityStateMatch[2]?.trim() || '';
+            }
+        }
+    }
+
+    updateDeliveryUI();
+    showMessage('Endereço do cliente definido para entrega!');
+}
+
+/**
+ * Atualiza a interface com as informações de entrega
+ */
+function updateDeliveryUI() {
+    if (!deliveryAddress) return;
+    
+    // Atualiza o botão de entrega
     if (deliveryBtn) {
         deliveryBtn.classList.add('has-delivery');
         deliveryBtn.innerHTML = '<i class="fas fa-check-circle"></i> Endereço de Entrega Cadastrado';
     }
     
-    closeModal();
-    showMessage('Endereço de entrega salvo com sucesso!');
+    // Exibe as informações de entrega
     showDeliveryInfo();
 }
 
@@ -763,24 +832,56 @@ function saveDeliveryAddress() {
 function showDeliveryInfo() {
     if (!deliveryBtn || !deliveryAddress) return;
     
+    // Remove qualquer informação de entrega existente
     const existingInfo = document.querySelector('.delivery-info');
     if (existingInfo) existingInfo.remove();
     
+    // Cria o elemento com as informações de entrega
     const deliveryInfo = document.createElement('div');
     deliveryInfo.className = 'delivery-info';
     deliveryInfo.innerHTML = `
         <p><strong>Endereço de Entrega:</strong></p>
         <p>${deliveryAddress.logradouro}, ${deliveryAddress.numero}${deliveryAddress.complemento ? ', ' + deliveryAddress.complemento : ''}</p>
         <p>${deliveryAddress.bairro} - ${deliveryAddress.cidade}/${deliveryAddress.estado}</p>
-        <p>CEP: ${deliveryAddress.cep}</p>
+        ${deliveryAddress.cep ? `<p>CEP: ${deliveryAddress.cep}</p>` : ''}
         ${deliveryAddress.instrucoes ? `<p><strong>Instruções:</strong> ${deliveryAddress.instrucoes}</p>` : ''}
-        <button class="btn-edit-delivery" id="edit-delivery-btn">
-            <i class="fas fa-edit"></i> Editar Endereço
-        </button>
+        <div class="delivery-actions">
+            <button class="btn-edit-delivery" id="edit-delivery-btn">
+                <i class="fas fa-edit"></i> Editar Endereço
+            </button>
+            <button class="btn-remove-delivery" id="remove-delivery-btn">
+                <i class="fas fa-trash"></i> Remover
+            </button>
+        </div>
     `;
     
+    // Insere após o botão de entrega
     deliveryBtn.insertAdjacentElement('afterend', deliveryInfo);
+    
+    // Adiciona os event listeners aos botões
     document.getElementById('edit-delivery-btn')?.addEventListener('click', openDeliveryModal);
+    document.getElementById('remove-delivery-btn')?.addEventListener('click', removeDeliveryAddress);
+}
+
+/**
+ * Remove o endereço de entrega
+ */
+function removeDeliveryAddress() {
+    deliveryAddress = null;
+    
+    // Remove a classe e restaura o ícone do botão
+    if (deliveryBtn) {
+        deliveryBtn.classList.remove('has-delivery');
+        deliveryBtn.innerHTML = '<i class="fas fa-truck"></i> Adicionar Entrega';
+    }
+    
+    // Remove o bloco de informações de entrega
+    const deliveryInfo = document.querySelector('.delivery-info');
+    if (deliveryInfo) {
+        deliveryInfo.remove();
+    }
+    
+    showMessage('Endereço de entrega removido');
 }
 
 // ==================== FUNÇÕES DE DESPESAS ====================
@@ -1288,6 +1389,23 @@ function setupEventListeners() {
         amountReceivedInput.addEventListener('input', calculateSaleTotal);
     }
     
+    // Event listeners de entrega
+    if (useClientAddressBtn) {
+        useClientAddressBtn.addEventListener('click', useClientAddress);
+    }
+    
+    if (deliveryBtn) {
+        deliveryBtn.addEventListener('click', openDeliveryModal);
+    }
+    
+    if (saveDeliveryBtn) {
+        saveDeliveryBtn.addEventListener('click', saveDeliveryAddress);
+    }
+    
+    if (cancelDeliveryBtn) {
+        cancelDeliveryBtn.addEventListener('click', closeModal);
+    }
+    
     // Event listeners de busca dinâmica
     if (clientSearchInput) {
         clientSearchInput.addEventListener('input', function(e) {
@@ -1383,11 +1501,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (productSearchInput) productSearchInput.value = '';
         });
     }
-    
-    // Configuração de entrega
-    if (deliveryBtn) deliveryBtn.addEventListener('click', openDeliveryModal);
-    if (saveDeliveryBtn) saveDeliveryBtn.addEventListener('click', saveDeliveryAddress);
-    if (cancelDeliveryBtn) cancelDeliveryBtn.addEventListener('click', closeModal);
     
     // Configuração de despesas
     if (openExpenseModalBtn) openExpenseModalBtn.addEventListener('click', openExpenseModal);

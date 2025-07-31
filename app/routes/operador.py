@@ -1,4 +1,5 @@
 from functools import wraps
+import re
 import threading
 from flask import Blueprint, render_template, request, jsonify, current_app as app
 from datetime import datetime, time, timedelta, timezone
@@ -10,6 +11,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 from app.bot.bot_movimentacao import enviar_resumo_movimentacao_diaria
 from flask import send_file
+from app.utils.converter_endereco import parse_endereco_string
 from app.utils.nfce import gerar_nfce_pdf_bobina_bytesio
 from app.models import entities
 from app.schemas import (
@@ -219,10 +221,18 @@ def api_registrar_venda():
         if not isinstance(data['itens'], list) or len(data['itens']) == 0:
             return jsonify({'error': 'Lista de itens inválida'}), 400
 
-        # Mapeia endereco_entrega para entrega se existir
+        # Processa o endereço de entrega se existir
         if 'endereco_entrega' in data:
-            data['entrega'] = data.pop('endereco_entrega')
+            entrega = data['endereco_entrega']
+            
+            # Se for string, converte para objeto estruturado
+            if isinstance(entrega, str):
+                data['entrega'] = parse_endereco_string(entrega)
+            else:
+                # Se já for objeto, apenas atribui sem validação obrigatória
+                data['entrega'] = entrega
 
+        # Valida itens da venda
         for i, item in enumerate(data['itens']):
             if not isinstance(item, dict):
                 return jsonify({'error': f'Item {i} não é um objeto válido'}), 400
@@ -290,9 +300,9 @@ def visualizar_pdf_venda(nota_id):
             "cidade": e.cidade,
             "estado": e.estado,
             "cep": e.cep,
-            "instrucoes": e.instrucoes
+            "instrucoes": e.instrucoes,
+            "endereco_completo": f"{e.logradouro}, {e.numero}, {e.bairro}, {e.cidade}-{e.estado}"
         }
-        print(f"instrucoes: {e.instrucoes}")
         
     pdf_buffer = gerar_nfce_pdf_bobina_bytesio(
         dados_nota,
@@ -307,6 +317,8 @@ def visualizar_pdf_venda(nota_id):
         download_name=f'nota_{nota.id}.pdf',
         mimetype='application/pdf'
     )
+
+    
 # ===== API SALDO =====
 @operador_bp.route('/api/saldo', methods=['GET'])
 @login_required

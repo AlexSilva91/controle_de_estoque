@@ -231,8 +231,19 @@
                     </div>
                     <div class="card-body">
                         <div class="form-group">
-                            <button class="btn-delivery" id="delivery-btn">
-                                <i class="fas fa-truck"></i> Adicionar Entrega
+                            <div class="delivery-buttons">
+                                <button class="btn-delivery" id="delivery-btn">
+                                    <i class="fas fa-truck"></i> Adicionar Entrega
+                                </button>
+                                <button class="btn-delivery" id="use-client-address-btn" title="Usar endereço do cliente">
+                                    <i class="fas fa-user"></i> Endereço do Cliente
+                                </button>
+                            </div>
+                        </div>
+                        <div id="delivery-info-display" style="margin-top: 10px; display: none;">
+                            <p><strong>Endereço de Entrega:</strong> <span id="delivery-address-text"></span></p>
+                            <button class="btn-remove-address" title="Remover endereço">
+                                <i class="fas fa-times"></i> Remover
                             </button>
                         </div>
                         <div class="payment-methods">
@@ -396,12 +407,12 @@
                 <form id="delivery-form">
                     <div class="form-group">
                         <label for="delivery-address">Endereço:</label>
-                        <input type="text" id="delivery-address" class="form-control" required>
+                        <input type="text" id="delivery-address" class="form-control">
                     </div>
                     
                     <div class="form-group">
                         <label for="delivery-number">Número:</label>
-                        <input type="text" id="delivery-number" class="form-control" required>
+                        <input type="text" id="delivery-number" class="form-control">
                     </div>
                     
                     <div class="form-group">
@@ -411,22 +422,22 @@
                     
                     <div class="form-group">
                         <label for="delivery-neighborhood">Bairro:</label>
-                        <input type="text" id="delivery-neighborhood" class="form-control" required>
+                        <input type="text" id="delivery-neighborhood" class="form-control">
                     </div>
                     
                     <div class="form-group">
                         <label for="delivery-city">Cidade:</label>
-                        <input type="text" id="delivery-city" class="form-control" required>
+                        <input type="text" id="delivery-city" class="form-control">
                     </div>
                     
                     <div class="form-group">
                         <label for="delivery-state">Estado:</label>
-                        <input type="text" id="delivery-state" class="form-control" required maxlength="2">
+                        <input type="text" id="delivery-state" class="form-control" maxlength="2">
                     </div>
                     
                     <div class="form-group">
                         <label for="delivery-zipcode">CEP:</label>
-                        <input type="text" id="delivery-zipcode" class="form-control" required>
+                        <input type="text" id="delivery-zipcode" class="form-control">
                     </div>
                     
                     <div class="form-group">

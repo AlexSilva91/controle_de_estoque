@@ -67,13 +67,13 @@ class StatusPagamento(str, Enum):
 # Entrega/Delivery
 # --------------------
 class EntregaBase(BaseModel):
-    logradouro: str = Field(..., max_length=200)
-    numero: str = Field(..., max_length=20)
+    logradouro: Optional[str] = Field(None, max_length=200)
+    numero: Optional[str] = Field(None, max_length=20)
     complemento: Optional[str] = Field(None, max_length=100)
-    bairro: str = Field(..., max_length=100)
-    cidade: str = Field(..., max_length=100)
-    estado: str = Field(..., max_length=2)
-    cep: str = Field(..., max_length=10)
+    bairro: Optional[str] = Field(None, max_length=100)
+    cidade: Optional[str] = Field(None, max_length=100)
+    estado: Optional[str] = Field(None, max_length=2)
+    cep: Optional[str] = Field(None, max_length=10)
     instrucoes: Optional[str] = None
 
 class EntregaCreate(EntregaBase):

@@ -74,16 +74,16 @@ class Entrega(Base):
     __tablename__ = "entregas"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    logradouro = Column(String(200), nullable=False)
-    numero = Column(String(20), nullable=False)
+    logradouro = Column(String(200), nullable=True)  
+    numero = Column(String(20), nullable=True)       
     complemento = Column(String(100), nullable=True)
-    bairro = Column(String(100), nullable=False)
-    cidade = Column(String(100), nullable=False)
-    estado = Column(String(2), nullable=False)
-    cep = Column(String(10), nullable=False)
+    bairro = Column(String(100), nullable=True)      
+    cidade = Column(String(100), nullable=True)      
+    estado = Column(String(2), nullable=True)        
+    cep = Column(String(10), nullable=True)          
     instrucoes = Column(Text, nullable=True)
     sincronizado = Column(Boolean, default=False, nullable=False)
-
+    
 # --------------------
 # Usuário
 # --------------------
