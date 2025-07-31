@@ -4,6 +4,8 @@ from flask import Blueprint, render_template, request, jsonify, session, flash, 
 from flask_login import login_required, current_user
 from datetime import datetime
 from decimal import Decimal
+from sqlalchemy.exc import IntegrityError
+import traceback
 
 from sqlalchemy import func
 from app import schemas
@@ -482,10 +484,32 @@ def obter_produto(produto_id):
 @admin_required
 def remover_produto(produto_id):
     try:
-        delete_produto(db.session, produto_id)
+        produto = db.session.query(entities.Produto).get(produto_id)
+
+        if not produto:
+            return jsonify({'success': False, 'message': 'Produto não encontrado'}), 404
+
+        estoque_total = (
+            float(produto.estoque_loja or 0) +
+            float(produto.estoque_deposito or 0) +
+            float(produto.estoque_fabrica or 0)
+        )
+
+        if estoque_total != 0:
+            return jsonify({
+                'success': False,
+                'message': 'Não é possível remover o produto. Ainda há saldo em estoque (mesmo que negativo).'
+            }), 400
+
+        db.session.delete(produto)
+        db.session.commit()
+
         return jsonify({'success': True, 'message': 'Produto removido com sucesso'})
+
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 400
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'Erro ao remover produto.'}), 500
+
 
 @admin_bp.route('/produtos/<int:produto_id>/movimentacao', methods=['POST'])
 @login_required
@@ -673,6 +697,7 @@ def atualizar_usuario(usuario_id):
         print(f"Erro ao atualizar usuário: {e}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
+
 @admin_bp.route('/usuarios/<int:usuario_id>', methods=['DELETE'])
 @login_required
 @admin_required
@@ -685,8 +710,24 @@ def remover_usuario(usuario_id):
         db.session.delete(usuario)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Usuário removido com sucesso'})
+
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': 'Não é possível remover o usuário. Ele está vinculado a um ou mais caixas.'
+        }), 400
+
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 400
+        db.session.rollback()
+        # Isso é opcional — para você ver os detalhes no terminal/log
+        print("Erro inesperado ao excluir usuário:")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': 'Erro inesperado ao remover o usuário. Tente novamente mais tarde.'
+        }), 500
+
 
 # ===== Financeiro Routes =====
 @admin_bp.route('/financeiro', methods=['GET'])

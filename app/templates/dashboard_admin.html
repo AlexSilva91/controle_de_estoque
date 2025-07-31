@@ -9,13 +9,20 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+    <!-- Botão de menu mobile -->
+    <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Menu">
+        <span class="menu-bar"></span>
+        <span class="menu-bar"></span>
+        <span class="menu-bar"></span>
+    </button>
+
     <!-- Flash Messages Container -->
     <div class="flash-messages">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
                     <div class="flash-message {{ category }}" id="flash-{{ loop.index }}">
-                        <div>
+                        <div class="flash-content">
                             <i class="fas 
                                 {% if category == 'success' %}fa-check-circle{% endif %}
                                 {% if category == 'error' %}fa-exclamation-circle{% endif %}
@@ -24,56 +31,96 @@
                             "></i>
                             <span>{{ message }}</span>
                         </div>
+                        <button class="close-flash" aria-label="Fechar">&times;</button>
                     </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
     </div>
+    
     <div class="dashboard-container">
         <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="logo-container">
-                <div class="logo">{{ nome_usuario }}</div>
-                <div class="logo-subtitle">Painel de Controle</div>
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <div class="logo">{{ nome_usuario }}</div>
+                    <div class="logo-subtitle">Painel de Controle</div>
+                </div>
+                <button class="close-sidebar-mobile" id="closeSidebarMobile" aria-label="Fechar menu">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             
             <nav class="sidebar-nav">
                 <ul>
                     <li class="active" data-tab="dashboard">
-                        <i class="fas fa-tachometer-alt"></i>
-                        <span>Dashboard</span>
+                        <a href="#dashboard" class="nav-link">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span class="nav-text">Dashboard</span>
+                        </a>
                     </li>
                     <li data-tab="clientes">
-                        <i class="fas fa-users"></i>
-                        <span>Clientes</span>
+                        <a href="#clientes" class="nav-link">
+                            <i class="fas fa-users"></i>
+                            <span class="nav-text">Clientes</span>
+                        </a>
                     </li>
                     <li data-tab="usuarios">
-                        <i class="fas fa-user-cog"></i>
-                        <span>Usuários</span>
+                        <a href="#usuarios" class="nav-link">
+                            <i class="fas fa-user-cog"></i>
+                            <span class="nav-text">Usuários</span>
+                        </a>
                     </li>
                     <li data-tab="produtos">
-                        <i class="fas fa-boxes"></i>
-                        <span>Produtos</span>
+                        <a href="#produtos" class="nav-link">
+                            <i class="fas fa-boxes"></i>
+                            <span class="nav-text">Produtos</span>
+                        </a>
                     </li>
                     <li data-tab="financeiro">
-                        <i class="fas fa-chart-line"></i>
-                        <span>Financeiro</span>
+                        <a href="#financeiro" class="nav-link">
+                            <i class="fas fa-chart-line"></i>
+                            <span class="nav-text">Financeiro</span>
+                        </a>
                     </li>
                     <li data-tab="estoque">
-                        <i class="fas fa-exchange-alt"></i>
-                        <span>Movimentações</span>
+                        <a href="#estoque" class="nav-link">
+                            <i class="fas fa-exchange-alt"></i>
+                            <span class="nav-text">Movimentações</span>
+                        </a>
                     </li>
                 </ul>
             </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-info-mobile">
+                    <div class="user-avatar-mobile">
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                    <div class="user-details-mobile">
+                        <span class="user-name">{{ nome_usuario }}</span>
+                        <span class="user-role">Administrador</span>
+                    </div>
+                </div>
+                <button class="logout-btn-mobile" id="logoutBtnMobile">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Sair</span>
+                </button>
+            </div>
         </aside>
 
         <!-- Main Content -->
         <main class="main-content">
             <!-- Header -->
             <header class="main-header">
-                <div class="header-title">
-                    <h1 id="page-title">Dashboard</h1>
-                    <div class="breadcrumb">Home / Dashboard</div>
+                <div class="header-left">
+                    <button class="mobile-menu-toggle-in-header" id="mobileMenuToggleInHeader" aria-label="Menu">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="header-title">
+                        <h1 id="page-title">Dashboard</h1>
+                        <div class="breadcrumb">Home / Dashboard</div>
+                    </div>
                 </div>
                 
                 <div class="user-actions">
@@ -86,7 +133,7 @@
                             <span class="user-role">Administrador</span>
                         </div>
                     </div>
-                    <button class="logout-btn" id="logoutBtn">
+                    <button class="logout-btn" id="logoutBtn" aria-label="Sair">
                         <i class="fas fa-sign-out-alt"></i>
                     </button>
                 </div>
@@ -111,10 +158,10 @@
                         <div class="card-header">
                             <h3><i class="fas fa-history"></i> Últimas Movimentações</h3>
                             <div class="card-actions">
-                                <button class="btn-icon" title="Exportar">
+                                <button class="btn-icon" title="Exportar" aria-label="Exportar">
                                     <i class="fas fa-file-export"></i>
                                 </button>
-                                <button class="btn-icon" title="Filtrar">
+                                <button class="btn-icon" title="Filtrar" aria-label="Filtrar">
                                     <i class="fas fa-filter"></i>
                                 </button>
                             </div>
@@ -151,7 +198,7 @@
                                 <i class="fas fa-plus"></i>
                                 <span>Novo Cliente</span>
                             </button>
-                            <button class="btn btn-outline" id="refreshClientes">
+                            <button class="btn btn-outline" id="refreshClientes" aria-label="Atualizar">
                                 <i class="fas fa-sync-alt"></i>
                             </button>
                         </div>
@@ -192,7 +239,7 @@
                                 <i class="fas fa-plus"></i>
                                 <span>Novo Usuário</span>
                             </button>
-                            <button class="btn btn-outline" id="refreshUsuarios">
+                            <button class="btn btn-outline" id="refreshUsuarios" aria-label="Atualizar">
                                 <i class="fas fa-sync-alt"></i>
                             </button>
                         </div>
@@ -232,7 +279,7 @@
                                 <i class="fas fa-plus"></i>
                                 <span>Novo Produto</span>
                             </button>
-                            <button class="btn btn-outline" id="refreshProdutos">
+                            <button class="btn btn-outline" id="refreshProdutos" aria-label="Atualizar">
                                 <i class="fas fa-sync-alt"></i>
                             </button>
                         </div>
@@ -281,7 +328,7 @@
                             </button>
                         </div>
                         <div class="action-buttons">
-                            <button class="btn btn-secondary">
+                            <button class="btn btn-secondary" aria-label="Exportar">
                                 <i class="fas fa-file-export"></i>
                                 <span>Exportar</span>
                             </button>
@@ -370,7 +417,7 @@
                             </button>
                         </div>
                         <div class="action-buttons">
-                            <button class="btn btn-secondary" id="exportMovimentacoes">
+                            <button class="btn btn-secondary" id="exportMovimentacoes" aria-label="Exportar">
                                 <i class="fas fa-file-export"></i>
                                 <span>Exportar</span>
                             </button>
@@ -421,7 +468,7 @@
                         <i class="fas fa-box-open"></i>
                         <span>Cadastrar Produto</span>
                     </h3>
-                    <button class="close-modal">&times;</button>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
                 </div>
                 <form id="produtoForm">
                     <div class="modal-body">
@@ -496,7 +543,7 @@
                         <i class="fas fa-plus-circle"></i>
                         <span>Registrar Entrada</span>
                     </h3>
-                    <button class="close-modal">&times;</button>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
                 </div>
                 <form id="entradaForm">
                     <div class="modal-body">
@@ -539,7 +586,7 @@
                         <i class="fas fa-minus-circle"></i>
                         <span>Registrar Saída</span>
                     </h3>
-                    <button class="close-modal">&times;</button>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
                 </div>
                 <form id="saidaForm">
                     <div class="modal-body">
@@ -585,7 +632,7 @@
                         <i class="fas fa-exchange-alt"></i>
                         <span>Transferir Estoque</span>
                     </h3>
-                    <button class="close-modal">&times;</button>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
                 </div>
                 <form id="transferenciaForm">
                     <input type="hidden" id="transferenciaProdutoId">
@@ -644,7 +691,7 @@
                         <i class="fas fa-edit"></i>
                         <span>Editar Produto</span>
                     </h3>
-                    <button class="close-modal">&times;</button>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
                 </div>
                 <form id="editarProdutoForm">
                     <div class="modal-body">
@@ -672,7 +719,7 @@
                         <i class="fas fa-exclamation-triangle"></i>
                         <span>Confirmar Exclusão</span>
                     </h3>
-                    <button class="close-modal">&times;</button>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
                 </div>
                 <div class="modal-body">
                     <p id="confirmarExclusaoTexto">Tem certeza que deseja excluir este item?</p>
@@ -698,7 +745,7 @@
                         <i class="fas fa-user-edit"></i>
                         <span id="usuarioModalTitle">Cadastrar Usuário</span>
                     </h3>
-                    <button class="close-modal">&times;</button>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
                 </div>
                 <form id="usuarioForm">
                     <div class="modal-body">
@@ -772,7 +819,7 @@
                         <i class="fas fa-user"></i>
                         <span>Detalhes do Usuário</span>
                     </h3>
-                    <button class="close-modal">&times;</button>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
                 </div>
                 <div class="modal-body">
                     <div class="user-profile">
@@ -823,7 +870,7 @@
                         <i class="fas fa-user-edit"></i>
                         <span id="clienteModalTitle">Cadastrar Cliente</span>
                     </h3>
-                    <button class="close-modal">&times;</button>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
                 </div>
                 <form id="clienteForm">
                     <div class="modal-body">
@@ -869,244 +916,7 @@
             </div>
         </div>
     </div>
+
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Adicionar nova aba de movimentações
-            const navItems = document.querySelectorAll('.sidebar-nav li');
-            navItems.forEach(item => {
-                if (item.getAttribute('data-tab') === 'estoque') {
-                    item.addEventListener('click', function() {
-                        loadMovimentacoesData();
-                    });
-                }
-            });
-
-            // Função para carregar dados de movimentações
-            async function loadMovimentacoesData() {
-                try {
-                    const dateInicio = document.getElementById('movimentacaoDateInicio').value;
-                    const dateFim = document.getElementById('movimentacaoDateFim').value;
-                    const tipo = document.getElementById('movimentacaoTipo').value;
-                    
-                    let url = '/admin/transferencias';
-                    const params = new URLSearchParams();
-                    
-                    if (dateInicio) params.append('data_inicio', dateInicio);
-                    if (dateFim) params.append('data_fim', dateFim);
-                    if (tipo) params.append('tipo', tipo);
-                    
-                    if (params.toString()) {
-                        url += `?${params.toString()}`;
-                    }
-                    
-                    const data = await fetchWithErrorHandling(url);
-                    
-                    if (data.success) {
-                        const table = document.querySelector('#movimentacoesEstoqueTable tbody');
-                        table.innerHTML = '';
-                        
-                        data.transferencias.forEach(transf => {
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td>${transf.data}</td>
-                                <td>${transf.observacao}</td>
-                                <td>${transf.produto}</td>
-                                <td>${transf.quantidade}</td>
-                                <td>${transf.origem || '-'}</td>
-                                <td>${transf.destino || '-'}</td>
-                                <td>${transf.usuario}</td>
-                            `;
-                            table.appendChild(row);
-                        });
-                    }
-                } catch (error) {
-                    console.error('Erro ao carregar movimentações:', error);
-                    showFlashMessage('error', 'Erro ao carregar histórico de movimentações');
-                }
-            }
-
-            // Configurar filtro de movimentações
-            document.getElementById('filterMovimentacoes').addEventListener('click', loadMovimentacoesData);
-
-            // Função para abrir modal de transferência
-            async function openTransferenciaModal(produtoId) {
-                try {
-                    const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
-                    if (response.success) {
-                        const produto = response.produto;
-                        
-                        document.getElementById('transferenciaProdutoId').value = produtoId;
-                        document.getElementById('transferenciaProdutoNome').textContent = produto.nome;
-                        
-                        // Resetar valores
-                        document.getElementById('transferenciaOrigem').value = 'loja';
-                        document.getElementById('transferenciaDestino').value = 'deposito';
-                        document.getElementById('transferenciaQuantidade').value = '';
-                        document.getElementById('transferenciaObservacao').value = '';
-                        
-                        openModal('transferenciaModal');
-                        updateEstoqueDisponivel();
-                    }
-                } catch (error) {
-                    console.error('Erro ao abrir modal de transferência:', error);
-                    showFlashMessage('error', 'Erro ao carregar dados do produto');
-                }
-            }
-
-            // Atualizar estoque disponível quando mudar a origem
-            document.getElementById('transferenciaOrigem').addEventListener('change', updateEstoqueDisponivel);
-            
-            function updateEstoqueDisponivel() {
-                const produtoId = document.getElementById('transferenciaProdutoId').value;
-                const origem = document.getElementById('transferenciaOrigem').value;
-                
-                // Buscar estoque atual do produto
-                fetchWithErrorHandling(`/admin/produtos/${produtoId}`)
-                    .then(response => {
-                        if (response.success) {
-                            const produto = response.produto;
-                            let estoque = 0;
-                            
-                            if (origem === 'loja') estoque = produto.estoque_loja;
-                            else if (origem === 'deposito') estoque = produto.estoque_deposito;
-                            else if (origem === 'fabrica') estoque = produto.estoque_fabrica;
-                            
-                            document.getElementById('transferenciaEstoqueDisponivel').textContent = 
-                                `Disponível: ${estoque} ${produto.unidade}`;
-                            
-                            // Definir valor máximo para o campo de quantidade
-                            document.getElementById('transferenciaQuantidade').max = estoque;
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Erro ao buscar estoque:', error);
-                    });
-            }
-
-            // Formulário de transferência
-            document.getElementById('transferenciaForm').addEventListener('submit', async function(e) {
-                e.preventDefault();
-                
-                const produtoId = document.getElementById('transferenciaProdutoId').value;
-                const origem = document.getElementById('transferenciaOrigem').value;
-                const destino = document.getElementById('transferenciaDestino').value;
-                const quantidade = document.getElementById('transferenciaQuantidade').value;
-                const observacao = document.getElementById('transferenciaObservacao').value;
-                
-                if (origem === destino) {
-                    showFlashMessage('error', 'Origem e destino não podem ser iguais');
-                    return;
-                }
-                
-                try {
-                    const response = await fetchWithErrorHandling('/admin/transferencias', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            produto_id: produtoId,
-                            estoque_origem: origem,
-                            estoque_destino: destino,
-                            quantidade: quantidade,
-                            observacao: observacao
-                        })
-                    });
-                    
-                    if (response.success) {
-                        showFlashMessage('success', 'Transferência realizada com sucesso');
-                        closeModal('transferenciaModal');
-                        loadProdutosData();
-                        loadMovimentacoesData();
-                    } else {
-                        showFlashMessage('error', response.message || 'Erro ao realizar transferência');
-                    }
-                } catch (error) {
-                    console.error('Erro ao realizar transferência:', error);
-                    showFlashMessage('error', 'Erro ao realizar transferência');
-                }
-            });
-
-            // Modificar setupProdutoActions para incluir o botão de transferência
-            function setupProdutoActions() {
-                document.querySelectorAll('.editar-produto').forEach(btn => {
-                    btn.addEventListener('click', async function() {
-                        const produtoId = this.getAttribute('data-id');
-                        // ... código existente ...
-                    });
-                });
-
-                document.querySelectorAll('.remover-produto').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const produtoId = this.getAttribute('data-id');
-                        // ... código existente ...
-                    });
-                });
-
-                document.querySelectorAll('.movimentar-estoque').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const produtoId = this.getAttribute('data-id');
-                        openTransferenciaModal(produtoId);
-                    });
-                });
-            }
-
-            // Atualizar a função loadProdutosData para incluir o botão de transferência
-            async function loadProdutosData() {
-                try {
-                    const searchText = document.getElementById('searchProduto').value.toLowerCase();
-                    const data = await fetchWithErrorHandling('/admin/produtos');
-                    
-                    if (data.success) {
-                        const produtosTable = document.querySelector('#produtosTable tbody');
-                        produtosTable.innerHTML = '';
-                        
-                        data.produtos.forEach(produto => {
-                            if (searchText && !produto.nome.toLowerCase().includes(searchText)) {
-                                return;
-                            }
-                            
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td>${produto.id}</td>
-                                <td>${produto.nome}</td>
-                                <td>${produto.tipo}</td>
-                                <td>${produto.unidade}</td>
-                                <td>${produto.valor}</td>
-                                <td>${produto.estoque_deposito}</td>
-                                <td>${produto.estoque_loja}</td>
-                                <td>${produto.estoque_fabrica}</td>
-                                <td>
-                                    <div class="table-actions">
-                                        <button class="btn-icon btn-info movimentar-estoque" data-id="${produto.id}" title="Transferir entre estoques">
-                                            <i class="fas fa-exchange-alt"></i>
-                                        </button>
-                                        <button class="btn-icon btn-warning editar-produto" data-id="${produto.id}" title="Editar">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="btn-icon btn-danger remover-produto" data-id="${produto.id}" title="Remover">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            `;
-                            produtosTable.appendChild(row);
-                        });
-                        
-                        setupProdutoActions();
-                    }
-                } catch (error) {
-                    console.error('Erro ao carregar produtos:', error);
-                    showFlashMessage('error', 'Erro ao carregar lista de produtos');
-                }
-            }
-
-            // Inicializar a aba de movimentações
-            if (document.querySelector('.sidebar-nav li[data-tab="estoque"].active')) {
-                loadMovimentacoesData();
-            }
-        });
-    </script>
 </body>
 </html>

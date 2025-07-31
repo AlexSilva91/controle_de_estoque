@@ -145,6 +145,12 @@ class Produto(Base):
     marca = Column(String(100), nullable=True)
     unidade = Column(Enum(UnidadeMedida), nullable=False, default=UnidadeMedida.kg)
     valor_unitario = Column(DECIMAL(10, 2), nullable=False)
+
+    # ✅ Novos campos de compra
+    valor_unitario_compra = Column(DECIMAL(10, 2), nullable=True)
+    valor_total_compra = Column(DECIMAL(12, 2), nullable=True)
+    imcs = Column(DECIMAL(5, 2), nullable=True)  # ou 6, 3 se quiser mais precisão
+
     estoque_loja = Column(DECIMAL(12, 3), nullable=False, default=0.0)
     estoque_deposito = Column(DECIMAL(12, 3), nullable=False, default=0.0)
     estoque_fabrica = Column(DECIMAL(12, 3), nullable=False, default=0.0)
