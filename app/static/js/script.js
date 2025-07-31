@@ -59,6 +59,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (tabId === 'financeiro') loadFinanceiroData();
       if (tabId === 'usuarios') loadUsuariosData();
       if (tabId === 'estoque') loadMovimentacoesData();
+      if (tabId === 'descontos') loadDescontosData();
     });
   });
 
@@ -1106,6 +1107,196 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
+  // ===== DESCONTOS =====
+  async function loadDescontosData() {
+      try {
+          const searchText = document.getElementById('searchDesconto').value.toLowerCase();
+          const data = await fetchWithErrorHandling('/admin/descontos');
+          
+          if (data.success) {
+              const descontosTable = document.querySelector('#descontosTable tbody');
+              descontosTable.innerHTML = '';
+              
+              data.descontos.forEach(desconto => {
+                  if (searchText && !desconto.produto_nome.toLowerCase().includes(searchText)) {
+                      return;
+                  }
+                  
+                  const row = document.createElement('tr');
+                  row.innerHTML = `
+                      <td>${desconto.quantidade_minima}</td>
+                      <td>${desconto.quantidade_maxima}</td>
+                      <td>${desconto.valor_unitario_com_desconto}</td>
+                      <td>${desconto.valido_ate || '-'}</td>
+                      <td><span class="badge ${desconto.ativo ? 'badge-success' : 'badge-danger'}">${desconto.ativo ? 'Ativo' : 'Inativo'}</span></td>
+                      <td>
+                          <div class="table-actions">
+                              <button class="btn-icon btn-warning editar-desconto" data-id="${desconto.id}" title="Editar">
+                                  <i class="fas fa-edit"></i>
+                              </button>
+                              <button class="btn-icon btn-danger remover-desconto" data-id="${desconto.id}" title="Remover">
+                                  <i class="fas fa-trash"></i>
+                              </button>
+                          </div>
+                      </td>
+                  `;
+                  descontosTable.appendChild(row);
+              });
+              
+              setupDescontoActions();
+          }
+      } catch (error) {
+          console.error('Erro ao carregar descontos:', error);
+          showFlashMessage('error', 'Erro ao carregar lista de descontos');
+      }
+  }
+
+  function setupDescontoActions() {
+      document.querySelectorAll('.editar-desconto').forEach(btn => {
+          btn.addEventListener('click', function() {
+              const descontoId = this.getAttribute('data-id');
+              openEditarDescontoModal(descontoId);
+          });
+      });
+
+      document.querySelectorAll('.remover-desconto').forEach(btn => {
+          btn.addEventListener('click', function() {
+              const descontoId = this.getAttribute('data-id');
+              document.getElementById('confirmarExclusaoTexto').textContent = `Tem certeza que deseja excluir este desconto?`;
+              document.getElementById('confirmarExclusaoBtn').setAttribute('data-id', descontoId);
+              document.getElementById('confirmarExclusaoBtn').setAttribute('data-type', 'desconto');
+              openModal('confirmarExclusaoModal');
+          });
+      });
+  }
+
+  // Função para limpar o valor monetário
+  function limparValor(valor) {
+      return parseFloat(valor.replace('R$', '').replace(',', '.').trim());
+  }
+
+  async function openEditarDescontoModal(descontoId) {
+      try {
+          const response = await fetchWithErrorHandling(`/admin/descontos/${descontoId}`);
+
+          if (response.success) {
+              const desconto = response.desconto;
+
+              // Preencher o formulário com os dados do desconto
+              document.getElementById('descontoId').value = desconto.id;
+              document.getElementById('descontoProdutoId').value = desconto.produto_id;
+              document.getElementById('descontoIdentificador').value = desconto.identificador;
+              document.getElementById('descontoQuantidadeMinima').value = desconto.quantidade_minima;
+              document.getElementById('descontoQuantidadeMaxima').value = desconto.quantidade_maxima;
+              document.getElementById('descontoValorUnitario').value = limparValor(desconto.valor_unitario_com_desconto);
+
+              // Tratamento da data para o formato 'YYYY-MM-DD'
+              if (desconto.valido_ate) {
+                  let dataValidoAte = desconto.valido_ate;
+
+                  // Verificar se a data tem formato com hora e minuto
+                  if (dataValidoAte.includes(' ')) {
+                      dataValidoAte = dataValidoAte.split(' ')[0]; // Pega apenas a parte 'YYYY-MM-DD'
+                  }
+
+                  // Definir o valor do input de data
+                  document.getElementById('descontoValidoAte').value = dataValidoAte;
+              } else {
+                  document.getElementById('descontoValidoAte').value = '';  // Se não houver data, limpa o campo
+              }
+
+              document.getElementById('descontoDescricao').value = desconto.descricao || '';
+              document.getElementById('descontoAtivo').value = desconto.ativo ? 'true' : 'false';
+
+              // Atualizar título do modal
+              document.getElementById('descontoModalTitle').textContent = 'Editar Desconto';
+              openModal('descontoModal');
+          } else {
+              showFlashMessage('error', response.erro || 'Erro ao carregar dados do desconto');
+          }
+      } catch (error) {
+          console.error('Erro ao carregar dados do desconto:', error);
+          showFlashMessage('error', 'Erro ao carregar dados do desconto');
+      }
+  }
+
+  // Formulário de desconto
+  document.getElementById('descontoForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const descontoId = document.getElementById('descontoId').value;
+      const isEdit = descontoId !== '';
+      
+      const formData = {
+          identificador: document.getElementById('descontoIdentificador').value,
+          quantidade_minima: document.getElementById('descontoQuantidadeMinima').value,
+          quantidade_maxima: document.getElementById('descontoQuantidadeMaxima').value,
+          valor_unitario_com_desconto: document.getElementById('descontoValorUnitario').value,
+          valido_ate: document.getElementById('descontoValidoAte').value || null,
+          descricao: document.getElementById('descontoDescricao').value,
+          ativo: document.getElementById('descontoAtivo').value === 'true'
+      };
+      
+      const url = isEdit ? `/admin/descontos/${descontoId}` : '/admin/descontos';
+      const method = isEdit ? 'PUT' : 'POST';
+      
+      try {
+          const response = await fetchWithErrorHandling(url, {
+              method: method,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(formData)
+          });
+          
+          if (response.success) {
+              showFlashMessage('success', `Desconto ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
+              closeModal('descontoModal');
+              loadDescontosData();
+          } else {
+              showFlashMessage('error', response.message || `Erro ao salvar desconto`);
+          }
+      } catch (error) {
+          console.error('Erro ao salvar desconto:', error);
+          showFlashMessage('error', 'Erro ao salvar desconto');
+      }
+  });
+
+  // Botão para adicionar novo desconto
+  document.getElementById('addDesconto').addEventListener('click', () => {
+      document.getElementById('descontoForm').reset();
+      document.getElementById('descontoId').value = '';
+      document.getElementById('descontoAtivo').value = 'true';
+      document.getElementById('descontoModalTitle').textContent = 'Cadastrar Desconto';
+      openModal('descontoModal');
+  });
+
+  // Botão para adicionar desconto a partir da visualização do produto
+  document.addEventListener('click', function(e) {
+      if (e.target && e.target.id === 'addDescontoBtn') {
+          const produtoId = e.target.getAttribute('data-produto-id');
+          document.getElementById('descontoForm').reset();
+          document.getElementById('descontoId').value = '';
+          document.getElementById('descontoProdutoId').value = produtoId;
+          document.getElementById('descontoProdutoNome').textContent = document.getElementById('visualizarProdutoNome').textContent;
+          document.getElementById('descontoAtivo').value = 'true';
+          document.getElementById('descontoModalTitle').textContent = 'Cadastrar Desconto';
+          openModal('descontoModal');
+      }
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+      const tabDescontos = document.querySelector('li[data-tab="descontos"] a');
+
+      if (tabDescontos) {
+          tabDescontos.addEventListener('click', function (event) {
+              // Se necessário, previna o comportamento padrão
+              // event.preventDefault();
+
+              // Carrega os dados de descontos
+              loadDescontosData();
+          });
+      }
+  });
+
   // ===== FUNÇÕES GERAIS =====
   // Funções auxiliares para formatar texto
   function formatPerfil(perfil) {
@@ -1118,49 +1309,54 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Confirmar exclusão
   document.getElementById('confirmarExclusaoBtn').addEventListener('click', async function() {
-    const id = this.getAttribute('data-id');
-    const type = this.getAttribute('data-type');
-    
-    try {
-      let url;
-      if (type === 'produto') {
-        url = `/admin/produtos/${id}`;
-      } else if (type === 'cliente') {
-        url = `/admin/clientes/${id}`;
-      } else if (type === 'usuario') {
-        url = `/admin/usuarios/${id}`;
-      }
+      const id = this.getAttribute('data-id');
+      const type = this.getAttribute('data-type');
       
-      const response = await fetchWithErrorHandling(url, {
-        method: 'DELETE'
-      });
-      
-      if (response.success) {
-        showFlashMessage('success', `${type.charAt(0).toUpperCase() + type.slice(1)} excluído com sucesso`);
-        closeModal('confirmarExclusaoModal');
-        
-        if (type === 'produto') loadProdutosData();
-        if (type === 'cliente') loadClientesData();
-        if (type === 'usuario') loadUsuariosData();
-      } else {
-        showFlashMessage('error', response.message || `Erro ao excluir ${type}`);
+      try {
+          let url;
+          if (type === 'produto') {
+              url = `/admin/produtos/${id}`;
+          } else if (type === 'cliente') {
+              url = `/admin/clientes/${id}`;
+          } else if (type === 'usuario') {
+              url = `/admin/usuarios/${id}`;
+          } else if (type === 'desconto') {
+              url = `/admin/descontos/${id}`;
+          }
+          
+          const response = await fetchWithErrorHandling(url, {
+              method: 'DELETE'
+          });
+          
+          if (response.success) {
+              showFlashMessage('success', `${type.charAt(0).toUpperCase() + type.slice(1)} excluído com sucesso`);
+              closeModal('confirmarExclusaoModal');
+              
+              if (type === 'produto') loadProdutosData();
+              if (type === 'cliente') loadClientesData();
+              if (type === 'usuario') loadUsuariosData();
+              if (type === 'desconto') loadDescontosData();
+          } else {
+              showFlashMessage('error', response.message || `Erro ao excluir ${type}`);
+          }
+      } catch (error) {
+          console.error(`Erro ao excluir ${type}:`, error);
+          showFlashMessage('error', `Erro ao excluir ${type}`);
       }
-    } catch (error) {
-      console.error(`Erro ao excluir ${type}:`, error);
-      showFlashMessage('error', `Erro ao excluir ${type}`);
-    }
   });
 
   // Filtros
   document.getElementById('searchCliente').addEventListener('input', loadClientesData);
   document.getElementById('searchProduto').addEventListener('input', loadProdutosData);
   document.getElementById('searchUsuario').addEventListener('input', loadUsuariosData);
+  document.getElementById('searchDesconto').addEventListener('input', loadDescontosData);
 
   // Botões de atualização
   document.getElementById('refreshData').addEventListener('click', loadDashboardData);
   document.getElementById('refreshClientes').addEventListener('click', loadClientesData);
   document.getElementById('refreshProdutos').addEventListener('click', loadProdutosData);
   document.getElementById('refreshUsuarios').addEventListener('click', loadUsuariosData);
+  document.getElementById('refreshDescontos').addEventListener('click', loadDescontosData);
   document.getElementById('filterFinanceiro').addEventListener('click', loadFinanceiroData);
 
   // Botão para adicionar novo usuário
@@ -1214,6 +1410,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tabId === 'financeiro') loadFinanceiroData();
         if (tabId === 'usuarios') loadUsuariosData();
         if (tabId === 'estoque') loadMovimentacoesData();
+        if (tabId === 'descontos') loadDescontosData();
       }
     } catch (error) {
       console.error('Erro ao carregar dados iniciais:', error);

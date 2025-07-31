@@ -492,7 +492,6 @@
                                 <table id="descontosTable">
                                     <thead>
                                         <tr>
-                                            <th>Produto</th>
                                             <th>Qtd. Mínima</th>
                                             <th>Qtd. Máxima</th>
                                             <th>Valor c/ Desc.</th>
@@ -1029,8 +1028,8 @@
                     <input type="hidden" id="descontoProdutoId">
                     <div class="modal-body">
                         <div class="form-group">
-                            <label>Produto</label>
-                            <div class="form-control-static" id="descontoProdutoNome"></div>
+                                <label for="descontoIdentificador">Identificador*</label>
+                                <input type="text" id="descontoIdentificador" class="form-control" required>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
@@ -1134,7 +1133,7 @@
                         
                         <div class="details-section">
                             <div class="section-header">
-                                <h4><i class="fas fa-percentage"></i> Descontos</h4>
+                                <h5 id="descontoModalTitle"><i class="fas fa-percentage"></i> Cadastrar Desconto</h5>
                                 <button class="btn btn-sm btn-primary" id="addDescontoBtn" data-produto-id="">
                                     <i class="fas fa-plus"></i> Adicionar Desconto
                                 </button>

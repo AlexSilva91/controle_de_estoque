@@ -185,7 +185,8 @@ class DescontoProduto(Base):
     __tablename__ = "descontos_produto"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False)
+    produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=True)
+    identificador = Column(String(50), unique=True, nullable=False)
 
     quantidade_minima = Column(DECIMAL(12, 3), nullable=False)
     quantidade_maxima = Column(DECIMAL(12, 3), nullable=False)
@@ -200,6 +201,24 @@ class DescontoProduto(Base):
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     produto = relationship("Produto", back_populates="descontos")
+
+    def __repr__(self):
+        return (
+            f"<DescontoProduto("
+            f"id={self.id}, "
+            f"produto_id={self.produto_id}, "
+            f"identificador='{self.identificador}', "
+            f"quantidade_minima={float(self.quantidade_minima):.3f}, "
+            f"quantidade_maxima={float(self.quantidade_maxima):.3f}, "
+            f"valor_unitario_com_desconto={float(self.valor_unitario_com_desconto):.2f}, "
+            f"descricao='{self.descricao}', "
+            f"valido_ate='{self.valido_ate}', "
+            f"ativo={self.ativo}, "
+            f"sincronizado={self.sincronizado}, "
+            f"criado_em='{self.criado_em}', "
+            f"atualizado_em='{self.atualizado_em}'"
+            f")>"
+        )
 
 # --------------------
 # Cliente

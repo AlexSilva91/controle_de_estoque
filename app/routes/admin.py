@@ -8,11 +8,12 @@ from sqlalchemy.exc import IntegrityError
 import traceback
 
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 from app import schemas
 from app.models import db
 from app.models import entities
 from app.crud import (
-    TipoEstoque, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, get_transferencias,
+    TipoEstoque, atualizar_desconto, buscar_descontos_por_produto, criar_desconto, deletar_desconto, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, get_transferencias,
     get_user_by_cpf, get_user_by_id, get_usuarios, create_user, registrar_transferencia, update_user,
     get_produto, get_produtos, create_produto, update_produto, delete_produto,
     registrar_movimentacao, get_cliente, get_clientes, create_cliente, 
@@ -25,6 +26,7 @@ from app.schemas import (
     UsuarioCreate, UsuarioUpdate, ProdutoCreate, ProdutoUpdate, MovimentacaoEstoqueCreate,
     ClienteCreate, ClienteUpdate, FinanceiroCreate, FinanceiroUpdate
 )
+from app.utils.format_data_moeda import formatar_data_br, formatar_valor_br
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -1061,4 +1063,181 @@ def listar_transferencias():
         return jsonify({'success': True, 'transferencias': result})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+@admin_bp.route('/descontos', methods=['POST'])
+@login_required
+@admin_required
+def criar_desconto_route():
+    dados = request.get_json()
     
+    # Validação básica dos dados
+    required_fields = ['identificador', 'quantidade_minima', 'quantidade_maxima', 'valor_unitario_com_desconto']
+    if not all(field in dados for field in required_fields):
+        return jsonify({'erro': 'Campos obrigatórios faltando'}), 400
+    
+    try:
+        session = Session(db.engine)
+        desconto = criar_desconto(session, dados)
+        return jsonify({
+            'mensagem': 'Desconto criado com sucesso',
+            'desconto': {
+                'id': desconto.id,
+                'identificador': desconto.identificador,
+                'quantidade_minima': float(desconto.quantidade_minima),
+                'quantidade_maxima': float(desconto.quantidade_maxima),
+                'valor_unitario_com_desconto': float(desconto.valor_unitario_com_desconto),
+                'valido_ate': desconto.valido_ate.isoformat() if desconto.valido_ate else None,
+                'ativo': desconto.ativo,
+                'criado_em': desconto.criado_em.isoformat()
+            }
+        }), 201
+    except Exception as e:
+        print(f"Erro ao criar desconto: {e}")
+        return jsonify({'erro': str(e)}), 500
+    finally:
+        session.close()
+
+@admin_bp.route('/descontos/produto/<int:produto_id>', methods=['GET'])
+@login_required
+def buscar_descontos_produto_route(produto_id):
+    try:
+        session = Session(db.engine)
+        descontos = buscar_descontos_por_produto(session, produto_id)
+        
+        return jsonify({
+            'success': True,
+            'descontos': [{
+                'id': d.id,
+                'produto_id': d.produto_id,
+                'produto_nome': d.produto.nome if d.produto else None,
+                'quantidade_minima': float(d.quantidade_minima),
+                'quantidade_maxima': float(d.quantidade_maxima),
+                'valor_unitario_com_desconto': float(d.valor_unitario_com_desconto),
+                'valido_ate': d.valido_ate.isoformat() if d.valido_ate else None,
+                'ativo': d.ativo,
+                'criado_em': d.criado_em.isoformat()
+            } for d in descontos]
+        }), 200
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+    finally:
+        session.close()
+
+@admin_bp.route('/descontos/<int:desconto_id>', methods=['PUT'])
+@login_required
+@admin_required
+def atualizar_desconto_route(desconto_id):
+    dados = request.get_json()
+
+    print(dados)
+    try:
+        session = Session(db.engine)
+        desconto = atualizar_desconto(session, desconto_id, dados)
+
+        if not desconto:
+            return jsonify({
+                'success': False,
+                'erro': 'Desconto não encontrado'
+            }), 404
+
+        return jsonify({
+            'success': True,
+            'mensagem': 'Desconto atualizado com sucesso',
+            'desconto': {
+                'id': desconto.id,
+                'produto_id': desconto.produto_id,
+                'quantidade_minima': float(desconto.quantidade_minima),
+                'quantidade_maxima': float(desconto.quantidade_maxima),
+                'valor_unitario_com_desconto': float(desconto.valor_unitario_com_desconto),
+                'valido_ate': desconto.valido_ate.isoformat() if desconto.valido_ate else None,
+                'ativo': desconto.ativo,
+                'atualizado_em': desconto.atualizado_em.isoformat()
+            }
+        }), 200
+    except Exception as e:
+        print(f"Erro ao atualizar desconto: {e}")
+        return jsonify({
+            'success': False,
+            'erro': 'Erro interno ao tentar atualizar o desconto. Por favor, tente novamente mais tarde.'
+        }), 500
+    finally:
+        session.close()
+
+
+@admin_bp.route('/descontos/<int:desconto_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def deletar_desconto_route(desconto_id):
+    try:
+        session = Session(db.engine)
+        sucesso = deletar_desconto(session, desconto_id)
+        
+        if not sucesso:
+            return jsonify({'erro': 'Desconto não encontrado'}), 404
+            
+        return jsonify({'mensagem': 'Desconto deletado com sucesso'}), 200
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+    finally:
+        session.close()
+
+@admin_bp.route('/descontos', methods=['GET'])
+@login_required
+def listar_descontos_route():
+    try:
+        session = Session(db.engine)
+        descontos = session.query(entities.DescontoProduto)\
+            .order_by(entities.DescontoProduto.produto_id, entities.DescontoProduto.quantidade_minima)\
+            .all()
+
+        return jsonify({
+            'success': True,
+            'descontos': [{
+                'id': d.id,
+                'produto_id': d.produto_id,
+                'produto_nome': d.produto.nome if d.produto else '',
+                'quantidade_minima': float(d.quantidade_minima),
+                'quantidade_maxima': float(d.quantidade_maxima),
+                'valor_unitario_com_desconto': formatar_valor_br(d.valor_unitario_com_desconto),
+                'valido_ate': formatar_data_br(d.valido_ate),
+                'ativo': d.ativo,
+                'criado_em': formatar_data_br(d.criado_em)
+            } for d in descontos]
+        }), 200
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+    finally:
+        session.close()
+
+
+@admin_bp.route('/descontos/<int:desconto_id>', methods=['GET'])
+@login_required
+def buscar_desconto_por_id(desconto_id):
+    try:
+        session = Session(db.engine)
+        desconto = session.query(entities.DescontoProduto).get(desconto_id)
+        
+        if not desconto:
+            return jsonify({'erro': 'Desconto não encontrado'}), 404
+        
+        # Formatar a data 'valido_ate' para 'YYYY-MM-DD' (sem hora)
+        valido_ate_formatado = desconto.valido_ate.strftime('%Y-%m-%d') if desconto.valido_ate else None
+        
+        return jsonify({
+            'success': True,
+            'desconto': {
+                'id': desconto.id,
+                'identificador': desconto.identificador,
+                'quantidade_minima': float(desconto.quantidade_minima),
+                'quantidade_maxima': float(desconto.quantidade_maxima),
+                'valor_unitario_com_desconto': formatar_valor_br(desconto.valor_unitario_com_desconto),
+                'descricao': desconto.descricao,
+                'valido_ate': valido_ate_formatado,
+                'ativo': desconto.ativo,
+                'criado_em': formatar_data_br(desconto.criado_em)
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+    finally:
+        session.close()
