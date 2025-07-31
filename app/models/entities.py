@@ -43,6 +43,7 @@ class CategoriaFinanceira(str, enum.Enum):
 class FormaPagamento(str, enum.Enum):
     pix_fabiano = "pix_fabiano"
     pix_maquineta = "pix_maquineta"
+    pix_edfrance = "pix_edfrance"
     dinheiro = "dinheiro"
     cartao_credito = "cartao_credito"
     cartao_debito = "cartao_debito"
@@ -52,6 +53,8 @@ class UnidadeMedida(str, enum.Enum):
     kg = "kg"
     saco = "saco"
     unidade = "unidade"
+    fardo = "fardo"
+    pacote = "pacote"
 
 class TipoDesconto(str, enum.Enum):
     fixo = "fixo"
