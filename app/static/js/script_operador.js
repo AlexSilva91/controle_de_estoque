@@ -445,16 +445,19 @@ function addProductToSale(product) {
     const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
     
     if (existingProductIndex >= 0) {
+        // Se o produto já existe, apenas incrementa a quantidade em 1
         selectedProducts[existingProductIndex].quantity += 1;
     } else {
+        // Adiciona o produto com quantidade inicial 1
         selectedProducts.push({
             id: product.id,
             name: product.nome,
             description: product.descricao || '',
             price: product.valor_unitario,
-            quantity: 1,
+            quantity: 1, // Quantidade padrão é 1
             unit: product.unidade,
-            stock: product.estoque_quantidade
+            stock: product.estoque_quantidade,
+            allowsFraction: product.unidade.toLowerCase() === 'kg' // Flag para produtos que permitem fração
         });
     }
     
@@ -479,9 +482,15 @@ function renderProductsList() {
             <td>${product.description}</td>
             <td>${formatCurrency(product.price)}</td>
             <td>
-                <input type="number" class="quantity-input" 
-                       value="${product.quantity}" min="1" 
-                       max="${product.stock}" data-index="${index}">
+                ${product.allowsFraction ? 
+                    `<input type="text" class="quantity-input" 
+                            value="${product.quantity.toFixed(3).replace('.', ',')}" 
+                            data-index="${index}" pattern="[0-9]+([,\.][0-9]+)?" 
+                            title="Use vírgula ou ponto para decimais">` :
+                    `<input type="number" class="quantity-input" 
+                            value="${product.quantity}" min="1" 
+                            max="${product.stock}" data-index="${index}">`
+                }
                 <small>${product.unit}</small>
             </td>
             <td class="product-total">${formatCurrency(totalValue)}</td>
@@ -493,6 +502,24 @@ function renderProductsList() {
         `;
         productsList.appendChild(row);
     });
+    
+    // Adiciona event listeners para os inputs de quantidade
+    document.querySelectorAll('.quantity-input').forEach(input => {
+        input.addEventListener('change', function(e) {
+            updateProductQuantity(e.target);
+            calculateSaleTotal();
+        });
+        
+        input.addEventListener('input', function(e) {
+            // Validação em tempo real para campos de quantidade fracionada
+            if (e.target.type === 'text') {
+                const value = e.target.value;
+                if (!/^[0-9]*([,\.][0-9]*)?$/.test(value)) {
+                    e.target.value = value.slice(0, -1);
+                }
+            }
+        });
+    });
 }
 
 /**
@@ -501,10 +528,38 @@ function renderProductsList() {
  */
 function updateProductQuantity(input) {
     const index = parseInt(input.dataset.index);
-    const newQuantity = parseInt(input.value);
+    if (isNaN(index)) return;
+
+    let newQuantity;
     
-    if (index >= 0 && index < selectedProducts.length && !isNaN(newQuantity) && newQuantity > 0) {
+    // Verifica se é um produto que permite valores fracionados (como kg)
+    const product = selectedProducts[index];
+    if (product.allowsFraction) {
+        // Converte o valor do input para número, tratando tanto vírgula quanto ponto como separador decimal
+        const value = input.value.trim().replace(',', '.');
+        newQuantity = parseFloat(value);
+
+        if (isNaN(newQuantity)) {
+            // Se não for um número válido, restaura o valor anterior
+            input.value = product.quantity.toFixed(3).replace('.', ',');
+            return;
+        }
+    } else {
+        newQuantity = parseInt(input.value);
+        if (isNaN(newQuantity)) {
+            input.value = product.quantity;
+            return;
+        }
+    }
+    
+    // Atualiza a quantidade no array de produtos selecionados
+    if (newQuantity > 0) {
         selectedProducts[index].quantity = newQuantity;
+    } else {
+        // Se a quantidade for zero ou negativa, restaura o valor anterior
+        input.value = product.allowsFraction ? 
+            product.quantity.toFixed(3).replace('.', ',') : 
+            product.quantity;
     }
 }
 
@@ -645,7 +700,6 @@ function calculateSaleTotal() {
     let total = subtotal;
     let change = 0;
     
-    // Modificado para aceitar valores com ponto ou vírgula
     const amountReceivedText = amountReceivedInput?.value.replace(/\./g, '').replace(',', '.') || '0';
     const amountReceived = parseFloat(amountReceivedText) || 0;
     
@@ -656,6 +710,16 @@ function calculateSaleTotal() {
     if (subtotalValueElement) subtotalValueElement.textContent = formatCurrency(subtotal);
     if (saleTotalElement) saleTotalElement.textContent = formatCurrency(total);
     if (changeValueElement) changeValueElement.textContent = formatCurrency(change);
+}
+
+/**
+ * Formata um número para exibição com casas decimais
+ * @param {number} num - Número a ser formatado
+ * @param {number} [decimals=3] - Número de casas decimais
+ * @returns {string} Número formatado com vírgula como separador decimal
+ */
+function formatDecimal(num, decimals = 3) {
+    return num.toFixed(decimals).replace('.', ',');
 }
 
 // Adicione esta função ao seu código

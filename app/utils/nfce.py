@@ -151,7 +151,7 @@ def gerar_nfce_pdf_bobina_bytesio(
         descricao_paragraph = Paragraph(item["descricao"], styleN_small)
         data.append([
             descricao_paragraph,
-            str(item["quantidade"]),
+            f"{item['quantidade']:.2f}",
             f"{item['valor_unitario']:.2f}",
             f"{item['valor_total']:.2f}"
         ])
