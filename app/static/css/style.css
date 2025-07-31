@@ -1022,12 +1022,13 @@ tr:hover td {
   font-size: var(--font-size-xl);
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 .close-modal:hover {
   color: var(--text-primary);
-  transform: rotate(90deg);
+  transform: translateY(-2px); 
+  box-shadow: var(--shadow-md);
 }
 
 .modal-body {
