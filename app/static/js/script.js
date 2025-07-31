@@ -451,21 +451,61 @@ document.addEventListener('DOMContentLoaded', function() {
               </div>
               <div class="form-row">
                 <div class="form-group">
-                  <label for="editUnidade">Unidade*</label>
-                  <select id="editUnidade" class="form-control" required>
-                    <option value="kg" ${produto.unidade === 'kg' ? 'selected' : ''}>kg</option>
-                    <option value="saco" ${produto.unidade === 'saco' ? 'selected' : ''}>saco</option>
-                    <option value="unidade" ${produto.unidade === 'unidade' ? 'selected' : ''}>unidade</option>
-                  </select>
+                  <label for="editUnidade">Unidade</label>
+                  <input type="text" id="editUnidade" class="form-control" value="${produto.unidade}" disabled>
                 </div>
                 <div class="form-group">
                   <label for="editValor">Valor Unitário*</label>
                   <input type="number" id="editValor" class="form-control" value="${valorUnitario}" step="0.01" min="0" required>
                 </div>
               </div>
-              <div class="form-group">
-                <label for="editEstoque">Quantidade em Estoque*</label>
-                <input type="number" id="editEstoque" class="form-control" value="${produto.estoque_loja}" step="0.001" min="0" required>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="editValorCompra">Valor Unitário de Compra</label>
+                  <input type="number" id="editValorCompra" class="form-control" value="${produto.valor_unitario_compra || ''}" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                  <label for="editValorTotalCompra">Valor Total de Compra</label>
+                  <input type="number" id="editValorTotalCompra" class="form-control" value="${produto.valor_total_compra || ''}" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                  <label for="editICMS">ICMS (%)</label>
+                  <input type="number" id="editICMS" class="form-control" value="${produto.imcs || ''}" step="0.01" min="0">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="editEstoqueLoja">Estoque Loja</label>
+                  <input type="number" id="editEstoqueLoja" class="form-control" value="${produto.estoque_loja}" step="0.001" min="0">
+                </div>
+                <div class="form-group">
+                  <label for="editEstoqueDeposito">Estoque Depósito</label>
+                  <input type="number" id="editEstoqueDeposito" class="form-control" value="${produto.estoque_deposito}" step="0.001" min="0">
+                </div>
+                <div class="form-group">
+                  <label for="editEstoqueFabrica">Estoque Fábrica</label>
+                  <input type="number" id="editEstoqueFabrica" class="form-control" value="${produto.estoque_fabrica}" step="0.001" min="0">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="editEstoqueMinimo">Estoque Mínimo</label>
+                  <input type="number" id="editEstoqueMinimo" class="form-control" value="${produto.estoque_minimo || 0}" step="0.001" min="0">
+                </div>
+                <div class="form-group">
+                  <label for="editEstoqueMaximo">Estoque Máximo</label>
+                  <input type="number" id="editEstoqueMaximo" class="form-control" value="${produto.estoque_maximo || ''}" step="0.001" min="0">
+                </div>
+                <div class="form-group">
+                  <label for="editAtivo">Ativo</label>
+                  <select id="editAtivo" class="form-control">
+                    <option value="true" ${produto.ativo ? 'selected' : ''}>Sim</option>
+                    <option value="false" ${!produto.ativo ? 'selected' : ''}>Não</option>
+                  </select>
+                </div>
               </div>
             `;
             
@@ -500,31 +540,167 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Função para abrir modal de transferência
   async function openTransferenciaModal(produtoId) {
-    try {
-      const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
-      if (response.success) {
-        const produto = response.produto;
-        
-        document.getElementById('transferenciaProdutoId').value = produtoId;
-        document.getElementById('transferenciaProdutoNome').textContent = produto.nome;
-        
-        // Resetar valores
-        document.getElementById('transferenciaOrigem').value = 'loja';
-        document.getElementById('transferenciaDestino').value = 'deposito';
-        document.getElementById('transferenciaQuantidade').value = '';
-        document.getElementById('transferenciaObservacao').value = '';
-        
-        openModal('transferenciaModal');
-        updateEstoqueDisponivel();
+      try {
+        const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
+        if (response.success) {
+          const produto = response.produto;
+          
+          document.getElementById('transferenciaProdutoId').value = produtoId;
+          document.getElementById('transferenciaProdutoNome').textContent = produto.nome;
+          document.getElementById('transferenciaUnidadeAtual').textContent = produto.unidade;
+          
+          // Resetar valores
+          document.getElementById('transferenciaOrigem').value = 'loja';
+          document.getElementById('transferenciaDestino').value = 'deposito';
+          document.getElementById('transferenciaQuantidade').value = '';
+          document.getElementById('transferenciaUnidadeDestino').value = produto.unidade;
+          document.getElementById('transferenciaPesoPorSaco').value = '50'; // Valor padrão
+          document.getElementById('transferenciaPacotesPorSaco').value = '10'; // Valor padrão
+          document.getElementById('transferenciaPacotesPorFardo').value = '5'; // Valor padrão
+          document.getElementById('transferenciaValorUnitarioDestino').value = produto.valor_unitario;
+          document.getElementById('transferenciaObservacao').value = '';
+          
+          openModal('transferenciaModal');
+          updateEstoqueDisponivel();
+          updateConversaoInfo();
+        }
+      } catch (error) {
+        console.error('Erro ao abrir modal de transferência:', error);
+        showFlashMessage('error', 'Erro ao carregar dados do produto');
       }
-    } catch (error) {
-      console.error('Erro ao abrir modal de transferência:', error);
-      showFlashMessage('error', 'Erro ao carregar dados do produto');
-    }
   }
 
-  // Atualizar estoque disponível quando mudar a origem
-  document.getElementById('transferenciaOrigem').addEventListener('change', updateEstoqueDisponivel);
+  // Atualizar informações de conversão
+  function updateConversaoInfo() {
+    const quantidade = parseFloat(document.getElementById('transferenciaQuantidade').value) || 0;
+    const unidadeOrigem = document.getElementById('transferenciaUnidadeAtual').textContent;
+    const unidadeDestino = document.getElementById('transferenciaUnidadeDestino').value;
+    
+    const pesoPorSaco = parseFloat(document.getElementById('transferenciaPesoPorSaco').value) || 50;
+    const pacotesPorSaco = parseFloat(document.getElementById('transferenciaPacotesPorSaco').value) || 10;
+    const pacotesPorFardo = parseFloat(document.getElementById('transferenciaPacotesPorFardo').value) || 5;
+    
+    const infoConversao = document.getElementById('transferenciaInfoConversao');
+    
+    if (quantidade <= 0) {
+      infoConversao.textContent = 'Informe uma quantidade válida para ver a conversão';
+      return;
+    }
+    
+    let resultado = quantidade;
+    let mensagem = `${quantidade} ${unidadeOrigem} = `;
+    
+    // Cálculos de conversão
+    if (unidadeOrigem === 'saco' && unidadeDestino === 'kg') {
+      resultado = quantidade * pesoPorSaco;
+      mensagem += `${resultado.toFixed(3)} kg (${pesoPorSaco} kg/saco)`;
+    } else if (unidadeOrigem === 'saco' && unidadeDestino === 'pacote') {
+      resultado = quantidade * pacotesPorSaco;
+      mensagem += `${resultado} pacotes (${pacotesPorSaco} pacotes/saco)`;
+    } else if (unidadeOrigem === 'kg' && unidadeDestino === 'saco') {
+      resultado = quantidade / pesoPorSaco;
+      mensagem += `${resultado.toFixed(3)} sacos (${pesoPorSaco} kg/saco)`;
+    } else if (unidadeOrigem === 'kg' && unidadeDestino === 'pacote') {
+      const kgPorPacote = pesoPorSaco / pacotesPorSaco;
+      resultado = quantidade / kgPorPacote;
+      mensagem += `${resultado.toFixed(1)} pacotes (${kgPorPacote.toFixed(3)} kg/pacote)`;
+    } else if (unidadeOrigem === 'fardo' && unidadeDestino === 'pacote') {
+      resultado = quantidade * pacotesPorFardo;
+      mensagem += `${resultado} pacotes (${pacotesPorFardo} pacotes/fardo)`;
+    } else if (unidadeOrigem === 'pacote' && unidadeDestino === 'fardo') {
+      resultado = quantidade / pacotesPorFardo;
+      mensagem += `${resultado.toFixed(2)} fardos (${pacotesPorFardo} pacotes/fardo)`;
+    } else {
+      mensagem = 'Não é necessária conversão ou conversão não suportada';
+    }
+    
+    infoConversao.textContent = mensagem;
+  }
+
+  // Formulário de transferência com conversão
+  document.getElementById('transferenciaForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const produtoId = document.getElementById('transferenciaProdutoId').value;
+    const origem = document.getElementById('transferenciaOrigem').value;
+    const destino = document.getElementById('transferenciaDestino').value;
+    const quantidade = parseFloat(document.getElementById('transferenciaQuantidade').value);
+    const unidadeDestino = document.getElementById('transferenciaUnidadeDestino').value;
+    const valorUnitarioDestino = parseFloat(document.getElementById('transferenciaValorUnitarioDestino').value);
+    const pesoPorSaco = parseFloat(document.getElementById('transferenciaPesoPorSaco').value);
+    const pacotesPorSaco = parseFloat(document.getElementById('transferenciaPacotesPorSaco').value);
+    const pacotesPorFardo = parseFloat(document.getElementById('transferenciaPacotesPorFardo').value);
+    const observacao = document.getElementById('transferenciaObservacao').value;
+    
+    // Validações
+    if (origem === destino) {
+      showFlashMessage('error', 'Origem e destino não podem ser iguais');
+      return;
+    }
+    
+    if (quantidade <= 0 || isNaN(quantidade)) {
+      showFlashMessage('error', 'Informe uma quantidade válida');
+      return;
+    }
+    
+    if (valorUnitarioDestino <= 0 || isNaN(valorUnitarioDestino)) {
+      showFlashMessage('error', 'Informe um valor unitário válido');
+      return;
+    }
+    
+    if (pesoPorSaco <= 0 || pacotesPorSaco <= 0 || pacotesPorFardo <= 0) {
+      showFlashMessage('error', 'Os valores de conversão devem ser maiores que zero');
+      return;
+    }
+    
+    try {
+      const response = await fetchWithErrorHandling('/admin/transferencias', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          produto_id: produtoId,
+          estoque_origem: origem,
+          estoque_destino: destino,
+          quantidade: quantidade,
+          unidade_destino: unidadeDestino,
+          valor_unitario_destino: valorUnitarioDestino,
+          peso_kg_por_saco: pesoPorSaco,
+          pacotes_por_saco: pacotesPorSaco,
+          pacotes_por_fardo: pacotesPorFardo,
+          observacao: observacao
+        })
+      });
+      
+      if (response.success) {
+        showFlashMessage('success', 'Transferência realizada com sucesso');
+        closeModal('transferenciaModal');
+        loadProdutosData();
+        loadMovimentacoesData();
+      } else {
+        showFlashMessage('error', response.message || 'Erro ao realizar transferência');
+      }
+    } catch (error) {
+      console.error('Erro ao realizar transferência:', error);
+      showFlashMessage('error', error.message || 'Erro ao realizar transferência');
+    }
+  });
+
+  // Event listeners para atualização em tempo real
+  document.getElementById('transferenciaQuantidade').addEventListener('input', updateConversaoInfo);
+  document.getElementById('transferenciaUnidadeDestino').addEventListener('change', updateConversaoInfo);
+  document.getElementById('transferenciaPesoPorSaco').addEventListener('input', updateConversaoInfo);
+  document.getElementById('transferenciaPacotesPorSaco').addEventListener('input', updateConversaoInfo);
+  document.getElementById('transferenciaPacotesPorFardo').addEventListener('input', updateConversaoInfo);
+
+  // Configurar botões de transferência de estoque
+  document.querySelectorAll('.movimentar-estoque').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const produtoId = this.getAttribute('data-id');
+      openTransferenciaModal(produtoId);
+    });
+  });
   
   function updateEstoqueDisponivel() {
     const produtoId = document.getElementById('transferenciaProdutoId').value;
@@ -615,6 +791,16 @@ document.addEventListener('DOMContentLoaded', function() {
       estoque_deposito: estoqueTipo === 'deposito' ? estoqueQuantidade : 0,
       estoque_fabrica: estoqueTipo === 'fabrica' ? estoqueQuantidade : 0
     };
+
+    const valorCompra = document.getElementById('produtoValorCompra').value;
+    const valorTotal = document.getElementById('produtoValorTotalCompra').value;
+    const icms = document.getElementById('produtoICMS').value;
+    const estoqueMinimo = document.getElementById('produtoEstoqueMinimo').value;
+
+    if (valorCompra) formData.valor_unitario_compra = valorCompra;
+    if (valorTotal) formData.valor_total_compra = valorTotal;
+    if (icms) formData.imcs = icms;
+    if (estoqueMinimo) formData.estoque_minimo = estoqueMinimo;
     
     try {
       const response = await fetchWithErrorHandling('/admin/produtos', {
@@ -648,9 +834,16 @@ document.addEventListener('DOMContentLoaded', function() {
       nome: document.getElementById('editNome').value,
       tipo: document.getElementById('editTipo').value,
       marca: document.getElementById('editMarca').value,
-      unidade: document.getElementById('editUnidade').value,
       valor_unitario: document.getElementById('editValor').value,
-      estoque_quantidade: document.getElementById('editEstoque').value
+      valor_unitario_compra: document.getElementById('editValorCompra').value,
+      valor_total_compra: document.getElementById('editValorTotalCompra').value,
+      imcs: document.getElementById('editICMS').value,
+      estoque_loja: document.getElementById('editEstoqueLoja').value,
+      estoque_deposito: document.getElementById('editEstoqueDeposito').value,
+      estoque_fabrica: document.getElementById('editEstoqueFabrica').value,
+      estoque_minimo: document.getElementById('editEstoqueMinimo').value,
+      estoque_maximo: document.getElementById('editEstoqueMaximo').value,
+      ativo: document.getElementById('editAtivo').value === 'true'
     };
     
     try {

@@ -12,6 +12,8 @@ from decimal import Decimal
 from enum import Enum
 from typing import List, Optional, Dict
 
+from app.utils.conversor_unidade import converter_quantidade
+
 class TipoUsuario(str, Enum):
     admin = "admin"
     operador = "operador"
@@ -297,6 +299,9 @@ def create_produto(db: Session, produto: schemas.ProdutoCreate):
         marca=produto.marca,
         unidade=produto.unidade,
         valor_unitario=produto.valor_unitario,
+        valor_unitario_compra=produto.valor_unitario_compra,
+        valor_total_compra=produto.valor_total_compra,
+        imcs=produto.imcs,
         estoque_loja=produto.estoque_loja,
         estoque_deposito=produto.estoque_deposito,
         estoque_fabrica=produto.estoque_fabrica,
@@ -315,15 +320,20 @@ def create_produto(db: Session, produto: schemas.ProdutoCreate):
         return db_produto
     except SQLAlchemyError as e:
         db.rollback()
+        print("Erro detalhado no banco:", str(e))
         raise ValueError("Erro ao criar produto no banco de dados.")
 
 def update_produto(db: Session, produto_id: int, produto_data: schemas.ProdutoUpdate):
-    produto = db.query(entities.Produto).filter(entities.Produto.id == produto_id, entities.Produto.ativo == True).first()
+    produto = db.query(entities.Produto).filter(
+        entities.Produto.id == produto_id,
+        entities.Produto.ativo == True
+    ).first()
     if not produto:
         raise ValueError("Produto não encontrado ou inativo.")
     
     update_data = produto_data.dict(exclude_unset=True)
     
+    # Validações
     if "unidade" in update_data and update_data["unidade"] not in [u.value for u in UnidadeMedida]:
         raise ValueError(f"Unidade de medida inválida. Deve ser um dos: {[u.value for u in UnidadeMedida]}")
     
@@ -342,6 +352,7 @@ def update_produto(db: Session, produto_id: int, produto_data: schemas.ProdutoUp
         return produto
     except SQLAlchemyError as e:
         db.rollback()
+        print("Erro detalhado no banco:", str(e))
         raise ValueError("Erro ao atualizar produto no banco de dados.")
 
 def delete_produto(db: Session, produto_id: int):
@@ -469,61 +480,111 @@ def get_movimentacoes(db: Session, skip: int = 0, limit: int = 100):
 
 # ===== Transferência Estoque =====
 def registrar_transferencia(db: Session, transf: dict):
-    # Verificar se o produto existe
-    produto = db.query(entities.Produto).filter(entities.Produto.id == transf['produto_id']).first()
-    if not produto:
+    produto_orig = db.query(entities.Produto).filter(entities.Produto.id == transf['produto_id']).first()
+    if not produto_orig:
         raise ValueError("Produto não encontrado")
-    
-    # Verificar se o usuário existe
+
     usuario = db.query(entities.Usuario).filter(entities.Usuario.id == transf['usuario_id']).first()
     if not usuario:
         raise ValueError("Usuário não encontrado")
-    
-    # Verificar estoque na origem
+
     estoque_origem = transf['estoque_origem']
-    quantidade = transf['quantidade']
-    
+    quantidade_origem = transf['quantidade']
+    unidade_destino = transf['unidade_destino']
+    valor_unitario_destino = transf['valor_unitario_destino']
+
+    # Fatores de conversão
+    info_produto = {
+        'peso_kg_por_saco': Decimal(str(transf.get('peso_kg_por_saco', 50))),
+        'pacotes_por_saco': Decimal(str(transf.get('pacotes_por_saco', 10))),
+        'pacotes_por_fardo': Decimal(str(transf.get('pacotes_por_fardo', 5))),
+    }
+
+    # Verificar estoque disponível
     estoque_disponivel = {
-        TipoEstoque.loja: produto.estoque_loja,
-        TipoEstoque.deposito: produto.estoque_deposito,
-        TipoEstoque.fabrica: produto.estoque_fabrica
-    }.get(estoque_origem, 0)
-    
-    if estoque_disponivel < quantidade:
+        TipoEstoque.loja: produto_orig.estoque_loja,
+        TipoEstoque.deposito: produto_orig.estoque_deposito,
+        TipoEstoque.fabrica: produto_orig.estoque_fabrica,
+    }.get(estoque_origem, Decimal('0'))
+
+    if estoque_disponivel < quantidade_origem:
         raise ValueError(f"Estoque insuficiente no {estoque_origem.value}. Disponível: {estoque_disponivel}")
-    
-    # Atualizar estoques
+
+    # Converter quantidade
+    quantidade_destino = converter_quantidade(
+        quantidade_origem, 
+        produto_orig.unidade.value, 
+        unidade_destino, 
+        info_produto
+    )
+
+    # Atualizar estoque original
     if estoque_origem == TipoEstoque.loja:
-        produto.estoque_loja -= quantidade
+        produto_orig.estoque_loja -= quantidade_origem
     elif estoque_origem == TipoEstoque.deposito:
-        produto.estoque_deposito -= quantidade
+        produto_orig.estoque_deposito -= quantidade_origem
     elif estoque_origem == TipoEstoque.fabrica:
-        produto.estoque_fabrica -= quantidade
-    
+        produto_orig.estoque_fabrica -= quantidade_origem
+
+    # Criar novo produto com a nova unidade
+    produto_novo = entities.Produto(
+        codigo=f"{produto_orig.codigo}-{unidade_destino.upper()}",
+        nome=f"{produto_orig.nome} ({unidade_destino})",
+        tipo=produto_orig.tipo,
+        marca=produto_orig.marca,
+        unidade=unidade_destino,
+        valor_unitario=valor_unitario_destino,
+        valor_unitario_compra=produto_orig.valor_unitario_compra,
+        valor_total_compra=produto_orig.valor_total_compra,
+        imcs=produto_orig.imcs,
+        estoque_loja=Decimal('0'),
+        estoque_deposito=Decimal('0'),
+        estoque_fabrica=Decimal('0'),
+        estoque_minimo=produto_orig.estoque_minimo,
+        estoque_maximo=produto_orig.estoque_maximo,
+        ativo=True,
+        criado_em=datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
+        atualizado_em=datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
+        sincronizado=False,
+        peso_kg_por_saco=info_produto['peso_kg_por_saco'],
+        pacotes_por_saco=info_produto['pacotes_por_saco'],
+        pacotes_por_fardo=info_produto['pacotes_por_fardo']
+    )
+
+    # Adicionar quantidade no estoque destino
     estoque_destino = transf['estoque_destino']
     if estoque_destino == TipoEstoque.loja:
-        produto.estoque_loja += quantidade
+        produto_novo.estoque_loja = quantidade_destino
     elif estoque_destino == TipoEstoque.deposito:
-        produto.estoque_deposito += quantidade
+        produto_novo.estoque_deposito = quantidade_destino
     elif estoque_destino == TipoEstoque.fabrica:
-        produto.estoque_fabrica += quantidade
-    
-    # Criar registro de transferência
-    db_transf = entities.TransferenciaEstoque(
-        produto_id=transf['produto_id'],
+        produto_novo.estoque_fabrica = quantidade_destino
+
+    db.add(produto_novo)
+    db.flush()
+
+    # Registrar transferência
+    transferencia = entities.TransferenciaEstoque(
+        produto_id=produto_orig.id,
+        produto_destino_id=produto_novo.id,
         usuario_id=transf['usuario_id'],
         estoque_origem=estoque_origem,
         estoque_destino=estoque_destino,
-        quantidade=quantidade,
+        quantidade=quantidade_origem,
+        quantidade_destino=quantidade_destino,
+        unidade_origem=produto_orig.unidade.value,
+        unidade_destino=unidade_destino,
+        peso_kg_por_saco=info_produto['peso_kg_por_saco'],
+        pacotes_por_saco=info_produto['pacotes_por_saco'],
+        pacotes_por_fardo=info_produto['pacotes_por_fardo'],
         observacao=transf.get('observacao', ''),
         data=datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
     )
 
-    db.add(db_transf)
+    db.add(transferencia)
     db.commit()
-    db.refresh(db_transf)
-    
-    return db_transf
+    db.refresh(transferencia)
+    return transferencia
 
 def get_transferencia_by_id(db: Session, transf_id: int):
     return db.query(entities.TransferenciaEstoque).filter(entities.TransferenciaEstoque.id == transf_id).first()

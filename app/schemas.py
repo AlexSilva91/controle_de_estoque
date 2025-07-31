@@ -153,6 +153,9 @@ class ProdutoBase(BaseModel):
     marca: Optional[str] = Field(None, max_length=100)
     unidade: UnidadeMedida = UnidadeMedida.kg
     valor_unitario: Decimal10_2
+    valor_unitario_compra: Optional[Decimal10_2] = None   # novo campo
+    valor_total_compra: Optional[Decimal12_2] = None      # novo campo
+    imcs: Optional[Decimal12_3] = None                    # novo campo
     estoque_loja: Decimal12_3 = Decimal('0.0')
     estoque_deposito: Decimal12_3 = Decimal('0.0')
     estoque_fabrica: Decimal12_3 = Decimal('0.0')
@@ -170,12 +173,16 @@ class ProdutoUpdate(BaseModel):
     marca: Optional[str] = Field(None, max_length=100)
     unidade: Optional[UnidadeMedida] = None
     valor_unitario: Optional[Decimal10_2] = None
+    valor_unitario_compra: Optional[Decimal10_2] = None   # novo campo
+    valor_total_compra: Optional[Decimal12_2] = None      # novo campo
+    imcs: Optional[Decimal12_3] = None                    # novo campo
     estoque_loja: Optional[Decimal12_3] = None
     estoque_deposito: Optional[Decimal12_3] = None
     estoque_fabrica: Optional[Decimal12_3] = None
     estoque_minimo: Optional[Decimal12_3] = None
     estoque_maximo: Optional[Decimal12_3] = None
     ativo: Optional[bool] = None
+
 
 class ProdutoRead(ProdutoBase):
     id: int

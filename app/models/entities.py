@@ -2,7 +2,7 @@ from datetime import datetime
 import enum
 from flask_login import UserMixin
 from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, Enum, ForeignKey, Text, DECIMAL,
+    Column, Integer, Numeric, String, Float, DateTime, Enum, ForeignKey, Text, DECIMAL,
     UniqueConstraint, Boolean
 )
 from sqlalchemy.orm import relationship
@@ -146,11 +146,13 @@ class Produto(Base):
     unidade = Column(Enum(UnidadeMedida), nullable=False, default=UnidadeMedida.kg)
     valor_unitario = Column(DECIMAL(10, 2), nullable=False)
 
-    # ✅ Novos campos de compra
     valor_unitario_compra = Column(DECIMAL(10, 2), nullable=True)
     valor_total_compra = Column(DECIMAL(12, 2), nullable=True)
-    imcs = Column(DECIMAL(5, 2), nullable=True)  # ou 6, 3 se quiser mais precisão
+    imcs = Column(DECIMAL(5, 2), nullable=True)
 
+    peso_kg_por_saco = Column(Numeric(10, 3), default=50.0)
+    pacotes_por_saco = Column(Integer, default=10)
+    pacotes_por_fardo = Column(Integer, default=5)
     estoque_loja = Column(DECIMAL(12, 3), nullable=False, default=0.0)
     estoque_deposito = Column(DECIMAL(12, 3), nullable=False, default=0.0)
     estoque_fabrica = Column(DECIMAL(12, 3), nullable=False, default=0.0)
@@ -163,7 +165,20 @@ class Produto(Base):
 
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="produto")
     itens_nf = relationship("NotaFiscalItem", back_populates="produto")
-    transferencias = relationship("TransferenciaEstoque", back_populates="produto")
+
+    # Relacionamento para transferências onde este produto é a origem
+    transferencias_origem = relationship(
+        "TransferenciaEstoque",
+        foreign_keys="[TransferenciaEstoque.produto_id]",
+        back_populates="produto"
+    )
+    # Relacionamento para transferências onde este produto é o destino
+    transferencias_destino = relationship(
+        "TransferenciaEstoque",
+        foreign_keys="[TransferenciaEstoque.produto_destino_id]",
+        back_populates="produto_destino"
+    )
+
 
 # --------------------
 # Cliente
@@ -223,16 +238,32 @@ class TransferenciaEstoque(Base):
     __tablename__ = "transferencias_estoque"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False)
+    produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False)  
+    produto_destino_id = Column(Integer, ForeignKey("produtos.id"), nullable=True) 
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     estoque_origem = Column(Enum(TipoEstoque), nullable=False)
     estoque_destino = Column(Enum(TipoEstoque), nullable=False)
     quantidade = Column(DECIMAL(12, 3), nullable=False)
     data = Column(DateTime, default=datetime.utcnow, nullable=False)
     observacao = Column(Text, nullable=True)
+    quantidade_destino = Column(Numeric(10, 3))
+    unidade_origem = Column(String(20))
+    unidade_destino = Column(String(20))
+    peso_kg_por_saco = Column(Numeric(10, 3))
+    pacotes_por_saco = Column(Integer)
+    pacotes_por_fardo = Column(Integer)
     sincronizado = Column(Boolean, default=False, nullable=False)
 
-    produto = relationship("Produto", back_populates="transferencias")
+    produto = relationship(
+        "Produto",
+        foreign_keys=[produto_id],
+        back_populates="transferencias_origem"
+    )
+    produto_destino = relationship(
+        "Produto",
+        foreign_keys=[produto_destino_id],
+        back_populates="transferencias_destino"
+    )
     usuario = relationship("Usuario", back_populates="transferencias")
 
 # --------------------

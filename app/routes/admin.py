@@ -387,7 +387,7 @@ def criar_produto():
     try:
         data = request.get_json()
         print("Dados recebidos:", data)
-        
+
         produto_data = ProdutoCreate(
             codigo=data.get('codigo'),
             nome=data['nome'],
@@ -395,14 +395,17 @@ def criar_produto():
             marca=data.get('marca'),
             unidade=data['unidade'],
             valor_unitario=Decimal(data['valor_unitario']),
+            valor_unitario_compra=Decimal(data.get('valor_unitario_compra', 0)),
+            valor_total_compra=Decimal(data.get('valor_total_compra', 0)),
+            imcs=Decimal(data.get('imcs', 0)),
             estoque_loja=Decimal(data.get('estoque_loja', 0)),
             estoque_deposito=Decimal(data.get('estoque_deposito', 0)),
             estoque_fabrica=Decimal(data.get('estoque_fabrica', 0)),
-            estoque_minimo=Decimal(0),  # Valor padrão
-            estoque_maximo=None,       # Valor padrão
+            estoque_minimo=Decimal(data.get('estoque_minimo', 0)),
+            estoque_maximo=None,
             ativo=True
         )
-        
+
         produto = create_produto(db.session, produto_data)
         return jsonify({
             'success': True,
@@ -412,14 +415,29 @@ def criar_produto():
                 'nome': produto.nome,
                 'tipo': produto.tipo,
                 'unidade': produto.unidade.value,
-                'valor': str(produto.valor_unitario),
+                'valor_unitario': str(produto.valor_unitario),
+                'valor_unitario_compra': str(produto.valor_unitario_compra),
+                'valor_total_compra': str(produto.valor_total_compra),
+                'imcs': str(produto.imcs),
                 'estoque_loja': str(produto.estoque_loja),
                 'estoque_deposito': str(produto.estoque_deposito),
-                'estoque_fabrica': str(produto.estoque_fabrica)
+                'estoque_fabrica': str(produto.estoque_fabrica),
+                'estoque_minimo': str(produto.estoque_minimo)
             }
         })
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
+
+
+def to_decimal_or_none(value):
+    if value is None:
+        return None
+    if isinstance(value, (int, float, Decimal)):
+        return Decimal(value)
+    value = str(value).strip()
+    if value == '':
+        return None
+    return Decimal(value)
 
 @admin_bp.route('/produtos/<int:produto_id>', methods=['PUT'])
 @login_required
@@ -427,17 +445,23 @@ def criar_produto():
 def atualizar_produto(produto_id):
     try:
         data = request.get_json()
-        produto_data = ProdutoUpdate(
-            codigo=data.get('codigo'),
-            nome=data.get('nome'),
-            tipo=data.get('tipo'),
-            marca=data.get('marca'),
-            unidade=data.get('unidade'),
-            valor_unitario=Decimal(data['valor_unitario']) if 'valor_unitario' in data else None,
-            estoque_loja=Decimal(data['estoque_quantidade']) if 'estoque_quantidade' in data else None
-        )
-        
+        print("Dados recebidos para atualização:", data)
+
+        update_fields = {}
+        for campo in ['codigo', 'nome', 'tipo', 'marca', 'unidade', 'ativo',
+                      'valor_unitario', 'valor_unitario_compra', 'valor_total_compra',
+                      'imcs', 'estoque_loja', 'estoque_deposito', 'estoque_fabrica',
+                      'estoque_minimo', 'estoque_maximo']:
+            if campo in data:
+                valor = data[campo]
+                if campo.startswith('valor_') or campo.startswith('estoque') or campo == 'imcs':
+                    valor = to_decimal_or_none(valor)
+                update_fields[campo] = valor
+
+        produto_data = ProdutoUpdate(**update_fields)
+
         produto = update_produto(db.session, produto_id, produto_data)
+
         return jsonify({
             'success': True,
             'message': 'Produto atualizado com sucesso',
@@ -446,12 +470,18 @@ def atualizar_produto(produto_id):
                 'nome': produto.nome,
                 'tipo': produto.tipo,
                 'unidade': produto.unidade.value,
-                'valor': str(produto.valor_unitario),
-                'estoque': str(produto.estoque_loja)
+                'valor_unitario': str(produto.valor_unitario),
+                'valor_unitario_compra': str(produto.valor_unitario_compra),
+                'valor_total_compra': str(produto.valor_total_compra),
+                'imcs': str(produto.imcs),
+                'estoque_loja': str(produto.estoque_loja)
             }
         })
     except Exception as e:
+        print("Erro ao atualizar produto:", e)
         return jsonify({'success': False, 'message': str(e)}), 400
+
+
 
 @admin_bp.route('/produtos/<int:produto_id>', methods=['GET'])
 @login_required
@@ -472,7 +502,14 @@ def obter_produto(produto_id):
                 'marca': produto.marca or '',
                 'unidade': produto.unidade.value,
                 'valor_unitario': str(produto.valor_unitario),
+                'valor_unitario_compra': str(produto.valor_unitario_compra or 0),
+                'valor_total_compra': str(produto.valor_total_compra or 0),
+                'imcs': str(produto.imcs or 0),
                 'estoque_loja': str(produto.estoque_loja),
+                'estoque_deposito': str(produto.estoque_deposito),
+                'estoque_fabrica': str(produto.estoque_fabrica),
+                'estoque_minimo': str(produto.estoque_minimo),
+                'estoque_maximo': str(produto.estoque_maximo or ''),
                 'ativo': produto.ativo
             }
         })
@@ -962,55 +999,65 @@ def criar_transferencia():
     try:
         data = request.get_json()
         print("Dados recebidos:", data)
+
+        required_keys = [
+            'produto_id', 'estoque_origem', 'estoque_destino', 
+            'quantidade', 'unidade_destino', 'valor_unitario_destino',
+            'peso_kg_por_saco', 'pacotes_por_saco', 'pacotes_por_fardo'
+        ]
         
-        # Validação dos dados recebidos
-        if not all(key in data for key in ['produto_id', 'estoque_origem', 'estoque_destino', 'quantidade']):
+        if not all(k in data and data[k] not in [None, ''] for k in required_keys):
             return jsonify({'success': False, 'message': 'Dados incompletos para a transferência'}), 400
-        
-        try:
-            # Converter para os tipos corretos
-            produto_id = int(data['produto_id'])
-            quantidade = Decimal(str(data['quantidade']))
-            
-            # Converter strings para enum TipoEstoque
-            estoque_origem = TipoEstoque(data['estoque_origem'])
-            estoque_destino = TipoEstoque(data['estoque_destino'])
-            
-            observacao = data.get('observacao', '')
-        except (ValueError, KeyError) as e:
-            return jsonify({'success': False, 'message': f'Dados inválidos: {str(e)}'}), 400
-        
-        # Validar quantidade
+
+        # Validações e conversões
+        produto_id = int(data['produto_id'])
+        quantidade = Decimal(str(data['quantidade']))
+        estoque_origem = TipoEstoque(data['estoque_origem'])
+        estoque_destino = TipoEstoque(data['estoque_destino'])
+        unidade_destino = data['unidade_destino']
+        valor_unitario_destino = Decimal(str(data['valor_unitario_destino']))
+        peso_kg_por_saco = Decimal(str(data['peso_kg_por_saco']))
+        pacotes_por_saco = Decimal(str(data['pacotes_por_saco']))
+        pacotes_por_fardo = Decimal(str(data['pacotes_por_fardo']))
+        observacao = data.get('observacao', '')
+
         if quantidade <= 0:
             return jsonify({'success': False, 'message': 'Quantidade deve ser maior que zero'}), 400
-        
-        # Validar estoques diferentes
         if estoque_origem == estoque_destino:
             return jsonify({'success': False, 'message': 'Estoque de origem e destino devem ser diferentes'}), 400
-        
-        # Criar objeto de transferência
+        if peso_kg_por_saco <= 0 or pacotes_por_saco <= 0 or pacotes_por_fardo <= 0:
+            return jsonify({'success': False, 'message': 'Valores de conversão devem ser maiores que zero'}), 400
+
         transferencia_data = {
             'produto_id': produto_id,
             'usuario_id': current_user.id,
             'estoque_origem': estoque_origem,
             'estoque_destino': estoque_destino,
             'quantidade': quantidade,
+            'unidade_destino': unidade_destino,
+            'valor_unitario_destino': valor_unitario_destino,
+            'peso_kg_por_saco': peso_kg_por_saco,
+            'pacotes_por_saco': pacotes_por_saco,
+            'pacotes_por_fardo': pacotes_por_fardo,
             'observacao': observacao
         }
-        
-        # Registrar transferência
+
         transferencia = registrar_transferencia(db.session, transferencia_data)
-        
+
         return jsonify({
             'success': True,
             'message': 'Transferência realizada com sucesso',
             'transferencia': {
                 'id': transferencia.id,
                 'data': transferencia.data.strftime('%d/%m/%Y %H:%M'),
-                'produto': transferencia.produto.nome,
+                'produto_origem': transferencia.produto.nome,
+                'produto_destino': transferencia.produto_destino.nome,
                 'origem': transferencia.estoque_origem.value,
                 'destino': transferencia.estoque_destino.value,
-                'quantidade': str(transferencia.quantidade)
+                'quantidade_origem': str(transferencia.quantidade),
+                'quantidade_destino': str(transferencia.quantidade_destino),
+                'unidade_origem': transferencia.unidade_origem,
+                'unidade_destino': transferencia.unidade_destino
             }
         })
     except Exception as e:
