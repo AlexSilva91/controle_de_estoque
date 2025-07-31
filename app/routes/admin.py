@@ -1000,10 +1000,10 @@ def criar_transferencia():
         data = request.get_json()
         print("Dados recebidos:", data)
 
+        # Campos obrigatórios básicos
         required_keys = [
             'produto_id', 'estoque_origem', 'estoque_destino', 
-            'quantidade', 'unidade_destino', 'valor_unitario_destino',
-            'peso_kg_por_saco', 'pacotes_por_saco', 'pacotes_por_fardo'
+            'quantidade', 'valor_unitario_destino'
         ]
         
         if not all(k in data and data[k] not in [None, ''] for k in required_keys):
@@ -1014,19 +1014,15 @@ def criar_transferencia():
         quantidade = Decimal(str(data['quantidade']))
         estoque_origem = TipoEstoque(data['estoque_origem'])
         estoque_destino = TipoEstoque(data['estoque_destino'])
-        unidade_destino = data['unidade_destino']
         valor_unitario_destino = Decimal(str(data['valor_unitario_destino']))
-        peso_kg_por_saco = Decimal(str(data['peso_kg_por_saco']))
-        pacotes_por_saco = Decimal(str(data['pacotes_por_saco']))
-        pacotes_por_fardo = Decimal(str(data['pacotes_por_fardo']))
         observacao = data.get('observacao', '')
-
+        converter_unidade = data.get('converter_unidade', False)
+        
         if quantidade <= 0:
             return jsonify({'success': False, 'message': 'Quantidade deve ser maior que zero'}), 400
+        
         if estoque_origem == estoque_destino:
             return jsonify({'success': False, 'message': 'Estoque de origem e destino devem ser diferentes'}), 400
-        if peso_kg_por_saco <= 0 or pacotes_por_saco <= 0 or pacotes_por_fardo <= 0:
-            return jsonify({'success': False, 'message': 'Valores de conversão devem ser maiores que zero'}), 400
 
         transferencia_data = {
             'produto_id': produto_id,
@@ -1034,12 +1030,9 @@ def criar_transferencia():
             'estoque_origem': estoque_origem,
             'estoque_destino': estoque_destino,
             'quantidade': quantidade,
-            'unidade_destino': unidade_destino,
             'valor_unitario_destino': valor_unitario_destino,
-            'peso_kg_por_saco': peso_kg_por_saco,
-            'pacotes_por_saco': pacotes_por_saco,
-            'pacotes_por_fardo': pacotes_por_fardo,
-            'observacao': observacao
+            'observacao': observacao,
+            'converter_unidade': converter_unidade
         }
 
         transferencia = registrar_transferencia(db.session, transferencia_data)
@@ -1050,14 +1043,11 @@ def criar_transferencia():
             'transferencia': {
                 'id': transferencia.id,
                 'data': transferencia.data.strftime('%d/%m/%Y %H:%M'),
-                'produto_origem': transferencia.produto.nome,
-                'produto_destino': transferencia.produto_destino.nome,
+                'produto': transferencia.produto.nome,
                 'origem': transferencia.estoque_origem.value,
                 'destino': transferencia.estoque_destino.value,
-                'quantidade_origem': str(transferencia.quantidade),
-                'quantidade_destino': str(transferencia.quantidade_destino),
-                'unidade_origem': transferencia.unidade_origem,
-                'unidade_destino': transferencia.unidade_destino
+                'quantidade': str(transferencia.quantidade),
+                'unidade': transferencia.unidade_origem
             }
         })
     except Exception as e:

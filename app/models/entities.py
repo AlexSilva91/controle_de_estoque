@@ -246,12 +246,15 @@ class TransferenciaEstoque(Base):
     quantidade = Column(DECIMAL(12, 3), nullable=False)
     data = Column(DateTime, default=datetime.utcnow, nullable=False)
     observacao = Column(Text, nullable=True)
-    quantidade_destino = Column(Numeric(10, 3))
-    unidade_origem = Column(String(20))
-    unidade_destino = Column(String(20))
-    peso_kg_por_saco = Column(Numeric(10, 3))
-    pacotes_por_saco = Column(Integer)
-    pacotes_por_fardo = Column(Integer)
+    
+    # Campos para conversão (opcionais)
+    quantidade_destino = Column(Numeric(10, 3), nullable=True)
+    unidade_origem = Column(String(20), nullable=True)
+    unidade_destino = Column(String(20), nullable=True)
+    peso_kg_por_saco = Column(Numeric(10, 3), nullable=True)
+    pacotes_por_saco = Column(Integer, nullable=True)
+    pacotes_por_fardo = Column(Integer, nullable=True)
+    
     sincronizado = Column(Boolean, default=False, nullable=False)
 
     produto = relationship(

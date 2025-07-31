@@ -490,16 +490,8 @@ def registrar_transferencia(db: Session, transf: dict):
 
     estoque_origem = transf['estoque_origem']
     quantidade_origem = transf['quantidade']
-    unidade_destino = transf['unidade_destino']
-    valor_unitario_destino = transf['valor_unitario_destino']
-
-    # Fatores de conversão
-    info_produto = {
-        'peso_kg_por_saco': Decimal(str(transf.get('peso_kg_por_saco', 50))),
-        'pacotes_por_saco': Decimal(str(transf.get('pacotes_por_saco', 10))),
-        'pacotes_por_fardo': Decimal(str(transf.get('pacotes_por_fardo', 5))),
-    }
-
+    converter_unidade = transf.get('converter_unidade', False)
+    
     # Verificar estoque disponível
     estoque_disponivel = {
         TipoEstoque.loja: produto_orig.estoque_loja,
@@ -510,14 +502,6 @@ def registrar_transferencia(db: Session, transf: dict):
     if estoque_disponivel < quantidade_origem:
         raise ValueError(f"Estoque insuficiente no {estoque_origem.value}. Disponível: {estoque_disponivel}")
 
-    # Converter quantidade
-    quantidade_destino = converter_quantidade(
-        quantidade_origem, 
-        produto_orig.unidade.value, 
-        unidade_destino, 
-        info_produto
-    )
-
     # Atualizar estoque original
     if estoque_origem == TipoEstoque.loja:
         produto_orig.estoque_loja -= quantidade_origem
@@ -526,57 +510,36 @@ def registrar_transferencia(db: Session, transf: dict):
     elif estoque_origem == TipoEstoque.fabrica:
         produto_orig.estoque_fabrica -= quantidade_origem
 
-    # Criar novo produto com a nova unidade
-    produto_novo = entities.Produto(
-        codigo=f"{produto_orig.codigo}-{unidade_destino.upper()}",
-        nome=f"{produto_orig.nome} ({unidade_destino})",
-        tipo=produto_orig.tipo,
-        marca=produto_orig.marca,
-        unidade=unidade_destino,
-        valor_unitario=valor_unitario_destino,
-        valor_unitario_compra=produto_orig.valor_unitario_compra,
-        valor_total_compra=produto_orig.valor_total_compra,
-        imcs=produto_orig.imcs,
-        estoque_loja=Decimal('0'),
-        estoque_deposito=Decimal('0'),
-        estoque_fabrica=Decimal('0'),
-        estoque_minimo=produto_orig.estoque_minimo,
-        estoque_maximo=produto_orig.estoque_maximo,
-        ativo=True,
-        criado_em=datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
-        atualizado_em=datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
-        sincronizado=False,
-        peso_kg_por_saco=info_produto['peso_kg_por_saco'],
-        pacotes_por_saco=info_produto['pacotes_por_saco'],
-        pacotes_por_fardo=info_produto['pacotes_por_fardo']
-    )
-
+    produto_destino = produto_orig  # Sempre o mesmo produto para transferência sem conversão
+    quantidade_destino = quantidade_origem
+    
     # Adicionar quantidade no estoque destino
     estoque_destino = transf['estoque_destino']
     if estoque_destino == TipoEstoque.loja:
-        produto_novo.estoque_loja = quantidade_destino
+        produto_destino.estoque_loja += quantidade_destino
     elif estoque_destino == TipoEstoque.deposito:
-        produto_novo.estoque_deposito = quantidade_destino
+        produto_destino.estoque_deposito += quantidade_destino
     elif estoque_destino == TipoEstoque.fabrica:
-        produto_novo.estoque_fabrica = quantidade_destino
+        produto_destino.estoque_fabrica += quantidade_destino
 
-    db.add(produto_novo)
-    db.flush()
+    # Atualizar valor unitário se fornecido
+    if 'valor_unitario_destino' in transf:
+        produto_destino.valor_unitario = Decimal(str(transf['valor_unitario_destino']))
 
     # Registrar transferência
     transferencia = entities.TransferenciaEstoque(
         produto_id=produto_orig.id,
-        produto_destino_id=produto_novo.id,
+        produto_destino_id=None,  # Sem produto destino para transferência sem conversão
         usuario_id=transf['usuario_id'],
         estoque_origem=estoque_origem,
         estoque_destino=estoque_destino,
         quantidade=quantidade_origem,
-        quantidade_destino=quantidade_destino,
+        quantidade_destino=None,  # Sem quantidade destino para transferência sem conversão
         unidade_origem=produto_orig.unidade.value,
-        unidade_destino=unidade_destino,
-        peso_kg_por_saco=info_produto['peso_kg_por_saco'],
-        pacotes_por_saco=info_produto['pacotes_por_saco'],
-        pacotes_por_fardo=info_produto['pacotes_por_fardo'],
+        unidade_destino=None,  # Sem unidade destino para transferência sem conversão
+        peso_kg_por_saco=None,
+        pacotes_por_saco=None,
+        pacotes_por_fardo=None,
         observacao=transf.get('observacao', ''),
         data=datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
     )

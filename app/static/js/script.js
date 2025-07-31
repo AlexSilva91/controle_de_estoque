@@ -541,237 +541,117 @@ document.addEventListener('DOMContentLoaded', function() {
   // Função para abrir modal de transferência
   async function openTransferenciaModal(produtoId) {
       try {
-        const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
-        if (response.success) {
-          const produto = response.produto;
-          
-          document.getElementById('transferenciaProdutoId').value = produtoId;
-          document.getElementById('transferenciaProdutoNome').textContent = produto.nome;
-          document.getElementById('transferenciaUnidadeAtual').textContent = produto.unidade;
-          
-          // Resetar valores
-          document.getElementById('transferenciaOrigem').value = 'loja';
-          document.getElementById('transferenciaDestino').value = 'deposito';
-          document.getElementById('transferenciaQuantidade').value = '';
-          document.getElementById('transferenciaUnidadeDestino').value = produto.unidade;
-          document.getElementById('transferenciaPesoPorSaco').value = '50'; // Valor padrão
-          document.getElementById('transferenciaPacotesPorSaco').value = '10'; // Valor padrão
-          document.getElementById('transferenciaPacotesPorFardo').value = '5'; // Valor padrão
-          document.getElementById('transferenciaValorUnitarioDestino').value = produto.valor_unitario;
-          document.getElementById('transferenciaObservacao').value = '';
-          
-          openModal('transferenciaModal');
-          updateEstoqueDisponivel();
-          updateConversaoInfo();
-        }
+          const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
+          if (response.success) {
+              const produto = response.produto;
+              
+              document.getElementById('transferenciaProdutoId').value = produtoId;
+              document.getElementById('transferenciaProdutoNome').textContent = produto.nome;
+              document.getElementById('transferenciaUnidadeAtual').textContent = produto.unidade;
+              
+              // Resetar valores
+              document.getElementById('transferenciaOrigem').value = 'loja';
+              document.getElementById('transferenciaDestino').value = 'deposito';
+              document.getElementById('transferenciaQuantidade').value = '';
+              document.getElementById('transferenciaValorUnitarioDestino').value = produto.valor_unitario;
+              document.getElementById('transferenciaObservacao').value = '';
+              
+              openModal('transferenciaModal');
+              updateEstoqueDisponivel();
+          }
       } catch (error) {
-        console.error('Erro ao abrir modal de transferência:', error);
-        showFlashMessage('error', 'Erro ao carregar dados do produto');
+          console.error('Erro ao abrir modal de transferência:', error);
+          showFlashMessage('error', 'Erro ao carregar dados do produto');
       }
   }
 
-  // Atualizar informações de conversão
-  function updateConversaoInfo() {
-    const quantidade = parseFloat(document.getElementById('transferenciaQuantidade').value) || 0;
-    const unidadeOrigem = document.getElementById('transferenciaUnidadeAtual').textContent;
-    const unidadeDestino = document.getElementById('transferenciaUnidadeDestino').value;
-    
-    const pesoPorSaco = parseFloat(document.getElementById('transferenciaPesoPorSaco').value) || 50;
-    const pacotesPorSaco = parseFloat(document.getElementById('transferenciaPacotesPorSaco').value) || 10;
-    const pacotesPorFardo = parseFloat(document.getElementById('transferenciaPacotesPorFardo').value) || 5;
-    
-    const infoConversao = document.getElementById('transferenciaInfoConversao');
-    
-    if (quantidade <= 0) {
-      infoConversao.textContent = 'Informe uma quantidade válida para ver a conversão';
-      return;
-    }
-    
-    let resultado = quantidade;
-    let mensagem = `${quantidade} ${unidadeOrigem} = `;
-    
-    // Cálculos de conversão
-    if (unidadeOrigem === 'saco' && unidadeDestino === 'kg') {
-      resultado = quantidade * pesoPorSaco;
-      mensagem += `${resultado.toFixed(3)} kg (${pesoPorSaco} kg/saco)`;
-    } else if (unidadeOrigem === 'saco' && unidadeDestino === 'pacote') {
-      resultado = quantidade * pacotesPorSaco;
-      mensagem += `${resultado} pacotes (${pacotesPorSaco} pacotes/saco)`;
-    } else if (unidadeOrigem === 'kg' && unidadeDestino === 'saco') {
-      resultado = quantidade / pesoPorSaco;
-      mensagem += `${resultado.toFixed(3)} sacos (${pesoPorSaco} kg/saco)`;
-    } else if (unidadeOrigem === 'kg' && unidadeDestino === 'pacote') {
-      const kgPorPacote = pesoPorSaco / pacotesPorSaco;
-      resultado = quantidade / kgPorPacote;
-      mensagem += `${resultado.toFixed(1)} pacotes (${kgPorPacote.toFixed(3)} kg/pacote)`;
-    } else if (unidadeOrigem === 'fardo' && unidadeDestino === 'pacote') {
-      resultado = quantidade * pacotesPorFardo;
-      mensagem += `${resultado} pacotes (${pacotesPorFardo} pacotes/fardo)`;
-    } else if (unidadeOrigem === 'pacote' && unidadeDestino === 'fardo') {
-      resultado = quantidade / pacotesPorFardo;
-      mensagem += `${resultado.toFixed(2)} fardos (${pacotesPorFardo} pacotes/fardo)`;
-    } else {
-      mensagem = 'Não é necessária conversão ou conversão não suportada';
-    }
-    
-    infoConversao.textContent = mensagem;
-  }
-
-  // Formulário de transferência com conversão
+  // Formulário de transferência SEM conversão
   document.getElementById('transferenciaForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const produtoId = document.getElementById('transferenciaProdutoId').value;
-    const origem = document.getElementById('transferenciaOrigem').value;
-    const destino = document.getElementById('transferenciaDestino').value;
-    const quantidade = parseFloat(document.getElementById('transferenciaQuantidade').value);
-    const unidadeDestino = document.getElementById('transferenciaUnidadeDestino').value;
-    const valorUnitarioDestino = parseFloat(document.getElementById('transferenciaValorUnitarioDestino').value);
-    const pesoPorSaco = parseFloat(document.getElementById('transferenciaPesoPorSaco').value);
-    const pacotesPorSaco = parseFloat(document.getElementById('transferenciaPacotesPorSaco').value);
-    const pacotesPorFardo = parseFloat(document.getElementById('transferenciaPacotesPorFardo').value);
-    const observacao = document.getElementById('transferenciaObservacao').value;
-    
-    // Validações
-    if (origem === destino) {
-      showFlashMessage('error', 'Origem e destino não podem ser iguais');
-      return;
-    }
-    
-    if (quantidade <= 0 || isNaN(quantidade)) {
-      showFlashMessage('error', 'Informe uma quantidade válida');
-      return;
-    }
-    
-    if (valorUnitarioDestino <= 0 || isNaN(valorUnitarioDestino)) {
-      showFlashMessage('error', 'Informe um valor unitário válido');
-      return;
-    }
-    
-    if (pesoPorSaco <= 0 || pacotesPorSaco <= 0 || pacotesPorFardo <= 0) {
-      showFlashMessage('error', 'Os valores de conversão devem ser maiores que zero');
-      return;
-    }
-    
-    try {
-      const response = await fetchWithErrorHandling('/admin/transferencias', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          produto_id: produtoId,
-          estoque_origem: origem,
-          estoque_destino: destino,
-          quantidade: quantidade,
-          unidade_destino: unidadeDestino,
-          valor_unitario_destino: valorUnitarioDestino,
-          peso_kg_por_saco: pesoPorSaco,
-          pacotes_por_saco: pacotesPorSaco,
-          pacotes_por_fardo: pacotesPorFardo,
-          observacao: observacao
-        })
-      });
+      e.preventDefault();
       
-      if (response.success) {
-        showFlashMessage('success', 'Transferência realizada com sucesso');
-        closeModal('transferenciaModal');
-        loadProdutosData();
-        loadMovimentacoesData();
-      } else {
-        showFlashMessage('error', response.message || 'Erro ao realizar transferência');
+      const produtoId = document.getElementById('transferenciaProdutoId').value;
+      const origem = document.getElementById('transferenciaOrigem').value;
+      const destino = document.getElementById('transferenciaDestino').value;
+      const quantidade = parseFloat(document.getElementById('transferenciaQuantidade').value);
+      const valorUnitarioDestino = parseFloat(document.getElementById('transferenciaValorUnitarioDestino').value);
+      const observacao = document.getElementById('transferenciaObservacao').value;
+      
+      // Validações
+      if (origem === destino) {
+          showFlashMessage('error', 'Origem e destino não podem ser iguais');
+          return;
       }
-    } catch (error) {
-      console.error('Erro ao realizar transferência:', error);
-      showFlashMessage('error', error.message || 'Erro ao realizar transferência');
-    }
+      
+      if (quantidade <= 0 || isNaN(quantidade)) {
+          showFlashMessage('error', 'Informe uma quantidade válida');
+          return;
+      }
+      
+      if (valorUnitarioDestino <= 0 || isNaN(valorUnitarioDestino)) {
+          showFlashMessage('error', 'Informe um valor unitário válido');
+          return;
+      }
+      
+      try {
+          const response = await fetchWithErrorHandling('/admin/transferencias', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                  produto_id: produtoId,
+                  estoque_origem: origem,
+                  estoque_destino: destino,
+                  quantidade: quantidade,
+                  valor_unitario_destino: valorUnitarioDestino,
+                  observacao: observacao,
+                  converter_unidade: false // Sempre false para transferência sem conversão
+              })
+          });
+          
+          if (response.success) {
+              showFlashMessage('success', 'Transferência realizada com sucesso');
+              closeModal('transferenciaModal');
+              loadProdutosData();
+              loadMovimentacoesData();
+          } else {
+              showFlashMessage('error', response.message || 'Erro ao realizar transferência');
+          }
+      } catch (error) {
+          console.error('Erro ao realizar transferência:', error);
+          showFlashMessage('error', error.message || 'Erro ao realizar transferência');
+      }
   });
 
-  // Event listeners para atualização em tempo real
-  document.getElementById('transferenciaQuantidade').addEventListener('input', updateConversaoInfo);
-  document.getElementById('transferenciaUnidadeDestino').addEventListener('change', updateConversaoInfo);
-  document.getElementById('transferenciaPesoPorSaco').addEventListener('input', updateConversaoInfo);
-  document.getElementById('transferenciaPacotesPorSaco').addEventListener('input', updateConversaoInfo);
-  document.getElementById('transferenciaPacotesPorFardo').addEventListener('input', updateConversaoInfo);
+  // Atualizar estoque disponível quando origem muda
+  document.getElementById('transferenciaOrigem').addEventListener('change', updateEstoqueDisponivel);
 
-  // Configurar botões de transferência de estoque
-  document.querySelectorAll('.movimentar-estoque').forEach(btn => {
-    btn.addEventListener('click', function() {
-      const produtoId = this.getAttribute('data-id');
-      openTransferenciaModal(produtoId);
-    });
-  });
-  
   function updateEstoqueDisponivel() {
-    const produtoId = document.getElementById('transferenciaProdutoId').value;
-    const origem = document.getElementById('transferenciaOrigem').value;
-    
-    // Buscar estoque atual do produto
-    fetchWithErrorHandling(`/admin/produtos/${produtoId}`)
-      .then(response => {
-        if (response.success) {
-          const produto = response.produto;
-          let estoque = 0;
-          
-          if (origem === 'loja') estoque = produto.estoque_loja;
-          else if (origem === 'deposito') estoque = produto.estoque_deposito;
-          else if (origem === 'fabrica') estoque = produto.estoque_fabrica;
-          
-          document.getElementById('transferenciaEstoqueDisponivel').textContent = 
-            `Disponível: ${estoque} ${produto.unidade}`;
-          
-          // Definir valor máximo para o campo de quantidade
-          document.getElementById('transferenciaQuantidade').max = estoque;
-        }
-      })
-      .catch(error => {
-        console.error('Erro ao buscar estoque:', error);
-      });
-  }
-
-  // Formulário de transferência
-  document.getElementById('transferenciaForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const produtoId = document.getElementById('transferenciaProdutoId').value;
-    const origem = document.getElementById('transferenciaOrigem').value;
-    const destino = document.getElementById('transferenciaDestino').value;
-    const quantidade = parseFloat(document.getElementById('transferenciaQuantidade').value);
-    const observacao = document.getElementById('transferenciaObservacao').value;
-    
-    if (origem === destino) {
-      showFlashMessage('error', 'Origem e destino não podem ser iguais');
-      return;
-    }
-    
-    try {
-      const response = await fetchWithErrorHandling('/admin/transferencias', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          produto_id: produtoId,
-          estoque_origem: origem,
-          estoque_destino: destino,
-          quantidade: quantidade,
-          observacao: observacao
-        })
-      });
+      const produtoId = document.getElementById('transferenciaProdutoId').value;
+      const origem = document.getElementById('transferenciaOrigem').value;
       
-      if (response.success) {
-        showFlashMessage('success', 'Transferência realizada com sucesso');
-        closeModal('transferenciaModal');
-        loadProdutosData();
-        loadMovimentacoesData();
-      } else {
-        showFlashMessage('error', response.message || 'Erro ao realizar transferência');
-      }
-    } catch (error) {
-      console.error('Erro ao realizar transferência:', error);
-      showFlashMessage('error', error.message || 'Erro ao realizar transferência');
-    }
-  });
+      // Buscar estoque atual do produto
+      fetchWithErrorHandling(`/admin/produtos/${produtoId}`)
+          .then(response => {
+              if (response.success) {
+                  const produto = response.produto;
+                  let estoque = 0;
+                  
+                  if (origem === 'loja') estoque = produto.estoque_loja;
+                  else if (origem === 'deposito') estoque = produto.estoque_deposito;
+                  else if (origem === 'fabrica') estoque = produto.estoque_fabrica;
+                  
+                  document.getElementById('transferenciaEstoqueDisponivel').textContent = 
+                      `Disponível: ${estoque} ${produto.unidade}`;
+                  
+                  // Definir valor máximo para o campo de quantidade
+                  document.getElementById('transferenciaQuantidade').max = estoque;
+              }
+          })
+          .catch(error => {
+              console.error('Erro ao buscar estoque:', error);
+          });
+  }
 
   // Formulário de produto
   document.getElementById('produtoForm').addEventListener('submit', async function(e) {
@@ -829,22 +709,22 @@ document.addEventListener('DOMContentLoaded', function() {
     e.preventDefault();
     
     const produtoId = this.getAttribute('data-produto-id');
-    const formData = {
-      codigo: document.getElementById('editCodigo').value,
-      nome: document.getElementById('editNome').value,
-      tipo: document.getElementById('editTipo').value,
-      marca: document.getElementById('editMarca').value,
-      valor_unitario: document.getElementById('editValor').value,
-      valor_unitario_compra: document.getElementById('editValorCompra').value,
-      valor_total_compra: document.getElementById('editValorTotalCompra').value,
-      imcs: document.getElementById('editICMS').value,
-      estoque_loja: document.getElementById('editEstoqueLoja').value,
-      estoque_deposito: document.getElementById('editEstoqueDeposito').value,
-      estoque_fabrica: document.getElementById('editEstoqueFabrica').value,
-      estoque_minimo: document.getElementById('editEstoqueMinimo').value,
-      estoque_maximo: document.getElementById('editEstoqueMaximo').value,
-      ativo: document.getElementById('editAtivo').value === 'true'
-    };
+  const formData = {
+    codigo: document.getElementById('editCodigo').value,
+    nome: document.getElementById('editNome').value,
+    tipo: document.getElementById('editTipo').value,
+    marca: document.getElementById('editMarca').value,
+    valor_unitario: document.getElementById('editValor').value,
+    valor_unitario_compra: document.getElementById('editValorCompra').value,
+    valor_total_compra: document.getElementById('editValorTotalCompra').value,
+    imcs: document.getElementById('editICMS').value,
+    estoque_loja: document.getElementById('editEstoqueLoja').value,
+    estoque_deposito: document.getElementById('editEstoqueDeposito').value,
+    estoque_fabrica: document.getElementById('editEstoqueFabrica').value,
+    estoque_minimo: document.getElementById('editEstoqueMinimo').value,
+    estoque_maximo: document.getElementById('editEstoqueMaximo').value,
+    ativo: document.getElementById('editAtivo').value === 'true'
+  };
     
     try {
       const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`, {
