@@ -550,8 +550,12 @@ async function registerSale() {
     }
     
     const notes = document.getElementById('sale-notes')?.value;
-    const amountReceived = parseFloat(amountReceivedInput?.value) || 0;
-    const totalText = saleTotalElement?.textContent.replace('R$ ', '').replace('.', '').replace(',', '.');
+    
+    // Modificado para aceitar valores com ponto ou vírgula
+    const amountReceivedText = amountReceivedInput?.value.replace(/\./g, '').replace(',', '.') || '0';
+    const amountReceived = parseFloat(amountReceivedText) || 0;
+    
+    const totalText = saleTotalElement?.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
     const total = parseFloat(totalText) || 0;
     
     if (paymentMethod !== 'a_prazo' && amountReceived < total) {
@@ -620,6 +624,7 @@ async function registerSale() {
 
 /**
  * Calcula o total da venda com base nos produtos selecionados
+ * Modificado para aceitar valores com ponto ou vírgula
  */
 function calculateSaleTotal() {
     let subtotal = 0;
@@ -639,7 +644,10 @@ function calculateSaleTotal() {
     
     let total = subtotal;
     let change = 0;
-    const amountReceived = parseFloat(amountReceivedInput?.value) || 0;
+    
+    // Modificado para aceitar valores com ponto ou vírgula
+    const amountReceivedText = amountReceivedInput?.value.replace(/\./g, '').replace(',', '.') || '0';
+    const amountReceived = parseFloat(amountReceivedText) || 0;
     
     if (amountReceived > 0) {
         change = Math.max(0, amountReceived - total);
@@ -648,6 +656,45 @@ function calculateSaleTotal() {
     if (subtotalValueElement) subtotalValueElement.textContent = formatCurrency(subtotal);
     if (saleTotalElement) saleTotalElement.textContent = formatCurrency(total);
     if (changeValueElement) changeValueElement.textContent = formatCurrency(change);
+}
+
+// Adicione esta função ao seu código
+function formatCurrencyInput(input) {
+    // Remove tudo que não é número, ponto ou vírgula
+    let value = input.value.replace(/[^\d,.]/g, '');
+    
+    // Substitui vírgula por ponto se houver mais de um separador
+    const separators = value.match(/[,.]/g);
+    if (separators && separators.length > 1) {
+        value = value.replace(/[,.]/g, (m, i) => (i === value.lastIndexOf('.') || i === value.lastIndexOf(',')) ? m : '');
+    }
+    
+    // Garante que há apenas um separador decimal
+    value = value.replace(/([,.])(?=.*\1)/g, '');
+    
+    // Substitui vírgula por ponto para cálculo
+    const numericValue = value.replace(',', '.');
+    
+    // Atualiza o valor formatado no input
+    input.value = value;
+    
+    return numericValue;
+}
+
+// Adicione este event listener no setupEventListeners()
+if (amountReceivedInput) {
+    amountReceivedInput.addEventListener('input', function(e) {
+        // Formata o valor enquanto digita
+        const numericValue = formatCurrencyInput(e.target);
+        
+        // Força o cálculo do total
+        if (!isNaN(parseFloat(numericValue))) {
+            calculateSaleTotal();
+        }
+    });
+    
+    // Mantenha o listener original para o cálculo do total
+    amountReceivedInput.addEventListener('change', calculateSaleTotal);
 }
 
 /**
