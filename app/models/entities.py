@@ -169,6 +169,7 @@ class Desconto(Base):
     )
 
     def __repr__(self):
+        qtd_maxima = f"{float(self.quantidade_maxima):.3f}" if self.quantidade_maxima is not None else "None"
         return (
             f"<Desconto("
             f"id={self.id}, "
@@ -176,7 +177,7 @@ class Desconto(Base):
             f"tipo='{self.tipo.value}', "
             f"valor={float(self.valor):.2f}, "
             f"quantidade_minima={float(self.quantidade_minima):.3f}, "
-            f"quantidade_maxima={float(self.quantidade_maxima):.3f if self.quantidade_maxima else None}, "
+            f"quantidade_maxima={qtd_maxima}, "
             f"descricao='{self.descricao}', "
             f"valido_ate='{self.valido_ate}', "
             f"ativo={self.ativo}, "
