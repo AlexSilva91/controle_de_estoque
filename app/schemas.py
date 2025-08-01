@@ -144,6 +144,43 @@ class CaixaRead(CaixaBase):
         from_attributes = True
 
 # --------------------
+# Desconto
+# --------------------
+class DescontoBase(BaseModel):
+    identificador: str = Field(..., max_length=50)
+    descricao: Optional[str] = Field(None, max_length=255)
+    tipo: TipoDesconto
+    valor: Decimal10_2
+    quantidade_minima: Decimal12_3
+    quantidade_maxima: Optional[Decimal12_3] = None
+    valido_ate: Optional[datetime] = None
+    ativo: bool = True
+
+class DescontoCreate(DescontoBase):
+    produtos_ids: Optional[List[int]] = None
+
+class DescontoUpdate(BaseModel):
+    identificador: Optional[str] = Field(None, max_length=50)
+    descricao: Optional[str] = Field(None, max_length=255)
+    tipo: Optional[TipoDesconto] = None
+    valor: Optional[Decimal10_2] = None
+    quantidade_minima: Optional[Decimal12_3] = None
+    quantidade_maxima: Optional[Decimal12_3] = None
+    valido_ate: Optional[datetime] = None
+    ativo: Optional[bool] = None
+    produtos_ids: Optional[List[int]] = None
+
+class DescontoRead(DescontoBase):
+    id: int
+    criado_em: datetime
+    atualizado_em: datetime
+    sincronizado: bool = False
+    produtos: List["ProdutoRead"] = []
+
+    class Config:
+        from_attributes = True
+
+# --------------------
 # Produto
 # --------------------
 class ProdutoBase(BaseModel):
@@ -153,9 +190,12 @@ class ProdutoBase(BaseModel):
     marca: Optional[str] = Field(None, max_length=100)
     unidade: UnidadeMedida = UnidadeMedida.kg
     valor_unitario: Decimal10_2
-    valor_unitario_compra: Optional[Decimal10_2] = None   # novo campo
-    valor_total_compra: Optional[Decimal12_2] = None      # novo campo
-    imcs: Optional[Decimal12_3] = None                    # novo campo
+    valor_unitario_compra: Optional[Decimal10_2] = None
+    valor_total_compra: Optional[Decimal12_2] = None
+    imcs: Optional[Decimal12_3] = None
+    peso_kg_por_saco: Decimal = Decimal('50.0')
+    pacotes_por_saco: int = 10
+    pacotes_por_fardo: int = 5
     estoque_loja: Decimal12_3 = Decimal('0.0')
     estoque_deposito: Decimal12_3 = Decimal('0.0')
     estoque_fabrica: Decimal12_3 = Decimal('0.0')
@@ -164,7 +204,7 @@ class ProdutoBase(BaseModel):
     ativo: bool = True
 
 class ProdutoCreate(ProdutoBase):
-    pass
+    descontos_ids: Optional[List[int]] = None
 
 class ProdutoUpdate(BaseModel):
     codigo: Optional[str] = Field(None, max_length=50)
@@ -173,22 +213,26 @@ class ProdutoUpdate(BaseModel):
     marca: Optional[str] = Field(None, max_length=100)
     unidade: Optional[UnidadeMedida] = None
     valor_unitario: Optional[Decimal10_2] = None
-    valor_unitario_compra: Optional[Decimal10_2] = None   # novo campo
-    valor_total_compra: Optional[Decimal12_2] = None      # novo campo
-    imcs: Optional[Decimal12_3] = None                    # novo campo
+    valor_unitario_compra: Optional[Decimal10_2] = None
+    valor_total_compra: Optional[Decimal12_2] = None
+    imcs: Optional[Decimal12_3] = None
+    peso_kg_por_saco: Optional[Decimal] = None
+    pacotes_por_saco: Optional[int] = None
+    pacotes_por_fardo: Optional[int] = None
     estoque_loja: Optional[Decimal12_3] = None
     estoque_deposito: Optional[Decimal12_3] = None
     estoque_fabrica: Optional[Decimal12_3] = None
     estoque_minimo: Optional[Decimal12_3] = None
     estoque_maximo: Optional[Decimal12_3] = None
     ativo: Optional[bool] = None
-
+    descontos_ids: Optional[List[int]] = None
 
 class ProdutoRead(ProdutoBase):
     id: int
     criado_em: datetime
     atualizado_em: datetime
     sincronizado: bool = False
+    descontos: List[DescontoRead] = []
 
     class Config:
         from_attributes = True
@@ -251,6 +295,10 @@ class MovimentacaoEstoqueRead(MovimentacaoEstoqueBase):
     id: int
     data: datetime
     sincronizado: bool = False
+    produto: Optional[ProdutoRead] = None
+    usuario: Optional[UsuarioRead] = None
+    cliente: Optional[ClienteRead] = None
+    caixa: Optional[CaixaRead] = None
 
     class Config:
         from_attributes = True
@@ -260,11 +308,18 @@ class MovimentacaoEstoqueRead(MovimentacaoEstoqueBase):
 # --------------------
 class TransferenciaEstoqueBase(BaseModel):
     produto_id: int
+    produto_destino_id: Optional[int] = None
     usuario_id: int
     estoque_origem: TipoEstoque
     estoque_destino: TipoEstoque
     quantidade: Decimal12_3
     observacao: Optional[str] = None
+    quantidade_destino: Optional[Decimal12_3] = None
+    unidade_origem: Optional[str] = Field(None, max_length=20)
+    unidade_destino: Optional[str] = Field(None, max_length=20)
+    peso_kg_por_saco: Optional[Decimal] = None
+    pacotes_por_saco: Optional[int] = None
+    pacotes_por_fardo: Optional[int] = None
 
 class TransferenciaEstoqueCreate(TransferenciaEstoqueBase):
     pass
@@ -273,12 +328,15 @@ class TransferenciaEstoqueRead(TransferenciaEstoqueBase):
     id: int
     data: datetime
     sincronizado: bool = False
+    produto: Optional[ProdutoRead] = None
+    produto_destino: Optional[ProdutoRead] = None
+    usuario: Optional[UsuarioRead] = None
 
     class Config:
         from_attributes = True
 
 # --------------------
-# Nota Fiscal
+# Nota Fiscal Item
 # --------------------
 class NotaFiscalItemBase(BaseModel):
     produto_id: int
@@ -295,10 +353,14 @@ class NotaFiscalItemCreate(NotaFiscalItemBase):
 class NotaFiscalItemRead(NotaFiscalItemBase):
     id: int
     sincronizado: bool = False
+    produto: Optional[ProdutoRead] = None
 
     class Config:
         from_attributes = True
 
+# --------------------
+# Nota Fiscal
+# --------------------
 class NotaFiscalBase(BaseModel):
     cliente_id: Optional[int] = None
     operador_id: int
@@ -322,7 +384,11 @@ class NotaFiscalCreate(NotaFiscalBase):
 class NotaFiscalRead(NotaFiscalBase):
     id: int
     sincronizado: bool = False
-    itens: List[NotaFiscalItemRead]
+    itens: List[NotaFiscalItemRead] = []
+    cliente: Optional[ClienteRead] = None
+    operador: Optional[UsuarioRead] = None
+    caixa: Optional[CaixaRead] = None
+    entrega: Optional[EntregaRead] = None
 
     class Config:
         from_attributes = True
@@ -347,6 +413,9 @@ class ContaReceberCreate(ContaReceberBase):
 class ContaReceberRead(ContaReceberBase):
     id: int
     sincronizado: bool = False
+    cliente: Optional[ClienteRead] = None
+    nota_fiscal: Optional[NotaFiscalRead] = None
+    pagamentos: List["PagamentoContaReceberRead"] = []
 
     class Config:
         from_attributes = True
@@ -368,6 +437,8 @@ class PagamentoContaReceberRead(PagamentoContaReceberBase):
     id: int
     data_pagamento: datetime
     sincronizado: bool = False
+    conta: Optional[ContaReceberRead] = None
+    caixa: Optional[CaixaRead] = None
 
     class Config:
         from_attributes = True
@@ -381,7 +452,7 @@ class FinanceiroBase(BaseModel):
     valor: Decimal12_2
     valor_desconto: Decimal12_2 = Decimal('0.00')
     descricao: Optional[str] = None
-    data: Optional[datetime] = None 
+    data: Optional[datetime] = None
     nota_fiscal_id: Optional[int] = None
     cliente_id: Optional[int] = None
     caixa_id: Optional[int] = None
@@ -405,10 +476,21 @@ class FinanceiroRead(FinanceiroBase):
     id: int
     data: datetime
     sincronizado: bool = False
+    nota_fiscal: Optional[NotaFiscalRead] = None
+    cliente: Optional[ClienteRead] = None
+    caixa: Optional[CaixaRead] = None
+    conta_receber: Optional[ContaReceberRead] = None
 
     class Config:
         from_attributes = True
 
-# Update forward references
-# NotaFiscalCreate.update_forward_refs()
-# NotaFiscalRead.update_forward_refs()
+# Resolver referências circulares
+ProdutoRead.update_forward_refs()
+DescontoRead.update_forward_refs()
+ContaReceberRead.update_forward_refs()
+PagamentoContaReceberRead.update_forward_refs()
+NotaFiscalRead.update_forward_refs()
+NotaFiscalItemRead.update_forward_refs()
+MovimentacaoEstoqueRead.update_forward_refs()
+TransferenciaEstoqueRead.update_forward_refs()
+FinanceiroRead.update_forward_refs()
