@@ -1343,37 +1343,55 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
 '''
     Secção de descontos de produtos
 '''
-# CRIAR desconto
+# CRIAR desconto (com lista de produto_ids)
 def criar_desconto(session: Session, dados: dict) -> entities.Desconto:
+    produto_ids = dados.pop('produto_ids', [])
     desconto = entities.Desconto(**dados)
+
+    if produto_ids:
+        produtos = session.query(entities.Produto).filter(entities.Produto.id.in_(produto_ids)).all()
+        desconto.produtos.extend(produtos)
+
     session.add(desconto)
     session.commit()
     session.refresh(desconto)
     return desconto
 
+
 # BUSCAR descontos por produto_id
 def buscar_descontos_por_produto(session: Session, produto_id: int) -> list[entities.Desconto]:
-    return session.query(entities.Desconto)\
-        .filter(entities.Desconto.produto_id == produto_id)\
-        .order_by(entities.Desconto.quantidade_minima.asc())\
+    return (
+        session.query(entities.Desconto)
+        .join(entities.Desconto.produtos)
+        .filter(entities.Produto.id == produto_id)
+        .order_by(entities.Desconto.quantidade_minima.asc())
         .all()
+    )
 
-# ATUALIZAR desconto
+
+# ATUALIZAR desconto (inclusive produtos vinculados)
 def atualizar_desconto(session: Session, desconto_id: int, novos_dados: dict) -> entities.Desconto | None:
     desconto = session.query(entities.Desconto).get(desconto_id)
     if not desconto:
         return None
+
+    produto_ids = novos_dados.pop('produto_ids', None)
+
     for chave, valor in novos_dados.items():
         setattr(desconto, chave, valor)
-    desconto.atualizado_em = datetime.utcnow()
+
+    if produto_ids is not None:
+        produtos = session.query(entities.Produto).filter(entities.Produto.id.in_(produto_ids)).all()
+        desconto.produtos = produtos 
+
     session.commit()
     session.refresh(desconto)
     return desconto
 
+
 # DELETAR desconto
 def deletar_desconto(session: Session, desconto_id: int) -> bool:
     desconto = session.query(entities.Desconto).get(desconto_id)
-
     if not desconto:
         return False
     session.delete(desconto)

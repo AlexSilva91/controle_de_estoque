@@ -1070,14 +1070,26 @@ def listar_transferencias():
 def criar_desconto_route():
     dados = request.get_json()
     
-    # Validação básica dos dados
+    # Validação básica dos dados - mantendo os nomes das variáveis originais
     required_fields = ['identificador', 'quantidade_minima', 'quantidade_maxima', 'valor_unitario_com_desconto']
     if not all(field in dados for field in required_fields):
         return jsonify({'erro': 'Campos obrigatórios faltando'}), 400
     
     try:
         session = Session(db.engine)
-        desconto = criar_desconto(session, dados)
+        # Mapeando os campos mantendo os nomes das variáveis originais
+        dados_desconto = {
+            'identificador': dados['identificador'],
+            'quantidade_minima': dados['quantidade_minima'],
+            'quantidade_maxima': dados.get('quantidade_maxima'),
+            'valor': dados['valor_unitario_com_desconto'],  # Mapeando para o campo 'valor' do modelo
+            'tipo': entities.TipoDesconto.fixo,  # Definindo como fixo para manter compatibilidade
+            'descricao': dados.get('descricao', ''),
+            'valido_ate': dados.get('valido_ate'),
+            'ativo': dados.get('ativo', True)
+        }
+        
+        desconto = criar_desconto(session, dados_desconto)
         return jsonify({
             'success': True,
             'mensagem': 'Desconto criado com sucesso',
@@ -1086,7 +1098,7 @@ def criar_desconto_route():
                 'identificador': desconto.identificador,
                 'quantidade_minima': float(desconto.quantidade_minima),
                 'quantidade_maxima': float(desconto.quantidade_maxima),
-                'valor_unitario_com_desconto': float(desconto.valor_unitario_com_desconto),
+                'valor_unitario_com_desconto': float(desconto.valor),  # Retornando o valor como valor_unitario_com_desconto
                 'valido_ate': desconto.valido_ate.isoformat() if desconto.valido_ate else None,
                 'ativo': desconto.ativo,
                 'criado_em': desconto.criado_em.isoformat()
@@ -1109,11 +1121,11 @@ def buscar_descontos_produto_route(produto_id):
             'success': True,
             'descontos': [{
                 'id': d.id,
-                'produto_id': d.produto_id,
+                'produto_id': produto_id,  # Mantendo o nome do parâmetro
                 'produto_nome': d.produto.nome if d.produto else None,
                 'quantidade_minima': float(d.quantidade_minima),
                 'quantidade_maxima': float(d.quantidade_maxima),
-                'valor_unitario_com_desconto': float(d.valor_unitario_com_desconto),
+                'valor_unitario_com_desconto': float(d.valor),  # Mapeando valor para valor_unitario_com_desconto
                 'valido_ate': d.valido_ate.isoformat() if d.valido_ate else None,
                 'ativo': d.ativo,
                 'criado_em': d.criado_em.isoformat()
@@ -1132,7 +1144,18 @@ def atualizar_desconto_route(desconto_id):
 
     try:
         session = Session(db.engine)
-        desconto = atualizar_desconto(session, desconto_id, dados)
+        # Mapeando os campos mantendo os nomes das variáveis originais
+        dados_atualizacao = {
+            'identificador': dados.get('identificador'),
+            'quantidade_minima': dados.get('quantidade_minima'),
+            'quantidade_maxima': dados.get('quantidade_maxima'),
+            'valor': dados.get('valor_unitario_com_desconto'),  # Mapeando para o campo 'valor' do modelo
+            'descricao': dados.get('descricao'),
+            'valido_ate': dados.get('valido_ate'),
+            'ativo': dados.get('ativo')
+        }
+        
+        desconto = atualizar_desconto(session, desconto_id, dados_atualizacao)
 
         if not desconto:
             return jsonify({
@@ -1145,12 +1168,11 @@ def atualizar_desconto_route(desconto_id):
             'mensagem': 'Desconto atualizado com sucesso',
             'desconto': {
                 'id': desconto.id,
-                'produto_id': desconto.produto_id,
-                'identificador': desconto.identificador if desconto.identificador else '-',
-                'descricao': desconto.descricao if desconto.descricao else '-',
+                'identificador': desconto.identificador,
+                'descricao': desconto.descricao,
                 'quantidade_minima': float(desconto.quantidade_minima),
                 'quantidade_maxima': float(desconto.quantidade_maxima),
-                'valor_unitario_com_desconto': float(desconto.valor_unitario_com_desconto),
+                'valor_unitario_com_desconto': float(desconto.valor),  # Mapeando valor para valor_unitario_com_desconto
                 'valido_ate': desconto.valido_ate.isoformat() if desconto.valido_ate else None,
                 'ativo': desconto.ativo,
                 'atualizado_em': desconto.atualizado_em.isoformat()
@@ -1164,7 +1186,6 @@ def atualizar_desconto_route(desconto_id):
         }), 500
     finally:
         session.close()
-
 
 @admin_bp.route('/descontos/<int:desconto_id>', methods=['DELETE'])
 @login_required
@@ -1200,19 +1221,18 @@ def listar_descontos_route():
     try:
         session = Session(db.engine)
         descontos = session.query(entities.Desconto)\
-            .order_by(entities.Desconto.produto_id, entities.Desconto.quantidade_minima)\
+            .order_by(entities.Desconto.identificador)\
             .all()
 
         return jsonify({
             'success': True,
             'descontos': [{
                 'id': d.id,
-                'produto_id': d.produto_id,
-                'identificador': d.identificador if d.identificador else '-',
-                'descricao': d.descricao if d.descricao else '-',
+                'identificador': d.identificador,
+                'descricao': d.descricao,
                 'quantidade_minima': float(d.quantidade_minima),
                 'quantidade_maxima': float(d.quantidade_maxima),
-                'valor_unitario_com_desconto': formatar_valor_br(d.valor_unitario_com_desconto),
+                'valor_unitario_com_desconto': formatar_valor_br(d.valor),  # Mapeando valor para valor_unitario_com_desconto
                 'valido_ate': formatar_data_br(d.valido_ate) if d.valido_ate else '-',
                 'ativo': d.ativo,
                 'criado_em': formatar_data_br(d.criado_em)
@@ -1222,7 +1242,6 @@ def listar_descontos_route():
         return jsonify({'erro': str(e)}), 500
     finally:
         session.close()
-
 
 @admin_bp.route('/descontos/<int:desconto_id>', methods=['GET'])
 @login_required
@@ -1234,7 +1253,6 @@ def buscar_desconto_por_id(desconto_id):
         if not desconto:
             return jsonify({'erro': 'Desconto não encontrado'}), 404
         
-        # Formatar a data 'valido_ate' para 'YYYY-MM-DD' (sem hora)
         valido_ate_formatado = desconto.valido_ate.strftime('%Y-%m-%d') if desconto.valido_ate else None
         
         return jsonify({
@@ -1244,7 +1262,7 @@ def buscar_desconto_por_id(desconto_id):
                 'identificador': desconto.identificador,
                 'quantidade_minima': float(desconto.quantidade_minima),
                 'quantidade_maxima': float(desconto.quantidade_maxima),
-                'valor_unitario_com_desconto': formatar_valor_br(desconto.valor_unitario_com_desconto),
+                'valor_unitario_com_desconto': formatar_valor_br(desconto.valor),  # Mapeando valor para valor_unitario_com_desconto
                 'descricao': desconto.descricao,
                 'valido_ate': valido_ate_formatado,
                 'ativo': desconto.ativo,
