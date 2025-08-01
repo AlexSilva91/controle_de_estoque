@@ -425,9 +425,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // Tratamento seguro para valor_unitario
             let valorUnitario = produto.valor_unitario;
             if (typeof valorUnitario === 'string') {
-              // Remove formatação de moeda se existir
               valorUnitario = valorUnitario.replace(/[^\d,.-]/g, '').replace(',', '.');
             }
+            
+            // Obter descontos atuais do produto
+            const descontosAtuais = produto.descontos || [];
+            const descontosAtuaisIds = descontosAtuais.map(d => d.id);
             
             formBody.innerHTML = `
               <div class="form-row">
@@ -508,9 +511,56 @@ document.addEventListener('DOMContentLoaded', function() {
                   </select>
                 </div>
               </div>
+
+              <div class="form-row">
+                <div class="form-group" style="width: 100%;">
+                  <label>Descontos Aplicados</label>
+                  <div id="descontosContainer" class="descontos-container">
+                    ${descontosAtuais.map(desconto => `
+                      <div class="desconto-item" data-id="${desconto.id}">
+                        <span>${desconto.identificador} - 
+                        ${desconto.tipo === 'fixo' ? `R$ ${desconto.valor}` : `${desconto.valor}%`} - 
+                        Mín: ${desconto.quantidade_minima}${desconto.quantidade_maxima ? `, Máx: ${desconto.quantidade_maxima}` : ''}</span>
+                        <button type="button" class="btn-icon btn-danger btn-remover-desconto">
+                          <i class="fas fa-times"></i>
+                        </button>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group" style="width: 100%;">
+                  <label for="selecionarDesconto">Adicionar Desconto</label>
+                  <div class="desconto-select-container">
+                    <select id="selecionarDesconto" class="form-control">
+                      <option value="">Selecione um desconto...</option>
+                      ${data.descontos
+                        .filter(d => !descontosAtuaisIds.includes(d.id))
+                        .map(desconto => `
+                          <option value="${desconto.id}" 
+                                  data-quantidade-minima="${desconto.quantidade_minima}"
+                                  data-quantidade-maxima="${desconto.quantidade_maxima || ''}"
+                                  data-valor="${desconto.valor}"
+                                  data-tipo="${desconto.tipo}"
+                                  data-identificador="${desconto.identificador}">
+                            ${desconto.identificador} - 
+                            ${desconto.tipo === 'fixo' ? `R$ ${desconto.valor}` : `${desconto.valor}%`} - 
+                            Mín: ${desconto.quantidade_minima}${desconto.quantidade_maxima ? `, Máx: ${desconto.quantidade_maxima}` : ''}
+                          </option>
+                        `).join('')}
+                    </select>
+                    <button type="button" id="btnAdicionarDesconto" class="btn btn-primary">
+                      <i class="fas fa-plus"></i> Adicionar
+                    </button>
+                  </div>
+                </div>
+              </div>
             `;
             
             document.getElementById('editarProdutoForm').setAttribute('data-produto-id', produtoId);
+            setupDescontoEvents();
             openModal('editarProdutoModal');
           }
         } catch (error) {
@@ -530,11 +580,62 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
 
-    // Configurar botões de transferência de estoque
     document.querySelectorAll('.movimentar-estoque').forEach(btn => {
       btn.addEventListener('click', function() {
         const produtoId = this.getAttribute('data-id');
         openTransferenciaModal(produtoId);
+      });
+    });
+  }
+
+  function setupDescontoEvents() {
+    // Adicionar desconto
+    document.getElementById('btnAdicionarDesconto').addEventListener('click', function() {
+      const select = document.getElementById('selecionarDesconto');
+      const selectedOption = select.options[select.selectedIndex];
+      
+      if (!selectedOption.value) {
+        showFlashMessage('warning', 'Selecione um desconto para adicionar');
+        return;
+      }
+      
+      const descontoId = selectedOption.value;
+      const container = document.getElementById('descontosContainer');
+      
+      // Verificar se o desconto já foi adicionado
+      if (document.querySelector(`.desconto-item[data-id="${descontoId}"]`)) {
+        showFlashMessage('warning', 'Este desconto já foi adicionado');
+        return;
+      }
+      
+      // Criar novo item de desconto
+      const item = document.createElement('div');
+      item.className = 'desconto-item';
+      item.dataset.id = descontoId;
+      item.innerHTML = `
+        <span>${selectedOption.dataset.identificador} - 
+        ${selectedOption.dataset.tipo === 'fixo' ? `R$ ${selectedOption.dataset.valor}` : `${selectedOption.dataset.valor}%`} - 
+        Mín: ${selectedOption.dataset.quantidadeMinima}${selectedOption.dataset.quantidadeMaxima ? `, Máx: ${selectedOption.dataset.quantidadeMaxima}` : ''}</span>
+        <button type="button" class="btn-icon btn-danger btn-remover-desconto">
+          <i class="fas fa-times"></i>
+        </button>
+      `;
+      
+      container.appendChild(item);
+      
+      // Resetar seleção
+      select.value = '';
+      
+      // Adicionar evento de remoção
+      item.querySelector('.btn-remover-desconto').addEventListener('click', function() {
+        item.remove();
+      });
+    });
+    
+    // Remover descontos existentes
+    document.querySelectorAll('.btn-remover-desconto').forEach(btn => {
+      btn.addEventListener('click', function() {
+        this.closest('.desconto-item').remove();
       });
     });
   }
@@ -606,7 +707,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   quantidade: quantidade,
                   valor_unitario_destino: valorUnitarioDestino,
                   observacao: observacao,
-                  converter_unidade: false // Sempre false para transferência sem conversão
+                  converter_unidade: false
               })
           });
           
@@ -631,7 +732,6 @@ document.addEventListener('DOMContentLoaded', function() {
       const produtoId = document.getElementById('transferenciaProdutoId').value;
       const origem = document.getElementById('transferenciaOrigem').value;
       
-      // Buscar estoque atual do produto
       fetchWithErrorHandling(`/admin/produtos/${produtoId}`)
           .then(response => {
               if (response.success) {
@@ -645,7 +745,6 @@ document.addEventListener('DOMContentLoaded', function() {
                   document.getElementById('transferenciaEstoqueDisponivel').textContent = 
                       `Disponível: ${estoque} ${produto.unidade}`;
                   
-                  // Definir valor máximo para o campo de quantidade
                   document.getElementById('transferenciaQuantidade').max = estoque;
               }
           })
@@ -710,22 +809,30 @@ document.addEventListener('DOMContentLoaded', function() {
     e.preventDefault();
     
     const produtoId = this.getAttribute('data-produto-id');
-  const formData = {
-    codigo: document.getElementById('editCodigo').value,
-    nome: document.getElementById('editNome').value,
-    tipo: document.getElementById('editTipo').value,
-    marca: document.getElementById('editMarca').value,
-    valor_unitario: document.getElementById('editValor').value,
-    valor_unitario_compra: document.getElementById('editValorCompra').value,
-    valor_total_compra: document.getElementById('editValorTotalCompra').value,
-    imcs: document.getElementById('editICMS').value,
-    estoque_loja: document.getElementById('editEstoqueLoja').value,
-    estoque_deposito: document.getElementById('editEstoqueDeposito').value,
-    estoque_fabrica: document.getElementById('editEstoqueFabrica').value,
-    estoque_minimo: document.getElementById('editEstoqueMinimo').value,
-    estoque_maximo: document.getElementById('editEstoqueMaximo').value,
-    ativo: document.getElementById('editAtivo').value === 'true'
-  };
+    
+    // Coletar descontos selecionados
+    const descontos = [];
+    document.querySelectorAll('#descontosContainer .desconto-item').forEach(item => {
+      descontos.push(item.dataset.id);
+    });
+    
+    const formData = {
+      codigo: document.getElementById('editCodigo').value,
+      nome: document.getElementById('editNome').value,
+      tipo: document.getElementById('editTipo').value,
+      marca: document.getElementById('editMarca').value,
+      valor_unitario: document.getElementById('editValor').value,
+      valor_unitario_compra: document.getElementById('editValorCompra').value,
+      valor_total_compra: document.getElementById('editValorTotalCompra').value,
+      imcs: document.getElementById('editICMS').value,
+      estoque_loja: document.getElementById('editEstoqueLoja').value,
+      estoque_deposito: document.getElementById('editEstoqueDeposito').value,
+      estoque_fabrica: document.getElementById('editEstoqueFabrica').value,
+      estoque_minimo: document.getElementById('editEstoqueMinimo').value,
+      estoque_maximo: document.getElementById('editEstoqueMaximo').value,
+      ativo: document.getElementById('editAtivo').value === 'true',
+      descontos: descontos
+    };
     
     try {
       const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`, {
@@ -749,6 +856,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
+  // Inicialização
+  document.addEventListener('DOMContentLoaded', function() {
+    loadProdutosData();
+    
+    // Adicionar evento de busca
+    document.getElementById('searchProduto').addEventListener('input', loadProdutosData);
+    
+    // Adicionar evento para abrir modal de novo produto
+    document.getElementById('btnNovoProduto').addEventListener('click', function() {
+      openModal('produtoModal');
+    });
+  });
   // ===== MOVIMENTAÇÕES =====
   // Carregar dados de movimentações
   async function loadMovimentacoesData() {

@@ -13,7 +13,7 @@ from app import schemas
 from app.models import db
 from app.models import entities
 from app.crud import (
-    TipoEstoque, atualizar_desconto, buscar_descontos_por_produto, criar_desconto, deletar_desconto, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, get_transferencias,
+    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto, buscar_todos_os_descontos, criar_desconto, deletar_desconto, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, get_transferencias,
     get_user_by_cpf, get_user_by_id, get_usuarios, create_user, registrar_transferencia, update_user,
     get_produto, get_produtos, create_produto, update_produto, delete_produto,
     registrar_movimentacao, get_cliente, get_clientes, create_cliente, 
@@ -445,12 +445,18 @@ def to_decimal_or_none(value):
 def atualizar_produto(produto_id):
     try:
         data = request.get_json()
+        print("Payload recebido:", data)
 
+        produto = get_produto(db.session, produto_id)
+        if not produto:
+            return jsonify({'success': False, 'message': 'Produto não encontrado'}), 404
+
+        # Atualizar campos básicos
         update_fields = {}
         for campo in ['codigo', 'nome', 'tipo', 'marca', 'unidade', 'ativo',
-                      'valor_unitario', 'valor_unitario_compra', 'valor_total_compra',
-                      'imcs', 'estoque_loja', 'estoque_deposito', 'estoque_fabrica',
-                      'estoque_minimo', 'estoque_maximo']:
+                     'valor_unitario', 'valor_unitario_compra', 'valor_total_compra',
+                     'imcs', 'estoque_loja', 'estoque_deposito', 'estoque_fabrica',
+                     'estoque_minimo', 'estoque_maximo']:
             if campo in data:
                 valor = data[campo]
                 if campo.startswith('valor_') or campo.startswith('estoque') or campo == 'imcs':
@@ -458,37 +464,94 @@ def atualizar_produto(produto_id):
                 update_fields[campo] = valor
 
         produto_data = ProdutoUpdate(**update_fields)
-
         produto = update_produto(db.session, produto_id, produto_data)
+
+        # Atualizar descontos
+        try:
+            produto.descontos = []
+            db.session.flush()
+
+            if 'descontos' in data and isinstance(data['descontos'], (list, tuple)):
+                desconto_ids = [int(id) for id in data['descontos']] if data['descontos'] else []
+            elif 'desconto_id' in data and data['desconto_id']:
+                desconto_ids = [int(data['desconto_id'])]
+            else:
+                desconto_ids = []
+
+            for desconto_id in desconto_ids:
+                desconto = buscar_desconto_by_id(db.session, desconto_id)
+                if not desconto:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Desconto com ID {desconto_id} não encontrado'
+                    }), 400
+                produto.descontos.append(desconto)
+
+            db.session.commit()
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'message': f'Erro ao atualizar descontos: {str(e)}'
+            }), 400
+
+        # Serializar resposta
+        descontos_serializados = [{
+            "id": d.id,
+            "identificador": d.identificador,
+            "valor": float(d.valor),
+            "quantidade_minima": float(d.quantidade_minima),
+            "tipo": d.tipo.name
+        } for d in produto.descontos]
 
         return jsonify({
             'success': True,
             'message': 'Produto atualizado com sucesso',
             'produto': {
                 'id': produto.id,
+                'codigo': produto.codigo or '',
                 'nome': produto.nome,
                 'tipo': produto.tipo,
                 'unidade': produto.unidade.value,
                 'valor_unitario': str(produto.valor_unitario),
-                'valor_unitario_compra': str(produto.valor_unitario_compra),
-                'valor_total_compra': str(produto.valor_total_compra),
-                'imcs': str(produto.imcs),
-                'estoque_loja': str(produto.estoque_loja)
-            }
+                'estoque_loja': f"{float(produto.estoque_loja or 0):.2f}",
+                'ativo': produto.ativo
+            },
+            'descontos': descontos_serializados
         })
+
     except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
-
-
-
+        
 @admin_bp.route('/produtos/<int:produto_id>', methods=['GET'])
 @login_required
 @admin_required
 def obter_produto(produto_id):
     try:
         produto = get_produto(db.session, produto_id)
+        descontos = buscar_todos_os_descontos(db.session)
+
         if not produto:
             return jsonify({'success': False, 'message': 'Produto não encontrado'}), 404
+
+        descontos_serializados = []
+        for d in descontos:
+            descontos_serializados.append({
+                "id": d.id,
+                "identificador": d.identificador,
+                "descricao": d.descricao,
+                "tipo": d.tipo.name if d.tipo else None,
+                "valor": float(d.valor),
+                "quantidade_minima": float(d.quantidade_minima),
+                "quantidade_maxima": float(d.quantidade_maxima) if d.quantidade_maxima is not None else None,
+                "valido_ate": d.valido_ate.isoformat() if d.valido_ate else None,
+                "ativo": d.ativo,
+                "criado_em": d.criado_em.isoformat(),
+                "atualizado_em": d.atualizado_em.isoformat(),
+                "sincronizado": d.sincronizado,
+            })
 
         return jsonify({
             'success': True,
@@ -509,10 +572,13 @@ def obter_produto(produto_id):
                 'estoque_minimo': f"{float(produto.estoque_minimo or 0):.2f}",
                 'estoque_maximo': f"{float(produto.estoque_maximo or 0):.2f}",
                 'ativo': produto.ativo
-            }
+            },
+            'descontos': descontos_serializados
         })
+
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
 
 @admin_bp.route('/produtos/<int:produto_id>', methods=['DELETE'])
 @login_required

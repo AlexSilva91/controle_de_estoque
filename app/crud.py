@@ -1368,6 +1368,24 @@ def buscar_descontos_por_produto(session: Session, produto_id: int) -> list[enti
         .all()
     )
 
+def buscar_desconto_by_id(session: Session, desconto_id: int) -> entities.Desconto | None:
+    """
+    Busca um desconto pelo ID.
+    
+    :param session: Sessão ativa do banco de dados.
+    :param desconto_id: ID do desconto a ser buscado.
+    :return: Objeto Desconto se encontrado, senão None.
+    """
+    return session.query(entities.Desconto).filter_by(id=desconto_id).first()
+
+def buscar_todos_os_descontos(session: Session):
+    """
+    Retorna todos os descontos cadastrados no banco de dados.
+    
+    :param session: Sessão ativa do SQLAlchemy.
+    :return: Lista de objetos Desconto.
+    """
+    return session.query(entities.Desconto).all()
 
 # ATUALIZAR desconto (inclusive produtos vinculados)
 def atualizar_desconto(session: Session, desconto_id: int, novos_dados: dict) -> entities.Desconto | None:
