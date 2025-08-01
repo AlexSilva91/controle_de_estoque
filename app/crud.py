@@ -369,6 +369,36 @@ def delete_produto(db: Session, produto_id: int):
         db.rollback()
         raise ValueError("Erro ao desativar produto no banco de dados.")
 
+def buscar_detalhes_produto(db: Session, produto_id: int):
+    try:
+        produto = db.get(entities.Produto, produto_id)
+
+        if not produto:
+            return None
+
+        return {
+            'id': produto.id,
+            'nome': produto.nome,
+            'codigo': produto.codigo,
+            'preco_unitario': round(float(produto.valor_unitario), 2),
+            'estoque_atual': round(float(produto.estoque_loja), 2),
+            'created_at': produto.criado_em.isoformat() if produto.criado_em else None,
+            'updated_at': produto.atualizado_em.isoformat() if produto.atualizado_em else None,
+            'ativo': produto.ativo,
+            'descontos': [
+                {
+                    'id': d.id,
+                    'identificador': d.identificador,
+                    'quantidade_minima': round(d.quantidade_minima, 2),
+                    'quantidade_maxima': round(d.quantidade_maxima, 2),
+                    'valor_desconto': round(float(d.valor), 2)
+                }
+                for d in produto.descontos
+            ]
+        }
+    finally:
+        db.close()
+        
 # ===== Movimentação Estoque =====
 def registrar_movimentacao(db: Session, mov: schemas.MovimentacaoEstoqueCreate):
     if mov.quantidade <= 0:
@@ -1167,7 +1197,6 @@ def delete_lancamento_financeiro(db: Session, lancamento_id: int) -> bool:
 # ===== Vendas =====
 def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_id: int):
     try:
-
         # Verificação dos campos obrigatórios básicos da venda
         if 'cliente_id' not in dados:
             raise ValueError('Campo obrigatório faltando: cliente_id')
@@ -1178,12 +1207,12 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
 
         # Processamento do endereço de entrega (com tratamento para campos nulos)
         entrega = None
-        if dados.get("entrega"):
-            entrega_data = dados["entrega"]
+        if dados.get("endereco_entrega"):
+            entrega_data = dados["endereco_entrega"]
             
             # Cria o objeto de entrega apenas se algum campo foi preenchido
             if any(v for k, v in entrega_data.items() if v):
-                entrega = entities.Entrega(
+                entrega = entities.Entregas.Entrega(
                     logradouro=entrega_data.get("logradouro") or "",
                     numero=entrega_data.get("numero") or "",
                     complemento=entrega_data.get("complemento") or "",
@@ -1212,10 +1241,12 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
             produto_id = item["produto_id"]
             quantidade = Decimal(str(item["quantidade"]))
             valor_unitario = Decimal(str(item["valor_unitario"]))
-            
-            # Correção da sintaxe aqui - parênteses balanceados
             valor_total_item = Decimal(str(item.get("valor_total", float(valor_unitario) * float(quantidade))))
-
+            
+            # Calcula desconto por item
+            valor_sem_desconto = valor_unitario * quantidade
+            desconto_item = valor_sem_desconto - valor_total_item
+            
             produto = db.query(entities.Produto).filter(
                 entities.Produto.id == produto_id
             ).with_for_update().one_or_none()
@@ -1228,11 +1259,12 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
             produtos_para_atualizar[produto_id] = {
                 "produto": produto,
                 "quantidade": quantidade,
-                "estoque_origem": estoque_origem
+                "estoque_origem": estoque_origem,
+                "desconto_aplicado": desconto_item
             }
 
             valor_total += valor_total_item
-            valor_desconto_total += (valor_unitario * quantidade) - valor_total_item
+            valor_desconto_total += desconto_item
 
         valor_recebido = Decimal(str(dados.get("valor_recebido", 0)))
         troco = max(valor_recebido - valor_total, Decimal("0.00"))
@@ -1246,7 +1278,7 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
             entrega_id=entrega.id if entrega else None,
             valor_total=valor_total,
             valor_desconto=valor_desconto_total,
-            tipo_desconto=TipoDesconto.fixo,
+            tipo_desconto=TipoDesconto.fixo if valor_desconto_total > 0 else None,
             status=StatusNota.emitida,
             observacao=dados.get("observacao", ""),
             forma_pagamento=dados["forma_pagamento"],
@@ -1278,10 +1310,10 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
                 produto_id=produto_id,
                 estoque_origem=produto_info["estoque_origem"],
                 quantidade=produto_info["quantidade"],
-                valor_unitario=valor_unitario,
+                valor_unitario=Decimal(str(item["valor_unitario"])),
                 valor_total=Decimal(str(item.get("valor_total", float(item["valor_unitario"]) * float(produto_info["quantidade"])))),
-                desconto_aplicado=Decimal(str(item.get("desconto_aplicado", 0))),
-                tipo_desconto=item.get("tipo_desconto"),
+                desconto_aplicado=produto_info["desconto_aplicado"],
+                tipo_desconto=TipoDesconto.fixo if produto_info["desconto_aplicado"] > 0 else None,
                 sincronizado=False,
             )
             db.add(nota_item)
@@ -1295,7 +1327,7 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
                 tipo=TipoMovimentacao.saida,
                 estoque_origem=produto_info["estoque_origem"],
                 quantidade=produto_info["quantidade"],
-                valor_unitario=valor_unitario,
+                valor_unitario=Decimal(str(item["valor_unitario"])),
                 valor_recebido=valor_recebido,
                 troco=troco,
                 forma_pagamento=dados["forma_pagamento"],
@@ -1337,7 +1369,6 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
 
     except Exception as e:
         db.rollback()
-        import traceback
         raise
     
 '''

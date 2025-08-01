@@ -1,7 +1,8 @@
+import base64
 from functools import wraps
 import re
 import threading
-from flask import Blueprint, render_template, request, jsonify, current_app as app
+from flask import Blueprint, json, render_template, request, jsonify, current_app as app
 from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from sqlalchemy.exc import SQLAlchemyError
@@ -11,6 +12,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 from app.bot.bot_movimentacao import enviar_resumo_movimentacao_diaria
 from flask import send_file
+from app.utils import preparar_dados_nota
 from app.utils.converter_endereco import parse_endereco_string
 from app.utils.nfce import gerar_nfce_pdf_bobina_bytesio
 from app.models import entities
@@ -202,12 +204,12 @@ def api_get_produto(produto_id):
 @login_required
 @operador_required
 def api_registrar_venda():
-    """Endpoint para registrar vendas"""
     try:
         if not request.is_json:
             return jsonify({'error': 'Content-Type deve ser application/json'}), 400
 
         data = request.get_json(force=True, silent=True)
+        print(f"PAYLOAD: \n\n{data}\n\n")
         if data is None:
             return jsonify({'error': 'Dados JSON inválidos'}), 400
 
@@ -220,17 +222,6 @@ def api_registrar_venda():
 
         if not isinstance(data['itens'], list) or len(data['itens']) == 0:
             return jsonify({'error': 'Lista de itens inválida'}), 400
-
-        # Processa o endereço de entrega se existir
-        if 'endereco_entrega' in data:
-            entrega = data['endereco_entrega']
-            
-            # Se for string, converte para objeto estruturado
-            if isinstance(entrega, str):
-                data['entrega'] = parse_endereco_string(entrega)
-            else:
-                # Se já for objeto, apenas atribui sem validação obrigatória
-                data['entrega'] = entrega
 
         # Valida itens da venda
         for i, item in enumerate(data['itens']):
@@ -257,9 +248,26 @@ def api_registrar_venda():
         if not caixa:
             return jsonify({'error': 'Nenhum caixa aberto encontrado para este operador'}), 400
 
+        # Prepara os dados da nota com descontos
+        dados_nota = preparar_dados_nota(data, db.session)
+
         # Processa a venda
-        nota_id = registrar_venda_completa(db.session, data, operador_id=current_user.id, caixa_id=caixa.id)
-        return jsonify({'mensagem': 'Venda registrada com sucesso', 'nota_id': nota_id}), 201
+        nota_id = registrar_venda_completa(db.session, dados_nota, operador_id=current_user.id, caixa_id=caixa.id)
+        
+        # Gera o PDF da NFC-e
+        pdf_bytesio = gerar_nfce_pdf_bobina_bytesio(
+            dados_nota=dados_nota,
+            nome_operador=current_user.nome,
+            nome_cliente=data.get('nome_cliente', ''),
+            endereco_entrega=data.get('endereco_entrega'),
+            logo_path=None
+        )
+
+        return jsonify({
+            'mensagem': 'Venda registrada com sucesso',
+            'nota_id': nota_id,
+            'pdf_base64': base64.b64encode(pdf_bytesio.getvalue()).decode('utf-8')
+        }), 201
 
     except ValueError as e:
         db.session.rollback()
@@ -562,3 +570,54 @@ def registrar_despesa():
     except Exception as e:
         db.session.rollback()
         return jsonify({"erro": str(e)}), 500
+    
+@operador_bp.route('/api/produtos/<int:produto_id>/descontos', methods=['GET'])
+@login_required
+@operador_required
+def api_get_produto_descontos(produto_id):
+    try:
+        # Busca o produto
+        produto = db.session.query(entities.Produto).get(produto_id)
+        if not produto:
+            return jsonify({'error': 'Produto não encontrado'}), 404
+        
+        # Busca todos os descontos associados a este produto
+        descontos = db.session.query(entities.Desconto)\
+            .join(entities.produto_desconto_association)\
+            .filter(entities.produto_desconto_association.c.produto_id == produto_id)\
+            .all()
+        
+        # Filtra os descontos ativos e dentro da validade
+        hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).replace(tzinfo=None)  # Remove timezone para comparação
+        descontos_validos = []
+        
+        for desconto in descontos:
+            # Verifica se o desconto está ativo
+            if not desconto.ativo:
+                continue
+                
+            # Verifica a data limite (se existir)
+            if desconto.valido_ate:
+                # Remove timezone da data do desconto se existir
+                valido_ate = desconto.valido_ate.replace(tzinfo=None) if desconto.valido_ate.tzinfo else desconto.valido_ate
+                if valido_ate < hoje:
+                    continue  # Desconto expirado
+                
+            # Adiciona à lista de descontos válidos
+            descontos_validos.append({
+                'id': desconto.id,
+                'identificador': desconto.identificador,
+                'tipo': desconto.tipo.value,
+                'valor': float(desconto.valor),
+                'quantidade_minima': float(desconto.quantidade_minima),
+                'quantidade_maxima': float(desconto.quantidade_maxima) if desconto.quantidade_maxima else None,
+                'descricao': desconto.descricao,
+                'valido_ate': desconto.valido_ate.isoformat() if desconto.valido_ate else None,
+                'ativo': desconto.ativo
+            })
+        
+        return jsonify(descontos_validos)
+        
+    except Exception as e:
+        app.logger.error(f"Erro ao buscar descontos do produto {produto_id}: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Erro interno ao buscar descontos'}), 500

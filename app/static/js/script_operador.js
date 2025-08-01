@@ -439,25 +439,29 @@ function displayProductSearchResults(products) {
  * Adiciona um produto à lista de venda
  * @param {Object} product - Produto a ser adicionado
  */
-function addProductToSale(product) {
+async function addProductToSale(product, initialQuantity = 1) {
     if (!product) return;
     
     const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
     
     if (existingProductIndex >= 0) {
-        // Se o produto já existe, apenas incrementa a quantidade em 1
         selectedProducts[existingProductIndex].quantity += 1;
     } else {
-        // Adiciona o produto com quantidade inicial 1
+        const { finalPrice, discountApplied, discountInfo } = await checkAndApplyDiscounts(product, initialQuantity);
+        
         selectedProducts.push({
             id: product.id,
             name: product.nome,
             description: product.descricao || '',
-            price: product.valor_unitario,
-            quantity: 1, // Quantidade padrão é 1
+            valor_unitario: product.valor_unitario, // Adiciona o valor unitário original
+            price: finalPrice, // Preço pode ter desconto aplicado
+            originalPrice: product.valor_unitario, // Guarda o preço original
+            quantity: initialQuantity,
             unit: product.unidade,
             stock: product.estoque_quantidade,
-            allowsFraction: product.unidade.toLowerCase() === 'kg' // Flag para produtos que permitem fração
+            allowsFraction: product.unidade.toLowerCase() === 'kg',
+            hasDiscount: discountApplied,
+            discountInfo: discountInfo || null
         });
     }
     
@@ -465,6 +469,71 @@ function addProductToSale(product) {
     calculateSaleTotal();
 }
 
+/**
+ * Verifica e aplica descontos ao produto selecionado
+ * @param {Object} product - Produto selecionado
+ * @param {number} quantity - Quantidade do produto
+ * @returns {Object} Objeto com valor unitário após desconto e flag indicando se desconto foi aplicado
+ */
+async function checkAndApplyDiscounts(product, quantity) {
+    try {
+        // Busca descontos ativos para o produto
+        const response = await fetch(`/operador/api/produtos/${product.id}/descontos?timestamp=${new Date().getTime()}`, {
+            ...preventCacheConfig,
+            method: 'GET'
+        });
+        
+        if (!response.ok) return { 
+            finalPrice: product.price, 
+            discountApplied: false 
+        };
+
+        const discounts = await response.json();
+        
+        // Verifica cada desconto disponível
+        for (const discount of discounts) {
+            // Verifica se o desconto está ativo
+            if (!discount.ativo) continue;
+            
+            // Verifica a data limite (se existir)
+            if (discount.valido_ate) {
+                const validUntil = new Date(discount.valido_ate);
+                const today = new Date();
+                if (today > validUntil) continue;
+            }
+            
+            // Verifica a quantidade mínima e máxima
+            if (quantity < discount.quantidade_minima) continue;
+            if (discount.quantidade_maxima && quantity > discount.quantidade_maxima) continue;
+            
+            // Aplica o desconto conforme o tipo
+            if (discount.tipo === 'fixo') {
+                return {
+                    finalPrice: product.price - discount.valor,
+                    discountApplied: true,
+                    discountInfo: discount
+                };
+            } else if (discount.tipo === 'percentual') {
+                return {
+                    finalPrice: product.price * (1 - (discount.valor / 100)),
+                    discountApplied: true,
+                    discountInfo: discount
+                };
+            }
+        }
+        
+        return { 
+            finalPrice: product.price, 
+            discountApplied: false 
+        };
+    } catch (error) {
+        console.error('Erro ao verificar descontos:', error);
+        return { 
+            finalPrice: product.price, 
+            discountApplied: false 
+        };
+    }
+}
 /**
  * Renderiza la lista de productos seleccionados para la venta
  */
@@ -475,12 +544,28 @@ function renderProductsList() {
     
     selectedProducts.forEach((product, index) => {
         const totalValue = product.price * product.quantity;
+        const originalTotalValue = product.originalPrice * product.quantity;
+        const discountValue = originalTotalValue - totalValue;
         
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${product.name}</td>
+            <td>
+                ${product.name}
+                ${product.hasDiscount ? 
+                    `<span class="discount-badge" title="${product.discountInfo.descricao || 'Desconto aplicado'}">
+                        <i class="fas fa-tag"></i> DESCONTO
+                    </span>` : 
+                    ''
+                }
+            </td>
             <td>${product.description}</td>
-            <td>${formatCurrency(product.price)}</td>
+            <td>
+                ${formatCurrency(product.valor_unitario)} <!-- Exibe o valor unitário original -->
+                ${product.hasDiscount ? 
+                    `<small class="original-price">${formatCurrency(product.originalPrice)}</small>` : 
+                    ''
+                }
+            </td>
             <td>
                 ${product.allowsFraction ? 
                     `<input type="text" class="quantity-input" 
@@ -493,7 +578,13 @@ function renderProductsList() {
                 }
                 <small>${product.unit}</small>
             </td>
-            <td class="product-total">${formatCurrency(totalValue)}</td>
+            <td class="product-total">
+                ${formatCurrency(totalValue)}
+                ${product.hasDiscount ? 
+                    `<small class="discount-value">(Economia: ${formatCurrency(discountValue)})</small>` : 
+                    ''
+                }
+            </td>
             <td>
                 <button class="btn-remove" data-index="${index}" title="Remover produto">
                     <i class="fas fa-trash"></i>
@@ -505,8 +596,8 @@ function renderProductsList() {
     
     // Adiciona event listeners para os inputs de quantidade
     document.querySelectorAll('.quantity-input').forEach(input => {
-        input.addEventListener('change', function(e) {
-            updateProductQuantity(e.target);
+        input.addEventListener('change', async function(e) {
+            await updateProductQuantity(e.target);
             calculateSaleTotal();
         });
         
@@ -526,14 +617,14 @@ function renderProductsList() {
  * Atualiza a quantidade de um produto na lista de venda
  * @param {HTMLInputElement} input - Campo de quantidade
  */
-function updateProductQuantity(input) {
+async function updateProductQuantity(input) {
     const index = parseInt(input.dataset.index);
     if (isNaN(index)) return;
 
     let newQuantity;
+    const product = selectedProducts[index];
     
     // Verifica se é um produto que permite valores fracionados (como kg)
-    const product = selectedProducts[index];
     if (product.allowsFraction) {
         // Converte o valor do input para número, tratando tanto vírgula quanto ponto como separador decimal
         const value = input.value.trim().replace(',', '.');
@@ -552,15 +643,25 @@ function updateProductQuantity(input) {
         }
     }
     
-    // Atualiza a quantidade no array de produtos selecionados
-    if (newQuantity > 0) {
-        selectedProducts[index].quantity = newQuantity;
-    } else {
-        // Se a quantidade for zero ou negativa, restaura o valor anterior
-        input.value = product.allowsFraction ? 
-            product.quantity.toFixed(3).replace('.', ',') : 
-            product.quantity;
-    }
+    // Verifica se a nova quantidade altera o desconto
+    const { finalPrice, discountApplied, discountInfo } = await checkAndApplyDiscounts(
+        { id: product.id, price: product.originalPrice },
+        newQuantity
+    );
+    
+    // Atualiza o produto no array
+    selectedProducts[index] = {
+        ...product,
+        quantity: newQuantity > 0 ? newQuantity : product.quantity,
+        price: finalPrice,
+        hasDiscount: discountApplied,
+        discountInfo: discountInfo || product.discountInfo
+    };
+    
+    // Atualiza o valor no input
+    input.value = product.allowsFraction ? 
+        selectedProducts[index].quantity.toFixed(3).replace('.', ',') : 
+        selectedProducts[index].quantity;
 }
 
 /**

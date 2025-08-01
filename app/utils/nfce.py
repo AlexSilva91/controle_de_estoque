@@ -6,25 +6,20 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from io import BytesIO
 from datetime import datetime
 from textwrap import wrap
+from decimal import Decimal
 
 def formatar_endereco_entrega(endereco) -> str:
     """
-    Formata o endereço de entrega no formato padrão:
-    Linha 1: Logradouro, número - complemento (se houver)
-    Linha 2: Bairro: nome_do_bairro (se diferente do complemento)
-    Linha 3: Cidade/Estado - CEP: xxxxx-xxx
-    Linha 4: Instruções: texto (se houver)
+    Formata o endereço de entrega no formato padrão.
     """
     if not endereco:
         return ""
     
-    # Se for string, tenta converter para dicionário
     if isinstance(endereco, str):
         endereco = endereco.replace("Endereco de entrega:", "").strip()
         parts = [p.strip() for p in endereco.split('-') if p.strip()]
         
         if len(parts) >= 3:
-            # Parse da string para estrutura de dados
             logradouro_numero_comp = parts[0]
             bairro = parts[1]
             cidade_estado_cep = parts[2]
@@ -42,7 +37,6 @@ def formatar_endereco_entrega(endereco) -> str:
             cidade = cidade_estado.split('/')[0].strip() if '/' in cidade_estado else ""
             estado = cidade_estado.split('/')[1].strip() if '/' in cidade_estado else ""
             
-            # Converte para dicionário para processamento uniforme
             endereco = {
                 "logradouro": logradouro,
                 "numero": numero,
@@ -55,10 +49,8 @@ def formatar_endereco_entrega(endereco) -> str:
         else:
             return endereco
     
-    # Processa dicionário
     partes = []
     
-    # Linha 1: Logradouro, número - complemento
     if endereco.get("logradouro") and endereco.get("numero"):
         linha1 = f"{endereco['logradouro']}, {endereco['numero']}"
         if endereco.get("complemento") and endereco["complemento"].strip():
@@ -72,14 +64,12 @@ def formatar_endereco_entrega(endereco) -> str:
             linha1 += f" - {endereco['complemento']}"
         partes.append(linha1)
     
-    # Linha 2: Bairro (somente se existir e for diferente do complemento)
     bairro = endereco.get("bairro", "").strip()
     complemento = endereco.get("complemento", "").strip()
     
     if bairro and bairro.lower() != complemento.lower():
         partes.append(f"Bairro: {bairro}")
     
-    # Linha 3: Cidade/Estado - CEP
     cidade = endereco.get("cidade", "").strip()
     estado = endereco.get("estado", "").strip()
     cep = endereco.get("cep", "").strip()
@@ -87,7 +77,6 @@ def formatar_endereco_entrega(endereco) -> str:
     if cidade or estado or cep:
         linha3_parts = []
         
-        # Cidade/Estado
         if cidade and estado:
             estado_upper = estado.upper() if len(estado) == 2 else estado
             linha3_parts.append(f"{cidade}/{estado_upper}")
@@ -97,9 +86,7 @@ def formatar_endereco_entrega(endereco) -> str:
             estado_upper = estado.upper() if len(estado) == 2 else estado
             linha3_parts.append(estado_upper)
         
-        # CEP formatado
         if cep:
-            # Remove caracteres não numéricos
             cep_numeros = ''.join(filter(str.isdigit, cep))
             if len(cep_numeros) == 8:
                 cep_formatado = f"{cep_numeros[:5]}-{cep_numeros[5:]}"
@@ -114,16 +101,13 @@ def formatar_endereco_entrega(endereco) -> str:
         if linha3_parts:
             partes.append("".join(linha3_parts))
     
-    # Linha 4: Instruções (se existirem)
     instrucoes = endereco.get("instrucoes", "").strip()
     if instrucoes:
         instrucoes_linhas = wrap(instrucoes, width=48)
         partes.append("Instruções:")
         partes.extend([f"  {linha}" for linha in instrucoes_linhas])
 
-    
     return "\n".join(partes)
-
 
 def gerar_nfce_pdf_bobina_bytesio(
     dados_nota: dict,
@@ -141,20 +125,35 @@ def gerar_nfce_pdf_bobina_bytesio(
         fontSize=6,  
     )
 
-    # Garante que descrição exista para todos os itens
-    for item in dados_nota["itens"]:
-        if "descricao" not in item:
-            item["descricao"] = f"Produto {item['produto_id']}"
+    # Verifica se há descontos para decidir se mostra a coluna
+    tem_descontos = any(item.get('desconto_aplicado', 0) > 0 for item in dados_nota["itens"])
 
-    data = [["Produto", "Qtd", "Unit", "Total"]]
-    for item in dados_nota["itens"]:
-        descricao_paragraph = Paragraph(item["descricao"], styleN_small)
-        data.append([
-            descricao_paragraph,
-            f"{item['quantidade']:.2f}",
-            f"{item['valor_unitario']:.2f}",
-            f"{item['valor_total']:.2f}"
-        ])
+    if tem_descontos:
+        data = [["Produto", "Qtd", "Unit", "Desc", "Total"]]
+        for item in dados_nota["itens"]:
+            descricao = item.get('descricao', f"Produto {item['produto_id']}")
+            descricao_paragraph = Paragraph(descricao, styleN_small)
+            desconto = item.get('desconto_aplicado', 0)
+            data.append([
+                descricao_paragraph,
+                f"{item['quantidade']:.2f}",
+                f"{item['valor_unitario_original']:.2f}",
+                f"-{desconto:.2f}" if desconto > 0 else "-",
+                f"{item['valor_total']:.2f}"
+            ])
+        col_widths = [28 * mm, 10 * mm, 12 * mm, 10 * mm, 10 * mm]
+    else:
+        data = [["Produto", "Qtd", "Unit", "Total"]]
+        for item in dados_nota["itens"]:
+            descricao = item.get('descricao', f"Produto {item['produto_id']}")
+            descricao_paragraph = Paragraph(descricao, styleN_small)
+            data.append([
+                descricao_paragraph,
+                f"{item['quantidade']:.2f}",
+                f"{item['valor_unitario']:.2f}",
+                f"{item['valor_total']:.2f}"
+            ])
+        col_widths = [33 * mm, 10 * mm, 12 * mm, 15 * mm]
 
     altura_base = 95 * mm
     altura_linha_item = 7.5 * mm
@@ -192,7 +191,7 @@ def gerar_nfce_pdf_bobina_bytesio(
     y -= 8 * mm
 
     # Tabela de itens
-    tabela = Table(data, colWidths=[33 * mm, 10 * mm, 12 * mm, 15 * mm], repeatRows=1)
+    tabela = Table(data, colWidths=col_widths, repeatRows=1)
     estilos = [
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
@@ -216,6 +215,13 @@ def gerar_nfce_pdf_bobina_bytesio(
 
     # Totais
     total = sum([item["valor_total"] for item in dados_nota["itens"]])
+    desconto_total = dados_nota.get("valor_desconto_total", 0)
+
+    if desconto_total > 0:
+        c.setFont("Helvetica", 7)
+        c.drawRightString(largura - 5 * mm, y, f"DESCONTO TOTAL: -{desconto_total:.2f}")
+        y -= 4 * mm
+
     c.setFont("Helvetica-Bold", 9)
     c.drawRightString(largura - 5 * mm, y, f"TOTAL R$: {total:.2f}")
     y -= 6 * mm
@@ -243,10 +249,9 @@ def gerar_nfce_pdf_bobina_bytesio(
         c.drawString(5 * mm, y, f"Cliente: {nome_cliente}")
         y -= 6 * mm
 
-    # Endereço de entrega formatado conforme solicitado
+    # Endereço de entrega
     if endereco_entrega:
         endereco_formatado = formatar_endereco_entrega(endereco_entrega)
-        print(f"Endereço formatado: {endereco_formatado}")
         c.setFont("Helvetica-Bold", 7)
         c.drawString(5 * mm, y, "Endereço de entrega:")
         y -= 4 * mm
