@@ -1299,6 +1299,56 @@ document.addEventListener('DOMContentLoaded', function() {
       }
   });
 
+  document.addEventListener('DOMContentLoaded', function() {
+    const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+    const sidebar = document.getElementById('sidebar');
+    const closeSidebarMobile = document.getElementById('closeSidebarMobile');
+    const sidebarOverlay = document.createElement('div');
+    
+    sidebarOverlay.className = 'sidebar-overlay';
+    document.body.appendChild(sidebarOverlay);
+    
+    // Alternar menu mobile
+    mobileMenuToggle.addEventListener('click', function() {
+      this.classList.toggle('active');
+      sidebar.classList.toggle('active');
+      sidebarOverlay.style.display = sidebar.classList.contains('active') ? 'block' : 'none';
+      document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
+    });
+    
+    // Fechar menu ao clicar no overlay ou botão de fechar
+    closeSidebarMobile.addEventListener('click', closeMenu);
+    sidebarOverlay.addEventListener('click', closeMenu);
+    
+    function closeMenu() {
+      mobileMenuToggle.classList.remove('active');
+      sidebar.classList.remove('active');
+      sidebarOverlay.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+    
+    // Ajustar layout quando a janela é redimensionada
+    function handleResize() {
+      if (window.innerWidth > 768) {
+        // Em telas maiores, garantir que o sidebar esteja visível
+        sidebar.style.transform = 'translateX(0)';
+        sidebarOverlay.style.display = 'none';
+        document.body.style.overflow = '';
+      } else {
+        // Em telas menores, garantir que o sidebar esteja escondido
+        if (!sidebar.classList.contains('active')) {
+          sidebar.style.transform = 'translateX(-100%)';
+        }
+      }
+    }
+    
+    // Verificar tamanho da tela no carregamento
+    handleResize();
+    
+    // Adicionar listener para redimensionamento
+    window.addEventListener('resize', handleResize);
+  });
+
   // ===== FUNÇÕES GERAIS =====
   // Funções auxiliares para formatar texto
   function formatPerfil(perfil) {

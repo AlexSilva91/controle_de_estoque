@@ -3,7 +3,7 @@ import enum
 from flask_login import UserMixin
 from sqlalchemy import (
     Column, Integer, Numeric, String, Float, DateTime, Enum, ForeignKey, Text, DECIMAL,
-    UniqueConstraint, Boolean
+    UniqueConstraint, Boolean, Table
 )
 from sqlalchemy.orm import relationship
 from . import db
@@ -71,6 +71,17 @@ class StatusPagamento(str, enum.Enum):
     quitado = "quitado"
 
 # --------------------
+# Tabela de associação para relacionamento muitos-para-muitos entre Produtos e Descontos
+# --------------------
+produto_desconto_association = Table(
+    'produto_desconto_association',
+    Base.metadata,
+    Column('produto_id', Integer, ForeignKey('produtos.id'), primary_key=True),
+    Column('desconto_id', Integer, ForeignKey('descontos.id'), primary_key=True),
+    Column('sincronizado', Boolean, default=False, nullable=False)
+)
+
+# --------------------
 # Entrega/Delivery
 # --------------------
 class Entrega(Base):
@@ -133,6 +144,47 @@ class Caixa(Base):
     pagamentos = relationship("PagamentoContaReceber", back_populates="caixa")
 
 # --------------------
+# Desconto (modelo principal)
+# --------------------
+class Desconto(Base):
+    __tablename__ = "descontos"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    identificador = Column(String(50), unique=True, nullable=False)
+    descricao = Column(String(255), nullable=True)
+    tipo = Column(Enum(TipoDesconto), nullable=False)
+    valor = Column(DECIMAL(10, 2), nullable=False)  # Pode ser valor fixo ou percentual
+    quantidade_minima = Column(DECIMAL(12, 3), nullable=False)
+    quantidade_maxima = Column(DECIMAL(12, 3), nullable=True)
+    valido_ate = Column(DateTime, nullable=True)
+    ativo = Column(Boolean, default=True, nullable=False)
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    sincronizado = Column(Boolean, default=False, nullable=False)
+
+    produtos = relationship(
+        "Produto",
+        secondary=produto_desconto_association,
+        back_populates="descontos"
+    )
+
+    def __repr__(self):
+        return (
+            f"<Desconto("
+            f"id={self.id}, "
+            f"identificador='{self.identificador}', "
+            f"tipo='{self.tipo.value}', "
+            f"valor={float(self.valor):.2f}, "
+            f"quantidade_minima={float(self.quantidade_minima):.3f}, "
+            f"quantidade_maxima={float(self.quantidade_maxima):.3f if self.quantidade_maxima else None}, "
+            f"descricao='{self.descricao}', "
+            f"valido_ate='{self.valido_ate}', "
+            f"ativo={self.ativo}, "
+            f"sincronizado={self.sincronizado}"
+            f")>"
+        )
+
+# --------------------
 # Produto
 # --------------------
 class Produto(Base):
@@ -178,47 +230,13 @@ class Produto(Base):
         foreign_keys="[TransferenciaEstoque.produto_destino_id]",
         back_populates="produto_destino"
     )
-    descontos = relationship("DescontoProduto", back_populates="produto", cascade="all, delete-orphan")
     
-
-class DescontoProduto(Base):
-    __tablename__ = "descontos_produto"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=True)
-    identificador = Column(String(50), unique=True, nullable=False)
-
-    quantidade_minima = Column(DECIMAL(12, 3), nullable=False)
-    quantidade_maxima = Column(DECIMAL(12, 3), nullable=False)
-    valor_unitario_com_desconto = Column(DECIMAL(10, 2), nullable=False)
-
-    descricao = Column(String(255), nullable=True)
-    valido_ate = Column(DateTime, nullable=True)
-    ativo = Column(Boolean, default=True, nullable=False)
-    sincronizado = Column(Boolean, default=False, nullable=False)
-
-    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
-    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    produto = relationship("Produto", back_populates="descontos")
-
-    def __repr__(self):
-        return (
-            f"<DescontoProduto("
-            f"id={self.id}, "
-            f"produto_id={self.produto_id}, "
-            f"identificador='{self.identificador}', "
-            f"quantidade_minima={float(self.quantidade_minima):.3f}, "
-            f"quantidade_maxima={float(self.quantidade_maxima):.3f}, "
-            f"valor_unitario_com_desconto={float(self.valor_unitario_com_desconto):.2f}, "
-            f"descricao='{self.descricao}', "
-            f"valido_ate='{self.valido_ate}', "
-            f"ativo={self.ativo}, "
-            f"sincronizado={self.sincronizado}, "
-            f"criado_em='{self.criado_em}', "
-            f"atualizado_em='{self.atualizado_em}'"
-            f")>"
-        )
+    # Relacionamento muitos-para-muitos com Descontos
+    descontos = relationship(
+        "Desconto",
+        secondary=produto_desconto_association,
+        back_populates="produtos"
+    )
 
 # --------------------
 # Cliente

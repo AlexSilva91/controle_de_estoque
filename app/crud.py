@@ -1344,23 +1344,23 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
     Secção de descontos de produtos
 '''
 # CRIAR desconto
-def criar_desconto(session: Session, dados: dict) -> entities.DescontoProduto:
-    desconto = entities.DescontoProduto(**dados)
+def criar_desconto(session: Session, dados: dict) -> entities.Desconto:
+    desconto = entities.Desconto(**dados)
     session.add(desconto)
     session.commit()
     session.refresh(desconto)
     return desconto
 
 # BUSCAR descontos por produto_id
-def buscar_descontos_por_produto(session: Session, produto_id: int) -> list[entities.DescontoProduto]:
-    return session.query(entities.DescontoProduto)\
-        .filter(entities.DescontoProduto.produto_id == produto_id)\
-        .order_by(entities.DescontoProduto.quantidade_minima.asc())\
+def buscar_descontos_por_produto(session: Session, produto_id: int) -> list[entities.Desconto]:
+    return session.query(entities.Desconto)\
+        .filter(entities.Desconto.produto_id == produto_id)\
+        .order_by(entities.Desconto.quantidade_minima.asc())\
         .all()
 
 # ATUALIZAR desconto
-def atualizar_desconto(session: Session, desconto_id: int, novos_dados: dict) -> entities.DescontoProduto | None:
-    desconto = session.query(entities.DescontoProduto).get(desconto_id)
+def atualizar_desconto(session: Session, desconto_id: int, novos_dados: dict) -> entities.Desconto | None:
+    desconto = session.query(entities.Desconto).get(desconto_id)
     if not desconto:
         return None
     for chave, valor in novos_dados.items():
@@ -1372,8 +1372,8 @@ def atualizar_desconto(session: Session, desconto_id: int, novos_dados: dict) ->
 
 # DELETAR desconto
 def deletar_desconto(session: Session, desconto_id: int) -> bool:
-    desconto = session.query(entities.DescontoProduto).get(desconto_id)
-    
+    desconto = session.query(entities.Desconto).get(desconto_id)
+
     if not desconto:
         return False
     session.delete(desconto)

@@ -503,11 +503,11 @@ def obter_produto(produto_id):
                 'valor_unitario_compra': str(produto.valor_unitario_compra or 0),
                 'valor_total_compra': str(produto.valor_total_compra or 0),
                 'imcs': str(produto.imcs or 0),
-                'estoque_loja': str(produto.estoque_loja),
-                'estoque_deposito': str(produto.estoque_deposito),
-                'estoque_fabrica': str(produto.estoque_fabrica),
-                'estoque_minimo': str(produto.estoque_minimo),
-                'estoque_maximo': str(produto.estoque_maximo or ''),
+                'estoque_loja': f"{float(produto.estoque_loja or 0):.2f}",
+                'estoque_deposito': f"{float(produto.estoque_deposito or 0):.2f}",
+                'estoque_fabrica': f"{float(produto.estoque_fabrica or 0):.2f}",
+                'estoque_minimo': f"{float(produto.estoque_minimo or 0):.2f}",
+                'estoque_maximo': f"{float(produto.estoque_maximo or 0):.2f}",
                 'ativo': produto.ativo
             }
         })
@@ -1034,7 +1034,7 @@ def criar_transferencia():
                 'produto': transferencia.produto.nome,
                 'origem': transferencia.estoque_origem.value,
                 'destino': transferencia.estoque_destino.value,
-                'quantidade': str(transferencia.quantidade),
+                'quantidade': f"{transferencia.quantidade:.2f}",
                 'unidade': transferencia.unidade_origem
             }
         })
@@ -1055,7 +1055,7 @@ def listar_transferencias():
                 'produto': transf.produto.nome,
                 'origem': transf.estoque_origem.value,
                 'destino': transf.estoque_destino.value,
-                'quantidade': str(transf.quantidade),
+                'quantidade': f"{transf.quantidade:.2f}",
                 'usuario': transf.usuario.nome, 
                 'observacao': transf.observacao or ''
             })
@@ -1199,8 +1199,8 @@ def deletar_desconto_route(desconto_id):
 def listar_descontos_route():
     try:
         session = Session(db.engine)
-        descontos = session.query(entities.DescontoProduto)\
-            .order_by(entities.DescontoProduto.produto_id, entities.DescontoProduto.quantidade_minima)\
+        descontos = session.query(entities.Desconto)\
+            .order_by(entities.Desconto.produto_id, entities.Desconto.quantidade_minima)\
             .all()
 
         return jsonify({
@@ -1229,7 +1229,7 @@ def listar_descontos_route():
 def buscar_desconto_por_id(desconto_id):
     try:
         session = Session(db.engine)
-        desconto = session.query(entities.DescontoProduto).get(desconto_id)
+        desconto = session.query(entities.Desconto).get(desconto_id)
         
         if not desconto:
             return jsonify({'erro': 'Desconto não encontrado'}), 404
