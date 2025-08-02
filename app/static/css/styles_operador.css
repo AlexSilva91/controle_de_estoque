@@ -1234,3 +1234,29 @@ body {
     color: #28a745;
     font-size: 0.8rem;
 }
+.discount-badge {
+    display: inline-block;
+    background-color: #28a745;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    margin-left: 5px;
+}
+
+.original-price {
+    display: block;
+    text-decoration: line-through;
+    color: #6c757d;
+    font-size: 0.8rem;
+}
+
+.discount-value {
+    display: block;
+    color: #28a745;
+    font-size: 0.8rem;
+}
+
+.product-total {
+    font-weight: bold;
+}

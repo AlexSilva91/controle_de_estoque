@@ -13,7 +13,7 @@ from app import schemas
 from app.models import db
 from app.models import entities
 from app.crud import (
-    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto, buscar_todos_os_descontos, criar_desconto, deletar_desconto, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, get_transferencias,
+    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_todos_os_descontos, criar_desconto, deletar_desconto, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, get_transferencias,
     get_user_by_cpf, get_user_by_id, get_usuarios, create_user, registrar_transferencia, update_user,
     get_produto, get_produtos, create_produto, update_produto, delete_produto,
     registrar_movimentacao, get_cliente, get_clientes, create_cliente, 
@@ -1181,7 +1181,7 @@ def criar_desconto_route():
 def buscar_descontos_produto_route(produto_id):
     try:
         session = Session(db.engine)
-        descontos = buscar_descontos_por_produto(session, produto_id)
+        descontos = buscar_descontos_por_produto_id(session, produto_id)
         
         return jsonify({
             'success': True,

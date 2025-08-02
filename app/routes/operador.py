@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 from app.bot.bot_movimentacao import enviar_resumo_movimentacao_diaria
 from flask import send_file
-from app.utils import preparar_dados_nota
+from app.utils.preparar_notas import preparar_dados_nota
 from app.utils.converter_endereco import parse_endereco_string
 from app.utils.nfce import gerar_nfce_pdf_bobina_bytesio
 from app.models import entities
@@ -209,7 +209,8 @@ def api_registrar_venda():
             return jsonify({'error': 'Content-Type deve ser application/json'}), 400
 
         data = request.get_json(force=True, silent=True)
-        print(f"PAYLOAD: \n\n{data}\n\n")
+        print(f"PAYLOAD: \n\n{json.dumps(data, indent=2)}\n\n")
+
         if data is None:
             return jsonify({'error': 'Dados JSON inválidos'}), 400
 
@@ -250,7 +251,8 @@ def api_registrar_venda():
 
         # Prepara os dados da nota com descontos
         dados_nota = preparar_dados_nota(data, db.session)
-
+        print(f"DADOS DA NOTA PREPARADOS: \n\n{json.dumps(dados_nota, indent=2)}\n\n")
+        
         # Processa a venda
         nota_id = registrar_venda_completa(db.session, dados_nota, operador_id=current_user.id, caixa_id=caixa.id)
         

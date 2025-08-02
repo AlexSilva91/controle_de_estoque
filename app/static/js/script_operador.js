@@ -442,31 +442,97 @@ function displayProductSearchResults(products) {
 async function addProductToSale(product, initialQuantity = 1) {
     if (!product) return;
     
+    // Busca descontos para o produto
+    const discounts = await fetchProductDiscounts(product.id);
+    
+    // Calcula o preço com desconto baseado na quantidade inicial
+    const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(product.valor_unitario, initialQuantity, discounts);
+    
     const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
     
     if (existingProductIndex >= 0) {
         selectedProducts[existingProductIndex].quantity += 1;
-    } else {
-        const { finalPrice, discountApplied, discountInfo } = await checkAndApplyDiscounts(product, initialQuantity);
+        // Recalcula desconto quando a quantidade muda
+        const newQuantity = selectedProducts[existingProductIndex].quantity;
+        const newPriceInfo = calculateDiscountedPrice(product.valor_unitario, newQuantity, discounts);
         
+        selectedProducts[existingProductIndex].price = newPriceInfo.finalPrice;
+        selectedProducts[existingProductIndex].hasDiscount = newPriceInfo.discountApplied;
+        selectedProducts[existingProductIndex].discountInfo = newPriceInfo.discountInfo;
+    } else {
         selectedProducts.push({
             id: product.id,
             name: product.nome,
             description: product.descricao || '',
-            valor_unitario: product.valor_unitario, // Adiciona o valor unitário original
-            price: finalPrice, // Preço pode ter desconto aplicado
-            originalPrice: product.valor_unitario, // Guarda o preço original
+            valor_unitario: product.valor_unitario,
+            price: finalPrice,
+            originalPrice: product.valor_unitario,
             quantity: initialQuantity,
             unit: product.unidade,
-            stock: product.estoque_quantidade,
+            stock: product.estoque_loja,
             allowsFraction: product.unidade.toLowerCase() === 'kg',
             hasDiscount: discountApplied,
-            discountInfo: discountInfo || null
+            discountInfo: discountInfo,
+            availableDiscounts: discounts // Armazena os descontos disponíveis para recálculo
         });
     }
     
     renderProductsList();
     calculateSaleTotal();
+}
+async function fetchProductDiscounts(productId) {
+    try {
+        const response = await fetch(`/operador/api/produtos/${productId}/descontos?timestamp=${new Date().getTime()}`);
+        if (!response.ok) return [];
+        return await response.json();
+    } catch (error) {
+        console.error('Erro ao buscar descontos:', error);
+        return [];
+    }
+}
+
+function calculateDiscountedPrice(basePrice, quantity, discounts) {
+    let bestDiscount = null;
+    let finalPrice = basePrice;
+    let discountApplied = false;
+    
+    // Verifica cada desconto disponível
+    for (const discount of discounts) {
+        // Verifica se o desconto está ativo
+        if (!discount.ativo) continue;
+        
+        // Verifica a data limite (se existir)
+        if (discount.valido_ate) {
+            const validUntil = new Date(discount.valido_ate);
+            const today = new Date();
+            if (today > validUntil) continue;
+        }
+        
+        // Verifica a quantidade mínima e máxima
+        if (quantity < discount.quantidade_minima) continue;
+        if (discount.quantidade_maxima && quantity > discount.quantidade_maxima) continue;
+        
+        // Calcula o valor com desconto
+        let discountedValue;
+        if (discount.tipo === 'fixo') {
+            discountedValue = basePrice - discount.valor;
+        } else if (discount.tipo === 'percentual') {
+            discountedValue = basePrice * (1 - (discount.valor / 100));
+        }
+        
+        // Mantém o melhor desconto (maior redução)
+        if (!bestDiscount || discountedValue < finalPrice) {
+            bestDiscount = discount;
+            finalPrice = discountedValue;
+            discountApplied = true;
+        }
+    }
+    
+    return {
+        finalPrice: finalPrice,
+        discountApplied: discountApplied,
+        discountInfo: bestDiscount
+    };
 }
 
 /**
@@ -553,14 +619,14 @@ function renderProductsList() {
                 ${product.name}
                 ${product.hasDiscount ? 
                     `<span class="discount-badge" title="${product.discountInfo.descricao || 'Desconto aplicado'}">
-                        <i class="fas fa-tag"></i> DESCONTO
+                        <i class="fas fa-tag"></i> ${product.discountInfo.identificador || 'DESCONTO'}
                     </span>` : 
                     ''
                 }
             </td>
             <td>${product.description}</td>
             <td>
-                ${formatCurrency(product.valor_unitario)} <!-- Exibe o valor unitário original -->
+                ${formatCurrency(product.price)}
                 ${product.hasDiscount ? 
                     `<small class="original-price">${formatCurrency(product.originalPrice)}</small>` : 
                     ''
@@ -598,11 +664,9 @@ function renderProductsList() {
     document.querySelectorAll('.quantity-input').forEach(input => {
         input.addEventListener('change', async function(e) {
             await updateProductQuantity(e.target);
-            calculateSaleTotal();
         });
         
         input.addEventListener('input', function(e) {
-            // Validação em tempo real para campos de quantidade fracionada
             if (e.target.type === 'text') {
                 const value = e.target.value;
                 if (!/^[0-9]*([,\.][0-9]*)?$/.test(value)) {
@@ -624,14 +688,11 @@ async function updateProductQuantity(input) {
     let newQuantity;
     const product = selectedProducts[index];
     
-    // Verifica se é um produto que permite valores fracionados (como kg)
+    // Converte o valor do input para número
     if (product.allowsFraction) {
-        // Converte o valor do input para número, tratando tanto vírgula quanto ponto como separador decimal
         const value = input.value.trim().replace(',', '.');
         newQuantity = parseFloat(value);
-
         if (isNaN(newQuantity)) {
-            // Se não for um número válido, restaura o valor anterior
             input.value = product.quantity.toFixed(3).replace('.', ',');
             return;
         }
@@ -643,10 +704,11 @@ async function updateProductQuantity(input) {
         }
     }
     
-    // Verifica se a nova quantidade altera o desconto
-    const { finalPrice, discountApplied, discountInfo } = await checkAndApplyDiscounts(
-        { id: product.id, price: product.originalPrice },
-        newQuantity
+    // Recalcula o preço com desconto baseado na nova quantidade
+    const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(
+        product.originalPrice, 
+        newQuantity, 
+        product.availableDiscounts || []
     );
     
     // Atualiza o produto no array
@@ -662,6 +724,8 @@ async function updateProductQuantity(input) {
     input.value = product.allowsFraction ? 
         selectedProducts[index].quantity.toFixed(3).replace('.', ',') : 
         selectedProducts[index].quantity;
+    
+    calculateSaleTotal();
 }
 
 /**

@@ -1212,7 +1212,7 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
             
             # Cria o objeto de entrega apenas se algum campo foi preenchido
             if any(v for k, v in entrega_data.items() if v):
-                entrega = entities.Entregas.Entrega(
+                entrega = entities.Entrega(
                     logradouro=entrega_data.get("logradouro") or "",
                     numero=entrega_data.get("numero") or "",
                     complemento=entrega_data.get("complemento") or "",
@@ -1390,7 +1390,7 @@ def criar_desconto(session: Session, dados: dict) -> entities.Desconto:
 
 
 # BUSCAR descontos por produto_id
-def buscar_descontos_por_produto(session: Session, produto_id: int) -> list[entities.Desconto]:
+def buscar_descontos_por_produto_id(session: Session, produto_id: int) -> list[entities.Desconto]:
     return (
         session.query(entities.Desconto)
         .join(entities.Desconto.produtos)
