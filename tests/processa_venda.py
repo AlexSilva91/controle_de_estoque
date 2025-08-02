@@ -1,3 +1,4 @@
+from flask import json
 from app.database import SessionLocal
 from decimal import Decimal
 from datetime import datetime
@@ -77,24 +78,24 @@ data = {
     "forma_pagamento": "dinheiro",
     "itens": [
         {
-            "produto_id": 8,
-            "quantidade": 5,
+            "produto_id": 28,
+            "quantidade": 4,
             "valor_total": 349.5,
-            "valor_unitario": 69.90
+            "valor_unitario": 110
         },
         {
-            "produto_id": 31,
-            "quantidade": 5,
+            "produto_id": 25,
+            "quantidade": 4,
             "valor_total": 300,
-            "valor_unitario": 60
+            "valor_unitario": 109.9
         }
     ],
     "observacao": "Venda para seu Madruga",
-    "valor_recebido": 981.7
+    "valor_recebido": 703.6
 }
 
 # Executando o processamento
 db = SessionLocal()
 resultado_venda = preparar_dados_nota(data, db)
 print("\n📦 Resultado final da venda:\n")
-print(resultado_venda)
+print(json.dumps(resultado_venda, indent=2))
