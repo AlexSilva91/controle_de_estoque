@@ -753,95 +753,149 @@ function addEmptyProductRow() {
  * @async
  */
 async function registerSale() {
-    if (!selectedClientIdInput?.value) {
-        showMessage('Selecione um cliente', 'error');
-        return;
-    }
-    
-    if (selectedProducts.length === 0) {
-        showMessage('Adicione pelo menos um produto', 'error');
-        return;
-    }
-    
-    const paymentMethod = document.getElementById('payment-method')?.value;
-    if (!paymentMethod) {
-        showMessage('Selecione a forma de pagamento', 'error');
-        return;
-    }
-    
-    const notes = document.getElementById('sale-notes')?.value;
-    
-    // Modificado para aceitar valores com ponto ou vírgula
-    const amountReceivedText = amountReceivedInput?.value.replace(/\./g, '').replace(',', '.') || '0';
-    const amountReceived = parseFloat(amountReceivedText) || 0;
-    
-    const totalText = saleTotalElement?.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
-    const total = parseFloat(totalText) || 0;
-    
-    if (paymentMethod !== 'a_prazo' && amountReceived < total) {
-        showMessage('Valor recebido menor que o total da venda', 'error');
-        return;
-    }
-    
-    const items = selectedProducts.map(product => ({
-        produto_id: product.id,
-        quantidade: Number(product.quantity),
-        valor_unitario: Number(product.price),
-        valor_total: Number(product.price * product.quantity)
-    }));
-
-    const saleData = {
-        cliente_id: parseInt(selectedClientIdInput.value),
-        forma_pagamento: paymentMethod,
-        valor_recebido: amountReceived,
-        itens: items,
-        observacao: notes
-    };
-
-    if (deliveryAddress) {
-        saleData.endereco_entrega = {
-            logradouro: deliveryAddress.logradouro || null,
-            numero: deliveryAddress.numero || null,
-            complemento: deliveryAddress.complemento || null,
-            bairro: deliveryAddress.bairro || null,
-            cidade: deliveryAddress.cidade || null,
-            estado: deliveryAddress.estado || null,
-            cep: deliveryAddress.cep || null,
-            instrucoes: deliveryAddress.instrucoes || null
-        };
-    }
-
     try {
+        // Validações iniciais
+        if (!selectedClientIdInput?.value) {
+            showMessage('Selecione um cliente', 'error');
+            throw new Error('Cliente não selecionado');
+        }
+        
+        if (selectedProducts.length === 0) {
+            showMessage('Adicione pelo menos um produto', 'error');
+            throw new Error('Nenhum produto selecionado');
+        }
+
+        // Coleta os métodos de pagamento
+        const paymentMethods = [];
+        const paymentItems = document.querySelectorAll('.payment-item');
+        
+        paymentItems.forEach(item => {
+            const method = item.querySelector('input[name="payment_methods[]"]').value;
+            const amount = parseFloat(item.querySelector('input[name="payment_amounts[]"]').value.replace(',', '.'));
+            if (!isNaN(amount)) {
+                paymentMethods.push({
+                    forma_pagamento: method,
+                    valor: amount
+                });
+            }
+        });
+
+        // Pega o valor total da venda
+        const totalText = saleTotalElement?.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
+        const total = parseFloat(totalText) || 0;
+
+        // Define o valor recebido
+        let valor_recebido = total;
+        if (paymentMethods.length > 0) {
+            valor_recebido = paymentMethods.reduce((sum, pm) => sum + pm.valor, 0);
+        } else {
+            const amountReceivedText = amountReceivedInput?.value.replace(/\./g, '').replace(',', '.') || '0';
+            valor_recebido = parseFloat(amountReceivedText) || 0;
+        }
+
+        // Validação do valor recebido
+        const a_prazo_usado = paymentMethods.some(p => p.forma_pagamento === 'a_prazo');
+        if (!a_prazo_usado && valor_recebido < total) {
+            showMessage('Valor recebido menor que o total da venda', 'error');
+            throw new Error('Valor recebido insuficiente');
+        }
+
+        // Prepara os itens da venda
+        const items = selectedProducts.map(product => {
+            const originalTotal = product.originalPrice * product.quantity;
+            const discountedTotal = product.price * product.quantity;
+            const discountValue = originalTotal - discountedTotal;
+            
+            return {
+                produto_id: product.id,
+                quantidade: Number(product.quantity),
+                valor_unitario: Number(product.originalPrice),
+                valor_unitario_com_desconto: Number(product.price),
+                valor_total: Number(discountedTotal),
+                valor_desconto: Number(discountValue),
+                desconto_info: product.discountInfo ? {
+                    tipo: product.discountInfo.tipo,
+                    valor: product.discountInfo.valor,
+                    identificador: product.discountInfo.identificador,
+                    descricao: product.discountInfo.descricao
+                } : null
+            };
+        });
+
+        // Prepara os dados da venda
+        const saleData = {
+            cliente_id: parseInt(selectedClientIdInput.value),
+            forma_pagamento: paymentMethods.length > 0 ? 'multiplos' : document.getElementById('payment-method')?.value || 'dinheiro',
+            valor_recebido: valor_recebido,
+            valor_total: total,
+            itens: items,
+            pagamentos: paymentMethods.length > 0 ? paymentMethods : [{
+                forma_pagamento: document.getElementById('payment-method')?.value || 'dinheiro',
+                valor: valor_recebido
+            }],
+            total_descontos: items.reduce((sum, item) => sum + item.valor_desconto, 0),
+            observacao: document.getElementById('sale-notes')?.value
+        };
+
+        // Adiciona endereço de entrega se existir
+        if (deliveryAddress) {
+            saleData.endereco_entrega = {
+                logradouro: deliveryAddress.logradouro || '',
+                numero: deliveryAddress.numero || '',
+                complemento: deliveryAddress.complemento || '',
+                bairro: deliveryAddress.bairro || '',
+                cidade: deliveryAddress.cidade || '',
+                estado: deliveryAddress.estado || '',
+                cep: deliveryAddress.cep || '',
+                instrucoes: deliveryAddress.instrucoes || ''
+            };
+        }
+
+        // Envia a venda para o servidor
         const response = await fetch('/operador/api/vendas', {
-            ...preventCacheConfig,
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify(saleData)
         });
         
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Erro ao registrar venda');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Erro ao registrar venda');
         }
         
         const result = await response.json();
         
+        if (!result.success) {
+            throw new Error(result.message || 'Erro ao registrar venda');
+        }
+
+        // Limpa o formulário após sucesso
         resetSaleForm();
         
+        // Atualiza os dados
         await updateBalance(true);
         await loadProducts(true);
         
-        showMessage('Registrando venda...');
-        showMessage(`Venda registrada com sucesso! Nº Nota: ${result.nota_id}`);
-        showMessage('Gerando comprovante...');
+        // Exibe mensagem de sucesso
+        showMessage(`Venda registrada com sucesso! Nº Nota: ${result.nota_fiscal_id}`);
         
-        window.open(`/operador/pdf/nota/${result.nota_id}?timestamp=${new Date().getTime()}`, '_blank');
+        // Abre o comprovante em nova aba
+        window.open(`/operador/pdf/nota/${result.nota_fiscal_id}?timestamp=${new Date().getTime()}`, '_blank');
+        
     } catch (error) {
-        console.error("Erro ao registrar venda:", error);
+        console.error('Erro ao registrar venda:', error);
         showMessage(error.message, 'error');
+        
+        // Log adicional para depuração
+        if (error.response) {
+            error.response.json().then(data => {
+                console.error("Detalhes do erro:", data);
+            });
+        }
     }
 }
-
 /**
  * Calcula o total da venda com base nos produtos selecionados
  * Modificado para aceitar valores com ponto ou vírgula
@@ -863,18 +917,20 @@ function calculateSaleTotal() {
     });
     
     let total = subtotal;
-    let change = 0;
     
-    const amountReceivedText = amountReceivedInput?.value.replace(/\./g, '').replace(',', '.') || '0';
-    const amountReceived = parseFloat(amountReceivedText) || 0;
-    
-    if (amountReceived > 0) {
-        change = Math.max(0, amountReceived - total);
-    }
-    
+    // Atualiza os elementos da UI
     if (subtotalValueElement) subtotalValueElement.textContent = formatCurrency(subtotal);
     if (saleTotalElement) saleTotalElement.textContent = formatCurrency(total);
-    if (changeValueElement) changeValueElement.textContent = formatCurrency(change);
+    
+    // Calcula o troco apenas se houver valor recebido
+    if (amountReceivedInput && amountReceivedInput.value) {
+        const amountReceivedText = amountReceivedInput.value.replace(/\./g, '').replace(',', '.');
+        const amountReceived = parseFloat(amountReceivedText) || 0;
+        const change = Math.max(0, amountReceived - total);
+        if (changeValueElement) changeValueElement.textContent = formatCurrency(change);
+    } else {
+        if (changeValueElement) changeValueElement.textContent = formatCurrency(0);
+    }
 }
 
 /**
@@ -966,7 +1022,7 @@ function resetSaleForm() {
         if (subtotalValueElement) subtotalValueElement.textContent = 'R$ 0.00';
         if (saleTotalElement) saleTotalElement.textContent = 'R$ 0.00';
         if (changeValueElement) changeValueElement.textContent = 'R$ 0.00';
-
+        if (amountReceivedInput) amountReceivedInput.value = '';
         // Atualiza status
         updateCaixaStatus();
 
@@ -1298,7 +1354,69 @@ async function updateBalance(forceUpdate = false) {
         if (currentBalanceLabel) currentBalanceLabel.textContent = '';
     }
 }
+// Adiciona um novo método de pagamento
+document.querySelector('.add-payment-method').addEventListener('click', function() {
+    const methodSelect = document.querySelector('.payment-method-select');
+    const amountInput = document.querySelector('.payment-amount');
+    const paymentsList = document.querySelector('.selected-payments-list');
+    
+    if (!methodSelect.value || !amountInput.value) {
+        showMessage('Selecione um método e informe o valor', 'error');
+        return;
+    }
+    
+    const methodText = methodSelect.options[methodSelect.selectedIndex].text;
+    const amount = parseFloat(amountInput.value.replace(',', '.'));
+    
+    if (isNaN(amount)) {
+        showMessage('Valor inválido', 'error');
+        return;
+    }
+    
+    const paymentItem = document.createElement('div');
+    paymentItem.className = 'payment-item';
+    paymentItem.innerHTML = `
+        <span>${methodText}: R$ ${amount.toFixed(2).replace('.', ',')}</span>
+        <input type="hidden" name="payment_methods[]" value="${methodSelect.value}">
+        <input type="hidden" name="payment_amounts[]" value="${amount}">
+        <span class="remove-payment"><i class="fas fa-times"></i></span>
+    `;
+    
+    paymentsList.appendChild(paymentItem);
+    
+    // Limpa os campos
+    methodSelect.value = '';
+    amountInput.value = '';
+    
+    // Adiciona evento para remover o pagamento
+    paymentItem.querySelector('.remove-payment').addEventListener('click', function() {
+        paymentItem.remove();
+        calculatePaymentTotals();
+    });
+    
+    calculatePaymentTotals();
+});
 
+// Calcula totais e verifica se o valor recebido cobre o total
+function calculatePaymentTotals() {
+    const paymentAmounts = document.querySelectorAll('input[name="payment_amounts[]"]');
+    let totalPaid = 0;
+    
+    paymentAmounts.forEach(input => {
+        totalPaid += parseFloat(input.value) || 0;
+    });
+    
+    const totalText = saleTotalElement?.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
+    const total = parseFloat(totalText) || 0;
+    
+    if (totalPaid > 0) {
+        const change = Math.max(0, totalPaid - total);
+        if (changeValueElement) {
+            changeValueElement.textContent = formatCurrency(change);
+            changeValueElement.style.color = totalPaid < total ? 'var(--danger)' : '';
+        }
+    }
+}
 /**
  * Fecha o caixa atual
  * @async
@@ -1749,6 +1867,24 @@ function setupEventListeners() {
             if (selectedClientInput) selectedClientInput.value = "";
             if (selectedClientIdInput) selectedClientIdInput.value = "";
             updateCaixaStatus();
+        });
+    }
+
+    // Adiciona listener para preencher automaticamente o valor recebido
+    const paymentMethodSelect = document.getElementById('payment-method');
+    if (paymentMethodSelect) {
+        paymentMethodSelect.addEventListener('change', function() {
+            if (this.value === 'dinheiro' && amountReceivedInput) {
+                const totalText = saleTotalElement.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
+                const total = parseFloat(totalText) || 0;
+                amountReceivedInput.value = total.toFixed(2).replace('.', ',');
+                const event = new Event('input', { bubbles: true });
+                amountReceivedInput.dispatchEvent(event);
+            } else if (this.value === 'a_prazo' && amountReceivedInput) {
+                amountReceivedInput.value = '0,00';
+                const event = new Event('input', { bubbles: true });
+                amountReceivedInput.dispatchEvent(event);
+            }
         });
     }
 }

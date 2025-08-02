@@ -186,6 +186,20 @@ class Desconto(Base):
         )
 
 # --------------------
+# Pagamentos de Nota Fiscal (para múltiplos pagamentos)
+# --------------------
+class PagamentoNotaFiscal(Base):
+    __tablename__ = "pagamentos_nota_fiscal"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nota_fiscal_id = Column(Integer, ForeignKey("notas_fiscais.id"), nullable=False)
+    forma_pagamento = Column(Enum(FormaPagamento), nullable=False)
+    valor = Column(DECIMAL(12, 2), nullable=False)
+    data = Column(DateTime, default=datetime.now(ZoneInfo('America/Sao_Paulo')), nullable=False)
+    sincronizado = Column(Boolean, default=False, nullable=False)
+    
+    nota_fiscal = relationship("NotaFiscal", back_populates="pagamentos")
+# --------------------
 # Produto
 # --------------------
 class Produto(Base):
@@ -351,6 +365,7 @@ class NotaFiscal(Base):
     troco = Column(DECIMAL(12, 2), nullable=True)
     a_prazo = Column(Boolean, default=False, nullable=False)
     sincronizado = Column(Boolean, default=False, nullable=False)
+    forma_pagamento = Column(Enum(FormaPagamento), nullable=True)
     
     cliente = relationship("Cliente", back_populates="notas_fiscais")
     operador = relationship("Usuario", back_populates="notas_fiscais")
@@ -359,7 +374,11 @@ class NotaFiscal(Base):
     itens = relationship("NotaFiscalItem", back_populates="nota", cascade="all, delete-orphan")
     financeiros = relationship("Financeiro", back_populates="nota_fiscal", cascade="all, delete-orphan")
     contas_receber = relationship("ContaReceber", back_populates="nota_fiscal", cascade="all, delete-orphan")
-
+    pagamentos = relationship(
+        "PagamentoNotaFiscal", 
+        back_populates="nota_fiscal",
+        cascade="all, delete-orphan"
+    )
 # --------------------
 # Item da Nota Fiscal
 # --------------------
@@ -475,6 +494,8 @@ class Financeiro(Base):
     caixa_id = Column(Integer, ForeignKey('caixas.id'), nullable=True)
     caixa = relationship("Caixa", back_populates="financeiros")
     
+    pagamento_id = Column(Integer, ForeignKey("pagamentos_nota_fiscal.id"), nullable=True)
+    pagamento = relationship("PagamentoNotaFiscal")
     conta_receber_id = Column(Integer, ForeignKey("contas_receber.id"), nullable=True)
     conta_receber = relationship("ContaReceber")
     

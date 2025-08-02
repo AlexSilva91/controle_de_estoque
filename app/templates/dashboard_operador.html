@@ -246,25 +246,29 @@
                                 <i class="fas fa-times"></i> Remover
                             </button>
                         </div>
-                        <div class="payment-methods">
-                            <div class="form-group">
-                                <label for="payment-method">Forma de Pagamento</label>
-                                <select id="payment-method" class="form-control">
-                                    <option value="">Selecione...</option>
-                                    <option value="pix_fabiano">Pix - Fabiano</option>
-                                    <option value="pix_edfrance">Pix - Edfrance</option>
-                                    <option value="pix_maquineta">Pix - Maquineta</option>
-                                    <option value="dinheiro">Dinheiro</option>
-                                    <option value="cartao_credito">Cartão de Crédito</option>
-                                    <option value="cartao_debito">Cartão de Débito</option>
-                                    <option value="a_prazo">A Prazo [Fiado]</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="sale-notes">Observações</label>
-                                <input type="text" id="sale-notes" class="form-control" placeholder="Observações sobre a venda (opcional)">
-                            </div>
+                            <!-- Substitua o select atual por este bloco -->
+                            <div class="payment-methods-container">
+                                <div class="form-group">
+                                    <label>Formas de Pagamento</label>
+                                    <div class="payment-method-input">
+                                        <select class="form-control payment-method-select">
+                                            <option value="">Selecione...</option>
+                                            <option value="pix_fabiano">Pix - Fabiano</option>
+                                            <option value="pix_edfrance">Pix - Edfrance</option>
+                                            <option value="pix_maquineta">Pix - Maquineta</option>
+                                            <option value="dinheiro">Dinheiro</option>
+                                            <option value="cartao_credito">Cartão de Crédito</option>
+                                            <option value="cartao_debito">Cartão de Débito</option>
+                                            <option value="a_prazo">A Prazo [Fiado]</option>
+                                        </select>
+                                        <input type="text" class="form-control payment-amount" placeholder="Valor">
+                                        <button class="btn btn-primary add-payment-method">Adicionar</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="selected-payments-list">
+                                    <!-- Os pagamentos adicionados aparecerão aqui -->
+                                </div>
                         </div>
                         
                         <!-- Sale Summary -->

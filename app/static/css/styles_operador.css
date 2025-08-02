@@ -1260,3 +1260,40 @@ body {
 .product-total {
     font-weight: bold;
 }
+
+.payment-methods-container {
+    margin-bottom: 20px;
+}
+
+.payment-method-input {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.payment-method-input select, 
+.payment-method-input input {
+    flex: 1;
+}
+
+.selected-payments-list {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.payment-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.payment-item:last-child {
+    border-bottom: none;
+}
+
+.remove-payment {
+    color: #dc3545;
+    cursor: pointer;
+}

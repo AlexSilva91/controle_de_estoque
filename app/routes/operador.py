@@ -22,7 +22,12 @@ from app.schemas import (
     MovimentacaoEstoqueCreate,
 )
 from app.crud import (
+    CategoriaFinanceira,
+    FormaPagamento,
     StatusCaixa,
+    StatusNota,
+    StatusPagamento,
+    TipoMovimentacao,
     listar_despesas_do_dia,
     registrar_venda_completa,
     get_caixa_aberto,
@@ -204,80 +209,273 @@ def api_get_produto(produto_id):
 @login_required
 @operador_required
 def api_registrar_venda():
+    # Verificação inicial do conteúdo da requisição
+    if not request.is_json:
+        app.logger.error("Requisição sem cabeçalho Content-Type: application/json")
+        return jsonify({
+            'success': False,
+            'message': 'Content-Type deve ser application/json'
+        }), 400
+
     try:
-        if not request.is_json:
-            return jsonify({'error': 'Content-Type deve ser application/json'}), 400
+        dados_venda = request.get_json()
+        if dados_venda is None:
+            app.logger.error("Nenhum dado JSON recebido ou JSON inválido")
+            return jsonify({
+                'success': False,
+                'message': 'JSON inválido ou não enviado'
+            }), 400
 
-        data = request.get_json(force=True, silent=True)
-        print(f"PAYLOAD: \n\n{json.dumps(data, indent=2)}\n\n")
+        app.logger.info(f"Dados recebidos: {dados_venda}")
 
-        if data is None:
-            return jsonify({'error': 'Dados JSON inválidos'}), 400
-
-        app.logger.info(f"Dados recebidos: {data}")
-
-        required_fields = ['cliente_id', 'forma_pagamento', 'itens']
+        # Campos obrigatórios
+        required_fields = ['cliente_id', 'itens', 'pagamentos', 'valor_total']
         for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'Campo obrigatório faltando: {field}'}), 400
+            if field not in dados_venda:
+                app.logger.error(f"Campo obrigatório faltando: {field}")
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo obrigatório faltando: {field}'
+                }), 400
 
-        if not isinstance(data['itens'], list) or len(data['itens']) == 0:
-            return jsonify({'error': 'Lista de itens inválida'}), 400
+        # Validação de tipos
+        if not isinstance(dados_venda['itens'], list) or len(dados_venda['itens']) == 0:
+            app.logger.error("Lista de itens inválida ou vazia")
+            return jsonify({
+                'success': False,
+                'message': 'Lista de itens inválida ou vazia'
+            }), 400
 
-        # Valida itens da venda
-        for i, item in enumerate(data['itens']):
-            if not isinstance(item, dict):
-                return jsonify({'error': f'Item {i} não é um objeto válido'}), 400
+        if not isinstance(dados_venda['pagamentos'], list) or len(dados_venda['pagamentos']) == 0:
+            app.logger.error("Lista de pagamentos inválida ou vazia")
+            return jsonify({
+                'success': False,
+                'message': 'Lista de pagamentos inválida ou vazia'
+            }), 400
 
-            required_item_fields = ['produto_id', 'quantidade', 'valor_unitario']
-            for field in required_item_fields:
-                if field not in item:
-                    return jsonify({'error': f'Item {i} está faltando o campo: {field}'}), 400
+        # Conversão e validação de valores
+        try:
+            cliente_id = int(dados_venda['cliente_id'])
+            valor_total = Decimal(str(dados_venda['valor_total']))
+            valor_recebido = Decimal(str(dados_venda.get('valor_recebido', valor_total)))
+            total_descontos = Decimal(str(dados_venda.get('total_descontos', 0)))
+        except (ValueError, InvalidOperation) as e:
+            app.logger.error(f"Erro na conversão de valores: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': 'Valores numéricos inválidos'
+            }), 400
 
+        # Consultar cliente
+        cliente = entities.Cliente.query.get(cliente_id)
+        if not cliente:
+            app.logger.error(f"Cliente não encontrado: ID {cliente_id}")
+            return jsonify({
+                'success': False,
+                'message': f'Cliente não encontrado: ID {cliente_id}'
+            }), 404
+
+        # Validar itens e estoque
+        for item_data in dados_venda['itens']:
             try:
-                item['quantidade'] = float(item['quantidade'])
-                item['valor_unitario'] = float(item['valor_unitario'])
-                if 'valor_total' in item:
-                    item['valor_total'] = float(item['valor_total'])
-                else:
-                    item['valor_total'] = item['quantidade'] * item['valor_unitario']
-            except (ValueError, TypeError):
-                return jsonify({'error': f'Valores inválidos no item {i}'}), 400
+                produto_id = int(item_data.get('produto_id'))
+                quantidade = Decimal(str(item_data.get('quantidade')))
+                valor_unitario = Decimal(str(item_data.get('valor_unitario')))
+                valor_total_item = Decimal(str(item_data.get('valor_total')))
+                
+                produto = entities.Produto.query.get(produto_id)
+                if not produto:
+                    app.logger.error(f"Produto não encontrado: ID {produto_id}")
+                    return jsonify({
+                        'success': False,
+                        'message': f'Produto não encontrado: ID {produto_id}'
+                    }), 404
 
-        # Verifica se o operador possui um caixa aberto
-        caixa = entities.Caixa.query.filter_by(operador_id=current_user.id, status=StatusCaixa.aberto).first()
-        if not caixa:
-            return jsonify({'error': 'Nenhum caixa aberto encontrado para este operador'}), 400
+                if produto.estoque_loja < quantidade:
+                    msg = f'Estoque insuficiente para {produto.nome} (estoque: {produto.estoque_loja}, solicitado: {quantidade})'
+                    app.logger.error(msg)
+                    return jsonify({
+                        'success': False,
+                        'message': msg
+                    }), 400
 
-        # Prepara os dados da nota com descontos
-        dados_nota = preparar_dados_nota(data, db.session)
-        print(f"DADOS DA NOTA PREPARADOS: \n\n{json.dumps(dados_nota, indent=2)}\n\n")
-        
-        # Processa a venda
-        nota_id = registrar_venda_completa(db.session, dados_nota, operador_id=current_user.id, caixa_id=caixa.id)
-        
-        # Gera o PDF da NFC-e
-        pdf_bytesio = gerar_nfce_pdf_bobina_bytesio(
-            dados_nota=dados_nota,
-            nome_operador=current_user.nome,
-            nome_cliente=data.get('nome_cliente', ''),
-            endereco_entrega=data.get('endereco_entrega'),
-            logo_path=None
+            except (ValueError, InvalidOperation, TypeError) as e:
+                app.logger.error(f"Erro ao processar item: {str(e)}")
+                return jsonify({
+                    'success': False,
+                    'message': 'Dados do item inválidos'
+                }), 400
+
+        # Verificar soma dos pagamentos
+        try:
+            soma_pagamentos = sum(Decimal(str(p.get('valor'))) for p in dados_venda['pagamentos'])
+            a_prazo_usado = any(p.get('forma_pagamento') == 'a_prazo' for p in dados_venda['pagamentos'])
+            
+            if not a_prazo_usado and abs(soma_pagamentos - valor_total) > Decimal('0.01'):
+                msg = f'Valor recebido ({soma_pagamentos}) diferente do total da venda ({valor_total})'
+                app.logger.error(msg)
+                return jsonify({
+                    'success': False,
+                    'message': msg
+                }), 400
+        except (ValueError, InvalidOperation, TypeError) as e:
+            app.logger.error(f"Erro ao verificar pagamentos: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': 'Dados de pagamento inválidos'
+            }), 400
+
+        # Verificar caixa aberto
+        caixa_aberto = entities.Caixa.query.filter_by(status='aberto').first()
+        if not caixa_aberto:
+            app.logger.error("Nenhum caixa aberto encontrado")
+            return jsonify({
+                'success': False,
+                'message': 'Nenhum caixa aberto encontrado'
+            }), 400
+
+        # Criar registro de Nota Fiscal
+        nota = entities.NotaFiscal(
+            cliente_id=cliente.id,
+            operador_id=current_user.id,
+            caixa_id=caixa_aberto.id,
+            data_emissao=datetime.utcnow(),
+            valor_total=valor_total,
+            valor_desconto=total_descontos,
+            tipo_desconto=None,
+            status=entities.StatusNota.emitida,
+            forma_pagamento=entities.FormaPagamento.dinheiro,
+            valor_recebido=valor_recebido,
+            troco=max(valor_recebido - valor_total, Decimal(0)),
+            a_prazo=a_prazo_usado
         )
 
+        # Criar Entrega, se presente - COM TRATAMENTO SEGURO
+        endereco_entrega = dados_venda.get('endereco_entrega')
+        if endereco_entrega and isinstance(endereco_entrega, dict):
+            entrega = entities.Entrega(
+                logradouro=endereco_entrega.get('logradouro', ''),
+                numero=endereco_entrega.get('numero', ''),
+                complemento=endereco_entrega.get('complemento', ''),
+                bairro=endereco_entrega.get('bairro', ''),
+                cidade=endereco_entrega.get('cidade', ''),
+                estado=endereco_entrega.get('estado', ''),
+                cep=endereco_entrega.get('cep', ''),
+                instrucoes=endereco_entrega.get('instrucoes', ''),
+                sincronizado=False
+            )
+            db.session.add(entrega)
+            db.session.flush()
+            nota.entrega_id = entrega.id
+
+        db.session.add(nota)
+        db.session.flush()
+
+        # Criar itens da nota fiscal
+        for item_data in dados_venda['itens']:
+            produto_id = item_data.get('produto_id')
+            produto = entities.Produto.query.get(produto_id)
+            quantidade = Decimal(str(item_data.get('quantidade')))
+            valor_unitario = Decimal(str(item_data.get('valor_unitario')))
+            valor_total_item = Decimal(str(item_data.get('valor_total')))
+            desconto_aplicado = Decimal(str(item_data.get('valor_desconto', 0)))
+            
+            # Tratamento seguro para desconto_info
+            desconto_info = item_data.get('desconto_info', {}) or {}
+            tipo_desconto = desconto_info.get('tipo') if isinstance(desconto_info, dict) else None
+
+            item_nf = entities.NotaFiscalItem(
+                nota_id=nota.id,
+                produto_id=produto_id,
+                estoque_origem=entities.TipoEstoque.loja,
+                quantidade=quantidade,
+                valor_unitario=valor_unitario,
+                valor_total=valor_total_item,
+                desconto_aplicado=desconto_aplicado,
+                tipo_desconto=entities.TipoDesconto(tipo_desconto) if tipo_desconto else None,
+                sincronizado=False
+            )
+            db.session.add(item_nf)
+            
+            # Atualizar estoque
+            produto.estoque_loja -= quantidade
+
+        # Criar pagamentos
+        for pagamento_data in dados_venda['pagamentos']:
+            forma = pagamento_data.get('forma_pagamento')
+            valor = Decimal(str(pagamento_data.get('valor')))
+            
+            pagamento_nf = entities.PagamentoNotaFiscal(
+                nota_fiscal_id=nota.id,
+                forma_pagamento=entities.FormaPagamento(forma),
+                valor=valor,
+                data=datetime.utcnow(),
+                sincronizado=False
+            )
+            db.session.add(pagamento_nf)
+            
+            # Registrar no financeiro
+            financeiro = entities.Financeiro(
+                tipo=entities.TipoMovimentacao.entrada,
+                categoria=entities.CategoriaFinanceira.venda,
+                valor=valor,
+                descricao=f"Pagamento venda NF #{nota.id}",
+                cliente_id=cliente.id,
+                caixa_id=caixa_aberto.id,
+                nota_fiscal_id=nota.id,
+                pagamento_id=pagamento_nf.id,
+                sincronizado=False
+            )
+            db.session.add(financeiro)
+
+        # Se houver pagamento a prazo, criar conta a receber
+        if a_prazo_usado:
+            valor_a_prazo = sum(
+                Decimal(str(p.get('valor'))) 
+                for p in dados_venda['pagamentos'] 
+                if p.get('forma_pagamento') == 'a_prazo'
+            )
+            
+            conta_receber = entities.ContaReceber(
+                cliente_id=cliente.id,
+                nota_fiscal_id=nota.id,
+                descricao=f"Venda a prazo NF #{nota.id}",
+                valor_original=valor_a_prazo,
+                valor_aberto=valor_a_prazo,
+                data_vencimento=datetime.utcnow() + timedelta(days=30),
+                status=entities.StatusPagamento.pendente,
+                sincronizado=False
+            )
+            db.session.add(conta_receber)
+
+        db.session.commit()
+
         return jsonify({
-            'mensagem': 'Venda registrada com sucesso',
-            'nota_id': nota_id,
-            'pdf_base64': base64.b64encode(pdf_bytesio.getvalue()).decode('utf-8')
+            'success': True,
+            'message': 'Venda registrada com sucesso',
+            'nota_fiscal_id': nota.id,
+            'valor_total': float(valor_total),
+            'valor_recebido': float(valor_recebido),
+            'troco': float(nota.troco) if nota.troco else 0
         }), 201
 
-    except ValueError as e:
+    except SQLAlchemyError as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        app.logger.error(f'Erro no banco ao registrar venda: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Erro ao registrar venda no banco',
+            'error': str(e)
+        }), 500
+        
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f"Erro ao registrar venda: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Erro interno ao processar a venda'}), 500
+        app.logger.error(f'Erro inesperado ao registrar venda: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': 'Erro inesperado ao registrar venda',
+            'error': str(e)
+        }), 500
 
 @operador_bp.route('/pdf/nota/<int:nota_id>', methods=['GET'])
 @login_required
