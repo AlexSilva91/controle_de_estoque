@@ -1,6 +1,6 @@
 from functools import wraps
 from zoneinfo import ZoneInfo
-from flask import Blueprint, render_template, request, jsonify, session, flash, redirect, url_for
+from flask import Blueprint, current_app, render_template, request, jsonify, session, flash, redirect, url_for
 from flask_login import login_required, current_user
 from datetime import datetime
 from decimal import Decimal
@@ -14,7 +14,7 @@ from app.models import db
 from app.models import entities
 from app.crud import (
     TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_todos_os_descontos, criar_desconto, deletar_desconto, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, get_transferencias,
-    get_user_by_cpf, get_user_by_id, get_usuarios, create_user, registrar_transferencia, update_user,
+    get_user_by_cpf, get_user_by_id, get_usuarios, create_user, obter_caixas_completo, registrar_transferencia, update_user,
     get_produto, get_produtos, create_produto, update_produto, delete_produto,
     registrar_movimentacao, get_cliente, get_clientes, create_cliente, 
     update_cliente, delete_cliente, create_nota_fiscal, get_nota_fiscal, 
@@ -1339,3 +1339,62 @@ def buscar_desconto_por_id(desconto_id):
         return jsonify({'erro': str(e)}), 500
     finally:
         session.close()
+        
+@admin_bp.route('/caixas')
+@login_required
+@admin_required
+def get_caixas():
+    session = Session(db.engine)
+    resultado = obter_caixas_completo(session)
+    
+    if resultado['success']:
+        return jsonify({
+            'success': True,
+            'data': resultado['data'],
+            'count': len(resultado['data'])
+        })
+    else:
+        return jsonify({'success': False, 'error': resultado['message']}), 500
+
+@admin_bp.route('/api/caixas/<int:caixa_id>', methods=['PUT'])
+@login_required
+@admin_required
+def atualizar_caixa_route(caixa_id):
+    try:
+        dados = request.get_json()
+        if not dados:
+            return jsonify({"error": "Dados não fornecidos"}), 400
+            
+        caixa = db.session.get(entities.Caixa, caixa_id)
+        if not caixa:
+            return jsonify({"error": "Caixa não encontrado"}), 404
+        
+        # Atualiza status e datas conforme ação
+        if 'status' in dados:
+            if dados['status'] == 'fechado':
+                caixa.status = entities.StatusCaixa.fechado
+                caixa.data_fechamento = datetime.utcnow()
+            elif dados['status'] == 'analise':
+                caixa.status = entities.StatusCaixa.analise
+                caixa.data_analise = datetime.utcnow()
+        
+        # Atualiza observações se existirem
+        if 'observacoes_admin' in dados:
+            caixa.observacoes_admin = dados['observacoes_admin']
+        
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Caixa atualizado com sucesso",
+            "caixa": {
+                "id": caixa.id,
+                "status": caixa.status.value,
+                "data_analise": caixa.data_analise.isoformat() if caixa.data_analise else None,
+                "data_fechamento": caixa.data_fechamento.isoformat() if caixa.data_fechamento else None,
+                "observacoes_admin": caixa.observacoes_admin
+            }
+        }), 200
+            
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Erro ao atualizar caixa: {str(e)}"}), 500

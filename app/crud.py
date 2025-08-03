@@ -11,6 +11,18 @@ from datetime import datetime, time, timedelta
 from decimal import Decimal
 from enum import Enum
 from typing import List, Optional, Dict
+from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
+from datetime import datetime
+from typing import Dict, List, Any, Optional
+from decimal import Decimal
+
+from app.models.entities import (
+    Caixa,
+    NotaFiscal,
+    NotaFiscalItem,
+    MovimentacaoEstoque
+)
 
 from app.utils.conversor_unidade import converter_quantidade
 
@@ -1446,3 +1458,226 @@ def deletar_desconto(session: Session, desconto_id: int) -> bool:
     session.delete(desconto)
     session.commit()
     return True
+
+
+def obter_caixas_completo(session: Session) -> Dict[str, Any]:
+    """
+    Retorna todos os caixas com informações completas:
+    - Dados básicos do caixa
+    - Informações financeiras associadas
+    - Detalhes dos produtos vendidos
+    - Movimentações de estoque relacionadas
+    - Notas fiscais emitidas
+    
+    Args:
+        session (Session): Sessão do SQLAlchemy para acesso ao banco de dados
+    
+    Returns:
+        dict: Dicionário com os resultados ou mensagem de erro
+    """
+    try:
+        # Busca todos os caixas com relacionamentos carregados
+        caixas = (
+            session.query(Caixa)
+            .options(
+                joinedload(Caixa.operador),
+                joinedload(Caixa.administrador),
+                joinedload(Caixa.financeiros),
+                joinedload(Caixa.notas_fiscais)
+                    .joinedload(NotaFiscal.itens)
+                    .joinedload(NotaFiscalItem.produto),
+                joinedload(Caixa.movimentacoes)
+                    .joinedload(MovimentacaoEstoque.produto),
+                joinedload(Caixa.pagamentos)
+            )
+            .order_by(Caixa.data_abertura.desc())
+            .all()
+        )
+
+        resultado: List[Dict[str, Any]] = []
+        
+        for caixa in caixas:
+            # Dados básicos do caixa
+            caixa_data = {
+                'id': caixa.id,
+                'operador': {
+                    'id': caixa.operador.id,
+                    'nome': caixa.operador.nome,
+                    'tipo': caixa.operador.tipo.value
+                } if caixa.operador else None,
+                'administrador': {
+                    'id': caixa.administrador.id if caixa.administrador else None,
+                    'nome': caixa.administrador.nome if caixa.administrador else None,
+                    'tipo': caixa.administrador.tipo.value if caixa.administrador else None
+                },
+                'data_abertura': caixa.data_abertura.isoformat() if caixa.data_abertura else None,
+                'data_fechamento': caixa.data_fechamento.isoformat() if caixa.data_fechamento else None,
+                'data_analise': caixa.data_analise.isoformat() if caixa.data_analise else None,
+                'valor_abertura': float(caixa.valor_abertura) if caixa.valor_abertura else 0.0,
+                'valor_fechamento': float(caixa.valor_fechamento) if caixa.valor_fechamento else None,
+                'valor_confirmado': float(caixa.valor_confirmado) if caixa.valor_confirmado else None,
+                'status': caixa.status.value if caixa.status else None,
+                'observacoes_operador': caixa.observacoes_operador,
+                'observacoes_admin': caixa.observacoes_admin,
+                'sincronizado': caixa.sincronizado,
+                'financeiro': [],
+                'vendas': [],
+                'movimentacoes': [],
+                'pagamentos': []
+            }
+
+            # Informações financeiras
+            if caixa.financeiros:
+                for financeiro in caixa.financeiros:
+                    caixa_data['financeiro'].append({
+                        'id': financeiro.id,
+                        'tipo': financeiro.tipo.value if financeiro.tipo else None,
+                        'categoria': financeiro.categoria.value if financeiro.categoria else None,
+                        'valor': float(financeiro.valor) if financeiro.valor else 0.0,
+                        'valor_desconto': float(financeiro.valor_desconto) if financeiro.valor_desconto else None,
+                        'descricao': financeiro.descricao,
+                        'data': financeiro.data.isoformat() if financeiro.data else None,
+                        'nota_fiscal_id': financeiro.nota_fiscal_id,
+                        'cliente_id': financeiro.cliente_id,
+                        'conta_receber_id': financeiro.conta_receber_id
+                    })
+
+            # Notas fiscais e produtos vendidos
+            if caixa.notas_fiscais:
+                for nota in caixa.notas_fiscais:
+                    nota_data = {
+                        'id': nota.id,
+                        'data_emissao': nota.data_emissao.isoformat() if nota.data_emissao else None,
+                        'valor_total': float(nota.valor_total) if nota.valor_total else 0.0,
+                        'valor_desconto': float(nota.valor_desconto) if nota.valor_desconto else 0.0,
+                        'status': nota.status.value if nota.status else None,
+                        'cliente': {
+                            'id': nota.cliente.id if nota.cliente else None,
+                            'nome': nota.cliente.nome if nota.cliente else None
+                        } if nota.cliente else None,
+                        'itens': [],
+                        'pagamentos': []
+                    }
+
+                    # Itens da nota fiscal (produtos vendidos)
+                    if nota.itens:
+                        for item in nota.itens:
+                            nota_data['itens'].append({
+                                'produto': {
+                                    'id': item.produto.id if item.produto else None,
+                                    'nome': item.produto.nome if item.produto else None,
+                                    'codigo': item.produto.codigo if item.produto else None,
+                                    'unidade': item.produto.unidade.value if item.produto and item.produto.unidade else None
+                                },
+                                'quantidade': float(item.quantidade) if item.quantidade else 0.0,
+                                'valor_unitario': float(item.valor_unitario) if item.valor_unitario else 0.0,
+                                'valor_total': float(item.valor_total) if item.valor_total else 0.0,
+                                'desconto_aplicado': float(item.desconto_aplicado) if item.desconto_aplicado else None,
+                                'tipo_desconto': item.tipo_desconto.value if item.tipo_desconto else None
+                            })
+
+                    # Pagamentos da nota fiscal
+                    if nota.pagamentos:
+                        for pagamento in nota.pagamentos:
+                            nota_data['pagamentos'].append({
+                                'forma_pagamento': pagamento.forma_pagamento.value if pagamento.forma_pagamento else None,
+                                'valor': float(pagamento.valor) if pagamento.valor else 0.0,
+                                'data': pagamento.data.isoformat() if pagamento.data else None
+                            })
+
+                    caixa_data['vendas'].append(nota_data)
+
+            # Movimentações de estoque
+            if caixa.movimentacoes:
+                for movimentacao in caixa.movimentacoes:
+                    caixa_data['movimentacoes'].append({
+                        'id': movimentacao.id,
+                        'tipo': movimentacao.tipo.value if movimentacao.tipo else None,
+                        'produto': {
+                            'id': movimentacao.produto.id if movimentacao.produto else None,
+                            'nome': movimentacao.produto.nome if movimentacao.produto else None,
+                            'codigo': movimentacao.produto.codigo if movimentacao.produto else None
+                        },
+                        'quantidade': float(movimentacao.quantidade) if movimentacao.quantidade else 0.0,
+                        'valor_unitario': float(movimentacao.valor_unitario) if movimentacao.valor_unitario else 0.0,
+                        'valor_total': float(movimentacao.valor_unitario) * float(movimentacao.quantidade) if movimentacao.valor_unitario and movimentacao.quantidade else 0.0,
+                        'forma_pagamento': movimentacao.forma_pagamento.value if movimentacao.forma_pagamento else None,
+                        'data': movimentacao.data.isoformat() if movimentacao.data else None,
+                        'cliente': {
+                            'id': movimentacao.cliente.id if movimentacao.cliente else None,
+                            'nome': movimentacao.cliente.nome if movimentacao.cliente else None
+                        } if movimentacao.cliente else None
+                    })
+
+            # Pagamentos de contas a receber
+            if caixa.pagamentos:
+                for pagamento in caixa.pagamentos:
+                    caixa_data['pagamentos'].append({
+                        'id': pagamento.id,
+                        'conta_receber_id': pagamento.conta_id,
+                        'valor_pago': float(pagamento.valor_pago) if pagamento.valor_pago else 0.0,
+                        'forma_pagamento': pagamento.forma_pagamento.value if pagamento.forma_pagamento else None,
+                        'data_pagamento': pagamento.data_pagamento.isoformat() if pagamento.data_pagamento else None,
+                        'observacoes': pagamento.observacoes
+                    })
+
+            resultado.append(caixa_data)
+
+        return {
+            'success': True,
+            'data': resultado,
+            'count': len(resultado)
+        }
+
+    except Exception as e:
+        session.rollback()
+        return {
+            'success': False,
+            'error': str(e),
+            'message': 'Erro ao buscar informações dos caixas'
+        }
+
+def atualizar_caixa(session: Session, caixa_id: int, dados_atualizacao: dict):
+    """
+    Atualiza um caixa existente usando uma sessão explícita
+    
+    Args:
+        session (Session): Sessão do SQLAlchemy
+        caixa_id (int): ID do caixa a ser atualizado
+        dados_atualizacao (dict): Dicionário com os campos a serem atualizados
+        
+    Returns:
+        tuple: (Caixa atualizado, mensagem de sucesso/erro)
+    """
+    try:
+        # Busca o caixa no banco de dados usando a sessão fornecida
+        caixa = session.get(Caixa, caixa_id)
+        if not caixa:
+            return None, "Caixa não encontrado"
+        
+        # Verifica se o caixa está aberto
+        if caixa.status != StatusCaixa.aberto:
+            return None, "Só é possível atualizar caixas com status 'aberto'"
+        
+        # Campos permitidos para atualização
+        campos_permitidos = {
+            'valor_abertura', 
+            'observacoes_operador'
+        }
+        
+        # Atualiza apenas os campos permitidos
+        for campo, valor in dados_atualizacao.items():
+            if campo in campos_permitidos:
+                setattr(caixa, campo, valor)
+        
+        # Marca como não sincronizado
+        caixa.sincronizado = False
+        caixa.atualizado_em = datetime.utcnow()
+        
+        # Não faz commit aqui - deixa para o chamador controlar a transação
+        return caixa, "Caixa atualizado com sucesso"
+        
+    except Exception as e:
+        # Faz rollback explícito em caso de erro
+        session.rollback()
+        return None, f"Erro ao atualizar caixa: {str(e)}"

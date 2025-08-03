@@ -30,6 +30,8 @@ class StatusNota(str, enum.Enum):
 class StatusCaixa(str, enum.Enum):
     aberto = "aberto"
     fechado = "fechado"
+    em_analise = "em_analise"
+    rejeitado = "rejeitado"
 
 class CategoriaFinanceira(str, enum.Enum):
     venda = "venda"
@@ -118,30 +120,123 @@ class Usuario(UserMixin, Base):
 
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="usuario")
     notas_fiscais = relationship("NotaFiscal", back_populates="operador")
-    caixas = relationship("Caixa", back_populates="operador")
+    caixas_operados = relationship("Caixa", foreign_keys="[Caixa.operador_id]", back_populates="operador")
+    caixas_analisados = relationship("Caixa", foreign_keys="[Caixa.administrador_id]", back_populates="administrador")
     transferencias = relationship("TransferenciaEstoque", back_populates="usuario")
 
 # --------------------
-# Caixa
+# Caixa (Modelo modificado com controle de fechamento)
 # --------------------
 class Caixa(Base):
     __tablename__ = "caixas"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     operador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    administrador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
     data_abertura = Column(DateTime, default=datetime.utcnow, nullable=False)
     data_fechamento = Column(DateTime, nullable=True)
+    data_analise = Column(DateTime, nullable=True)
     valor_abertura = Column(DECIMAL(12, 2), nullable=False)
     valor_fechamento = Column(DECIMAL(12, 2), nullable=True)
+    valor_confirmado = Column(DECIMAL(12, 2), nullable=True)
     status = Column(Enum(StatusCaixa), nullable=False, default=StatusCaixa.aberto)
-    observacoes = Column(Text, nullable=True)
+    observacoes_operador = Column(Text, nullable=True)
+    observacoes_admin = Column(Text, nullable=True)
     sincronizado = Column(Boolean, default=False, nullable=False)
 
-    operador = relationship("Usuario", back_populates="caixas")
+    operador = relationship("Usuario", foreign_keys=[operador_id], back_populates="caixas_operados")
+    administrador = relationship("Usuario", foreign_keys=[administrador_id], back_populates="caixas_analisados")
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="caixa")
     financeiros = relationship("Financeiro", back_populates="caixa")
     notas_fiscais = relationship("NotaFiscal", back_populates="caixa")
     pagamentos = relationship("PagamentoContaReceber", back_populates="caixa")
+
+    def fechar_caixa(self, valor_fechamento, observacoes_operador=None, usuario_id=None):
+        """Método para fechar o caixa (aguardando aprovação)"""
+        if self.status != StatusCaixa.aberto:
+            raise ValueError("Caixa não está aberto para fechamento")
+            
+        self.valor_fechamento = valor_fechamento
+        self.data_fechamento = datetime.utcnow()
+        self.observacoes_operador = observacoes_operador
+        self.status = StatusCaixa.em_analise
+        self.sincronizado = False
+        
+        # Cria registro financeiro do fechamento (pendente)
+        fechamento = Financeiro(
+            tipo=TipoMovimentacao.saida,
+            categoria=CategoriaFinanceira.fechamento_caixa,
+            valor=valor_fechamento,
+            descricao=f"Fechamento do caixa #{self.id} (pendente)",
+            caixa_id=self.id,
+            data=self.data_fechamento
+        )
+        db.session.add(fechamento)
+
+    def aprovar_fechamento(self, administrador_id, valor_confirmado=None, observacoes_admin=None):
+        """Método para aprovar o fechamento do caixa"""
+        if self.status != StatusCaixa.em_analise:
+            raise ValueError("Caixa não está aguardando análise")
+            
+        self.valor_confirmado = valor_confirmado if valor_confirmado else self.valor_fechamento
+        self.observacoes_admin = observacoes_admin
+        self.administrador_id = administrador_id
+        self.data_analise = datetime.utcnow()
+        self.status = StatusCaixa.fechado
+        self.sincronizado = False
+        
+        # Atualiza registro financeiro do fechamento
+        fechamento = Financeiro.query.filter_by(
+            caixa_id=self.id,
+            categoria=CategoriaFinanceira.fechamento_caixa
+        ).first()
+        
+        if fechamento:
+            fechamento.valor = self.valor_confirmado
+            fechamento.descricao = f"Fechamento do caixa #{self.id}"
+            fechamento.data = self.data_analise
+
+    def rejeitar_fechamento(self, administrador_id, motivo, valor_correto=None):
+        """Método para rejeitar o fechamento do caixa"""
+        if self.status != StatusCaixa.em_analise:
+            raise ValueError("Caixa não está aguardando análise")
+            
+        self.valor_confirmado = valor_correto
+        self.observacoes_admin = motivo
+        self.administrador_id = administrador_id
+        self.data_analise = datetime.utcnow()
+        self.status = StatusCaixa.rejeitado
+        self.sincronizado = False
+        
+        # Remove registro financeiro do fechamento
+        fechamento = Financeiro.query.filter_by(
+            caixa_id=self.id,
+            categoria=CategoriaFinanceira.fechamento_caixa
+        ).first()
+        
+        if fechamento:
+            db.session.delete(fechamento)
+            
+    def reabrir_caixa(self, administrador_id, motivo=None):
+        """Método para reabrir um caixa fechado ou rejeitado"""
+        if self.status not in [StatusCaixa.fechado, StatusCaixa.rejeitado]:
+            raise ValueError("Caixa não está fechado ou rejeitado")
+            
+        self.status = StatusCaixa.aberto
+        self.data_fechamento = None
+        self.data_analise = None
+        self.administrador_id = administrador_id
+        self.observacoes_admin = f"Reabertura: {motivo}" if motivo else "Reabertura do caixa"
+        self.sincronizado = False
+        
+        # Remove registro financeiro do fechamento se existir
+        fechamento = Financeiro.query.filter_by(
+            caixa_id=self.id,
+            categoria=CategoriaFinanceira.fechamento_caixa
+        ).first()
+        
+        if fechamento:
+            db.session.delete(fechamento)
 
 # --------------------
 # Desconto (modelo principal)
@@ -153,7 +248,7 @@ class Desconto(Base):
     identificador = Column(String(50), unique=True, nullable=False)
     descricao = Column(String(255), nullable=True)
     tipo = Column(Enum(TipoDesconto), nullable=False)
-    valor = Column(DECIMAL(10, 2), nullable=False)  # Pode ser valor fixo ou percentual
+    valor = Column(DECIMAL(10, 2), nullable=False)
     quantidade_minima = Column(DECIMAL(12, 3), nullable=False)
     quantidade_maxima = Column(DECIMAL(12, 3), nullable=True)
     valido_ate = Column(DateTime, nullable=True)
@@ -199,6 +294,7 @@ class PagamentoNotaFiscal(Base):
     sincronizado = Column(Boolean, default=False, nullable=False)
     
     nota_fiscal = relationship("NotaFiscal", back_populates="pagamentos")
+
 # --------------------
 # Produto
 # --------------------
@@ -233,20 +329,17 @@ class Produto(Base):
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="produto")
     itens_nf = relationship("NotaFiscalItem", back_populates="produto")
 
-    # Relacionamento para transferências onde este produto é a origem
     transferencias_origem = relationship(
         "TransferenciaEstoque",
         foreign_keys="[TransferenciaEstoque.produto_id]",
         back_populates="produto"
     )
-    # Relacionamento para transferências onde este produto é o destino
     transferencias_destino = relationship(
         "TransferenciaEstoque",
         foreign_keys="[TransferenciaEstoque.produto_destino_id]",
         back_populates="produto_destino"
     )
     
-    # Relacionamento muitos-para-muitos com Descontos
     descontos = relationship(
         "Desconto",
         secondary=produto_desconto_association,
@@ -320,7 +413,6 @@ class TransferenciaEstoque(Base):
     data = Column(DateTime, default=datetime.utcnow, nullable=False)
     observacao = Column(Text, nullable=True)
     
-    # Campos para conversão (opcionais)
     quantidade_destino = Column(Numeric(10, 3), nullable=True)
     unidade_origem = Column(String(20), nullable=True)
     unidade_destino = Column(String(20), nullable=True)
@@ -360,12 +452,11 @@ class NotaFiscal(Base):
     status = Column(Enum(StatusNota), nullable=False, default=StatusNota.emitida)
     chave_acesso = Column(String(60), unique=True, nullable=True)
     observacao = Column(Text, nullable=True)
-    forma_pagamento = Column(Enum(FormaPagamento), nullable=False)
+    forma_pagamento = Column(Enum(FormaPagamento), nullable=True)
     valor_recebido = Column(DECIMAL(12, 2), nullable=True)
     troco = Column(DECIMAL(12, 2), nullable=True)
     a_prazo = Column(Boolean, default=False, nullable=False)
     sincronizado = Column(Boolean, default=False, nullable=False)
-    forma_pagamento = Column(Enum(FormaPagamento), nullable=True)
     
     cliente = relationship("Cliente", back_populates="notas_fiscais")
     operador = relationship("Usuario", back_populates="notas_fiscais")
@@ -379,6 +470,7 @@ class NotaFiscal(Base):
         back_populates="nota_fiscal",
         cascade="all, delete-orphan"
     )
+
 # --------------------
 # Item da Nota Fiscal
 # --------------------
