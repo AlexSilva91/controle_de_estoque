@@ -4,41 +4,45 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Administrativo</title>
+    
+    <!-- Links de recursos externos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
-    <!-- Botão de menu mobile -->
-    <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Menu">
-        <span class="menu-bar"></span>
-        <span class="menu-bar"></span>
-        <span class="menu-bar"></span>
-    </button>
 
-    <!-- Flash Messages Container -->
-    <div class="flash-messages">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="flash-message {{ category }}" id="flash-{{ loop.index }}">
-                        <div class="flash-content">
-                            <i class="fas 
-                                {% if category == 'success' %}fa-check-circle{% endif %}
-                                {% if category == 'error' %}fa-exclamation-circle{% endif %}
-                                {% if category == 'warning' %}fa-exclamation-triangle{% endif %}
-                                {% if category == 'info' %}fa-info-circle{% endif %}
-                            "></i>
-                            <span>{{ message }}</span>
-                        </div>
-                        <button class="close-flash" aria-label="Fechar">&times;</button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-    </div>
-    
+<body>
+    <!-- Estrutura principal do dashboard -->
     <div class="dashboard-container">
+        <!-- Botão de menu mobile (fora da estrutura principal para melhor acessibilidade) -->
+        <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Menu">
+            <span class="menu-bar"></span>
+            <span class="menu-bar"></span>
+            <span class="menu-bar"></span>
+        </button>
+
+        <!-- Mensagens flash (posicionadas no topo para maior visibilidade) -->
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash-message {{ category }}" id="flash-{{ loop.index }}">
+                            <div class="flash-content">
+                                <i class="fas 
+                                    {% if category == 'success' %}fa-check-circle
+                                    {% elif category == 'error' %}fa-exclamation-circle
+                                    {% elif category == 'warning' %}fa-exclamation-triangle
+                                    {% elif category == 'info' %}fa-info-circle{% endif %}">
+                                </i>
+                                <span>{{ message }}</span>
+                            </div>
+                            <button class="close-flash" aria-label="Fechar">&times;</button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
@@ -46,11 +50,10 @@
                     <div class="logo">{{ nome_usuario }}</div>
                     <div class="logo-subtitle">Painel de Controle</div>
                 </div>
-                <button class="close-sidebar-mobile" id="closeSidebarMobile" aria-label="Fechar menu">
-                </button>
+                <button class="close-sidebar-mobile" id="closeSidebarMobile" aria-label="Fechar menu"></button>
             </div>
             
-            <!-- No sidebar-nav, adicione o novo item após "Movimentações" -->
+            <!-- Navegação principal -->
             <nav class="sidebar-nav">
                 <ul>
                     <li class="active" data-tab="dashboard">
@@ -89,6 +92,12 @@
                             <span class="nav-text">Financeiro</span>
                         </a>
                     </li>
+                    <li data-tab="caixas">
+                        <a href="#caixas" class="nav-link">
+                            <i class="fas fa-cash-register"></i>
+                            <span class="nav-text">Caixas</span>
+                        </a>
+                    </li>
                     <li data-tab="usuarios">
                         <a href="#usuarios" class="nav-link">
                             <i class="fas fa-user-cog"></i>
@@ -98,6 +107,7 @@
                 </ul>
             </nav>
             
+            <!-- Rodapé da sidebar -->
             <div class="sidebar-footer">
                 <div class="user-info-mobile">
                     <div class="user-avatar-mobile">
@@ -115,9 +125,9 @@
             </div>
         </aside>
 
-        <!-- Main Content -->
+        <!-- Conteúdo principal -->
         <main class="main-content">
-            <!-- Header -->
+            <!-- Cabeçalho -->
             <header class="main-header">
                 <div class="header-left">
                     <button class="mobile-menu-toggle-in-header" id="mobileMenuToggleInHeader" aria-label="Menu"></button>
@@ -143,10 +153,10 @@
                 </div>
             </header>
 
-            <!-- Tab Contents -->
+            <!-- Conteúdo das abas -->
             <div class="content-wrapper">
+                <!-- Dashboard -->
                 <div id="dashboard" class="tab-content active">
-                    <!-- Conteúdo do Dashboard -->
                     <div class="action-bar">
                         <button class="btn btn-primary" id="refreshData">
                             <i class="fas fa-sync-alt"></i>
@@ -191,6 +201,7 @@
                     </div>
                 </div>
 
+                <!-- Clientes -->
                 <div id="clientes" class="tab-content">
                     <div class="action-bar">
                         <div class="search-container">
@@ -232,6 +243,7 @@
                     </div>
                 </div>
 
+                <!-- Usuários -->
                 <div id="usuarios" class="tab-content">
                     <div class="action-bar">
                         <div class="search-container">
@@ -272,6 +284,7 @@
                     </div>
                 </div>
 
+                <!-- Produtos -->
                 <div id="produtos" class="tab-content">
                     <div class="action-bar">
                         <div class="search-container">
@@ -315,6 +328,7 @@
                     </div>
                 </div>
 
+                <!-- Financeiro -->
                 <div id="financeiro" class="tab-content">
                     <div class="action-bar">
                         <div class="filter-container">
@@ -395,6 +409,7 @@
                     </div>
                 </div>
                 
+                <!-- Estoque -->
                 <div id="estoque" class="tab-content">
                     <div class="action-bar">
                         <div class="filter-container">
@@ -454,7 +469,61 @@
                         </div>
                     </div>
                 </div>
-                <!-- Adicione esta div com as outras tab contents -->
+
+                <!-- Caixas -->
+                <div id="caixas" class="tab-content">
+                    <div class="action-bar">
+                        <div class="filter-container">
+                            <div class="filter-group">
+                                <label for="caixaStatus">Status:</label>
+                                <select id="caixaStatus" class="form-control">
+                                    <option value="">Todos</option>
+                                    <option value="aberto">Abertos</option>
+                                    <option value="fechado">Fechados</option>
+                                    <option value="analise">Em análise</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" id="filterCaixas">
+                                <i class="fas fa-filter"></i>
+                                <span>Filtrar</span>
+                            </button>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn btn-outline" id="refreshCaixas" aria-label="Atualizar">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-cash-register"></i> Histórico de Caixas</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table id="caixasTable">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Operador</th>
+                                            <th>Abertura</th>
+                                            <th>Fechamento</th>
+                                            <th>Valor Abertura</th>
+                                            <th>Valor Fechamento</th>
+                                            <th>Status</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Dados serão preenchidos via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Descontos -->
                 <div id="descontos" class="tab-content">
                     <div class="action-bar">
                         <div class="search-container">
@@ -509,12 +578,15 @@
                 </div>
             </div>
 
+            <!-- Rodapé -->
             <footer>
                 <p>© 2025 Sistema de Gestão | Versão 2.1.0 | Atualizado em: <span id="updateTime"></span></p>
             </footer>
         </main>
     </div>
 
+    <!-- MODAIS -->
+    
     <!-- Modal Produto -->
     <div id="produtoModal" class="modal">
         <div class="modal-overlay"></div>
@@ -580,24 +652,24 @@
                             </div>
                         </div>
                         <div class="form-row">
-                        <div class="form-group">
-                            <label for="produtoValorCompra">Valor Unitário de Compra</label>
-                            <input type="number" id="produtoValorCompra" class="form-control" step="0.01" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="produtoValorTotalCompra">Valor Total de Compra</label>
-                            <input type="number" id="produtoValorTotalCompra" class="form-control" step="0.01" min="0">
-                        </div>
+                            <div class="form-group">
+                                <label for="produtoValorCompra">Valor Unitário de Compra</label>
+                                <input type="number" id="produtoValorCompra" class="form-control" step="0.01" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="produtoValorTotalCompra">Valor Total de Compra</label>
+                                <input type="number" id="produtoValorTotalCompra" class="form-control" step="0.01" min="0">
+                            </div>
                         </div>
                         <div class="form-row">
-                        <div class="form-group">
-                            <label for="produtoICMS">ICMS (%)</label>
-                            <input type="number" id="produtoICMS" class="form-control" step="0.01" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="produtoEstoqueMinimo">Estoque Mínimo</label>
-                            <input type="number" id="produtoEstoqueMinimo" class="form-control" step="0.001" min="0">
-                        </div>
+                            <div class="form-group">
+                                <label for="produtoICMS">ICMS (%)</label>
+                                <input type="number" id="produtoICMS" class="form-control" step="0.01" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="produtoEstoqueMinimo">Estoque Mínimo</label>
+                                <input type="number" id="produtoEstoqueMinimo" class="form-control" step="0.001" min="0">
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -813,6 +885,118 @@
             </div>
         </div>
     </div>
+    
+    <!-- Modal de Visualização do Caixa -->
+    <div id="visualizarCaixaModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Detalhes do Caixa <span id="visualizarCaixaId"></span></h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Operador:</label>
+                        <span id="visualizarCaixaOperador"></span>
+                    </div>
+                    <div class="info-item">
+                        <label>Status:</label>
+                        <span id="visualizarCaixaStatus" class="badge"></span>
+                    </div>
+                    <div class="info-item">
+                        <label>Data Abertura:</label>
+                        <span id="visualizarCaixaDataAbertura"></span>
+                    </div>
+                    <div class="info-item">
+                        <label>Valor Abertura:</label>
+                        <span id="visualizarCaixaValorAbertura"></span>
+                    </div>
+                    
+                    <div id="caixaFechamentoInfo" style="display: none;">
+                        <div class="info-item">
+                            <label>Data Fechamento:</label>
+                            <span id="visualizarCaixaDataFechamento"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Valor Fechamento:</label>
+                            <span id="visualizarCaixaValorFechamento"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-item full-width">
+                        <label>Observações do Operador:</label>
+                        <div class="info-text" id="visualizarCaixaObsOperador"></div>
+                    </div>
+                    
+                    <div class="info-item full-width">
+                        <label>Observações do Administrador:</label>
+                        <div class="info-text" id="visualizarCaixaObsAdmin"></div>
+                    </div>
+                </div>
+                
+                <h4>Movimentações Financeiras</h4>
+                <div class="table-responsive">
+                    <table id="caixaFinanceiroTable" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Tipo</th>
+                                <th>Categoria</th>
+                                <th>Valor</th>
+                                <th>Descrição</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                
+                <div class="financeiro-totals">
+                    <div class="total-item">
+                        <label>Total Entradas:</label>
+                        <span id="caixaTotalEntradas" class="total-value positive">R$ 0,00</span>
+                    </div>
+                    <div class="total-item">
+                        <label>Total Saídas:</label>
+                        <span id="caixaTotalSaidas" class="total-value negative">R$ 0,00</span>
+                    </div>
+                    <div class="total-item">
+                        <label>Saldo:</label>
+                        <span id="caixaSaldo" class="total-value">R$ 0,00</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary close-modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Edição do Caixa -->
+    <div id="editarCaixaModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="editarCaixaModalTitle">Editar Caixa</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <form id="editarCaixaForm">
+                <input type="hidden" id="editarCaixaId">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="editarCaixaValorAbertura">Valor de Abertura</label>
+                        <input type="number" id="editarCaixaValorAbertura" class="form-control" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editarCaixaObservacoes">Observações</label>
+                        <textarea id="editarCaixaObservacoes" class="form-control" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary close-modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- Modal Visualizar Usuário -->
     <div id="visualizarUsuarioModal" class="modal">
@@ -921,6 +1105,7 @@
             </div>
         </div>
     </div>
+
     <!-- Modal Desconto Produto -->
     <div id="descontoModal" class="modal">
         <div class="modal-overlay"></div>
@@ -938,8 +1123,8 @@
                     <input type="hidden" id="descontoProdutoId">
                     <div class="modal-body">
                         <div class="form-group">
-                                <label for="descontoIdentificador">Identificador*</label>
-                                <input type="text" id="descontoIdentificador" class="form-control" required>
+                            <label for="descontoIdentificador">Identificador*</label>
+                            <input type="text" id="descontoIdentificador" class="form-control" required>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
@@ -984,6 +1169,7 @@
             </div>
         </div>
     </div>
+
     <!-- Modal Visualizar Produto -->
     <div id="visualizarProdutoModal" class="modal">
         <div class="modal-overlay"></div>

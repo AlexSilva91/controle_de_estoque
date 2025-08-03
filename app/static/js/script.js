@@ -2,13 +2,16 @@ document.addEventListener('DOMContentLoaded', function() {
   // Atualizar data e hora
   function updateDateTime() {
     const now = new Date();
-    document.getElementById('updateTime').textContent = now.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    const updateTimeElement = document.getElementById('updateTime');
+    if (updateTimeElement) {
+      updateTimeElement.textContent = now.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
   }
   
   updateDateTime();
@@ -18,15 +21,17 @@ document.addEventListener('DOMContentLoaded', function() {
   const mobileMenuToggle = document.getElementById('mobileMenuToggle');
   const sidebar = document.querySelector('.sidebar');
 
-  mobileMenuToggle.addEventListener('click', function() {
-    this.classList.toggle('active');
-    sidebar.classList.toggle('active');
-  });
+  if (mobileMenuToggle && sidebar) {
+    mobileMenuToggle.addEventListener('click', function() {
+      this.classList.toggle('active');
+      sidebar.classList.toggle('active');
+    });
+  }
 
   // Fechar menu ao clicar em um item (para mobile)
   document.querySelectorAll('.sidebar-nav li').forEach(item => {
     item.addEventListener('click', function() {
-      if (window.innerWidth <= 768) {
+      if (window.innerWidth <= 768 && mobileMenuToggle && sidebar) {
         mobileMenuToggle.classList.remove('active');
         sidebar.classList.remove('active');
       }
@@ -38,6 +43,18 @@ document.addEventListener('DOMContentLoaded', function() {
   const tabContents = document.querySelectorAll('.tab-content');
   const pageTitle = document.getElementById('page-title');
   const breadcrumb = document.querySelector('.breadcrumb');
+
+  // Adiciona listeners apenas se os elementos existirem
+  const filterCaixasBtn = document.getElementById('filterCaixas');
+  const refreshCaixasBtn = document.getElementById('refreshCaixas');
+
+  if (filterCaixasBtn) {
+    filterCaixasBtn.addEventListener('click', loadCaixasData);
+  }
+
+  if (refreshCaixasBtn) {
+    refreshCaixasBtn.addEventListener('click', loadCaixasData);
+  }
   
   navItems.forEach(item => {
     item.addEventListener('click', function() {
@@ -46,11 +63,15 @@ document.addEventListener('DOMContentLoaded', function() {
       
       this.classList.add('active');
       const tabId = this.getAttribute('data-tab');
-      document.getElementById(tabId).classList.add('active');
+      const tabContent = document.getElementById(tabId);
+      
+      if (tabContent) {
+        tabContent.classList.add('active');
+      }
       
       const tabName = this.querySelector('span').textContent;
-      pageTitle.textContent = tabName;
-      breadcrumb.textContent = `Home / ${tabName}`;
+      if (pageTitle) pageTitle.textContent = tabName;
+      if (breadcrumb) breadcrumb.textContent = `Home / ${tabName}`;
 
       // Carregar dados específicos da aba quando ativada
       if (tabId === 'dashboard') loadDashboardData();
@@ -60,32 +81,44 @@ document.addEventListener('DOMContentLoaded', function() {
       if (tabId === 'usuarios') loadUsuariosData();
       if (tabId === 'estoque') loadMovimentacoesData();
       if (tabId === 'descontos') loadDescontosData();
+      if (tabId === 'caixas') loadCaixasData();
     });
   });
 
   // Botão de logout
-  document.getElementById('logoutBtn').addEventListener('click', () => {
-    if (confirm('Tem certeza que deseja sair do sistema?')) {
-      window.location.href = '/logout';
-    }
-  });
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      if (confirm('Tem certeza que deseja sair do sistema?')) {
+        window.location.href = '/logout';
+      }
+    });
+  }
 
   // Modal functions
   function openModal(modalId) {
-    document.getElementById(modalId).style.display = 'flex';
-    document.body.style.overflow = 'hidden';
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
   }
 
   function closeModal(modalId) {
-    document.getElementById(modalId).style.display = 'none';
-    document.body.style.overflow = 'auto';
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.style.display = 'none';
+      document.body.style.overflow = 'auto';
+    }
   }
 
   // Event listeners para modals
   document.querySelectorAll('.close-modal').forEach(btn => {
     btn.addEventListener('click', function() {
       const modal = this.closest('.modal');
-      closeModal(modal.id);
+      if (modal) {
+        closeModal(modal.id);
+      }
     });
   });
 
@@ -93,13 +126,17 @@ document.addEventListener('DOMContentLoaded', function() {
   window.addEventListener('click', (e) => {
     if (e.target.classList.contains('modal-overlay')) {
       const modal = e.target.closest('.modal');
-      closeModal(modal.id);
+      if (modal) {
+        closeModal(modal.id);
+      }
     }
   });
 
   // Função para mostrar mensagens flash
   function showFlashMessage(type, message) {
     const flashContainer = document.querySelector('.flash-messages');
+    if (!flashContainer) return;
+    
     const flashId = `flash-${Date.now()}`;
     
     const flashMessage = document.createElement('div');
@@ -122,9 +159,12 @@ document.addEventListener('DOMContentLoaded', function() {
     flashContainer.appendChild(flashMessage);
     
     // Fechar mensagem ao clicar no botão
-    flashMessage.querySelector('.close-flash').addEventListener('click', () => {
-      flashMessage.remove();
-    });
+    const closeBtn = flashMessage.querySelector('.close-flash');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        flashMessage.remove();
+      });
+    }
     
     // Auto-close flash messages after 5 seconds
     setTimeout(() => {
@@ -150,18 +190,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Função auxiliar para chamadas à API
   async function fetchWithErrorHandling(url, options = {}) {
-    try {
-      const response = await fetch(url, options);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      try {
+          const response = await fetch(url, options);
+          
+          // First check if the response is JSON
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+              const text = await response.text();
+              throw new Error(text || `HTTP error! status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          if (!response.ok) {
+              throw new Error(data.message || `HTTP error! status: ${response.status}`);
+          }
+          return data;
+      } catch (error) {
+          console.error('Erro na requisição:', error);
+          showFlashMessage('error', error.message || 'Erro ao comunicar com o servidor');
+          throw error;
       }
-      return await response.json();
-    } catch (error) {
-      console.error('Erro na requisição:', error);
-      showFlashMessage('error', error.message || 'Erro ao comunicar com o servidor');
-      throw error;
-    }
   }
 
   // ===== Funções para carregar dados =====
@@ -174,24 +222,26 @@ document.addEventListener('DOMContentLoaded', function() {
       
       if (metricsData.success) {
         const metricsContainer = document.querySelector('.metrics-grid');
-        metricsContainer.innerHTML = '';
-        
-        metricsData.metrics.forEach(metric => {
-          const card = document.createElement('div');
-          card.className = `metric-card ${metric.color}`;
+        if (metricsContainer) {
+          metricsContainer.innerHTML = '';
           
-          card.innerHTML = `
-            <div class="metric-icon">
-              <i class="fas fa-${metric.icon}"></i>
-            </div>
-            <div class="metric-info">
-              <h3>${metric.title}</h3>
-              <div class="value">${metric.value}</div>
-            </div>
-          `;
-          
-          metricsContainer.appendChild(card);
-        });
+          metricsData.metrics.forEach(metric => {
+            const card = document.createElement('div');
+            card.className = `metric-card ${metric.color}`;
+            
+            card.innerHTML = `
+              <div class="metric-icon">
+                <i class="fas fa-${metric.icon}"></i>
+              </div>
+              <div class="metric-info">
+                <h3>${metric.title}</h3>
+                <div class="value">${metric.value}</div>
+              </div>
+            `;
+            
+            metricsContainer.appendChild(card);
+          });
+        }
       }
       
       // Carregar movimentações
@@ -199,19 +249,21 @@ document.addEventListener('DOMContentLoaded', function() {
       
       if (movData.success) {
         const movTable = document.querySelector('#movimentacoesTable tbody');
-        movTable.innerHTML = '';
-        
-        movData.movimentacoes.forEach(mov => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${mov.data}</td>
-            <td><span class="badge ${mov.tipo === 'Entrada' ? 'badge-success' : 'badge-danger'}">${mov.tipo}</span></td>
-            <td>${mov.produto}</td>
-            <td>${mov.quantidade}</td>
-            <td>${mov.valor}</td>
-          `;
-          movTable.appendChild(row);
-        });
+        if (movTable) {
+          movTable.innerHTML = '';
+          
+          movData.movimentacoes.forEach(mov => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${mov.data}</td>
+              <td><span class="badge ${mov.tipo === 'Entrada' ? 'badge-success' : 'badge-danger'}">${mov.tipo}</span></td>
+              <td>${mov.produto}</td>
+              <td>${mov.quantidade}</td>
+              <td>${mov.valor}</td>
+            `;
+            movTable.appendChild(row);
+          });
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados do dashboard:', error);
@@ -223,25 +275,34 @@ document.addEventListener('DOMContentLoaded', function() {
   // Função para abrir modal de edição de cliente
   async function openEditarClienteModal(clienteId) {
     // Resetar formulário
-    document.getElementById('clienteForm').reset();
-    document.getElementById('clienteId').value = '';
-    document.getElementById('clienteStatus').value = 'true';
+    const clienteForm = document.getElementById('clienteForm');
+    if (clienteForm) clienteForm.reset();
+    
+    const clienteIdField = document.getElementById('clienteId');
+    if (clienteIdField) clienteIdField.value = '';
+    
+    const clienteStatus = document.getElementById('clienteStatus');
+    if (clienteStatus) clienteStatus.value = 'true';
 
     // Ajustar título e botão
-    document.getElementById('clienteModalTitle').textContent = 'Editar Cliente';
-    document.getElementById('clienteModalSubmitText').textContent = 'Atualizar';
+    const clienteModalTitle = document.getElementById('clienteModalTitle');
+    if (clienteModalTitle) clienteModalTitle.textContent = 'Editar Cliente';
+    
+    const clienteModalSubmitText = document.getElementById('clienteModalSubmitText');
+    if (clienteModalSubmitText) clienteModalSubmitText.textContent = 'Atualizar';
 
     try {
       const response = await fetchWithErrorHandling(`/admin/clientes/${clienteId}`);
       if (response.success) {
         const cliente = response.cliente;
-        document.getElementById('clienteId').value = cliente.id;
-        document.getElementById('clienteNome').value = cliente.nome;
-        document.getElementById('clienteDocumento').value = cliente.documento || '';
-        document.getElementById('clienteTelefone').value = cliente.telefone || '';
-        document.getElementById('clienteEmail').value = cliente.email || '';
-        document.getElementById('clienteEndereco').value = cliente.endereco || '';
-        document.getElementById('clienteStatus').value = cliente.ativo ? 'true' : 'false';
+        
+        if (document.getElementById('clienteId')) document.getElementById('clienteId').value = cliente.id;
+        if (document.getElementById('clienteNome')) document.getElementById('clienteNome').value = cliente.nome;
+        if (document.getElementById('clienteDocumento')) document.getElementById('clienteDocumento').value = cliente.documento || '';
+        if (document.getElementById('clienteTelefone')) document.getElementById('clienteTelefone').value = cliente.telefone || '';
+        if (document.getElementById('clienteEmail')) document.getElementById('clienteEmail').value = cliente.email || '';
+        if (document.getElementById('clienteEndereco')) document.getElementById('clienteEndereco').value = cliente.endereco || '';
+        if (document.getElementById('clienteStatus')) document.getElementById('clienteStatus').value = cliente.ativo ? 'true' : 'false';
       } else {
         showFlashMessage('error', 'Erro ao carregar dados do cliente');
         return;
@@ -256,43 +317,46 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Submissão do formulário de cliente
-  document.getElementById('clienteForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
+  const clienteForm = document.getElementById('clienteForm');
+  if (clienteForm) {
+    clienteForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
 
-    const clienteId = document.getElementById('clienteId').value;
-    const isEdit = clienteId !== '';
+      const clienteId = document.getElementById('clienteId')?.value || '';
+      const isEdit = clienteId !== '';
 
-    const formData = {
-      nome: document.getElementById('clienteNome').value,
-      documento: document.getElementById('clienteDocumento').value,
-      telefone: document.getElementById('clienteTelefone').value,
-      email: document.getElementById('clienteEmail').value,
-      endereco: document.getElementById('clienteEndereco').value,
-      ativo: document.getElementById('clienteStatus').value === 'true'
-    };
+      const formData = {
+        nome: document.getElementById('clienteNome')?.value || '',
+        documento: document.getElementById('clienteDocumento')?.value || '',
+        telefone: document.getElementById('clienteTelefone')?.value || '',
+        email: document.getElementById('clienteEmail')?.value || '',
+        endereco: document.getElementById('clienteEndereco')?.value || '',
+        ativo: document.getElementById('clienteStatus')?.value === 'true'
+      };
 
-    const url = isEdit ? `/admin/clientes/${clienteId}` : '/admin/clientes';
-    const method = isEdit ? 'PUT' : 'POST';
+      const url = isEdit ? `/admin/clientes/${clienteId}` : '/admin/clientes';
+      const method = isEdit ? 'PUT' : 'POST';
 
-    try {
-      const response = await fetchWithErrorHandling(url, {
-        method: method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
+      try {
+        const response = await fetchWithErrorHandling(url, {
+          method: method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
 
-      if (response.success) {
-        showFlashMessage('success', `Cliente ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
-        closeModal('clienteModal');
-        loadClientesData();
-      } else {
-        showFlashMessage('error', response.message || 'Erro ao salvar cliente');
+        if (response.success) {
+          showFlashMessage('success', `Cliente ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
+          closeModal('clienteModal');
+          loadClientesData();
+        } else {
+          showFlashMessage('error', response.message || 'Erro ao salvar cliente');
+        }
+      } catch (error) {
+        console.error('Erro ao salvar cliente:', error);
+        showFlashMessage('error', 'Erro ao salvar cliente');
       }
-    } catch (error) {
-      console.error('Erro ao salvar cliente:', error);
-      showFlashMessage('error', 'Erro ao salvar cliente');
-    }
-  });
+    });
+  }
 
   // Configurar ações dos botões editar e remover após carregar tabela
   function setupClienteActions() {
@@ -306,9 +370,14 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.remover-cliente').forEach(btn => {
       btn.addEventListener('click', function() {
         const clienteId = this.getAttribute('data-id');
-        document.getElementById('confirmarExclusaoTexto').textContent = `Tem certeza que deseja excluir o cliente ${clienteId}?`;
-        document.getElementById('confirmarExclusaoBtn').setAttribute('data-id', clienteId);
-        document.getElementById('confirmarExclusaoBtn').setAttribute('data-type', 'cliente');
+        const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
+        const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
+        
+        if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir o cliente ${clienteId}?`;
+        if (confirmarExclusaoBtn) {
+          confirmarExclusaoBtn.setAttribute('data-id', clienteId);
+          confirmarExclusaoBtn.setAttribute('data-type', 'cliente');
+        }
         openModal('confirmarExclusaoModal');
       });
     });
@@ -317,41 +386,43 @@ document.addEventListener('DOMContentLoaded', function() {
   // Carregar dados de clientes e montar tabela
   async function loadClientesData() {
     try {
-      const searchText = document.getElementById('searchCliente').value.toLowerCase();
+      const searchText = document.getElementById('searchCliente')?.value.toLowerCase() || '';
       const data = await fetchWithErrorHandling('/admin/clientes');
 
       if (data.success) {
         const clientesTable = document.querySelector('#clientesTable tbody');
-        clientesTable.innerHTML = '';
+        if (clientesTable) {
+          clientesTable.innerHTML = '';
 
-        data.clientes.forEach(cliente => {
-          if (searchText && !cliente.nome.toLowerCase().includes(searchText)) return;
+          data.clientes.forEach(cliente => {
+            if (searchText && !cliente.nome.toLowerCase().includes(searchText)) return;
 
-          const status = cliente.ativo === 'Ativo' || cliente.ativo === true ? 'Ativo' : 'Inativo';
+            const status = cliente.ativo === 'Ativo' || cliente.ativo === true ? 'Ativo' : 'Inativo';
 
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${cliente.id}</td>
-            <td>${cliente.nome}</td>
-            <td>${cliente.documento || ''}</td>
-            <td>${cliente.telefone || ''}</td>
-            <td>${cliente.email || ''}</td>
-            <td><span class="badge ${status === 'Ativo' ? 'badge-success' : 'badge-danger'}">${status}</span></td>
-            <td>
-              <div class="table-actions">
-                <button class="btn-icon btn-warning editar-cliente" data-id="${cliente.id}" title="Editar">
-                  <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn-icon btn-danger remover-cliente" data-id="${cliente.id}" title="Remover">
-                  <i class="fas fa-trash"></i>
-                </button>
-              </div>
-            </td>
-          `;
-          clientesTable.appendChild(row);
-        });
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${cliente.id}</td>
+              <td>${cliente.nome}</td>
+              <td>${cliente.documento || ''}</td>
+              <td>${cliente.telefone || ''}</td>
+              <td>${cliente.email || ''}</td>
+              <td><span class="badge ${status === 'Ativo' ? 'badge-success' : 'badge-danger'}">${status}</span></td>
+              <td>
+                <div class="table-actions">
+                  <button class="btn-icon btn-warning editar-cliente" data-id="${cliente.id}" title="Editar">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button class="btn-icon btn-danger remover-cliente" data-id="${cliente.id}" title="Remover">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </td>
+            `;
+            clientesTable.appendChild(row);
+          });
 
-        setupClienteActions();
+          setupClienteActions();
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
@@ -363,46 +434,48 @@ document.addEventListener('DOMContentLoaded', function() {
   // Carregar dados de produtos
   async function loadProdutosData() {
     try {
-      const searchText = document.getElementById('searchProduto').value.toLowerCase();
+      const searchText = document.getElementById('searchProduto')?.value.toLowerCase() || '';
       const data = await fetchWithErrorHandling('/admin/produtos');
       
       if (data.success) {
         const produtosTable = document.querySelector('#produtosTable tbody');
-        produtosTable.innerHTML = '';
-        
-        data.produtos.forEach(produto => {
-          if (searchText && !produto.nome.toLowerCase().includes(searchText)) {
-            return;
-          }
+        if (produtosTable) {
+          produtosTable.innerHTML = '';
           
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${produto.id}</td>
-            <td>${produto.nome}</td>
-            <td>${produto.tipo}</td>
-            <td>${produto.unidade}</td>
-            <td>${produto.valor}</td>
-            <td>${produto.estoque_deposito}</td>
-            <td>${produto.estoque_loja}</td>
-            <td>${produto.estoque_fabrica}</td>
-            <td>
-              <div class="table-actions">
-                <button class="btn-icon btn-info movimentar-estoque" data-id="${produto.id}" title="Transferir entre estoques">
-                  <i class="fas fa-exchange-alt"></i>
-                </button>
-                <button class="btn-icon btn-warning editar-produto" data-id="${produto.id}" title="Editar">
-                  <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn-icon btn-danger remover-produto" data-id="${produto.id}" title="Remover">
-                  <i class="fas fa-trash"></i>
-                </button>
-              </div>
-            </td>
-          `;
-          produtosTable.appendChild(row);
-        });
-        
-        setupProdutoActions();
+          data.produtos.forEach(produto => {
+            if (searchText && !produto.nome.toLowerCase().includes(searchText)) {
+              return;
+            }
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${produto.id}</td>
+              <td>${produto.nome}</td>
+              <td>${produto.tipo}</td>
+              <td>${produto.unidade}</td>
+              <td>${produto.valor}</td>
+              <td>${produto.estoque_deposito}</td>
+              <td>${produto.estoque_loja}</td>
+              <td>${produto.estoque_fabrica}</td>
+              <td>
+                <div class="table-actions">
+                  <button class="btn-icon btn-info movimentar-estoque" data-id="${produto.id}" title="Transferir entre estoques">
+                    <i class="fas fa-exchange-alt"></i>
+                  </button>
+                  <button class="btn-icon btn-warning editar-produto" data-id="${produto.id}" title="Editar">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button class="btn-icon btn-danger remover-produto" data-id="${produto.id}" title="Remover">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </td>
+            `;
+            produtosTable.appendChild(row);
+          });
+          
+          setupProdutoActions();
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
@@ -421,6 +494,8 @@ document.addEventListener('DOMContentLoaded', function() {
           if (data.success) {
             const produto = data.produto;
             const formBody = document.querySelector('#editarProdutoModal .modal-body');
+            
+            if (!formBody) return;
             
             // Tratamento seguro para valor_unitario
             let valorUnitario = produto.valor_unitario;
@@ -559,7 +634,10 @@ document.addEventListener('DOMContentLoaded', function() {
               </div>
             `;
             
-            document.getElementById('editarProdutoForm').setAttribute('data-produto-id', produtoId);
+            const editarProdutoForm = document.getElementById('editarProdutoForm');
+            if (editarProdutoForm) {
+              editarProdutoForm.setAttribute('data-produto-id', produtoId);
+            }
             setupDescontoEvents();
             openModal('editarProdutoModal');
           }
@@ -573,9 +651,14 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.remover-produto').forEach(btn => {
       btn.addEventListener('click', function() {
         const produtoId = this.getAttribute('data-id');
-        document.getElementById('confirmarExclusaoTexto').textContent = `Tem certeza que deseja excluir o produto ${produtoId}?`;
-        document.getElementById('confirmarExclusaoBtn').setAttribute('data-id', produtoId);
-        document.getElementById('confirmarExclusaoBtn').setAttribute('data-type', 'produto');
+        const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
+        const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
+        
+        if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir o produto ${produtoId}?`;
+        if (confirmarExclusaoBtn) {
+          confirmarExclusaoBtn.setAttribute('data-id', produtoId);
+          confirmarExclusaoBtn.setAttribute('data-type', 'produto');
+        }
         openModal('confirmarExclusaoModal');
       });
     });
@@ -590,52 +673,64 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function setupDescontoEvents() {
     // Adicionar desconto
-    document.getElementById('btnAdicionarDesconto').addEventListener('click', function() {
-      const select = document.getElementById('selecionarDesconto');
-      const selectedOption = select.options[select.selectedIndex];
-      
-      if (!selectedOption.value) {
-        showFlashMessage('warning', 'Selecione um desconto para adicionar');
-        return;
-      }
-      
-      const descontoId = selectedOption.value;
-      const container = document.getElementById('descontosContainer');
-      
-      // Verificar se o desconto já foi adicionado
-      if (document.querySelector(`.desconto-item[data-id="${descontoId}"]`)) {
-        showFlashMessage('warning', 'Este desconto já foi adicionado');
-        return;
-      }
-      
-      // Criar novo item de desconto
-      const item = document.createElement('div');
-      item.className = 'desconto-item';
-      item.dataset.id = descontoId;
-      item.innerHTML = `
-        <span>${selectedOption.dataset.identificador} - 
-        ${selectedOption.dataset.tipo === 'fixo' ? `R$ ${selectedOption.dataset.valor}` : `${selectedOption.dataset.valor}%`} - 
-        Mín: ${selectedOption.dataset.quantidadeMinima}${selectedOption.dataset.quantidadeMaxima ? `, Máx: ${selectedOption.dataset.quantidadeMaxima}` : ''}</span>
-        <button type="button" class="btn-icon btn-danger btn-remover-desconto">
-          <i class="fas fa-times"></i>
-        </button>
-      `;
-      
-      container.appendChild(item);
-      
-      // Resetar seleção
-      select.value = '';
-      
-      // Adicionar evento de remoção
-      item.querySelector('.btn-remover-desconto').addEventListener('click', function() {
-        item.remove();
+    const btnAdicionarDesconto = document.getElementById('btnAdicionarDesconto');
+    if (btnAdicionarDesconto) {
+      btnAdicionarDesconto.addEventListener('click', function() {
+        const select = document.getElementById('selecionarDesconto');
+        if (!select) return;
+        
+        const selectedOption = select.options[select.selectedIndex];
+        
+        if (!selectedOption.value) {
+          showFlashMessage('warning', 'Selecione um desconto para adicionar');
+          return;
+        }
+        
+        const descontoId = selectedOption.value;
+        const container = document.getElementById('descontosContainer');
+        if (!container) return;
+        
+        // Verificar se o desconto já foi adicionado
+        if (document.querySelector(`.desconto-item[data-id="${descontoId}"]`)) {
+          showFlashMessage('warning', 'Este desconto já foi adicionado');
+          return;
+        }
+        
+        // Criar novo item de desconto
+        const item = document.createElement('div');
+        item.className = 'desconto-item';
+        item.dataset.id = descontoId;
+        item.innerHTML = `
+          <span>${selectedOption.dataset.identificador} - 
+          ${selectedOption.dataset.tipo === 'fixo' ? `R$ ${selectedOption.dataset.valor}` : `${selectedOption.dataset.valor}%`} - 
+          Mín: ${selectedOption.dataset.quantidadeMinima}${selectedOption.dataset.quantidadeMaxima ? `, Máx: ${selectedOption.dataset.quantidadeMaxima}` : ''}</span>
+          <button type="button" class="btn-icon btn-danger btn-remover-desconto">
+            <i class="fas fa-times"></i>
+          </button>
+        `;
+        
+        container.appendChild(item);
+        
+        // Resetar seleção
+        select.value = '';
+        
+        // Adicionar evento de remoção
+        const removeBtn = item.querySelector('.btn-remover-desconto');
+        if (removeBtn) {
+          removeBtn.addEventListener('click', function() {
+            item.remove();
+          });
+        }
       });
-    });
+    }
     
     // Remover descontos existentes
     document.querySelectorAll('.btn-remover-desconto').forEach(btn => {
       btn.addEventListener('click', function() {
-        this.closest('.desconto-item').remove();
+        const item = this.closest('.desconto-item');
+        if (item) {
+          item.remove();
+        }
       });
     });
   }
@@ -647,16 +742,30 @@ document.addEventListener('DOMContentLoaded', function() {
           if (response.success) {
               const produto = response.produto;
               
-              document.getElementById('transferenciaProdutoId').value = produtoId;
-              document.getElementById('transferenciaProdutoNome').textContent = produto.nome;
-              document.getElementById('transferenciaUnidadeAtual').textContent = produto.unidade;
+              const transferenciaProdutoId = document.getElementById('transferenciaProdutoId');
+              if (transferenciaProdutoId) transferenciaProdutoId.value = produtoId;
+              
+              const transferenciaProdutoNome = document.getElementById('transferenciaProdutoNome');
+              if (transferenciaProdutoNome) transferenciaProdutoNome.textContent = produto.nome;
+              
+              const transferenciaUnidadeAtual = document.getElementById('transferenciaUnidadeAtual');
+              if (transferenciaUnidadeAtual) transferenciaUnidadeAtual.textContent = produto.unidade;
               
               // Resetar valores
-              document.getElementById('transferenciaOrigem').value = 'loja';
-              document.getElementById('transferenciaDestino').value = 'deposito';
-              document.getElementById('transferenciaQuantidade').value = '';
-              document.getElementById('transferenciaValorUnitarioDestino').value = produto.valor_unitario;
-              document.getElementById('transferenciaObservacao').value = '';
+              const transferenciaOrigem = document.getElementById('transferenciaOrigem');
+              if (transferenciaOrigem) transferenciaOrigem.value = 'loja';
+              
+              const transferenciaDestino = document.getElementById('transferenciaDestino');
+              if (transferenciaDestino) transferenciaDestino.value = 'deposito';
+              
+              const transferenciaQuantidade = document.getElementById('transferenciaQuantidade');
+              if (transferenciaQuantidade) transferenciaQuantidade.value = '';
+              
+              const transferenciaValorUnitarioDestino = document.getElementById('transferenciaValorUnitarioDestino');
+              if (transferenciaValorUnitarioDestino) transferenciaValorUnitarioDestino.value = produto.valor_unitario;
+              
+              const transferenciaObservacao = document.getElementById('transferenciaObservacao');
+              if (transferenciaObservacao) transferenciaObservacao.value = '';
               
               openModal('transferenciaModal');
               updateEstoqueDisponivel();
@@ -668,69 +777,77 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Formulário de transferência SEM conversão
-  document.getElementById('transferenciaForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const produtoId = document.getElementById('transferenciaProdutoId').value;
-      const origem = document.getElementById('transferenciaOrigem').value;
-      const destino = document.getElementById('transferenciaDestino').value;
-      const quantidade = parseFloat(document.getElementById('transferenciaQuantidade').value);
-      const valorUnitarioDestino = parseFloat(document.getElementById('transferenciaValorUnitarioDestino').value);
-      const observacao = document.getElementById('transferenciaObservacao').value;
-      
-      // Validações
-      if (origem === destino) {
-          showFlashMessage('error', 'Origem e destino não podem ser iguais');
-          return;
-      }
-      
-      if (quantidade <= 0 || isNaN(quantidade)) {
-          showFlashMessage('error', 'Informe uma quantidade válida');
-          return;
-      }
-      
-      if (valorUnitarioDestino <= 0 || isNaN(valorUnitarioDestino)) {
-          showFlashMessage('error', 'Informe um valor unitário válido');
-          return;
-      }
-      
-      try {
-          const response = await fetchWithErrorHandling('/admin/transferencias', {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                  produto_id: produtoId,
-                  estoque_origem: origem,
-                  estoque_destino: destino,
-                  quantidade: quantidade,
-                  valor_unitario_destino: valorUnitarioDestino,
-                  observacao: observacao,
-                  converter_unidade: false
-              })
-          });
-          
-          if (response.success) {
-              showFlashMessage('success', 'Transferência realizada com sucesso');
-              closeModal('transferenciaModal');
-              loadProdutosData();
-              loadMovimentacoesData();
-          } else {
-              showFlashMessage('error', response.message || 'Erro ao realizar transferência');
-          }
-      } catch (error) {
-          console.error('Erro ao realizar transferência:', error);
-          showFlashMessage('error', error.message || 'Erro ao realizar transferência');
-      }
-  });
+  const transferenciaForm = document.getElementById('transferenciaForm');
+  if (transferenciaForm) {
+    transferenciaForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const produtoId = document.getElementById('transferenciaProdutoId')?.value;
+        const origem = document.getElementById('transferenciaOrigem')?.value;
+        const destino = document.getElementById('transferenciaDestino')?.value;
+        const quantidade = parseFloat(document.getElementById('transferenciaQuantidade')?.value || 0);
+        const valorUnitarioDestino = parseFloat(document.getElementById('transferenciaValorUnitarioDestino')?.value || 0);
+        const observacao = document.getElementById('transferenciaObservacao')?.value || '';
+        
+        // Validações
+        if (origem === destino) {
+            showFlashMessage('error', 'Origem e destino não podem ser iguais');
+            return;
+        }
+        
+        if (quantidade <= 0 || isNaN(quantidade)) {
+            showFlashMessage('error', 'Informe uma quantidade válida');
+            return;
+        }
+        
+        if (valorUnitarioDestino <= 0 || isNaN(valorUnitarioDestino)) {
+            showFlashMessage('error', 'Informe um valor unitário válido');
+            return;
+        }
+        
+        try {
+            const response = await fetchWithErrorHandling('/admin/transferencias', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    produto_id: produtoId,
+                    estoque_origem: origem,
+                    estoque_destino: destino,
+                    quantidade: quantidade,
+                    valor_unitario_destino: valorUnitarioDestino,
+                    observacao: observacao,
+                    converter_unidade: false
+                })
+            });
+            
+            if (response.success) {
+                showFlashMessage('success', 'Transferência realizada com sucesso');
+                closeModal('transferenciaModal');
+                loadProdutosData();
+                loadMovimentacoesData();
+            } else {
+                showFlashMessage('error', response.message || 'Erro ao realizar transferência');
+            }
+        } catch (error) {
+            console.error('Erro ao realizar transferência:', error);
+            showFlashMessage('error', error.message || 'Erro ao realizar transferência');
+        }
+    });
+  }
 
   // Atualizar estoque disponível quando origem muda
-  document.getElementById('transferenciaOrigem').addEventListener('change', updateEstoqueDisponivel);
+  const transferenciaOrigem = document.getElementById('transferenciaOrigem');
+  if (transferenciaOrigem) {
+    transferenciaOrigem.addEventListener('change', updateEstoqueDisponivel);
+  }
 
   function updateEstoqueDisponivel() {
-      const produtoId = document.getElementById('transferenciaProdutoId').value;
-      const origem = document.getElementById('transferenciaOrigem').value;
+      const produtoId = document.getElementById('transferenciaProdutoId')?.value;
+      const origem = document.getElementById('transferenciaOrigem')?.value;
+      
+      if (!produtoId || !origem) return;
       
       fetchWithErrorHandling(`/admin/produtos/${produtoId}`)
           .then(response => {
@@ -742,10 +859,16 @@ document.addEventListener('DOMContentLoaded', function() {
                   else if (origem === 'deposito') estoque = produto.estoque_deposito;
                   else if (origem === 'fabrica') estoque = produto.estoque_fabrica;
                   
-                  document.getElementById('transferenciaEstoqueDisponivel').textContent = 
-                      `Disponível: ${estoque} ${produto.unidade}`;
+                  const transferenciaEstoqueDisponivel = document.getElementById('transferenciaEstoqueDisponivel');
+                  if (transferenciaEstoqueDisponivel) {
+                    transferenciaEstoqueDisponivel.textContent = 
+                        `Disponível: ${estoque} ${produto.unidade}`;
+                  }
                   
-                  document.getElementById('transferenciaQuantidade').max = estoque;
+                  const transferenciaQuantidade = document.getElementById('transferenciaQuantidade');
+                  if (transferenciaQuantidade) {
+                    transferenciaQuantidade.max = estoque;
+                  }
               }
           })
           .catch(error => {
@@ -754,127 +877,122 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Formulário de produto
-  document.getElementById('produtoForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const estoqueTipo = document.getElementById('produtoEstoqueTipo').value;
-    const estoqueQuantidade = document.getElementById('produtoEstoque').value;
-    
-    const formData = {
-      codigo: document.getElementById('produtoCodigo').value,
-      nome: document.getElementById('produtoNome').value,
-      tipo: document.getElementById('produtoTipo').value,
-      marca: document.getElementById('produtoMarca').value,
-      unidade: document.getElementById('produtoUnidade').value,
-      valor_unitario: document.getElementById('produtoValor').value,
-      estoque_loja: estoqueTipo === 'loja' ? estoqueQuantidade : 0,
-      estoque_deposito: estoqueTipo === 'deposito' ? estoqueQuantidade : 0,
-      estoque_fabrica: estoqueTipo === 'fabrica' ? estoqueQuantidade : 0
-    };
-
-    const valorCompra = document.getElementById('produtoValorCompra').value;
-    const valorTotal = document.getElementById('produtoValorTotalCompra').value;
-    const icms = document.getElementById('produtoICMS').value;
-    const estoqueMinimo = document.getElementById('produtoEstoqueMinimo').value;
-
-    if (valorCompra) formData.valor_unitario_compra = valorCompra;
-    if (valorTotal) formData.valor_total_compra = valorTotal;
-    if (icms) formData.imcs = icms;
-    if (estoqueMinimo) formData.estoque_minimo = estoqueMinimo;
-    
-    try {
-      const response = await fetchWithErrorHandling('/admin/produtos', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
+  const produtoForm = document.getElementById('produtoForm');
+  if (produtoForm) {
+    produtoForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
       
-      if (response.success) {
-        showFlashMessage('success', 'Produto cadastrado com sucesso');
-        closeModal('produtoModal');
-        loadProdutosData();
-      } else {
-        showFlashMessage('error', response.message || 'Erro ao cadastrar produto');
+      const estoqueTipo = document.getElementById('produtoEstoqueTipo')?.value || 'loja';
+      const estoqueQuantidade = parseFloat(document.getElementById('produtoEstoque')?.value) || 0;
+      
+      const formData = {
+        codigo: document.getElementById('produtoCodigo')?.value || '',
+        nome: document.getElementById('produtoNome')?.value || '',
+        tipo: document.getElementById('produtoTipo')?.value || '',
+        marca: document.getElementById('produtoMarca')?.value || '',
+        unidade: document.getElementById('produtoUnidade')?.value || 'kg',
+        valor_unitario: parseFloat(document.getElementById('produtoValor')?.value) || 0,
+        estoque_loja: estoqueTipo === 'loja' ? estoqueQuantidade : 0,
+        estoque_deposito: estoqueTipo === 'deposito' ? estoqueQuantidade : 0,
+        estoque_fabrica: estoqueTipo === 'fabrica' ? estoqueQuantidade : 0
+      };
+
+      const valorCompra = parseFloat(document.getElementById('produtoValorCompra')?.value);
+      const valorTotal = parseFloat(document.getElementById('produtoValorTotalCompra')?.value);
+      const icms = parseFloat(document.getElementById('produtoICMS')?.value);
+      const estoqueMinimo = parseFloat(document.getElementById('produtoEstoqueMinimo')?.value);
+
+      if (!isNaN(valorCompra)) formData.valor_unitario_compra = valorCompra;
+      if (!isNaN(valorTotal)) formData.valor_total_compra = valorTotal;
+      if (!isNaN(icms)) formData.imcs = icms;
+      if (!isNaN(estoqueMinimo)) formData.estoque_minimo = estoqueMinimo;
+      
+      try {
+        const response = await fetchWithErrorHandling('/admin/produtos', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+        
+        if (response.success) {
+          showFlashMessage('success', 'Produto cadastrado com sucesso');
+          closeModal('produtoModal');
+          loadProdutosData();
+        } else {
+          showFlashMessage('error', response.message || 'Erro ao cadastrar produto');
+        }
+      } catch (error) {
+        console.error('Erro ao cadastrar produto:', error);
+        showFlashMessage('error', 'Erro ao cadastrar produto');
       }
-    } catch (error) {
-      console.error('Erro ao cadastrar produto:', error);
-      showFlashMessage('error', 'Erro ao cadastrar produto');
-    }
-  });
+    });
+  }
 
   // Formulário de edição de produto
-  document.getElementById('editarProdutoForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const produtoId = this.getAttribute('data-produto-id');
-    
-    // Coletar descontos selecionados
-    const descontos = [];
-    document.querySelectorAll('#descontosContainer .desconto-item').forEach(item => {
-      descontos.push(item.dataset.id);
-    });
-    
-    const formData = {
-      codigo: document.getElementById('editCodigo').value,
-      nome: document.getElementById('editNome').value,
-      tipo: document.getElementById('editTipo').value,
-      marca: document.getElementById('editMarca').value,
-      valor_unitario: document.getElementById('editValor').value,
-      valor_unitario_compra: document.getElementById('editValorCompra').value,
-      valor_total_compra: document.getElementById('editValorTotalCompra').value,
-      imcs: document.getElementById('editICMS').value,
-      estoque_loja: document.getElementById('editEstoqueLoja').value,
-      estoque_deposito: document.getElementById('editEstoqueDeposito').value,
-      estoque_fabrica: document.getElementById('editEstoqueFabrica').value,
-      estoque_minimo: document.getElementById('editEstoqueMinimo').value,
-      estoque_maximo: document.getElementById('editEstoqueMaximo').value,
-      ativo: document.getElementById('editAtivo').value === 'true',
-      descontos: descontos
-    };
-    
-    try {
-      const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
+  const editarProdutoForm = document.getElementById('editarProdutoForm');
+  if (editarProdutoForm) {
+    editarProdutoForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const produtoId = this.getAttribute('data-produto-id');
+      if (!produtoId) return;
+      
+      // Coletar descontos selecionados
+      const descontos = [];
+      document.querySelectorAll('#descontosContainer .desconto-item').forEach(item => {
+        descontos.push(item.dataset.id);
       });
       
-      if (response.success) {
-        showFlashMessage('success', 'Produto atualizado com sucesso');
-        closeModal('editarProdutoModal');
-        loadProdutosData();
-      } else {
-        showFlashMessage('error', response.message || 'Erro ao atualizar produto');
+      const formData = {
+        codigo: document.getElementById('editCodigo')?.value || '',
+        nome: document.getElementById('editNome')?.value || '',
+        tipo: document.getElementById('editTipo')?.value || '',
+        marca: document.getElementById('editMarca')?.value || '',
+        valor_unitario: parseFloat(document.getElementById('editValor')?.value) || 0,
+        valor_unitario_compra: parseFloat(document.getElementById('editValorCompra')?.value) || 0,
+        valor_total_compra: parseFloat(document.getElementById('editValorTotalCompra')?.value) || 0,
+        imcs: parseFloat(document.getElementById('editICMS')?.value) || 0,
+        estoque_loja: parseFloat(document.getElementById('editEstoqueLoja')?.value) || 0,
+        estoque_deposito: parseFloat(document.getElementById('editEstoqueDeposito')?.value) || 0,
+        estoque_fabrica: parseFloat(document.getElementById('editEstoqueFabrica')?.value) || 0,
+        estoque_minimo: parseFloat(document.getElementById('editEstoqueMinimo')?.value) || 0,
+        estoque_maximo: parseFloat(document.getElementById('editEstoqueMaximo')?.value) || 0,
+        ativo: document.getElementById('editAtivo')?.value === 'true',
+        descontos: descontos
+      };
+      
+      try {
+        const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+        
+        if (response.success) {
+          showFlashMessage('success', 'Produto atualizado com sucesso');
+          closeModal('editarProdutoModal');
+          loadProdutosData();
+        } else {
+          showFlashMessage('error', response.message || 'Erro ao atualizar produto');
+        }
+      } catch (error) {
+        console.error('Erro ao atualizar produto:', error);
+        showFlashMessage('error', 'Erro ao atualizar produto');
       }
-    } catch (error) {
-      console.error('Erro ao atualizar produto:', error);
-      showFlashMessage('error', 'Erro ao atualizar produto');
-    }
-  });
-
-  // Inicialização
-  document.addEventListener('DOMContentLoaded', function() {
-    loadProdutosData();
-    
-    // Adicionar evento de busca
-    document.getElementById('searchProduto').addEventListener('input', loadProdutosData);
-    
-    // Adicionar evento para abrir modal de novo produto
-    document.getElementById('btnNovoProduto').addEventListener('click', function() {
-      openModal('produtoModal');
     });
-  });
+  }
+
   // ===== MOVIMENTAÇÕES =====
   // Carregar dados de movimentações
   async function loadMovimentacoesData() {
     try {
-      const dateInicio = document.getElementById('movimentacaoDateInicio').value;
-      const dateFim = document.getElementById('movimentacaoDateFim').value;
-      const tipo = document.getElementById('movimentacaoTipo').value;
+      const dateInicio = document.getElementById('movimentacaoDateInicio')?.value;
+      const dateFim = document.getElementById('movimentacaoDateFim')?.value;
+      const tipo = document.getElementById('movimentacaoTipo')?.value;
       
       let url = '/admin/transferencias';
       const params = new URLSearchParams();
@@ -891,21 +1009,23 @@ document.addEventListener('DOMContentLoaded', function() {
       
       if (data.success) {
         const table = document.querySelector('#movimentacoesEstoqueTable tbody');
-        table.innerHTML = '';
-        
-        data.transferencias.forEach(transf => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${transf.data}</td>
-            <td>${transf.observacao || '-'}</td>
-            <td>${transf.produto}</td>
-            <td>${transf.quantidade}</td>
-            <td>${transf.origem || '-'}</td>
-            <td>${transf.destino || '-'}</td>
-            <td>${transf.usuario}</td>
-          `;
-          table.appendChild(row);
-        });
+        if (table) {
+          table.innerHTML = '';
+          
+          data.transferencias.forEach(transf => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${transf.data}</td>
+              <td>${transf.observacao || '-'}</td>
+              <td>${transf.produto}</td>
+              <td>${transf.quantidade}</td>
+              <td>${transf.origem || '-'}</td>
+              <td>${transf.destino || '-'}</td>
+              <td>${transf.usuario}</td>
+            `;
+            table.appendChild(row);
+          });
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar movimentações:', error);
@@ -914,14 +1034,17 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Configurar filtro de movimentações
-  document.getElementById('filterMovimentacoes').addEventListener('click', loadMovimentacoesData);
+  const filterMovimentacoes = document.getElementById('filterMovimentacoes');
+  if (filterMovimentacoes) {
+    filterMovimentacoes.addEventListener('click', loadMovimentacoesData);
+  }
 
   // ===== FINANCEIRO =====
   // Carregar dados financeiros
   async function loadFinanceiroData() {
     try {
-      const dateInicio = document.getElementById('dateInicio').value;
-      const dateFim = document.getElementById('dateFim').value;
+      const dateInicio = document.getElementById('dateInicio')?.value;
+      const dateFim = document.getElementById('dateFim')?.value;
       
       let url = '/admin/financeiro';
       if (dateInicio || dateFim) {
@@ -932,26 +1055,33 @@ document.addEventListener('DOMContentLoaded', function() {
       
       if (data.success) {
         // Atualizar resumo
-        document.getElementById('receitasValue').textContent = data.resumo.receitas;
-        document.getElementById('despesasValue').textContent = data.resumo.despesas;
-        document.getElementById('saldoValue').textContent = data.resumo.saldo;
+        const receitasValue = document.getElementById('receitasValue');
+        if (receitasValue) receitasValue.textContent = data.resumo.receitas;
+        
+        const despesasValue = document.getElementById('despesasValue');
+        if (despesasValue) despesasValue.textContent = data.resumo.despesas;
+        
+        const saldoValue = document.getElementById('saldoValue');
+        if (saldoValue) saldoValue.textContent = data.resumo.saldo;
         
         // Atualizar tabela
         const financeiroTable = document.querySelector('#financeiroTable tbody');
-        financeiroTable.innerHTML = '';
-        
-        data.lancamentos.forEach(lanc => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${lanc.data}</td>
-            <td><span class="badge ${lanc.tipo === 'Entrada' ? 'badge-success' : 'badge-danger'}">${lanc.tipo}</span></td>
-            <td>${lanc.categoria}</td>
-            <td style="font-weight: 500; color: ${lanc.tipo === 'Entrada' ? 'var(--success-dark)' : 'var(--danger-dark)'}">${lanc.valor}</td>
-            <td>${lanc.descricao}</td>
-            <td>${lanc.nota}</td>
-          `;
-          financeiroTable.appendChild(row);
-        });
+        if (financeiroTable) {
+          financeiroTable.innerHTML = '';
+          
+          data.lancamentos.forEach(lanc => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${lanc.data}</td>
+              <td><span class="badge ${lanc.tipo === 'Entrada' ? 'badge-success' : 'badge-danger'}">${lanc.tipo}</span></td>
+              <td>${lanc.categoria}</td>
+              <td style="font-weight: 500; color: ${lanc.tipo === 'Entrada' ? 'var(--success-dark)' : 'var(--danger-dark)'}">${lanc.valor}</td>
+              <td>${lanc.descricao}</td>
+              <td>${lanc.nota}</td>
+            `;
+            financeiroTable.appendChild(row);
+          });
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados financeiros:', error);
@@ -965,29 +1095,47 @@ document.addEventListener('DOMContentLoaded', function() {
     const isEdit = usuarioId !== null;
     
     // Configurar o modal conforme o modo (edição ou cadastro)
-    document.getElementById('usuarioModalTitle').textContent = isEdit ? 'Editar Usuário' : 'Cadastrar Usuário';
-    document.getElementById('usuarioModalSubmitText').textContent = isEdit ? 'Atualizar' : 'Cadastrar';
+    const usuarioModalTitle = document.getElementById('usuarioModalTitle');
+    if (usuarioModalTitle) {
+      usuarioModalTitle.textContent = isEdit ? 'Editar Usuário' : 'Cadastrar Usuário';
+    }
+    
+    const usuarioModalSubmitText = document.getElementById('usuarioModalSubmitText');
+    if (usuarioModalSubmitText) {
+      usuarioModalSubmitText.textContent = isEdit ? 'Atualizar' : 'Cadastrar';
+    }
     
     // Configurar campos de senha
     const senhaInput = document.getElementById('usuarioSenha');
     const confirmaSenhaInput = document.getElementById('usuarioConfirmaSenha');
 
     if (isEdit) {
-      senhaInput.required = false;
-      confirmaSenhaInput.required = false;
-      senhaInput.placeholder = "Deixe em branco para manter a senha atual";
-      confirmaSenhaInput.placeholder = "Repita a nova senha se for alterar";
+      if (senhaInput) {
+        senhaInput.required = false;
+        senhaInput.placeholder = "Deixe em branco para manter a senha atual";
+      }
+      if (confirmaSenhaInput) {
+        confirmaSenhaInput.required = false;
+        confirmaSenhaInput.placeholder = "Repita a nova senha se for alterar";
+      }
     } else {
-      senhaInput.required = true;
-      confirmaSenhaInput.required = true;
-      senhaInput.placeholder = "";
-      confirmaSenhaInput.placeholder = "";
+      if (senhaInput) {
+        senhaInput.required = true;
+        senhaInput.placeholder = "";
+      }
+      if (confirmaSenhaInput) {
+        confirmaSenhaInput.required = true;
+        confirmaSenhaInput.placeholder = "";
+      }
     }
     
     // Limpar formulário se for novo usuário
     if (!isEdit) {
-      document.getElementById('usuarioForm').reset();
-      document.getElementById('usuarioId').value = '';
+      const usuarioForm = document.getElementById('usuarioForm');
+      if (usuarioForm) usuarioForm.reset();
+      
+      const usuarioIdField = document.getElementById('usuarioId');
+      if (usuarioIdField) usuarioIdField.value = '';
     }
     
     // Se for edição, carregar os dados do usuário
@@ -1002,16 +1150,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const usuario = response.usuario;
         
         // Preencher formulário
-        document.getElementById('usuarioId').value = usuario.id;
-        document.getElementById('usuarioNome').value = usuario.nome;
-        document.getElementById('usuarioCpf').value = usuario.cpf;
-        document.getElementById('usuarioPerfil').value = usuario.tipo.toLowerCase();
-        document.getElementById('usuarioStatus').value = usuario.status ? 'true' : 'false';
-        document.getElementById('usuarioObservacoes').value = usuario.observacoes || '';
+        if (document.getElementById('usuarioId')) document.getElementById('usuarioId').value = usuario.id;
+        if (document.getElementById('usuarioNome')) document.getElementById('usuarioNome').value = usuario.nome;
+        if (document.getElementById('usuarioCpf')) document.getElementById('usuarioCpf').value = usuario.cpf;
+        if (document.getElementById('usuarioPerfil')) document.getElementById('usuarioPerfil').value = usuario.tipo.toLowerCase();
+        if (document.getElementById('usuarioStatus')) document.getElementById('usuarioStatus').value = usuario.status ? 'true' : 'false';
+        if (document.getElementById('usuarioObservacoes')) document.getElementById('usuarioObservacoes').value = usuario.observacoes || '';
         
         // Limpar campos de senha
-        document.getElementById('usuarioSenha').value = '';
-        document.getElementById('usuarioConfirmaSenha').value = '';
+        if (document.getElementById('usuarioSenha')) document.getElementById('usuarioSenha').value = '';
+        if (document.getElementById('usuarioConfirmaSenha')) document.getElementById('usuarioConfirmaSenha').value = '';
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
         showFlashMessage('error', error.message || 'Erro ao carregar dados do usuário');
@@ -1023,59 +1171,62 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Formulário de usuário
-  document.getElementById('usuarioForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const isEdit = document.getElementById('usuarioId').value !== '';
-    const usuarioId = document.getElementById('usuarioId').value;
-    
-    const formData = {
-      nome: document.getElementById('usuarioNome').value,
-      cpf: document.getElementById('usuarioCpf').value,
-      tipo: document.getElementById('usuarioPerfil').value,
-      status: document.getElementById('usuarioStatus').value === 'true',
-      observacoes: document.getElementById('usuarioObservacoes').value
-    };
-    
-    // Verificar se há senha sendo enviada (tanto para edição quanto cadastro)
-    const senha = document.getElementById('usuarioSenha').value;
-    const confirmaSenha = document.getElementById('usuarioConfirmaSenha').value;
-    
-    if (senha || confirmaSenha) {
-      if (senha !== confirmaSenha) {
-        showFlashMessage('error', 'As senhas não coincidem');
-        return;
-      }
-      if (senha.length > 0) { // Só adiciona se não estiver vazia
-        formData.senha = senha;
-        formData.confirma_senha = confirmaSenha;
-      }
-    }
-    
-    try {
-      const url = isEdit ? `/admin/usuarios/${usuarioId}` : '/admin/usuarios';
-      const method = isEdit ? 'PUT' : 'POST';
+  const usuarioForm = document.getElementById('usuarioForm');
+  if (usuarioForm) {
+    usuarioForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
       
-      const response = await fetchWithErrorHandling(url, {
-        method: method,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
+      const isEdit = document.getElementById('usuarioId')?.value !== '';
+      const usuarioId = document.getElementById('usuarioId')?.value || '';
       
-      if (response.success) {
-        showFlashMessage('success', `Usuário ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
-        closeModal('usuarioModal');
-        loadUsuariosData();
-      } else {
-        showFlashMessage('error', response.message || `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
+      const formData = {
+        nome: document.getElementById('usuarioNome')?.value || '',
+        cpf: document.getElementById('usuarioCpf')?.value || '',
+        tipo: document.getElementById('usuarioPerfil')?.value || '',
+        status: document.getElementById('usuarioStatus')?.value === 'true',
+        observacoes: document.getElementById('usuarioObservacoes')?.value || ''
+      };
+      
+      // Verificar se há senha sendo enviada (tanto para edição quanto cadastro)
+      const senha = document.getElementById('usuarioSenha')?.value || '';
+      const confirmaSenha = document.getElementById('usuarioConfirmaSenha')?.value || '';
+      
+      if (senha || confirmaSenha) {
+        if (senha !== confirmaSenha) {
+          showFlashMessage('error', 'As senhas não coincidem');
+          return;
+        }
+        if (senha.length > 0) { // Só adiciona se não estiver vazia
+          formData.senha = senha;
+          formData.confirma_senha = confirmaSenha;
+        }
       }
-    } catch (error) {
-      console.error(`Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário:`, error);
-      showFlashMessage('error', `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
-    }
-  });
+      
+      try {
+        const url = isEdit ? `/admin/usuarios/${usuarioId}` : '/admin/usuarios';
+        const method = isEdit ? 'PUT' : 'POST';
+        
+        const response = await fetchWithErrorHandling(url, {
+          method: method,
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+        
+        if (response.success) {
+          showFlashMessage('success', `Usuário ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
+          closeModal('usuarioModal');
+          loadUsuariosData();
+        } else {
+          showFlashMessage('error', response.message || `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
+        }
+      } catch (error) {
+        console.error(`Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário:`, error);
+        showFlashMessage('error', `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
+      }
+    });
+  }
 
   // Função para abrir modal de visualização de usuário
   async function openVisualizarUsuarioModal(usuarioId) {
@@ -1085,23 +1236,27 @@ document.addEventListener('DOMContentLoaded', function() {
       if (response.success) {
         const usuario = response.usuario;
         
-        document.getElementById('visualizarUsuarioNome').textContent = usuario.nome;
-        document.getElementById('visualizarUsuarioCPF').textContent = usuario.cpf;
-        document.getElementById('visualizarUsuarioUltimoAcesso').textContent = usuario.ultimo_acesso || 'Nunca acessou';
-        document.getElementById('visualizarUsuarioDataCadastro').textContent = usuario.data_cadastro || 'Data não disponível';
-        document.getElementById('visualizarUsuarioObservacoes').textContent = usuario.observacoes || 'Nenhuma observação';
+        if (document.getElementById('visualizarUsuarioNome')) document.getElementById('visualizarUsuarioNome').textContent = usuario.nome;
+        if (document.getElementById('visualizarUsuarioCPF')) document.getElementById('visualizarUsuarioCPF').textContent = usuario.cpf;
+        if (document.getElementById('visualizarUsuarioUltimoAcesso')) document.getElementById('visualizarUsuarioUltimoAcesso').textContent = usuario.ultimo_acesso || 'Nunca acessou';
+        if (document.getElementById('visualizarUsuarioDataCadastro')) document.getElementById('visualizarUsuarioDataCadastro').textContent = usuario.data_cadastro || 'Data não disponível';
+        if (document.getElementById('visualizarUsuarioObservacoes')) document.getElementById('visualizarUsuarioObservacoes').textContent = usuario.observacoes || 'Nenhuma observação';
         
         // Configurar badge de perfil
         const perfilBadge = document.getElementById('visualizarUsuarioPerfil');
-        perfilBadge.textContent = formatPerfil(usuario.tipo);
-        perfilBadge.className = 'badge';
-        perfilBadge.classList.add(`badge-${usuario.tipo.toLowerCase()}`);
+        if (perfilBadge) {
+          perfilBadge.textContent = formatPerfil(usuario.tipo);
+          perfilBadge.className = 'badge';
+          perfilBadge.classList.add(`badge-${usuario.tipo.toLowerCase()}`);
+        }
         
         // Configurar badge de status
         const statusBadge = document.getElementById('visualizarUsuarioStatus');
-        statusBadge.textContent = usuario.status ? 'Ativo' : 'Inativo';
-        statusBadge.className = 'badge';
-        statusBadge.classList.add(usuario.status ? 'badge-success' : 'badge-danger');
+        if (statusBadge) {
+          statusBadge.textContent = usuario.status ? 'Ativo' : 'Inativo';
+          statusBadge.className = 'badge';
+          statusBadge.classList.add(usuario.status ? 'badge-success' : 'badge-danger');
+        }
 
         openModal('visualizarUsuarioModal');
       }
@@ -1162,9 +1317,14 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.remover-usuario').forEach(btn => {
       btn.addEventListener('click', function() {
         const usuarioId = this.getAttribute('data-id');
-        document.getElementById('confirmarExclusaoTexto').textContent = `Tem certeza que deseja excluir permanentemente o usuário ${usuarioId}?`;
-        document.getElementById('confirmarExclusaoBtn').setAttribute('data-id', usuarioId);
-        document.getElementById('confirmarExclusaoBtn').setAttribute('data-type', 'usuario');
+        const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
+        const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
+        
+        if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir permanentemente o usuário ${usuarioId}?`;
+        if (confirmarExclusaoBtn) {
+          confirmarExclusaoBtn.setAttribute('data-id', usuarioId);
+          confirmarExclusaoBtn.setAttribute('data-type', 'usuario');
+        }
         openModal('confirmarExclusaoModal');
       });
     });
@@ -1173,52 +1333,54 @@ document.addEventListener('DOMContentLoaded', function() {
   // Função para carregar dados de usuários
   async function loadUsuariosData() {
     try {
-      const searchText = document.getElementById('searchUsuario').value.toLowerCase();
+      const searchText = document.getElementById('searchUsuario')?.value.toLowerCase() || '';
       const data = await fetchWithErrorHandling('/admin/usuarios');
       
       if (data.success) {
         const usuariosTable = document.querySelector('#usuariosTable tbody');
-        usuariosTable.innerHTML = '';
-        
-        data.usuarios.forEach(usuario => {
-          if (searchText && !usuario.nome.toLowerCase().includes(searchText)) {
-            return;
-          }
+        if (usuariosTable) {
+          usuariosTable.innerHTML = '';
           
-          const statusBool = usuario.status === true || usuario.status === 'true' || usuario.status === 'Ativo';
-          const status = statusBool ? 'Ativo' : 'Inativo';
+          data.usuarios.forEach(usuario => {
+            if (searchText && !usuario.nome.toLowerCase().includes(searchText)) {
+              return;
+            }
+            
+            const statusBool = usuario.status === true || usuario.status === 'true' || usuario.status === 'Ativo';
+            const status = statusBool ? 'Ativo' : 'Inativo';
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${usuario.id}</td>
+              <td>${usuario.nome}</td>
+              <td><span class="badge badge-${usuario.tipo.toLowerCase()}">${formatPerfil(usuario.tipo)}</span></td>
+              <td><span class="badge ${statusBool ? 'badge-success' : 'badge-danger'}">${status}</span></td>
+              <td>${usuario.ultimo_acesso || 'Nunca'}</td>
+              <td>
+                <div class="table-actions">
+                  <button class="btn-icon btn-primary visualizar-usuario" data-id="${usuario.id}" title="Visualizar">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                  <button class="btn-icon btn-warning editar-usuario" data-id="${usuario.id}" title="Editar">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button class="btn-icon ${statusBool ? 'btn-danger' : 'btn-success'} alterar-status-usuario" 
+                          data-id="${usuario.id}" 
+                          data-status="${status}"
+                          title="${statusBool ? 'Desativar' : 'Ativar'}">
+                    <i class="fas ${statusBool ? 'fa-user-slash' : 'fa-user-check'}"></i>
+                  </button>
+                  <button class="btn-icon btn-danger remover-usuario" data-id="${usuario.id}" title="Remover">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </td>
+            `;
+            usuariosTable.appendChild(row);
+          });
           
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${usuario.id}</td>
-            <td>${usuario.nome}</td>
-            <td><span class="badge badge-${usuario.tipo.toLowerCase()}">${formatPerfil(usuario.tipo)}</span></td>
-            <td><span class="badge ${statusBool ? 'badge-success' : 'badge-danger'}">${status}</span></td>
-            <td>${usuario.ultimo_acesso || 'Nunca'}</td>
-            <td>
-              <div class="table-actions">
-                <button class="btn-icon btn-primary visualizar-usuario" data-id="${usuario.id}" title="Visualizar">
-                  <i class="fas fa-eye"></i>
-                </button>
-                <button class="btn-icon btn-warning editar-usuario" data-id="${usuario.id}" title="Editar">
-                  <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn-icon ${statusBool ? 'btn-danger' : 'btn-success'} alterar-status-usuario" 
-                        data-id="${usuario.id}" 
-                        data-status="${status}"
-                        title="${statusBool ? 'Desativar' : 'Ativar'}">
-                  <i class="fas ${statusBool ? 'fa-user-slash' : 'fa-user-check'}"></i>
-                </button>
-                <button class="btn-icon btn-danger remover-usuario" data-id="${usuario.id}" title="Remover">
-                  <i class="fas fa-trash"></i>
-                </button>
-              </div>
-            </td>
-          `;
-          usuariosTable.appendChild(row);
-        });
-        
-        setupUsuarioActions();
+          setupUsuarioActions();
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
@@ -1229,42 +1391,44 @@ document.addEventListener('DOMContentLoaded', function() {
   // ===== DESCONTOS =====
   async function loadDescontosData() {
       try {
-          const searchText = document.getElementById('searchDesconto').value.toLowerCase();
+          const searchText = document.getElementById('searchDesconto')?.value.toLowerCase() || '';
           const data = await fetchWithErrorHandling('/admin/descontos');
           
           if (data.success) {
               const descontosTable = document.querySelector('#descontosTable tbody');
-              descontosTable.innerHTML = '';
-              
-              data.descontos.forEach(desconto => {
-                  if (searchText && !(desconto.identificador || '').toLowerCase().includes(searchText)) {
-                      return;
-                  }
-                  
-                  const row = document.createElement('tr');
-                  row.innerHTML = `
-                      <td>${desconto.identificador || '-'}</td>
-                      <td>${desconto.descricao || '-'}</td>
-                      <td>${desconto.quantidade_minima}</td>
-                      <td>${desconto.quantidade_maxima}</td>
-                      <td>${desconto.valor_unitario_com_desconto || '0,00'}</td>
-                      <td>${desconto.valido_ate || '-'}</td>
-                      <td><span class="badge ${desconto.ativo ? 'badge-success' : 'badge-danger'}">${desconto.ativo ? 'Ativo' : 'Inativo'}</span></td>
-                      <td>
-                          <div class="table-actions">
-                              <button class="btn-icon btn-warning editar-desconto" data-id="${desconto.id}" title="Editar">
-                                  <i class="fas fa-edit"></i>
-                              </button>
-                              <button class="btn-icon btn-danger remover-desconto" data-id="${desconto.id}" title="Remover">
-                                  <i class="fas fa-trash"></i>
-                              </button>
-                          </div>
-                      </td>
-                  `;
-                  descontosTable.appendChild(row);
-              });
-              
-              setupDescontoActions();
+              if (descontosTable) {
+                descontosTable.innerHTML = '';
+                
+                data.descontos.forEach(desconto => {
+                    if (searchText && !(desconto.identificador || '').toLowerCase().includes(searchText)) {
+                        return;
+                    }
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${desconto.identificador || '-'}</td>
+                        <td>${desconto.descricao || '-'}</td>
+                        <td>${desconto.quantidade_minima}</td>
+                        <td>${desconto.quantidade_maxima}</td>
+                        <td>${desconto.valor_unitario_com_desconto || '0,00'}</td>
+                        <td>${desconto.valido_ate || '-'}</td>
+                        <td><span class="badge ${desconto.ativo ? 'badge-success' : 'badge-danger'}">${desconto.ativo ? 'Ativo' : 'Inativo'}</span></td>
+                        <td>
+                            <div class="table-actions">
+                                <button class="btn-icon btn-warning editar-desconto" data-id="${desconto.id}" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-icon btn-danger remover-desconto" data-id="${desconto.id}" title="Remover">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    descontosTable.appendChild(row);
+                });
+                
+                setupDescontoActions();
+              }
           }
       } catch (error) {
           console.error('Erro ao carregar descontos:', error);
@@ -1283,9 +1447,14 @@ document.addEventListener('DOMContentLoaded', function() {
       document.querySelectorAll('.remover-desconto').forEach(btn => {
           btn.addEventListener('click', function() {
               const descontoId = this.getAttribute('data-id');
-              document.getElementById('confirmarExclusaoTexto').textContent = `Tem certeza que deseja excluir este desconto?`;
-              document.getElementById('confirmarExclusaoBtn').setAttribute('data-id', descontoId);
-              document.getElementById('confirmarExclusaoBtn').setAttribute('data-type', 'desconto');
+              const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
+              const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
+              
+              if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir este desconto?`;
+              if (confirmarExclusaoBtn) {
+                confirmarExclusaoBtn.setAttribute('data-id', descontoId);
+                confirmarExclusaoBtn.setAttribute('data-type', 'desconto');
+              }
               openModal('confirmarExclusaoModal');
           });
       });
@@ -1293,6 +1462,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Função para limpar o valor monetário
   function limparValor(valor) {
+      if (!valor) return 0;
       return parseFloat(valor.replace('R$', '').replace(',', '.').trim());
   }
 
@@ -1304,12 +1474,12 @@ document.addEventListener('DOMContentLoaded', function() {
               const desconto = response.desconto;
 
               // Preencher o formulário com os dados do desconto
-              document.getElementById('descontoId').value = desconto.id;
-              document.getElementById('descontoProdutoId').value = desconto.produto_id;
-              document.getElementById('descontoIdentificador').value = desconto.identificador;
-              document.getElementById('descontoQuantidadeMinima').value = desconto.quantidade_minima;
-              document.getElementById('descontoQuantidadeMaxima').value = desconto.quantidade_maxima;
-              document.getElementById('descontoValorUnitario').value = limparValor(desconto.valor_unitario_com_desconto);
+              if (document.getElementById('descontoId')) document.getElementById('descontoId').value = desconto.id;
+              if (document.getElementById('descontoProdutoId')) document.getElementById('descontoProdutoId').value = desconto.produto_id;
+              if (document.getElementById('descontoIdentificador')) document.getElementById('descontoIdentificador').value = desconto.identificador;
+              if (document.getElementById('descontoQuantidadeMinima')) document.getElementById('descontoQuantidadeMinima').value = desconto.quantidade_minima;
+              if (document.getElementById('descontoQuantidadeMaxima')) document.getElementById('descontoQuantidadeMaxima').value = desconto.quantidade_maxima;
+              if (document.getElementById('descontoValorUnitario')) document.getElementById('descontoValorUnitario').value = limparValor(desconto.valor_unitario_com_desconto);
 
               // Tratamento da data para o formato 'YYYY-MM-DD'
               if (desconto.valido_ate) {
@@ -1321,16 +1491,17 @@ document.addEventListener('DOMContentLoaded', function() {
                   }
 
                   // Definir o valor do input de data
-                  document.getElementById('descontoValidoAte').value = dataValidoAte;
+                  if (document.getElementById('descontoValidoAte')) document.getElementById('descontoValidoAte').value = dataValidoAte;
               } else {
-                  document.getElementById('descontoValidoAte').value = '';  // Se não houver data, limpa o campo
+                  if (document.getElementById('descontoValidoAte')) document.getElementById('descontoValidoAte').value = '';  // Se não houver data, limpa o campo
               }
 
-              document.getElementById('descontoDescricao').value = desconto.descricao || '';
-              document.getElementById('descontoAtivo').value = desconto.ativo ? 'true' : 'false';
+              if (document.getElementById('descontoDescricao')) document.getElementById('descontoDescricao').value = desconto.descricao || '';
+              if (document.getElementById('descontoAtivo')) document.getElementById('descontoAtivo').value = desconto.ativo ? 'true' : 'false';
 
               // Atualizar título do modal
-              document.getElementById('descontoModalTitle').textContent = 'Editar Desconto';
+              const descontoModalTitle = document.getElementById('descontoModalTitle');
+              if (descontoModalTitle) descontoModalTitle.textContent = 'Editar Desconto';
               openModal('descontoModal');
           } else {
               showFlashMessage('error', response.erro || 'Erro ao carregar dados do desconto');
@@ -1342,131 +1513,407 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Formulário de desconto
-  document.getElementById('descontoForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const descontoId = document.getElementById('descontoId').value;
-      const isEdit = descontoId !== '';
-      
-      const formData = {
-          identificador: document.getElementById('descontoIdentificador').value,
-          quantidade_minima: document.getElementById('descontoQuantidadeMinima').value,
-          quantidade_maxima: document.getElementById('descontoQuantidadeMaxima').value,
-          valor_unitario_com_desconto: document.getElementById('descontoValorUnitario').value,
-          valido_ate: document.getElementById('descontoValidoAte').value || null,
-          descricao: document.getElementById('descontoDescricao').value,
-          ativo: document.getElementById('descontoAtivo').value === 'true'
-      };
-      
-      const url = isEdit ? `/admin/descontos/${descontoId}` : '/admin/descontos';
-      const method = isEdit ? 'PUT' : 'POST';
-      
-      try {
-          const response = await fetchWithErrorHandling(url, {
-              method: method,
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(formData)
-          });
-          
-          if (response.success) {
-              showFlashMessage('success', `Desconto ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
-              closeModal('descontoModal');
-              loadDescontosData();
-          } else {
-              showFlashMessage('error', response.message || `Erro ao salvar desconto`);
-          }
-      } catch (error) {
-          console.error('Erro ao salvar desconto:', error);
-          showFlashMessage('error', 'Erro ao salvar desconto');
-      }
-  });
+  const descontoForm = document.getElementById('descontoForm');
+  if (descontoForm) {
+    descontoForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const descontoId = document.getElementById('descontoId')?.value || '';
+        const isEdit = descontoId !== '';
+        
+        const formData = {
+            identificador: document.getElementById('descontoIdentificador')?.value || '',
+            quantidade_minima: document.getElementById('descontoQuantidadeMinima')?.value || 0,
+            quantidade_maxima: document.getElementById('descontoQuantidadeMaxima')?.value || 0,
+            valor_unitario_com_desconto: document.getElementById('descontoValorUnitario')?.value || 0,
+            valido_ate: document.getElementById('descontoValidoAte')?.value || null,
+            descricao: document.getElementById('descontoDescricao')?.value || '',
+            ativo: document.getElementById('descontoAtivo')?.value === 'true'
+        };
+        
+        const url = isEdit ? `/admin/descontos/${descontoId}` : '/admin/descontos';
+        const method = isEdit ? 'PUT' : 'POST';
+        
+        try {
+            const response = await fetchWithErrorHandling(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+            
+            if (response.success) {
+                showFlashMessage('success', `Desconto ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
+                closeModal('descontoModal');
+                loadDescontosData();
+            } else {
+                showFlashMessage('error', response.message || `Erro ao salvar desconto`);
+            }
+        } catch (error) {
+            console.error('Erro ao salvar desconto:', error);
+            showFlashMessage('error', 'Erro ao salvar desconto');
+        }
+    });
+  }
 
   // Botão para adicionar novo desconto
-  document.getElementById('addDesconto').addEventListener('click', () => {
-      document.getElementById('descontoForm').reset();
-      document.getElementById('descontoId').value = '';
-      document.getElementById('descontoAtivo').value = 'true';
-      document.getElementById('descontoModalTitle').textContent = 'Cadastrar Desconto';
-      openModal('descontoModal');
-  });
+  const addDescontoBtn = document.getElementById('addDesconto');
+  if (addDescontoBtn) {
+    addDescontoBtn.addEventListener('click', () => {
+        const descontoForm = document.getElementById('descontoForm');
+        if (descontoForm) descontoForm.reset();
+        
+        if (document.getElementById('descontoId')) document.getElementById('descontoId').value = '';
+        if (document.getElementById('descontoAtivo')) document.getElementById('descontoAtivo').value = 'true';
+        
+        const descontoModalTitle = document.getElementById('descontoModalTitle');
+        if (descontoModalTitle) descontoModalTitle.textContent = 'Cadastrar Desconto';
+        openModal('descontoModal');
+    });
+  }
 
   // Botão para adicionar desconto a partir da visualização do produto
   document.addEventListener('click', function(e) {
       if (e.target && e.target.id === 'addDescontoBtn') {
           const produtoId = e.target.getAttribute('data-produto-id');
-          document.getElementById('descontoForm').reset();
-          document.getElementById('descontoId').value = '';
-          document.getElementById('descontoProdutoId').value = produtoId;
-          document.getElementById('descontoProdutoNome').textContent = document.getElementById('visualizarProdutoNome').textContent;
-          document.getElementById('descontoAtivo').value = 'true';
-          document.getElementById('descontoModalTitle').textContent = 'Cadastrar Desconto';
+          const descontoForm = document.getElementById('descontoForm');
+          if (descontoForm) descontoForm.reset();
+          
+          if (document.getElementById('descontoId')) document.getElementById('descontoId').value = '';
+          if (document.getElementById('descontoProdutoId')) document.getElementById('descontoProdutoId').value = produtoId;
+          
+          const descontoProdutoNome = document.getElementById('descontoProdutoNome');
+          if (descontoProdutoNome) {
+            const visualizarProdutoNome = document.getElementById('visualizarProdutoNome');
+            if (visualizarProdutoNome) {
+              descontoProdutoNome.textContent = visualizarProdutoNome.textContent;
+            }
+          }
+          
+          if (document.getElementById('descontoAtivo')) document.getElementById('descontoAtivo').value = 'true';
+          
+          const descontoModalTitle = document.getElementById('descontoModalTitle');
+          if (descontoModalTitle) descontoModalTitle.textContent = 'Cadastrar Desconto';
           openModal('descontoModal');
       }
   });
 
-  document.addEventListener('DOMContentLoaded', function () {
-      const tabDescontos = document.querySelector('li[data-tab="descontos"] a');
-
-      if (tabDescontos) {
-          tabDescontos.addEventListener('click', function (event) {
-              // Se necessário, previna o comportamento padrão
-              // event.preventDefault();
-
-              // Carrega os dados de descontos
-              loadDescontosData();
-          });
+  // ===== CAIXAS =====
+  async function loadCaixasData() {
+    try {
+      const status = document.getElementById('caixaStatus')?.value;
+      let url = '/admin/caixas';
+      
+      if (status) {
+        url += `?status=${status}`;
       }
-  });
-
-  document.addEventListener('DOMContentLoaded', function() {
-    const mobileMenuToggle = document.getElementById('mobileMenuToggle');
-    const sidebar = document.getElementById('sidebar');
-    const closeSidebarMobile = document.getElementById('closeSidebarMobile');
-    const sidebarOverlay = document.createElement('div');
-    
-    sidebarOverlay.className = 'sidebar-overlay';
-    document.body.appendChild(sidebarOverlay);
-    
-    // Alternar menu mobile
-    mobileMenuToggle.addEventListener('click', function() {
-      this.classList.toggle('active');
-      sidebar.classList.toggle('active');
-      sidebarOverlay.style.display = sidebar.classList.contains('active') ? 'block' : 'none';
-      document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
-    });
-    
-    // Fechar menu ao clicar no overlay ou botão de fechar
-    closeSidebarMobile.addEventListener('click', closeMenu);
-    sidebarOverlay.addEventListener('click', closeMenu);
-    
-    function closeMenu() {
-      mobileMenuToggle.classList.remove('active');
-      sidebar.classList.remove('active');
-      sidebarOverlay.style.display = 'none';
-      document.body.style.overflow = '';
-    }
-    
-    // Ajustar layout quando a janela é redimensionada
-    function handleResize() {
-      if (window.innerWidth > 768) {
-        // Em telas maiores, garantir que o sidebar esteja visível
-        sidebar.style.transform = 'translateX(0)';
-        sidebarOverlay.style.display = 'none';
-        document.body.style.overflow = '';
-      } else {
-        // Em telas menores, garantir que o sidebar esteja escondido
-        if (!sidebar.classList.contains('active')) {
-          sidebar.style.transform = 'translateX(-100%)';
+      
+      const data = await fetchWithErrorHandling(url);
+      
+      if (data.success) {
+        const caixasTable = document.querySelector('#caixasTable tbody');
+        if (caixasTable) {
+          caixasTable.innerHTML = '';
+          
+          data.data.forEach(caixa => {
+            const row = document.createElement('tr');
+            
+            // Formatar datas
+            const dataAbertura = formatDateTime(caixa.data_abertura);
+            const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
+            
+            // Formatar valores monetários
+            const valorAbertura = formatCurrency(caixa.valor_abertura);
+            const valorFechamento = caixa.valor_fechamento ? formatCurrency(caixa.valor_fechamento) : '-';
+            
+            // Determinar classe do status
+            let statusClass = '';
+            if (caixa.status === 'aberto') statusClass = 'badge-success';
+            else if (caixa.status === 'fechado') statusClass = 'badge-primary';
+            else if (caixa.status === 'analise') statusClass = 'badge-warning';
+            
+            row.innerHTML = `
+              <td>${caixa.id}</td>
+              <td>${caixa.operador.nome || '-'}</td>
+              <td>${dataAbertura}</td>
+              <td>${dataFechamento}</td>
+              <td>${valorAbertura}</td>
+              <td>${valorFechamento}</td>
+              <td><span class="badge ${statusClass}">${caixa.status}</span></td>
+              <td>
+                <div class="table-actions">
+                  <button class="btn-icon btn-info visualizar-caixa" data-id="${caixa.id}" title="Visualizar">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                  ${caixa.status === 'aberto' ? `
+                  <button class="btn-icon btn-warning editar-caixa" data-id="${caixa.id}" title="Editar">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button class="btn-icon btn-danger fechar-caixa" data-id="${caixa.id}" title="Fechar">
+                    <i class="fas fa-lock"></i>
+                  </button>
+                  ` : ''}
+                </div>
+              </td>
+            `;
+            caixasTable.appendChild(row);
+          });
+          
+          setupCaixaActions();
         }
       }
+    } catch (error) {
+      console.error('Erro ao carregar caixas:', error);
+      showFlashMessage('error', 'Erro ao carregar lista de caixas');
     }
-    
-    // Verificar tamanho da tela no carregamento
-    handleResize();
-    
-    // Adicionar listener para redimensionamento
-    window.addEventListener('resize', handleResize);
-  });
+  }
+
+  function setupCaixaActions() {
+    document.querySelectorAll('.visualizar-caixa').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const caixaId = this.getAttribute('data-id');
+        openVisualizarCaixaModal(caixaId);
+      });
+    });
+
+    document.querySelectorAll('.editar-caixa').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const caixaId = this.getAttribute('data-id');
+        openEditarCaixaModal(caixaId);
+      });
+    });
+
+    document.querySelectorAll('.fechar-caixa').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const caixaId = this.getAttribute('data-id');
+        if (confirm('Tem certeza que deseja fechar este caixa?')) {
+          fecharCaixa(caixaId);
+        }
+      });
+    });
+  }
+
+  // Função para abrir o modal de visualização do caixa
+  async function openVisualizarCaixaModal(caixaId) {
+      try {
+          const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}`);
+          
+          if (response.success) {
+              const caixa = response.data;
+              
+              // Preencher os dados no modal
+              if (document.getElementById('visualizarCaixaId')) document.getElementById('visualizarCaixaId').textContent = caixa.id;
+              if (document.getElementById('visualizarCaixaOperador')) document.getElementById('visualizarCaixaOperador').textContent = caixa.operador.nome;
+              if (document.getElementById('visualizarCaixaDataAbertura')) document.getElementById('visualizarCaixaDataAbertura').textContent = formatDateTime(caixa.data_abertura);
+              if (document.getElementById('visualizarCaixaValorAbertura')) document.getElementById('visualizarCaixaValorAbertura').textContent = formatCurrency(caixa.valor_abertura);
+              
+              // Status do caixa
+              const statusElement = document.getElementById('visualizarCaixaStatus');
+              if (statusElement) {
+                statusElement.textContent = caixa.status;
+                statusElement.className = 'badge ' + 
+                    (caixa.status === 'aberto' ? 'badge-success' : 
+                    caixa.status === 'fechado' ? 'badge-primary' : 'badge-warning');
+              }
+              
+              // Se o caixa estiver fechado, mostrar informações de fechamento
+              if (caixa.status === 'fechado') {
+                  if (document.getElementById('visualizarCaixaDataFechamento')) document.getElementById('visualizarCaixaDataFechamento').textContent = formatDateTime(caixa.data_fechamento);
+                  if (document.getElementById('visualizarCaixaValorFechamento')) document.getElementById('visualizarCaixaValorFechamento').textContent = formatCurrency(caixa.valor_fechamento);
+                  
+                  const caixaFechamentoInfo = document.getElementById('caixaFechamentoInfo');
+                  if (caixaFechamentoInfo) caixaFechamentoInfo.style.display = 'block';
+              } else {
+                  const caixaFechamentoInfo = document.getElementById('caixaFechamentoInfo');
+                  if (caixaFechamentoInfo) caixaFechamentoInfo.style.display = 'none';
+              }
+              
+              // Observações
+              if (document.getElementById('visualizarCaixaObsOperador')) document.getElementById('visualizarCaixaObsOperador').textContent = caixa.observacoes_operador || 'Nenhuma observação';
+              if (document.getElementById('visualizarCaixaObsAdmin')) document.getElementById('visualizarCaixaObsAdmin').textContent = caixa.observacoes_admin || 'Nenhuma observação';
+              
+              // Carregar movimentações financeiras do caixa
+              await loadCaixaFinanceiro(caixaId);
+              
+              // Abrir o modal
+              openModal('visualizarCaixaModal');
+          }
+      } catch (error) {
+          console.error('Erro ao visualizar caixa:', error);
+          showFlashMessage('error', 'Erro ao carregar dados do caixa');
+      }
+  }
+
+  // Função para carregar as movimentações financeiras do caixa
+  async function loadCaixaFinanceiro(caixaId) {
+      try {
+          const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
+          
+          if (response.success) {
+              const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
+              if (tableBody) {
+                  tableBody.innerHTML = '';
+                  
+                  let totalEntradas = 0;
+                  let totalSaidas = 0;
+                  
+                  response.data.forEach(item => {
+                      const row = document.createElement('tr');
+                      const valor = parseFloat(item.valor);
+                      
+                      if (item.tipo === 'entrada') {
+                          totalEntradas += valor;
+                      } else {
+                          totalSaidas += valor;
+                      }
+                      
+                      row.innerHTML = `
+                          <td>${formatDateTime(item.data)}</td>
+                          <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo}</span></td>
+                          <td>${item.categoria}</td>
+                          <td>${formatCurrency(valor)}</td>
+                          <td>${item.descricao || '-'}</td>
+                          <td>${item.forma_pagamento || '-'}</td>
+                      `;
+                      tableBody.appendChild(row);
+                  });
+                  
+                  // Atualizar totais
+                  if (document.getElementById('caixaTotalEntradas')) {
+                      document.getElementById('caixaTotalEntradas').textContent = formatCurrency(totalEntradas);
+                  }
+                  if (document.getElementById('caixaTotalSaidas')) {
+                      document.getElementById('caixaTotalSaidas').textContent = formatCurrency(totalSaidas);
+                  }
+                  if (document.getElementById('caixaSaldo')) {
+                      document.getElementById('caixaSaldo').textContent = formatCurrency(totalEntradas - totalSaidas);
+                  }
+              }
+          }
+      } catch (error) {
+          console.error('Erro ao carregar financeiro do caixa:', error);
+          showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
+      }
+  }
+
+  // Função para fechar o caixa
+  async function fecharCaixa(caixaId) {
+      try {
+          // Pedir confirmação do valor de fechamento
+          const valorFechamento = prompt('Informe o valor de fechamento do caixa:');
+          
+          if (valorFechamento === null) return; // Usuário cancelou
+          
+          if (!valorFechamento || isNaN(parseFloat(valorFechamento))) {
+              showFlashMessage('error', 'Valor inválido');
+              return;
+          }
+          
+          // Pedir observações (opcional)
+          const observacoes = prompt('Observações (opcional):') || '';
+          
+          const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}`, {
+              method: 'PUT',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                  status: 'fechado',
+                  valor_fechamento: parseFloat(valorFechamento),
+                  observacoes_admin: observacoes
+              })
+          });
+          
+          if (response.success) {
+              showFlashMessage('success', 'Caixa fechado com sucesso');
+              loadCaixasData(); // Atualizar a lista de caixas
+              
+              // Fechar modais abertos
+              closeModal('visualizarCaixaModal');
+              closeModal('editarCaixaModal');
+          } else {
+              showFlashMessage('error', response.message || 'Erro ao fechar caixa');
+          }
+      } catch (error) {
+          console.error('Erro ao fechar caixa:', error);
+          showFlashMessage('error', 'Erro ao fechar caixa');
+      }
+  }
+
+  // Função para abrir modal de edição do caixa
+  async function openEditarCaixaModal(caixaId) {
+      try {
+          const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}`);
+          
+          if (response.success) {
+              const caixa = response.data;
+              
+              // Preencher o formulário
+              if (document.getElementById('editarCaixaId')) document.getElementById('editarCaixaId').value = caixa.id;
+              if (document.getElementById('editarCaixaValorAbertura')) document.getElementById('editarCaixaValorAbertura').value = caixa.valor_abertura;
+              if (document.getElementById('editarCaixaObservacoes')) document.getElementById('editarCaixaObservacoes').value = caixa.observacoes_operador || '';
+              
+              // Configurar o modal
+              const editarCaixaModalTitle = document.getElementById('editarCaixaModalTitle');
+              if (editarCaixaModalTitle) editarCaixaModalTitle.textContent = `Editar Caixa #${caixa.id}`;
+              openModal('editarCaixaModal');
+          }
+      } catch (error) {
+          console.error('Erro ao abrir edição do caixa:', error);
+          showFlashMessage('error', 'Erro ao carregar dados do caixa');
+      }
+  }
+
+  // Evento de submit do formulário de edição do caixa
+  const editarCaixaForm = document.getElementById('editarCaixaForm');
+  if (editarCaixaForm) {
+    editarCaixaForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const caixaId = document.getElementById('editarCaixaId')?.value;
+        if (!caixaId) return;
+        
+        const formData = {
+            valor_abertura: document.getElementById('editarCaixaValorAbertura')?.value || 0,
+            observacoes_operador: document.getElementById('editarCaixaObservacoes')?.value || ''
+        };
+        
+        try {
+            const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            if (response.success) {
+                showFlashMessage('success', 'Caixa atualizado com sucesso');
+                closeModal('editarCaixaModal');
+                loadCaixasData();
+            } else {
+                showFlashMessage('error', response.message || 'Erro ao atualizar caixa');
+            }
+        } catch (error) {
+            console.error('Erro ao atualizar caixa:', error);
+            showFlashMessage('error', 'Erro ao atualizar caixa');
+        }
+    });
+  }
+
+  // Funções auxiliares para formatação
+  function formatDateTime(dateTimeString) {
+    if (!dateTimeString) return '-';
+    const date = new Date(dateTimeString);
+    return date.toLocaleString('pt-BR');
+  }
+
+  function formatCurrency(value) {
+    if (!value) return '-';
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value);
+  }
 
   // ===== FUNÇÕES GERAIS =====
   // Funções auxiliares para formatar texto
@@ -1479,77 +1926,140 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Confirmar exclusão
-  document.getElementById('confirmarExclusaoBtn').addEventListener('click', async function() {
-      const id = this.getAttribute('data-id');
-      const type = this.getAttribute('data-type');
-      
-      try {
-          let url;
-          if (type === 'produto') {
-              url = `/admin/produtos/${id}`;
-          } else if (type === 'cliente') {
-              url = `/admin/clientes/${id}`;
-          } else if (type === 'usuario') {
-              url = `/admin/usuarios/${id}`;
-          } else if (type === 'desconto') {
-              url = `/admin/descontos/${id}`;
-          }
-          
-          const response = await fetchWithErrorHandling(url, {
-              method: 'DELETE'
-          });
-          
-          if (response.success) {
-              showFlashMessage('success', `${type.charAt(0).toUpperCase() + type.slice(1)} excluído com sucesso`);
-              closeModal('confirmarExclusaoModal');
-              
-              if (type === 'produto') loadProdutosData();
-              if (type === 'cliente') loadClientesData();
-              if (type === 'usuario') loadUsuariosData();
-              if (type === 'desconto') loadDescontosData();
-          } else {
-              showFlashMessage('error', response.message || `Erro ao excluir ${type}`);
-          }
-      } catch (error) {
-          console.error(`Erro ao excluir ${type}:`, error);
-          showFlashMessage('error', `Erro ao excluir ${type}`);
-      }
-  });
+  const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
+  if (confirmarExclusaoBtn) {
+    confirmarExclusaoBtn.addEventListener('click', async function() {
+        const id = this.getAttribute('data-id');
+        const type = this.getAttribute('data-type');
+        
+        try {
+            let url;
+            if (type === 'produto') {
+                url = `/admin/produtos/${id}`;
+            } else if (type === 'cliente') {
+                url = `/admin/clientes/${id}`;
+            } else if (type === 'usuario') {
+                url = `/admin/usuarios/${id}`;
+            } else if (type === 'desconto') {
+                url = `/admin/descontos/${id}`;
+            } else if (type === 'caixa') {
+                url = `/admin/caixas/${id}`;
+            }
+            
+            if (!url) return;
+            
+            const response = await fetchWithErrorHandling(url, {
+                method: 'DELETE'
+            });
+            
+            if (response.success) {
+                showFlashMessage('success', `${type.charAt(0).toUpperCase() + type.slice(1)} excluído com sucesso`);
+                closeModal('confirmarExclusaoModal');
+                
+                if (type === 'produto') loadProdutosData();
+                if (type === 'cliente') loadClientesData();
+                if (type === 'usuario') loadUsuariosData();
+                if (type === 'desconto') loadDescontosData();
+                if (type === 'caixa') loadCaixasData();
+            } else {
+                showFlashMessage('error', response.message || `Erro ao excluir ${type}`);
+            }
+        } catch (error) {
+            console.error(`Erro ao excluir ${type}:`, error);
+            showFlashMessage('error', `Erro ao excluir ${type}`);
+        }
+    });
+  }
 
   // Filtros
-  document.getElementById('searchCliente').addEventListener('input', loadClientesData);
-  document.getElementById('searchProduto').addEventListener('input', loadProdutosData);
-  document.getElementById('searchUsuario').addEventListener('input', loadUsuariosData);
-  document.getElementById('searchDesconto').addEventListener('input', loadDescontosData);
+  const searchCliente = document.getElementById('searchCliente');
+  if (searchCliente) {
+    searchCliente.addEventListener('input', loadClientesData);
+  }
+  
+  const searchProduto = document.getElementById('searchProduto');
+  if (searchProduto) {
+    searchProduto.addEventListener('input', loadProdutosData);
+  }
+  
+  const searchUsuario = document.getElementById('searchUsuario');
+  if (searchUsuario) {
+    searchUsuario.addEventListener('input', loadUsuariosData);
+  }
+  
+  const searchDesconto = document.getElementById('searchDesconto');
+  if (searchDesconto) {
+    searchDesconto.addEventListener('input', loadDescontosData);
+  }
 
   // Botões de atualização
-  document.getElementById('refreshData').addEventListener('click', loadDashboardData);
-  document.getElementById('refreshClientes').addEventListener('click', loadClientesData);
-  document.getElementById('refreshProdutos').addEventListener('click', loadProdutosData);
-  document.getElementById('refreshUsuarios').addEventListener('click', loadUsuariosData);
-  document.getElementById('refreshDescontos').addEventListener('click', loadDescontosData);
-  document.getElementById('filterFinanceiro').addEventListener('click', loadFinanceiroData);
+  const refreshData = document.getElementById('refreshData');
+  if (refreshData) {
+    refreshData.addEventListener('click', loadDashboardData);
+  }
+  
+  const refreshClientes = document.getElementById('refreshClientes');
+  if (refreshClientes) {
+    refreshClientes.addEventListener('click', loadClientesData);
+  }
+  
+  const refreshProdutos = document.getElementById('refreshProdutos');
+  if (refreshProdutos) {
+    refreshProdutos.addEventListener('click', loadProdutosData);
+  }
+  
+  const refreshUsuarios = document.getElementById('refreshUsuarios');
+  if (refreshUsuarios) {
+    refreshUsuarios.addEventListener('click', loadUsuariosData);
+  }
+  
+  const refreshDescontos = document.getElementById('refreshDescontos');
+  if (refreshDescontos) {
+    refreshDescontos.addEventListener('click', loadDescontosData);
+  }
+  
+  const filterFinanceiro = document.getElementById('filterFinanceiro');
+  if (filterFinanceiro) {
+    filterFinanceiro.addEventListener('click', loadFinanceiroData);
+  }
 
   // Botão para adicionar novo usuário
-  document.getElementById('addUsuario').addEventListener('click', () => openEditarUsuarioModal());
+  const addUsuario = document.getElementById('addUsuario');
+  if (addUsuario) {
+    addUsuario.addEventListener('click', () => openEditarUsuarioModal());
+  }
 
   // Botão para adicionar novo cliente
-  document.getElementById('addCliente').addEventListener('click', () => {
-    document.getElementById('clienteForm').reset();
-    document.getElementById('clienteId').value = '';
-    document.getElementById('clienteStatus').value = 'true';
-    document.getElementById('clienteModalTitle').textContent = 'Cadastrar Cliente';
-    document.getElementById('clienteModalSubmitText').textContent = 'Cadastrar';
-    openModal('clienteModal');
-  });
+  const addCliente = document.getElementById('addCliente');
+  if (addCliente) {
+    addCliente.addEventListener('click', () => {
+      const clienteForm = document.getElementById('clienteForm');
+      if (clienteForm) clienteForm.reset();
+      
+      if (document.getElementById('clienteId')) document.getElementById('clienteId').value = '';
+      if (document.getElementById('clienteStatus')) document.getElementById('clienteStatus').value = 'true';
+      
+      const clienteModalTitle = document.getElementById('clienteModalTitle');
+      if (clienteModalTitle) clienteModalTitle.textContent = 'Cadastrar Cliente';
+      
+      const clienteModalSubmitText = document.getElementById('clienteModalSubmitText');
+      if (clienteModalSubmitText) clienteModalSubmitText.textContent = 'Cadastrar';
+      openModal('clienteModal');
+    });
+  }
 
   // Botão para adicionar novo produto
-  document.getElementById('addProduto').addEventListener('click', () => {
-    document.getElementById('produtoForm').reset();
-    document.getElementById('produtoEstoqueTipo').value = 'loja';
-    document.getElementById('produtoUnidade').value = 'kg';
-    openModal('produtoModal');
-  });
+  const addProduto = document.getElementById('addProduto');
+  if (addProduto) {
+    addProduto.addEventListener('click', () => {
+      const produtoForm = document.getElementById('produtoForm');
+      if (produtoForm) produtoForm.reset();
+      
+      if (document.getElementById('produtoEstoqueTipo')) document.getElementById('produtoEstoqueTipo').value = 'loja';
+      if (document.getElementById('produtoUnidade')) document.getElementById('produtoUnidade').value = 'kg';
+      openModal('produtoModal');
+    });
+  }
 
   // Verificar caixa aberto ao carregar a página
   async function checkCaixaStatus() {
@@ -1582,6 +2092,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tabId === 'usuarios') loadUsuariosData();
         if (tabId === 'estoque') loadMovimentacoesData();
         if (tabId === 'descontos') loadDescontosData();
+        if (tabId === 'caixas') loadCaixasData();
       }
     } catch (error) {
       console.error('Erro ao carregar dados iniciais:', error);

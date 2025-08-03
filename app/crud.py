@@ -16,6 +16,9 @@ from sqlalchemy.orm import joinedload
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from decimal import Decimal
+from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy import func
+from typing import Dict, Any, List
 
 from app.models.entities import (
     Caixa,
@@ -1462,54 +1465,49 @@ def deletar_desconto(session: Session, desconto_id: int) -> bool:
 
 def obter_caixas_completo(session: Session) -> Dict[str, Any]:
     """
-    Retorna todos os caixas com informações completas:
-    - Dados básicos do caixa
-    - Informações financeiras associadas
-    - Detalhes dos produtos vendidos
-    - Movimentações de estoque relacionadas
-    - Notas fiscais emitidas
+    Versão otimizada para retornar todos os caixas com informações completas.
     
-    Args:
-        session (Session): Sessão do SQLAlchemy para acesso ao banco de dados
-    
-    Returns:
-        dict: Dicionário com os resultados ou mensagem de erro
+    Principais otimizações aplicadas:
+    1. Uso de selectinload para relacionamentos 1:N (evita N+1 queries)
+    2. Processamento em lote dos dados
+    3. Reutilização de objetos carregados
+    4. Redução de conversões desnecessárias
     """
     try:
-        # Busca todos os caixas com relacionamentos carregados
+        # Carrega todos os caixas com relacionamentos otimizados
         caixas = (
             session.query(Caixa)
             .options(
+                # Relacionamentos 1:1 com joinedload (mais eficiente)
                 joinedload(Caixa.operador),
                 joinedload(Caixa.administrador),
-                joinedload(Caixa.financeiros),
-                joinedload(Caixa.notas_fiscais)
-                    .joinedload(NotaFiscal.itens)
-                    .joinedload(NotaFiscalItem.produto),
-                joinedload(Caixa.movimentacoes)
-                    .joinedload(MovimentacaoEstoque.produto),
-                joinedload(Caixa.pagamentos)
+                
+                # Relacionamentos 1:N com selectinload (evita N+1)
+                selectinload(Caixa.financeiros),
+                selectinload(Caixa.pagamentos),
+                
+                # Notas fiscais com todos os relacionamentos aninhados
+                selectinload(Caixa.notas_fiscais).selectinload(NotaFiscal.cliente),
+                selectinload(Caixa.notas_fiscais).selectinload(NotaFiscal.itens).joinedload(NotaFiscalItem.produto),
+                selectinload(Caixa.notas_fiscais).selectinload(NotaFiscal.pagamentos),
+                
+                # Movimentações com produtos
+                selectinload(Caixa.movimentacoes).joinedload(MovimentacaoEstoque.produto),
+                selectinload(Caixa.movimentacoes).joinedload(MovimentacaoEstoque.cliente)
             )
             .order_by(Caixa.data_abertura.desc())
             .all()
         )
 
-        resultado: List[Dict[str, Any]] = []
+        # Processamento otimizado dos dados
+        resultado = []
         
         for caixa in caixas:
-            # Dados básicos do caixa
+            # Dados básicos do caixa (otimizado com verificações inline)
             caixa_data = {
                 'id': caixa.id,
-                'operador': {
-                    'id': caixa.operador.id,
-                    'nome': caixa.operador.nome,
-                    'tipo': caixa.operador.tipo.value
-                } if caixa.operador else None,
-                'administrador': {
-                    'id': caixa.administrador.id if caixa.administrador else None,
-                    'nome': caixa.administrador.nome if caixa.administrador else None,
-                    'tipo': caixa.administrador.tipo.value if caixa.administrador else None
-                },
+                'operador': _extrair_dados_usuario(caixa.operador),
+                'administrador': _extrair_dados_usuario(caixa.administrador),
                 'data_abertura': caixa.data_abertura.isoformat() if caixa.data_abertura else None,
                 'data_fechamento': caixa.data_fechamento.isoformat() if caixa.data_fechamento else None,
                 'data_analise': caixa.data_analise.isoformat() if caixa.data_analise else None,
@@ -1520,106 +1518,11 @@ def obter_caixas_completo(session: Session) -> Dict[str, Any]:
                 'observacoes_operador': caixa.observacoes_operador,
                 'observacoes_admin': caixa.observacoes_admin,
                 'sincronizado': caixa.sincronizado,
-                'financeiro': [],
-                'vendas': [],
-                'movimentacoes': [],
-                'pagamentos': []
+                'financeiro': _processar_financeiros(caixa.financeiros),
+                'vendas': _processar_notas_fiscais(caixa.notas_fiscais),
+                'movimentacoes': _processar_movimentacoes(caixa.movimentacoes),
+                'pagamentos': _processar_pagamentos_contas(caixa.pagamentos)
             }
-
-            # Informações financeiras
-            if caixa.financeiros:
-                for financeiro in caixa.financeiros:
-                    caixa_data['financeiro'].append({
-                        'id': financeiro.id,
-                        'tipo': financeiro.tipo.value if financeiro.tipo else None,
-                        'categoria': financeiro.categoria.value if financeiro.categoria else None,
-                        'valor': float(financeiro.valor) if financeiro.valor else 0.0,
-                        'valor_desconto': float(financeiro.valor_desconto) if financeiro.valor_desconto else None,
-                        'descricao': financeiro.descricao,
-                        'data': financeiro.data.isoformat() if financeiro.data else None,
-                        'nota_fiscal_id': financeiro.nota_fiscal_id,
-                        'cliente_id': financeiro.cliente_id,
-                        'conta_receber_id': financeiro.conta_receber_id
-                    })
-
-            # Notas fiscais e produtos vendidos
-            if caixa.notas_fiscais:
-                for nota in caixa.notas_fiscais:
-                    nota_data = {
-                        'id': nota.id,
-                        'data_emissao': nota.data_emissao.isoformat() if nota.data_emissao else None,
-                        'valor_total': float(nota.valor_total) if nota.valor_total else 0.0,
-                        'valor_desconto': float(nota.valor_desconto) if nota.valor_desconto else 0.0,
-                        'status': nota.status.value if nota.status else None,
-                        'cliente': {
-                            'id': nota.cliente.id if nota.cliente else None,
-                            'nome': nota.cliente.nome if nota.cliente else None
-                        } if nota.cliente else None,
-                        'itens': [],
-                        'pagamentos': []
-                    }
-
-                    # Itens da nota fiscal (produtos vendidos)
-                    if nota.itens:
-                        for item in nota.itens:
-                            nota_data['itens'].append({
-                                'produto': {
-                                    'id': item.produto.id if item.produto else None,
-                                    'nome': item.produto.nome if item.produto else None,
-                                    'codigo': item.produto.codigo if item.produto else None,
-                                    'unidade': item.produto.unidade.value if item.produto and item.produto.unidade else None
-                                },
-                                'quantidade': float(item.quantidade) if item.quantidade else 0.0,
-                                'valor_unitario': float(item.valor_unitario) if item.valor_unitario else 0.0,
-                                'valor_total': float(item.valor_total) if item.valor_total else 0.0,
-                                'desconto_aplicado': float(item.desconto_aplicado) if item.desconto_aplicado else None,
-                                'tipo_desconto': item.tipo_desconto.value if item.tipo_desconto else None
-                            })
-
-                    # Pagamentos da nota fiscal
-                    if nota.pagamentos:
-                        for pagamento in nota.pagamentos:
-                            nota_data['pagamentos'].append({
-                                'forma_pagamento': pagamento.forma_pagamento.value if pagamento.forma_pagamento else None,
-                                'valor': float(pagamento.valor) if pagamento.valor else 0.0,
-                                'data': pagamento.data.isoformat() if pagamento.data else None
-                            })
-
-                    caixa_data['vendas'].append(nota_data)
-
-            # Movimentações de estoque
-            if caixa.movimentacoes:
-                for movimentacao in caixa.movimentacoes:
-                    caixa_data['movimentacoes'].append({
-                        'id': movimentacao.id,
-                        'tipo': movimentacao.tipo.value if movimentacao.tipo else None,
-                        'produto': {
-                            'id': movimentacao.produto.id if movimentacao.produto else None,
-                            'nome': movimentacao.produto.nome if movimentacao.produto else None,
-                            'codigo': movimentacao.produto.codigo if movimentacao.produto else None
-                        },
-                        'quantidade': float(movimentacao.quantidade) if movimentacao.quantidade else 0.0,
-                        'valor_unitario': float(movimentacao.valor_unitario) if movimentacao.valor_unitario else 0.0,
-                        'valor_total': float(movimentacao.valor_unitario) * float(movimentacao.quantidade) if movimentacao.valor_unitario and movimentacao.quantidade else 0.0,
-                        'forma_pagamento': movimentacao.forma_pagamento.value if movimentacao.forma_pagamento else None,
-                        'data': movimentacao.data.isoformat() if movimentacao.data else None,
-                        'cliente': {
-                            'id': movimentacao.cliente.id if movimentacao.cliente else None,
-                            'nome': movimentacao.cliente.nome if movimentacao.cliente else None
-                        } if movimentacao.cliente else None
-                    })
-
-            # Pagamentos de contas a receber
-            if caixa.pagamentos:
-                for pagamento in caixa.pagamentos:
-                    caixa_data['pagamentos'].append({
-                        'id': pagamento.id,
-                        'conta_receber_id': pagamento.conta_id,
-                        'valor_pago': float(pagamento.valor_pago) if pagamento.valor_pago else 0.0,
-                        'forma_pagamento': pagamento.forma_pagamento.value if pagamento.forma_pagamento else None,
-                        'data_pagamento': pagamento.data_pagamento.isoformat() if pagamento.data_pagamento else None,
-                        'observacoes': pagamento.observacoes
-                    })
 
             resultado.append(caixa_data)
 
@@ -1629,6 +1532,230 @@ def obter_caixas_completo(session: Session) -> Dict[str, Any]:
             'count': len(resultado)
         }
 
+    except Exception as e:
+        session.rollback()
+        return {
+            'success': False,
+            'error': str(e),
+            'message': 'Erro ao buscar informações dos caixas'
+        }
+
+
+def _extrair_dados_usuario(usuario) -> Dict[str, Any]:
+    """Função auxiliar para extrair dados do usuário de forma otimizada"""
+    if not usuario:
+        return None
+    
+    return {
+        'id': usuario.id,
+        'nome': usuario.nome,
+        'tipo': usuario.tipo.value if usuario.tipo else None
+    }
+
+
+def _processar_financeiros(financeiros) -> List[Dict[str, Any]]:
+    """Processa lista de financeiros de forma otimizada"""
+    if not financeiros:
+        return []
+    
+    return [
+        {
+            'id': f.id,
+            'tipo': f.tipo.value if f.tipo else None,
+            'categoria': f.categoria.value if f.categoria else None,
+            'valor': float(f.valor) if f.valor else 0.0,
+            'valor_desconto': float(f.valor_desconto) if f.valor_desconto else None,
+            'descricao': f.descricao,
+            'data': f.data.isoformat() if f.data else None,
+            'nota_fiscal_id': f.nota_fiscal_id,
+            'cliente_id': f.cliente_id,
+            'conta_receber_id': f.conta_receber_id
+        }
+        for f in financeiros
+    ]
+
+
+def _processar_notas_fiscais(notas_fiscais) -> List[Dict[str, Any]]:
+    """Processa lista de notas fiscais de forma otimizada"""
+    if not notas_fiscais:
+        return []
+    
+    resultado = []
+    
+    for nota in notas_fiscais:
+        nota_data = {
+            'id': nota.id,
+            'data_emissao': nota.data_emissao.isoformat() if nota.data_emissao else None,
+            'valor_total': float(nota.valor_total) if nota.valor_total else 0.0,
+            'valor_desconto': float(nota.valor_desconto) if nota.valor_desconto else 0.0,
+            'status': nota.status.value if nota.status else None,
+            'cliente': _extrair_dados_cliente(nota.cliente),
+            'itens': _processar_itens_nota(nota.itens),
+            'pagamentos': _processar_pagamentos_nota(nota.pagamentos)
+        }
+        resultado.append(nota_data)
+    
+    return resultado
+
+
+def _extrair_dados_cliente(cliente) -> Dict[str, Any]:
+    """Função auxiliar para extrair dados do cliente"""
+    if not cliente:
+        return None
+    
+    return {
+        'id': cliente.id,
+        'nome': cliente.nome
+    }
+
+
+def _processar_itens_nota(itens) -> List[Dict[str, Any]]:
+    """Processa itens da nota fiscal de forma otimizada"""
+    if not itens:
+        return []
+    
+    return [
+        {
+            'produto': {
+                'id': item.produto.id if item.produto else None,
+                'nome': item.produto.nome if item.produto else None,
+                'codigo': item.produto.codigo if item.produto else None,
+                'unidade': item.produto.unidade.value if item.produto and item.produto.unidade else None
+            },
+            'quantidade': float(item.quantidade) if item.quantidade else 0.0,
+            'valor_unitario': float(item.valor_unitario) if item.valor_unitario else 0.0,
+            'valor_total': float(item.valor_total) if item.valor_total else 0.0,
+            'desconto_aplicado': float(item.desconto_aplicado) if item.desconto_aplicado else None,
+            'tipo_desconto': item.tipo_desconto.value if item.tipo_desconto else None
+        }
+        for item in itens
+    ]
+
+
+def _processar_pagamentos_nota(pagamentos) -> List[Dict[str, Any]]:
+    """Processa pagamentos da nota fiscal"""
+    if not pagamentos:
+        return []
+    
+    return [
+        {
+            'forma_pagamento': p.forma_pagamento.value if p.forma_pagamento else None,
+            'valor': float(p.valor) if p.valor else 0.0,
+            'data': p.data.isoformat() if p.data else None
+        }
+        for p in pagamentos
+    ]
+
+
+def _processar_movimentacoes(movimentacoes) -> List[Dict[str, Any]]:
+    """Processa movimentações de estoque de forma otimizada"""
+    if not movimentacoes:
+        return []
+    
+    return [
+        {
+            'id': mov.id,
+            'tipo': mov.tipo.value if mov.tipo else None,
+            'produto': {
+                'id': mov.produto.id if mov.produto else None,
+                'nome': mov.produto.nome if mov.produto else None,
+                'codigo': mov.produto.codigo if mov.produto else None
+            },
+            'quantidade': float(mov.quantidade) if mov.quantidade else 0.0,
+            'valor_unitario': float(mov.valor_unitario) if mov.valor_unitario else 0.0,
+            'valor_total': float(mov.valor_unitario) * float(mov.quantidade) if mov.valor_unitario and mov.quantidade else 0.0,
+            'forma_pagamento': mov.forma_pagamento.value if mov.forma_pagamento else None,
+            'data': mov.data.isoformat() if mov.data else None,
+            'cliente': _extrair_dados_cliente(mov.cliente)
+        }
+        for mov in movimentacoes
+    ]
+
+
+def _processar_pagamentos_contas(pagamentos) -> List[Dict[str, Any]]:
+    """Processa pagamentos de contas a receber"""
+    if not pagamentos:
+        return []
+    
+    return [
+        {
+            'id': p.id,
+            'conta_receber_id': p.conta_id,
+            'valor_pago': float(p.valor_pago) if p.valor_pago else 0.0,
+            'forma_pagamento': p.forma_pagamento.value if p.forma_pagamento else None,
+            'data_pagamento': p.data_pagamento.isoformat() if p.data_pagamento else None,
+            'observacoes': p.observacoes
+        }
+        for p in pagamentos
+    ]
+
+
+# Versão alternativa com paginação para grandes volumes de dados
+def obter_caixas_completo_paginado(session: Session, page: int = 1, per_page: int = 50) -> Dict[str, Any]:
+    """
+    Versão paginada para quando há muitos registros de caixa.
+    
+    Args:
+        session: Sessão do SQLAlchemy
+        page: Página atual (inicia em 1)
+        per_page: Registros por página
+    """
+    try:
+        # Query com paginação
+        query = (
+            session.query(Caixa)
+            .options(
+                joinedload(Caixa.operador),
+                joinedload(Caixa.administrador),
+                selectinload(Caixa.financeiros),
+                selectinload(Caixa.pagamentos),
+                selectinload(Caixa.notas_fiscais).selectinload(NotaFiscal.cliente),
+                selectinload(Caixa.notas_fiscais).selectinload(NotaFiscal.itens).joinedload(NotaFiscalItem.produto),
+                selectinload(Caixa.notas_fiscais).selectinload(NotaFiscal.pagamentos),
+                selectinload(Caixa.movimentacoes).joinedload(MovimentacaoEstoque.produto),
+                selectinload(Caixa.movimentacoes).joinedload(MovimentacaoEstoque.cliente)
+            )
+            .order_by(Caixa.data_abertura.desc())
+        )
+        
+        # Aplicar paginação
+        total = query.count()
+        caixas = query.offset((page - 1) * per_page).limit(per_page).all()
+        
+        # Processar dados (mesmo código da função principal)
+        resultado = []
+        for caixa in caixas:
+            caixa_data = {
+                'id': caixa.id,
+                'operador': _extrair_dados_usuario(caixa.operador),
+                'administrador': _extrair_dados_usuario(caixa.administrador),
+                'data_abertura': caixa.data_abertura.isoformat() if caixa.data_abertura else None,
+                'data_fechamento': caixa.data_fechamento.isoformat() if caixa.data_fechamento else None,
+                'data_analise': caixa.data_analise.isoformat() if caixa.data_analise else None,
+                'valor_abertura': float(caixa.valor_abertura) if caixa.valor_abertura else 0.0,
+                'valor_fechamento': float(caixa.valor_fechamento) if caixa.valor_fechamento else None,
+                'valor_confirmado': float(caixa.valor_confirmado) if caixa.valor_confirmado else None,
+                'status': caixa.status.value if caixa.status else None,
+                'observacoes_operador': caixa.observacoes_operador,
+                'observacoes_admin': caixa.observacoes_admin,
+                'sincronizado': caixa.sincronizado,
+                'financeiro': _processar_financeiros(caixa.financeiros),
+                'vendas': _processar_notas_fiscais(caixa.notas_fiscais),
+                'movimentacoes': _processar_movimentacoes(caixa.movimentacoes),
+                'pagamentos': _processar_pagamentos_contas(caixa.pagamentos)
+            }
+            resultado.append(caixa_data)
+        
+        return {
+            'success': True,
+            'data': resultado,
+            'count': len(resultado),
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'pages': (total + per_page - 1) // per_page
+        }
+        
     except Exception as e:
         session.rollback()
         return {

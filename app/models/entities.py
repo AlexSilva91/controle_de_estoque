@@ -142,6 +142,7 @@ class Caixa(Base):
     status = Column(Enum(StatusCaixa), nullable=False, default=StatusCaixa.aberto)
     observacoes_operador = Column(Text, nullable=True)
     observacoes_admin = Column(Text, nullable=True)
+    observacoes = Column(Text, nullable=True)
     sincronizado = Column(Boolean, default=False, nullable=False)
 
     operador = relationship("Usuario", foreign_keys=[operador_id], back_populates="caixas_operados")

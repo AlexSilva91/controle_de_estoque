@@ -1356,12 +1356,13 @@ def get_caixas():
     else:
         return jsonify({'success': False, 'error': resultado['message']}), 500
 
-@admin_bp.route('/api/caixas/<int:caixa_id>', methods=['PUT'])
+@admin_bp.route('/caixas/<int:caixa_id>', methods=['PUT'])
 @login_required
 @admin_required
 def atualizar_caixa_route(caixa_id):
     try:
         dados = request.get_json()
+        print(f"Dados recebidos para atualização do caixa {caixa_id}: {dados}")
         if not dados:
             return jsonify({"error": "Dados não fornecidos"}), 400
             
@@ -1378,6 +1379,11 @@ def atualizar_caixa_route(caixa_id):
                 caixa.status = entities.StatusCaixa.analise
                 caixa.data_analise = datetime.utcnow()
         
+        if 'valor_fechamento' in dados:
+            caixa.valor_fechamento = Decimal(dados['valor_fechamento'])
+        if 'valor_abertura' in dados:
+            caixa.valor_abertura = Decimal(dados['valor_abertura'])
+            
         # Atualiza observações se existirem
         if 'observacoes_admin' in dados:
             caixa.observacoes_admin = dados['observacoes_admin']
@@ -1398,3 +1404,125 @@ def atualizar_caixa_route(caixa_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": f"Erro ao atualizar caixa: {str(e)}"}), 500
+
+@admin_bp.route('/caixas/<int:caixa_id>', methods=['GET', 'PUT'])
+@login_required
+@admin_required
+def caixa_detail(caixa_id):
+    if request.method == 'GET':
+        try:
+            session = Session(db.engine)
+            caixa = session.get(entities.Caixa, caixa_id)
+            
+            if not caixa:
+                return jsonify({"success": False, "error": "Caixa não encontrado"}), 404
+            
+            # Convert caixa object to dictionary
+            caixa_data = {
+                'id': caixa.id,
+                'operador': {
+                    'id': caixa.operador.id,
+                    'nome': caixa.operador.nome,
+                    'tipo': caixa.operador.tipo
+                },
+                'data_abertura': caixa.data_abertura.isoformat(),
+                'data_fechamento': caixa.data_fechamento.isoformat() if caixa.data_fechamento else None,
+                'valor_abertura': float(caixa.valor_abertura),
+                'valor_fechamento': float(caixa.valor_fechamento) if caixa.valor_fechamento else None,
+                'status': caixa.status.value,
+                'observacoes_operador': caixa.observacoes_operador,
+                'observacoes_admin': caixa.observacoes_admin
+            }
+            
+            return jsonify({"success": True, "data": caixa_data})
+            
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+    
+    elif request.method == 'PUT':
+        try:
+            dados = request.get_json()
+            if not dados:
+                return jsonify({"success": False, "error": "Dados não fornecidos"}), 400
+                
+            caixa = db.session.get(entities.Caixa, caixa_id)
+            if not caixa:
+                return jsonify({"success": False, "error": "Caixa não encontrado"}), 404
+            
+            # Atualiza status e datas conforme ação
+            if 'status' in dados:
+                if dados['status'] == 'fechado' and caixa.status != entities.StatusCaixa.fechado:
+                    caixa.status = entities.StatusCaixa.fechado
+                    caixa.data_fechamento = datetime.utcnow()
+                elif dados['status'] == 'analise' and caixa.status != entities.StatusCaixa.analise:
+                    caixa.status = entities.StatusCaixa.analise
+                    caixa.data_analise = datetime.utcnow()
+            
+            # Atualiza observações se existirem
+            if 'observacoes_operador' in dados:
+                caixa.observacoes_operador = dados['observacoes_operador']
+            if 'observacoes_admin' in dados:
+                caixa.observacoes_admin = dados['observacoes_admin']
+            
+            db.session.commit()
+            
+            return jsonify({
+                "success": True,
+                "message": "Caixa atualizado com sucesso",
+                "data": {
+                    "id": caixa.id,
+                    "status": caixa.status.value,
+                    "data_analise": caixa.data_analise.isoformat() if caixa.data_analise else None,
+                    "data_fechamento": caixa.data_fechamento.isoformat() if caixa.data_fechamento else None,
+                }
+            })
+                
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"success": False, "error": f"Erro ao atualizar caixa: {str(e)}"}), 500
+        
+@admin_bp.route('/caixas/<int:caixa_id>/financeiro')
+@login_required
+@admin_required
+def get_caixa_financeiro(caixa_id):
+    try:
+        session = Session(db.engine)
+        
+        # Busca as movimentações financeiras do caixa
+        movimentacoes = session.query(entities.Financeiro)\
+            .filter_by(caixa_id=caixa_id)\
+            .order_by(entities.Financeiro.data.desc())\
+            .all()
+        
+        # Formata os dados para resposta
+        dados = [{
+            'id': mov.id,
+            'data': mov.data.isoformat(),
+            'tipo': mov.tipo.value,
+            'categoria': mov.categoria.value if mov.categoria else None,
+            'valor': float(mov.valor),
+            'descricao': mov.descricao,
+            'nota_fiscal_id': mov.nota_fiscal_id,
+            'cliente_id': mov.cliente_id,
+            'conta_receber_id': mov.conta_receber_id
+        } for mov in movimentacoes]
+        
+        # Calcula totais
+        total_entradas = sum(mov.valor for mov in movimentacoes if mov.tipo == entities.TipoMovimentacao.entrada)
+        total_saidas = sum(mov.valor for mov in movimentacoes if mov.tipo == entities.TipoMovimentacao.saida)
+        
+        return jsonify({
+            'success': True,
+            'data': dados,
+            'totais': {
+                'entradas': float(total_entradas),
+                'saidas': float(total_saidas),
+                'saldo': float(total_entradas - total_saidas)
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
