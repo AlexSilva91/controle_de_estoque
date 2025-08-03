@@ -2084,3 +2084,77 @@ footer {
 .details-table-container::-webkit-scrollbar-thumb:hover {
   background: var(--primary-dark);
 }
+/* Estilos para os modais de caixa */
+.modal-dialog.caixa-modal {
+    max-width: min(90vw, 800px);
+}
+
+/* Estilo para o status no modal de visualização */
+#visualizarCaixaStatus.badge-status {
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--border-radius-sm);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    display: inline-block;
+}
+
+#visualizarCaixaStatus.badge-status.aberto {
+    background-color: rgba(0, 184, 148, 0.2);
+    color: var(--success-color);
+    border-left: 3px solid var(--success-color);
+}
+
+#visualizarCaixaStatus.badge-status.fechado {
+    background-color: rgba(214, 48, 49, 0.2);
+    color: var(--danger-color);
+    border-left: 3px solid var(--danger-color);
+}
+
+#visualizarCaixaStatus.badge-status.analise {
+    background-color: rgba(253, 203, 110, 0.2);
+    color: var(--warning-color);
+    border-left: 3px solid var(--warning-color);
+}
+
+/* Ajustes para valores monetários */
+.value.monetary {
+    font-family: 'Courier New', monospace;
+    font-weight: var(--font-weight-bold);
+}
+
+/* Ajustes para a tabela de movimentações */
+#caixaFinanceiroTable th {
+    position: sticky;
+    top: 0;
+    background-color: var(--bg-tertiary);
+    z-index: 10;
+}
+
+#caixaFinanceiroTable tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+#caixaFinanceiroTable tr:hover {
+    background-color: rgba(108, 92, 231, 0.1);
+}
+
+/* Estilo para os totais */
+.details-totals .total-item {
+    background-color: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+    padding: var(--space-md);
+    border: 1px solid var(--border-color);
+}
+
+.details-totals .total-value {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+}
+
+.details-totals .total-value.positive {
+    color: var(--success-color);
+}
+
+.details-totals .total-value.negative {
+    color: var(--danger-color);
+}

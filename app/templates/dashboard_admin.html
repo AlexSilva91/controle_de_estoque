@@ -888,113 +888,142 @@
     
     <!-- Modal de Visualização do Caixa -->
     <div id="visualizarCaixaModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Detalhes do Caixa <span id="visualizarCaixaId"></span></h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="info-grid">
-                    <div class="info-item">
-                        <label>Operador:</label>
-                        <span id="visualizarCaixaOperador"></span>
-                    </div>
-                    <div class="info-item">
-                        <label>Status:</label>
-                        <span id="visualizarCaixaStatus" class="badge"></span>
-                    </div>
-                    <div class="info-item">
-                        <label>Data Abertura:</label>
-                        <span id="visualizarCaixaDataAbertura"></span>
-                    </div>
-                    <div class="info-item">
-                        <label>Valor Abertura:</label>
-                        <span id="visualizarCaixaValorAbertura"></span>
-                    </div>
-                    
-                    <div id="caixaFechamentoInfo" style="display: none;">
-                        <div class="info-item">
-                            <label>Data Fechamento:</label>
-                            <span id="visualizarCaixaDataFechamento"></span>
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-cash-register"></i>
+                        <span>Detalhes do Caixa <span id="visualizarCaixaId"></span></span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <div class="modal-body details-body">
+                    <div class="details-main-info">
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <label>Operador:</label>
+                                <div class="value" id="visualizarCaixaOperador"></div>
+                            </div>
+                            <div class="detail-item">
+                                <label>Status:</label>
+                                <div class="value" id="visualizarCaixaStatus"></div>
+                            </div>
+                            <div class="detail-item">
+                                <label>Data Abertura:</label>
+                                <div class="value" id="visualizarCaixaDataAbertura"></div>
+                            </div>
+                            <div class="detail-item">
+                                <label>Valor Abertura:</label>
+                                <div class="value" id="visualizarCaixaValorAbertura"></div>
+                            </div>
+                            
+                            <div id="caixaFechamentoInfo" style="display: none;">
+                                <div class="detail-item">
+                                    <label>Data Fechamento:</label>
+                                    <div class="value" id="visualizarCaixaDataFechamento"></div>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Valor Fechamento:</label>
+                                    <div class="value" id="visualizarCaixaValorFechamento"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-item full-width">
+                                <label>Observações do Operador:</label>
+                                <div class="value" id="visualizarCaixaObsOperador"></div>
+                            </div>
+                            
+                            <div class="detail-item full-width">
+                                <label>Observações do Administrador:</label>
+                                <div class="value" id="visualizarCaixaObsAdmin"></div>
+                            </div>
                         </div>
-                        <div class="info-item">
-                            <label>Valor Fechamento:</label>
-                            <span id="visualizarCaixaValorFechamento"></span>
+                    </div>
+                    
+                    <div class="details-table-section">
+                        <h4><i class="fas fa-file-invoice-dollar"></i> Movimentações Financeiras</h4>
+                        <div class="details-table-container">
+                            <table id="caixaFinanceiroTable" class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Tipo</th>
+                                        <th>Categoria</th>
+                                        <th>Valor</th>
+                                        <th>Descrição</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
                         </div>
                     </div>
                     
-                    <div class="info-item full-width">
-                        <label>Observações do Operador:</label>
-                        <div class="info-text" id="visualizarCaixaObsOperador"></div>
-                    </div>
-                    
-                    <div class="info-item full-width">
-                        <label>Observações do Administrador:</label>
-                        <div class="info-text" id="visualizarCaixaObsAdmin"></div>
-                    </div>
-                </div>
-                
-                <h4>Movimentações Financeiras</h4>
-                <div class="table-responsive">
-                    <table id="caixaFinanceiroTable" class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Data</th>
-                                <th>Tipo</th>
-                                <th>Categoria</th>
-                                <th>Valor</th>
-                                <th>Descrição</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-                
-                <div class="financeiro-totals">
-                    <div class="total-item">
-                        <label>Total Entradas:</label>
-                        <span id="caixaTotalEntradas" class="total-value positive">R$ 0,00</span>
-                    </div>
-                    <div class="total-item">
-                        <label>Total Saídas:</label>
-                        <span id="caixaTotalSaidas" class="total-value negative">R$ 0,00</span>
-                    </div>
-                    <div class="total-item">
-                        <label>Saldo:</label>
-                        <span id="caixaSaldo" class="total-value">R$ 0,00</span>
+                    <div class="details-totals">
+                        <div class="total-item">
+                            <label>Total Entradas:</label>
+                            <span id="caixaTotalEntradas" class="total-value positive">R$ 0,00</span>
+                        </div>
+                        <div class="total-item">
+                            <label>Total Saídas:</label>
+                            <span id="caixaTotalSaidas" class="total-value negative">R$ 0,00</span>
+                        </div>
+                        <div class="total-item">
+                            <label>Saldo:</label>
+                            <span id="caixaSaldo" class="total-value">R$ 0,00</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary close-modal">Fechar</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Modal de Edição do Caixa -->
     <div id="editarCaixaModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="editarCaixaModalTitle">Editar Caixa</h3>
-                <button class="close-modal">&times;</button>
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-edit"></i>
+                        <span id="editarCaixaModalTitle">Editar Caixa</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <form id="editarCaixaForm">
+                    <input type="hidden" id="editarCaixaId">
+                    <div class="modal-body">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="editarCaixaValorAbertura">Valor de Abertura*</label>
+                                <input type="number" id="editarCaixaValorAbertura" class="form-control" step="0.01" min="0" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="editarCaixaStatus">Status*</label>
+                                <select id="editarCaixaStatus" class="form-control" required>
+                                    <option value="aberto">Aberto</option>
+                                    <option value="fechado">Fechado</option>
+                                    <option value="analise">Em análise</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="editarCaixaObservacoes">Observações</label>
+                            <textarea id="editarCaixaObservacoes" class="form-control" rows="3"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i>
+                            <span>Salvar Alterações</span>
+                        </button>
+                    </div>
+                </form>
             </div>
-            <form id="editarCaixaForm">
-                <input type="hidden" id="editarCaixaId">
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="editarCaixaValorAbertura">Valor de Abertura</label>
-                        <input type="number" id="editarCaixaValorAbertura" class="form-control" step="0.01" min="0" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="editarCaixaObservacoes">Observações</label>
-                        <textarea id="editarCaixaObservacoes" class="form-control" rows="3"></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary close-modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
-                </div>
-            </form>
         </div>
     </div>
 
