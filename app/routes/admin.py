@@ -1526,3 +1526,146 @@ def get_caixa_financeiro(caixa_id):
             'success': False,
             'error': str(e)
         }), 500
+        
+        
+@admin_bp.route('/caixas/<int:caixa_id>/aprovar', methods=['POST'])
+@login_required
+@admin_required
+def aprovar_caixa(caixa_id):
+    """Rota para aprovar o fechamento de um caixa"""
+    caixa = entities.Caixa.query.get_or_404(caixa_id)
+    
+    if current_user.tipo != 'admin':
+        return jsonify({'error': 'Apenas administradores podem aprovar caixas'}), 403
+    
+    data = request.get_json()
+    valor_confirmado = data.get('valor_confirmado')
+    observacoes = data.get('observacoes')
+    
+    try:
+        caixa.aprovar_fechamento(
+            administrador_id=current_user.id,
+            valor_confirmado=valor_confirmado,
+            observacoes_admin=observacoes
+        )
+        db.session.commit()
+        return jsonify({
+            'message': 'Caixa aprovado com sucesso',
+            'status': caixa.status.value,
+            'valor_confirmado': float(caixa.valor_confirmado) if caixa.valor_confirmado else None
+        }), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro ao aprovar caixa: {str(e)}'}), 500
+
+@admin_bp.route('/caixas/<int:caixa_id>/recusar', methods=['POST'])
+@login_required
+@admin_required
+def recusar_caixa(caixa_id):
+    """Rota para recusar o fechamento de um caixa"""
+    caixa = entities.Caixa.query.get_or_404(caixa_id)
+    
+    if current_user.tipo != 'admin':
+        return jsonify({'error': 'Apenas administradores podem recusar caixas'}), 403
+    
+    data = request.get_json()
+    motivo = data.get('motivo')
+    valor_correto = data.get('valor_correto')
+    
+    if not motivo:
+        return jsonify({'error': 'Motivo da recusa é obrigatório'}), 400
+    
+    try:
+        caixa.rejeitar_fechamento(
+            administrador_id=current_user.id,
+            motivo=motivo,
+            valor_correto=valor_correto
+        )
+        db.session.commit()
+        return jsonify({
+            'message': 'Caixa recusado com sucesso',
+            'status': caixa.status.value,
+            'observacoes_admin': caixa.observacoes_admin
+        }), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro ao recusar caixa: {str(e)}'}), 500
+
+@admin_bp.route('/caixas/<int:caixa_id>/enviar_analise', methods=['POST'])
+@login_required
+@admin_required
+def enviar_para_analise(caixa_id):
+    """Rota para enviar um caixa para análise (fechamento inicial)"""
+    print(f"Recebendo solicitação para caixa {caixa_id}")  # Log de depuração
+    
+    try:
+        caixa = entities.Caixa.query.get_or_404(caixa_id)
+        print(f"Caixa encontrado: {caixa.id}, status: {caixa.status}")  # Log de depuração
+        
+        data = request.get_json()
+        print(f"Dados recebidos: {data}")  # Log de depuração
+        
+        valor_fechamento = data.get('valor_fechamento')
+        observacoes = data.get('observacoes')
+        
+        if not valor_fechamento:
+            print("Erro: Valor de fechamento não fornecido")  # Log de depuração
+            return jsonify({'error': 'Valor de fechamento é obrigatório'}), 400
+        
+        # Adicione mais logs para verificar o usuário atual
+        print(f"Usuário atual: {current_user.id}, Tipo: {current_user.tipo}")
+        
+        caixa.fechar_caixa(
+            valor_fechamento=valor_fechamento,
+            observacoes_operador=observacoes,
+            usuario_id=current_user.id
+        )
+        db.session.commit()
+        
+        print("Caixa enviado para análise com sucesso")  # Log de depuração
+        return jsonify({
+            'message': 'Caixa enviado para análise com sucesso',
+            'status': caixa.status.value,
+            'valor_fechamento': float(caixa.valor_fechamento)
+        }), 200
+        
+    except ValueError as e:
+        print(f"Erro de valor: {str(e)}")  # Log de depuração
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro interno: {str(e)}")  # Log de depuração
+        return jsonify({'error': f'Erro ao enviar caixa para análise: {str(e)}'}), 500
+
+@admin_bp.route('/caixas/<int:caixa_id>/reabrir', methods=['POST'])
+@login_required
+@admin_required
+def reabrir_caixa(caixa_id):
+    """Rota para reabrir um caixa fechado ou recusado"""
+    caixa = entities.Caixa.query.get_or_404(caixa_id)
+    
+    if current_user.tipo != 'admin':
+        return jsonify({'error': 'Apenas administradores podem reabrir caixas'}), 403
+    
+    data = request.get_json()
+    motivo = data.get('motivo')
+    
+    try:
+        caixa.reabrir_caixa(
+            administrador_id=current_user.id,
+            motivo=motivo
+        )
+        db.session.commit()
+        return jsonify({
+            'message': 'Caixa reaberto com sucesso',
+            'status': caixa.status.value
+        }), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro ao reabrir caixa: {str(e)}'}), 500

@@ -1599,97 +1599,240 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // ===== CAIXAS =====
   async function loadCaixasData() {
-    try {
-      const status = document.getElementById('caixaStatus')?.value;
-      let url = '/admin/caixas';
-      
-      if (status) {
-        url += `?status=${status}`;
-      }
-      
-      const data = await fetchWithErrorHandling(url);
-      
-      if (data.success) {
-        const caixasTable = document.querySelector('#caixasTable tbody');
-        if (caixasTable) {
-          caixasTable.innerHTML = '';
+      try {
+          const status = document.getElementById('caixaStatus')?.value;
+          let url = '/admin/caixas';
           
-          data.data.forEach(caixa => {
-            const row = document.createElement('tr');
-            
-            // Formatar datas
-            const dataAbertura = formatDateTime(caixa.data_abertura);
-            const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
-            
-            // Formatar valores monetários
-            const valorAbertura = formatCurrency(caixa.valor_abertura);
-            const valorFechamento = caixa.valor_fechamento ? formatCurrency(caixa.valor_fechamento) : '-';
-            
-            // Determinar classe do status
-            let statusClass = '';
-            if (caixa.status === 'aberto') statusClass = 'badge-success';
-            else if (caixa.status === 'fechado') statusClass = 'badge-primary';
-            else if (caixa.status === 'analise') statusClass = 'badge-warning';
-            
-            row.innerHTML = `
-              <td>${caixa.id}</td>
-              <td>${caixa.operador.nome || '-'}</td>
-              <td>${dataAbertura}</td>
-              <td>${dataFechamento}</td>
-              <td>${valorAbertura}</td>
-              <td>${valorFechamento}</td>
-              <td><span class="badge ${statusClass}">${caixa.status}</span></td>
-              <td>
-                <div class="table-actions">
-                  <button class="btn-icon btn-info visualizar-caixa" data-id="${caixa.id}" title="Visualizar">
-                    <i class="fas fa-eye"></i>
-                  </button>
-                  ${caixa.status === 'aberto' ? `
-                  <button class="btn-icon btn-warning editar-caixa" data-id="${caixa.id}" title="Editar">
-                    <i class="fas fa-edit"></i>
-                  </button>
-                  <button class="btn-icon btn-danger fechar-caixa" data-id="${caixa.id}" title="Fechar">
-                    <i class="fas fa-lock"></i>
-                  </button>
-                  ` : ''}
-                </div>
-              </td>
-            `;
-            caixasTable.appendChild(row);
-          });
+          if (status) {
+              url += `?status=${status}`;
+          }
           
-          setupCaixaActions();
-        }
+          const data = await fetchWithErrorHandling(url);
+          
+          if (data.success) {
+              const caixasTable = document.querySelector('#caixasTable tbody');
+              if (caixasTable) {
+                  caixasTable.innerHTML = '';
+                  
+                  data.data.forEach(caixa => {
+                      const row = document.createElement('tr');
+                      
+                      // Formatar datas
+                      const dataAbertura = formatDateTime(caixa.data_abertura);
+                      const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
+                      
+                      // Formatar valores monetários
+                      const valorAbertura = formatCurrency(caixa.valor_abertura);
+                      const valorFechamento = caixa.valor_fechamento ? formatCurrency(caixa.valor_fechamento) : '-';
+                      const valorConfirmado = caixa.valor_confirmado ? formatCurrency(caixa.valor_confirmado) : '-';
+                      
+                      // Determinar classe do status
+                      let statusClass = '';
+                      let statusText = '';
+                      if (caixa.status === 'aberto') {
+                          statusClass = 'badge-success';
+                          statusText = 'Aberto';
+                      } else if (caixa.status === 'fechado') {
+                          statusClass = 'badge-primary';
+                          statusText = 'Fechado';
+                      } else if (caixa.status === 'analise') {
+                          statusClass = 'badge-warning';
+                          statusText = 'Em Análise';
+                      } else if (caixa.status === 'rejeitado') {
+                          statusClass = 'badge-danger';
+                          statusText = 'Rejeitado';
+                      }
+                      
+                      row.innerHTML = `
+                          <td>${caixa.id}</td>
+                          <td>${caixa.operador?.nome || '-'}</td>
+                          <td>${dataAbertura}</td>
+                          <td>${dataFechamento}</td>
+                          <td>${valorAbertura}</td>
+                          <td>${valorFechamento}</td>
+                          <td><span class="badge ${statusClass}">${statusText}</span></td>
+                          <td>
+                              <div class="table-actions">
+                                  <!-- Botão Visualizar - Sempre visível -->
+                                  <button class="btn-icon btn-info visualizar-caixa" data-id="${caixa.id}" title="Visualizar">
+                                      <i class="fas fa-eye"></i>
+                                  </button>
+                                  <button class="btn-icon btn-primary enviar-analise-caixa" data-id="${caixa.id}" title="Enviar para Análise">
+                                      <i class="fas fa-paper-plane"></i>
+                                  </button>
+                                  <button class="btn-icon btn-success aprovar-caixa" data-id="${caixa.id}" title="Aprovar">
+                                      <i class="fas fa-check"></i>
+                                  </button>
+                                  <button class="btn-icon btn-danger recusar-caixa" data-id="${caixa.id}" title="Recusar">
+                                      <i class="fas fa-times"></i>
+                                  </button>
+                                  <button class="btn-icon btn-warning reabrir-caixa" data-id="${caixa.id}" title="Reabrir">
+                                      <i class="fas fa-unlock"></i>
+                                  </button>
+                              </div>
+                          </td>
+                      `;
+                      caixasTable.appendChild(row);
+                  });
+                  
+                  setupCaixaActions();
+              }
+          }
+      } catch (error) {
+          console.error('Erro ao carregar caixas:', error);
+          showFlashMessage('error', 'Erro ao carregar lista de caixas');
       }
-    } catch (error) {
-      console.error('Erro ao carregar caixas:', error);
-      showFlashMessage('error', 'Erro ao carregar lista de caixas');
-    }
   }
 
   function setupCaixaActions() {
-    document.querySelectorAll('.visualizar-caixa').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const caixaId = this.getAttribute('data-id');
-        openVisualizarCaixaModal(caixaId);
+      // Visualizar
+      document.querySelectorAll('.visualizar-caixa').forEach(btn => {
+          btn.addEventListener('click', function() {
+              const caixaId = this.getAttribute('data-id');
+              openVisualizarCaixaModal(caixaId);
+          });
       });
-    });
 
-    document.querySelectorAll('.editar-caixa').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const caixaId = this.getAttribute('data-id');
-        openEditarCaixaModal(caixaId);
+      // Enviar para Análise
+      document.querySelectorAll('.enviar-analise-caixa').forEach(btn => {
+          btn.addEventListener('click', async function() {
+              const caixaId = this.getAttribute('data-id');
+              
+              try {
+                  const valorFechamento = prompt('Informe o valor de fechamento para análise:');
+                  if (!valorFechamento) return;
+                  
+                  if (isNaN(valorFechamento) || parseFloat(valorFechamento) <= 0) {
+                      showFlashMessage('error', 'Digite um valor válido!');
+                      return;
+                  }
+                  
+                  const observacoes = prompt('Observações (opcional):') || '';
+                  
+                  const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/enviar_analise`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ 
+                          valor_fechamento: parseFloat(valorFechamento),
+                          observacoes: observacoes
+                      })
+                  });
+                  
+                  if (response.success) {
+                      showFlashMessage('success', 'Caixa enviado para análise com sucesso');
+                      loadCaixasData();
+                  }
+              } catch (error) {
+                  console.error('Erro ao enviar para análise:', error);
+                  showFlashMessage('error', error.message || 'Erro ao enviar para análise');
+              }
+          });
       });
-    });
 
-    document.querySelectorAll('.fechar-caixa').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const caixaId = this.getAttribute('data-id');
-        if (confirm('Tem certeza que deseja fechar este caixa?')) {
-          fecharCaixa(caixaId);
-        }
+      // Aprovar
+      document.querySelectorAll('.aprovar-caixa').forEach(btn => {
+          btn.addEventListener('click', async function() {
+              const caixaId = this.getAttribute('data-id');
+              
+              try {
+                  const valorConfirmado = prompt('Valor confirmado (opcional):');
+                  const observacoes = prompt('Observações (opcional):') || '';
+                  
+                  // Se o usuário cancelar o prompt de valorConfirmado, não prosseguir
+                  if (valorConfirmado === null && observacoes === null) return;
+                  
+                  // Validar se valorConfirmado é um número válido quando fornecido
+                  if (valorConfirmado && (isNaN(valorConfirmado) || parseFloat(valorConfirmado) <= 0)) {
+                      showFlashMessage('error', 'Digite um valor válido ou deixe em branco!');
+                      return;
+                  }
+                  
+                  const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/aprovar`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ 
+                          valor_confirmado: valorConfirmado ? parseFloat(valorConfirmado) : null,
+                          observacoes: observacoes
+                      })
+                  });
+                  
+                  if (response.success) {
+                      showFlashMessage('success', 'Caixa aprovado com sucesso');
+                      loadCaixasData();
+                  }
+              } catch (error) {
+                  console.error('Erro ao aprovar caixa:', error);
+                  showFlashMessage('error', error.message || 'Erro ao aprovar caixa');
+              }
+          });
       });
-    });
+
+      // Recusar
+      document.querySelectorAll('.recusar-caixa').forEach(btn => {
+          btn.addEventListener('click', async function() {
+              const caixaId = this.getAttribute('data-id');
+              
+              try {
+                  const motivo = prompt('Motivo da recusa (obrigatório):');
+                  if (!motivo) {
+                      showFlashMessage('warning', 'O motivo é obrigatório');
+                      return;
+                  }
+                  
+                  const valorCorreto = prompt('Valor correto (opcional):');
+                  
+                  // Validar se valorCorreto é um número válido quando fornecido
+                  if (valorCorreto && (isNaN(valorCorreto) || parseFloat(valorCorreto) <= 0)) {
+                      showFlashMessage('error', 'Digite um valor válido ou deixe em branco!');
+                      return;
+                  }
+                  
+                  const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/recusar`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ 
+                          motivo: motivo,
+                          valor_correto: valorCorreto ? parseFloat(valorCorreto) : null
+                      })
+                  });
+                  
+                  if (response.success) {
+                      showFlashMessage('success', 'Caixa recusado com sucesso');
+                      loadCaixasData();
+                  }
+              } catch (error) {
+                  console.error('Erro ao recusar caixa:', error);
+                  showFlashMessage('error', error.message || 'Erro ao recusar caixa');
+              }
+          });
+      });
+
+      // Reabrir
+      document.querySelectorAll('.reabrir-caixa').forEach(btn => {
+          btn.addEventListener('click', async function() {
+              const caixaId = this.getAttribute('data-id');
+              
+              try {
+                  const motivo = prompt('Motivo da reabertura (opcional):') || '';
+                  
+                  if (confirm('Tem certeza que deseja reabrir este caixa?')) {
+                      const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/reabrir`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ motivo: motivo })
+                      });
+                      
+                      if (response.success) {
+                          showFlashMessage('success', 'Caixa reaberto com sucesso');
+                          loadCaixasData();
+                      }
+                  }
+              } catch (error) {
+                  console.error('Erro ao reabrir caixa:', error);
+                  showFlashMessage('error', error.message || 'Erro ao reabrir caixa');
+              }
+          });
+      });
   }
 
   // Função para abrir o modal de visualização do caixa
@@ -1702,23 +1845,39 @@ document.addEventListener('DOMContentLoaded', function() {
               
               // Preencher os dados no modal
               if (document.getElementById('visualizarCaixaId')) document.getElementById('visualizarCaixaId').textContent = caixa.id;
-              if (document.getElementById('visualizarCaixaOperador')) document.getElementById('visualizarCaixaOperador').textContent = caixa.operador.nome;
+              if (document.getElementById('visualizarCaixaOperador')) document.getElementById('visualizarCaixaOperador').textContent = caixa.operador?.nome || '-';
               if (document.getElementById('visualizarCaixaDataAbertura')) document.getElementById('visualizarCaixaDataAbertura').textContent = formatDateTime(caixa.data_abertura);
               if (document.getElementById('visualizarCaixaValorAbertura')) document.getElementById('visualizarCaixaValorAbertura').textContent = formatCurrency(caixa.valor_abertura);
               
               // Status do caixa
               const statusElement = document.getElementById('visualizarCaixaStatus');
               if (statusElement) {
-                statusElement.textContent = caixa.status;
-                statusElement.className = 'badge ' + 
-                    (caixa.status === 'aberto' ? 'badge-success' : 
-                    caixa.status === 'fechado' ? 'badge-primary' : 'badge-warning');
+                  let statusText = '';
+                  let statusClass = '';
+                  
+                  if (caixa.status === 'aberto') {
+                      statusText = 'Aberto';
+                      statusClass = 'badge-success';
+                  } else if (caixa.status === 'fechado') {
+                      statusText = 'Fechado';
+                      statusClass = 'badge-primary';
+                  } else if (caixa.status === 'analise') {
+                      statusText = 'Em Análise';
+                      statusClass = 'badge-warning';
+                  } else if (caixa.status === 'rejeitado') {
+                      statusText = 'Rejeitado';
+                      statusClass = 'badge-danger';
+                  }
+                  
+                  statusElement.textContent = statusText;
+                  statusElement.className = 'badge ' + statusClass;
               }
               
-              // Se o caixa estiver fechado, mostrar informações de fechamento
-              if (caixa.status === 'fechado') {
-                  if (document.getElementById('visualizarCaixaDataFechamento')) document.getElementById('visualizarCaixaDataFechamento').textContent = formatDateTime(caixa.data_fechamento);
-                  if (document.getElementById('visualizarCaixaValorFechamento')) document.getElementById('visualizarCaixaValorFechamento').textContent = formatCurrency(caixa.valor_fechamento);
+              // Se o caixa estiver fechado ou em análise, mostrar informações de fechamento
+              if (['fechado', 'analise', 'rejeitado'].includes(caixa.status)) {
+                  if (document.getElementById('visualizarCaixaDataFechamento')) document.getElementById('visualizarCaixaDataFechamento').textContent = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
+                  if (document.getElementById('visualizarCaixaValorFechamento')) document.getElementById('visualizarCaixaValorFechamento').textContent = caixa.valor_fechamento ? formatCurrency(caixa.valor_fechamento) : '-';
+                  if (document.getElementById('visualizarCaixaValorConfirmado')) document.getElementById('visualizarCaixaValorConfirmado').textContent = caixa.valor_confirmado ? formatCurrency(caixa.valor_confirmado) : '-';
                   
                   const caixaFechamentoInfo = document.getElementById('caixaFechamentoInfo');
                   if (caixaFechamentoInfo) caixaFechamentoInfo.style.display = 'block';
@@ -1768,8 +1927,8 @@ document.addEventListener('DOMContentLoaded', function() {
                       
                       row.innerHTML = `
                           <td>${formatDateTime(item.data)}</td>
-                          <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo}</span></td>
-                          <td>${item.categoria}</td>
+                          <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
+                          <td>${item.categoria || '-'}</td>
                           <td>${formatCurrency(valor)}</td>
                           <td>${item.descricao || '-'}</td>
                           <td>${item.forma_pagamento || '-'}</td>
@@ -1795,124 +1954,19 @@ document.addEventListener('DOMContentLoaded', function() {
       }
   }
 
-  // Função para fechar o caixa
-  async function fecharCaixa(caixaId) {
-      try {
-          // Pedir confirmação do valor de fechamento
-          const valorFechamento = prompt('Informe o valor de fechamento do caixa:');
-          
-          if (valorFechamento === null) return; // Usuário cancelou
-          
-          if (!valorFechamento || isNaN(parseFloat(valorFechamento))) {
-              showFlashMessage('error', 'Valor inválido');
-              return;
-          }
-          
-          // Pedir observações (opcional)
-          const observacoes = prompt('Observações (opcional):') || '';
-          
-          const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}`, {
-              method: 'PUT',
-              headers: {
-                  'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                  status: 'fechado',
-                  valor_fechamento: parseFloat(valorFechamento),
-                  observacoes_admin: observacoes
-              })
-          });
-          
-          if (response.success) {
-              showFlashMessage('success', 'Caixa fechado com sucesso');
-              loadCaixasData(); // Atualizar a lista de caixas
-              
-              // Fechar modais abertos
-              closeModal('visualizarCaixaModal');
-              closeModal('editarCaixaModal');
-          } else {
-              showFlashMessage('error', response.message || 'Erro ao fechar caixa');
-          }
-      } catch (error) {
-          console.error('Erro ao fechar caixa:', error);
-          showFlashMessage('error', 'Erro ao fechar caixa');
-      }
-  }
-
-  // Função para abrir modal de edição do caixa
-  async function openEditarCaixaModal(caixaId) {
-      try {
-          const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}`);
-          
-          if (response.success) {
-              const caixa = response.data;
-              
-              // Preencher o formulário
-              if (document.getElementById('editarCaixaId')) document.getElementById('editarCaixaId').value = caixa.id;
-              if (document.getElementById('editarCaixaValorAbertura')) document.getElementById('editarCaixaValorAbertura').value = caixa.valor_abertura;
-              if (document.getElementById('editarCaixaObservacoes')) document.getElementById('editarCaixaObservacoes').value = caixa.observacoes_operador || '';
-              
-              // Configurar o modal
-              const editarCaixaModalTitle = document.getElementById('editarCaixaModalTitle');
-              if (editarCaixaModalTitle) editarCaixaModalTitle.textContent = `Editar Caixa #${caixa.id}`;
-              openModal('editarCaixaModal');
-          }
-      } catch (error) {
-          console.error('Erro ao abrir edição do caixa:', error);
-          showFlashMessage('error', 'Erro ao carregar dados do caixa');
-      }
-  }
-
-  // Evento de submit do formulário de edição do caixa
-  const editarCaixaForm = document.getElementById('editarCaixaForm');
-  if (editarCaixaForm) {
-    editarCaixaForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const caixaId = document.getElementById('editarCaixaId')?.value;
-        if (!caixaId) return;
-        
-        const formData = {
-            valor_abertura: document.getElementById('editarCaixaValorAbertura')?.value || 0,
-            observacoes_operador: document.getElementById('editarCaixaObservacoes')?.value || ''
-        };
-        
-        try {
-            const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            });
-            
-            if (response.success) {
-                showFlashMessage('success', 'Caixa atualizado com sucesso');
-                closeModal('editarCaixaModal');
-                loadCaixasData();
-            } else {
-                showFlashMessage('error', response.message || 'Erro ao atualizar caixa');
-            }
-        } catch (error) {
-            console.error('Erro ao atualizar caixa:', error);
-            showFlashMessage('error', 'Erro ao atualizar caixa');
-        }
-    });
-  }
-
   // Funções auxiliares para formatação
   function formatDateTime(dateTimeString) {
-    if (!dateTimeString) return '-';
-    const date = new Date(dateTimeString);
-    return date.toLocaleString('pt-BR');
+      if (!dateTimeString) return '-';
+      const date = new Date(dateTimeString);
+      return date.toLocaleString('pt-BR');
   }
 
   function formatCurrency(value) {
-    if (!value) return '-';
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
+      if (!value) return '-';
+      return new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL'
+      }).format(value);
   }
 
   // ===== FUNÇÕES GERAIS =====
