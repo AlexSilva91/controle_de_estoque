@@ -879,10 +879,13 @@ async function registerSale() {
         await loadProducts(true);
         
         // Exibe mensagem de sucesso
-        showMessage(`Venda registrada com sucesso! Nº Nota: ${result.nota_fiscal_id}`);
+        showMessage(`Venda registrada com sucesso!`);
         
         // Abre o comprovante em nova aba
-        window.open(`/operador/pdf/nota/${result.nota_fiscal_id}?timestamp=${new Date().getTime()}`, '_blank');
+        const paymentIdsStr = result.pagamentos_ids.join(',');
+
+        // Abrir o PDF com os IDs formatados
+        window.open(`/operador/pdf/nota/${paymentIdsStr}?timestamp=${new Date().getTime()}`, '_blank');
         
     } catch (error) {
         console.error('Erro ao registrar venda:', error);

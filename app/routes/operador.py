@@ -2,7 +2,7 @@ import base64
 from functools import wraps
 import re
 import threading
-from flask import Blueprint, json, render_template, request, jsonify, current_app as app
+from flask import Blueprint, abort, json, make_response, render_template, request, jsonify, current_app as app
 from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from sqlalchemy.exc import SQLAlchemyError
@@ -28,6 +28,7 @@ from app.crud import (
     StatusNota,
     StatusPagamento,
     TipoMovimentacao,
+    buscar_pagamentos_notas_fiscais,
     listar_despesas_do_dia,
     registrar_venda_completa,
     get_caixa_aberto,
@@ -400,7 +401,8 @@ def api_registrar_venda():
             # Atualizar estoque
             produto.estoque_loja -= quantidade
 
-        # Criar pagamentos
+        # Criar pagamentos e armazenar seus IDs
+        pagamentos_ids = []
         for pagamento_data in dados_venda['pagamentos']:
             forma = pagamento_data.get('forma_pagamento')
             valor = Decimal(str(pagamento_data.get('valor')))
@@ -413,6 +415,9 @@ def api_registrar_venda():
                 sincronizado=False
             )
             db.session.add(pagamento_nf)
+            db.session.flush()  # Garante que teremos o ID do pagamento
+            
+            pagamentos_ids.append(pagamento_nf.id)
             
             # Registrar no financeiro
             financeiro = entities.Financeiro(
@@ -454,6 +459,7 @@ def api_registrar_venda():
             'success': True,
             'message': 'Venda registrada com sucesso',
             'nota_fiscal_id': nota.id,
+            'pagamentos_ids': pagamentos_ids,  # Adicionado os IDs dos pagamentos
             'valor_total': float(valor_total),
             'valor_recebido': float(valor_recebido),
             'troco': float(nota.troco) if nota.troco else 0
@@ -477,55 +483,38 @@ def api_registrar_venda():
             'error': str(e)
         }), 500
 
-@operador_bp.route('/pdf/nota/<int:nota_id>', methods=['GET'])
+@operador_bp.route('/pdf/nota/<id_list>', methods=['GET'])
 @login_required
 @operador_required
-def visualizar_pdf_venda(nota_id):
-    nota = entities.NotaFiscal.query.get_or_404(nota_id)
-
-    dados_nota = {
-        "data_emissao": nota.data_emissao,
-        "forma_pagamento": nota.forma_pagamento,
-        "itens": [
-            {
-                "descricao": item.produto.nome,
-                "quantidade": item.quantidade,
-                "valor_unitario": item.valor_unitario,
-                "valor_total": item.valor_total
-            }
-            for item in nota.itens
-        ]
-    }
-
-    endereco_entrega = None
-    if nota.entrega:
-        e = nota.entrega
-        endereco_entrega = {
-            "logradouro": e.logradouro,
-            "numero": e.numero,
-            "complemento": e.complemento,
-            "bairro": e.bairro,
-            "cidade": e.cidade,
-            "estado": e.estado,
-            "cep": e.cep,
-            "instrucoes": e.instrucoes,
-            "endereco_completo": f"{e.logradouro}, {e.numero}, {e.bairro}, {e.cidade}-{e.estado}"
-        }
+def visualizar_pdf_venda(id_list):
+    try:
+        # Converter string de IDs para lista de inteiros
+        ids = [int(id.strip()) for id in id_list.split(',')] if ',' in id_list else [int(id_list)]
         
-    pdf_buffer = gerar_nfce_pdf_bobina_bytesio(
-        dados_nota,
-        nome_operador=nota.operador.nome,
-        nome_cliente=nota.cliente.nome,
-        endereco_entrega=endereco_entrega
-    )
-
-    return send_file(
-        pdf_buffer,
-        as_attachment=False,
-        download_name=f'nota_{nota.id}.pdf',
-        mimetype='application/pdf'
-    )
-
+        # Buscar os dados das notas fiscais
+        resultado_busca = buscar_pagamentos_notas_fiscais(db.session, ids)
+        
+        if not resultado_busca or not resultado_busca['data']:
+            abort(404, description="Nenhuma nota encontrada com os IDs fornecidos")
+        
+        # Pegar os dados da primeira nota (mesmo para múltiplas notas)
+        dados_nota = resultado_busca['data'][0]
+        
+        # Gerar PDF em memória com os dados completos
+        pdf_buffer = gerar_nfce_pdf_bobina_bytesio(dados_nota=dados_nota)
+        
+        # Criar resposta para abrir em nova guia
+        response = make_response(pdf_buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=nota_{dados_nota["nota_fiscal_id"]}.pdf'
+        
+        return response
+        
+    except ValueError:
+        abort(400, description="Formato inválido. Use um número ou números separados por vírgula (ex: 44 ou 44,45)")
+    except Exception as e:
+        app.logger.error(f"Erro ao gerar PDF: {str(e)}")
+        abort(500, description="Ocorreu um erro ao gerar o PDF")
     
 # ===== API SALDO =====
 @operador_bp.route('/api/saldo', methods=['GET'])

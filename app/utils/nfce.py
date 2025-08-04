@@ -6,164 +6,154 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from io import BytesIO
 from datetime import datetime
 from textwrap import wrap
-from decimal import Decimal
+
+def safe_float(value, default=0.0):
+    """Converte para float com tratamento seguro para None e valores inválidos"""
+    try:
+        return float(value) if value is not None else default
+    except (ValueError, TypeError):
+        return default
+
+def safe_str(value, default=""):
+    """Converte para string com tratamento seguro para None"""
+    return str(value) if value is not None else default
 
 def formatar_endereco_entrega(endereco) -> str:
-    """
-    Formata o endereço de entrega no formato padrão, com todas as proteções contra valores None ou vazios.
-    """
-    if not endereco:
+    """Formata o endereço de entrega com tratamento seguro para valores nulos"""
+    if not endereco or not isinstance(endereco, dict):
         return ""
-
-    if isinstance(endereco, str):
-        endereco = endereco.replace("Endereco de entrega:", "").strip()
-        parts = [p.strip() for p in endereco.split('-') if p.strip()]
-        
-        if len(parts) >= 3:
-            logradouro_numero_comp = parts[0]
-            bairro = parts[1]
-            cidade_estado_cep = parts[2]
-            
-            logradouro_parts = logradouro_numero_comp.split(',')
-            logradouro = logradouro_parts[0].strip() if logradouro_parts else ""
-            numero_comp = logradouro_parts[1].strip() if len(logradouro_parts) > 1 else ""
-            
-            numero = numero_comp.split(' ')[0] if numero_comp else ""
-            complemento = ' '.join(numero_comp.split(' ')[1:]) if len(numero_comp.split(' ')) > 1 else ""
-            
-            cidade_estado = cidade_estado_cep.split('- CEP:')[0].strip()
-            cep = cidade_estado_cep.split('- CEP:')[1].strip() if '- CEP:' in cidade_estado_cep else ""
-            
-            cidade = cidade_estado.split('/')[0].strip() if '/' in cidade_estado else ""
-            estado = cidade_estado.split('/')[1].strip() if '/' in cidade_estado else ""
-            
-            endereco = {
-                "logradouro": logradouro or "",
-                "numero": numero or "",
-                "complemento": complemento or "",
-                "bairro": bairro or "",
-                "cidade": cidade or "",
-                "estado": estado or "",
-                "cep": cep or "",
-            }
-        else:
-            return endereco.strip()
-
-    logradouro = str(endereco.get("logradouro") or "").strip()
-    numero = str(endereco.get("numero") or "").strip()
-    complemento = str(endereco.get("complemento") or "").strip()
-    bairro = str(endereco.get("bairro") or "").strip()
-    cidade = str(endereco.get("cidade") or "").strip()
-    estado = str(endereco.get("estado") or "").strip()
-    cep = str(endereco.get("cep") or "").strip()
-    instrucoes = str(endereco.get("instrucoes") or "").strip()
+    
+    logradouro = safe_str(endereco.get("logradouro"))
+    numero = safe_str(endereco.get("numero"))
+    complemento = safe_str(endereco.get("complemento"))
+    bairro = safe_str(endereco.get("bairro"))
+    cidade = safe_str(endereco.get("cidade"))
+    estado = safe_str(endereco.get("estado"))
+    cep = safe_str(endereco.get("cep"))
+    instrucoes = safe_str(endereco.get("instrucoes"))
 
     partes = []
-
+    
+    # Linha 1: Logradouro, número e complemento
     if logradouro:
-        linha1 = logradouro
+        linha = logradouro
         if numero:
-            linha1 += f", {numero}"
+            linha += f", {numero}"
         if complemento:
-            linha1 += f" - {complemento}"
-        partes.append(linha1)
-
-    if bairro and bairro.lower() != complemento.lower():
+            linha += f" - {complemento}"
+        partes.append(linha)
+    
+    # Linha 2: Bairro (se diferente do complemento)
+    if bairro and (not complemento or bairro.lower() != complemento.lower()):
         partes.append(f"Bairro: {bairro}")
-
-    linha3_parts = []
+    
+    # Linha 3: Cidade/Estado e CEP
+    linha3 = []
     if cidade:
         if estado:
-            linha3_parts.append(f"{cidade}/{estado.upper() if len(estado) == 2 else estado}")
+            linha3.append(f"{cidade}/{estado.upper() if len(estado) == 2 else estado}")
         else:
-            linha3_parts.append(cidade)
+            linha3.append(cidade)
     elif estado:
-        linha3_parts.append(estado.upper() if len(estado) == 2 else estado)
-
+        linha3.append(estado.upper() if len(estado) == 2 else estado)
+    
     if cep:
         cep_numeros = ''.join(filter(str.isdigit, cep))
         if len(cep_numeros) == 8:
             cep_formatado = f"{cep_numeros[:5]}-{cep_numeros[5:]}"
-        else:
-            cep_formatado = cep
-        if linha3_parts:
-            linha3_parts.append(f" - CEP: {cep_formatado}")
-        else:
-            linha3_parts.append(f"CEP: {cep_formatado}")
-
-    if linha3_parts:
-        partes.append("".join(linha3_parts))
-
+            if linha3:
+                linha3.append(f" - CEP: {cep_formatado}")
+            else:
+                linha3.append(f"CEP: {cep_formatado}")
+    
+    if linha3:
+        partes.append("".join(linha3))
+    
+    # Instruções de entrega
     if instrucoes:
-        instrucoes_linhas = wrap(instrucoes, width=48)
         partes.append("Instruções:")
-        partes.extend([f"  {linha}" for linha in instrucoes_linhas])
-
+        for linha in wrap(instrucoes, width=48):
+            partes.append(f"  {linha}")
+    
     return "\n".join(partes)
 
-
-def gerar_nfce_pdf_bobina_bytesio(
-    dados_nota: dict,
-    nome_operador: str = "",
-    nome_cliente: str = "",
-    endereco_entrega = None,
-    logo_path: str = None
-):
+def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> BytesIO:
+    """Gera PDF de nota fiscal no formato bobina com tratamento completo dos dados"""
+    # Configurações básicas do PDF
     largura = 80 * mm
     styles = getSampleStyleSheet()
     styleN = styles["Normal"]
     styleN_small = ParagraphStyle(
         name="NormalSmall",
         parent=styleN,
-        fontSize=6,  
+        fontSize=6,
+        leading=8
     )
 
-    itens = dados_nota.get("itens", [])
-    tem_descontos = any(item.get('desconto_aplicado', 0) > 0 for item in itens)
+    # Extração segura dos dados com valores padrão
+    produtos = dados_nota.get("produtos", []) or []
+    operador = dados_nota.get("operador", {}) or {}
+    formas_pagamento = dados_nota.get("formas_pagamento", []) or []
+    endereco_entrega = dados_nota.get("endereco_entrega", {}) or {}
+    metadados = dados_nota.get("metadados", {}) or {}
 
+    # Processamento seguro da data
+    try:
+        emissao_str = dados_nota.get("data_emissao", "")
+        emissao = datetime.strptime(emissao_str, "%Y-%m-%dT%H:%M:%S") if emissao_str else datetime.now()
+    except ValueError:
+        emissao = datetime.now()
+
+    # Cálculos financeiros com tratamento para None
+    valor_total_nota = safe_float(dados_nota.get("valor_total_nota"))
+    valor_total_sem_desconto = safe_float(dados_nota.get("valor_total_sem_desconto"))
+    desconto_total = max(valor_total_sem_desconto - valor_total_nota, 0)
+
+    # Verifica se há descontos
+    tem_descontos = desconto_total > 0 or any(
+        safe_float(p.get("desconto_aplicado")) > 0 
+        for p in produtos 
+        if p is not None
+    )
+
+    # Prepara tabela de produtos
     if tem_descontos:
         data = [["Produto", "Qtd", "Unit", "Desc", "Total"]]
-        for item in itens:
-            descricao = item.get("descricao")
-            if not descricao:
-                produto_id = item.get("produto_id")
-                descricao = f"Produto {produto_id}" if produto_id is not None else "Produto"
+        col_widths = [28*mm, 10*mm, 12*mm, 10*mm, 10*mm]
+    else:
+        data = [["Produto", "Qtd", "Unit", "Total"]]
+        col_widths = [33*mm, 10*mm, 12*mm, 15*mm]
 
-            descricao_paragraph = Paragraph(descricao, styleN_small)
-            quantidade = item.get("quantidade", 0)
-            valor_unitario = item.get("valor_unitario_original", item.get("valor_unitario", 0))
-            desconto = item.get("desconto_aplicado", 0)
-            valor_total = item.get("valor_total", 0)
+    for produto in produtos:
+        if not produto or not isinstance(produto, dict):
+            continue
+            
+        # Extração segura dos dados do produto
+        nome_produto = safe_str(produto.get("nome"), f"Produto {produto.get('id', '')}")
+        quantidade = safe_float(produto.get("quantidade"))
+        valor_unitario = safe_float(produto.get("valor_unitario"))
+        valor_total = safe_float(produto.get("valor_total_com_desconto", valor_unitario * quantidade))
+        desconto = safe_float(produto.get("desconto_aplicado"))
 
+        descricao = Paragraph(nome_produto, styleN_small)
+        
+        if tem_descontos:
             data.append([
-                descricao_paragraph,
+                descricao,
                 f"{quantidade:.2f}",
                 f"{valor_unitario:.2f}",
                 f"-{desconto:.2f}" if desconto > 0 else "-",
                 f"{valor_total:.2f}"
             ])
-        col_widths = [28 * mm, 10 * mm, 12 * mm, 10 * mm, 10 * mm]
-    else:
-        data = [["Produto", "Qtd", "Unit", "Total"]]
-        for item in itens:
-            descricao = item.get("descricao")
-            if not descricao:
-                produto_id = item.get("produto_id")
-                descricao = f"Produto {produto_id}" if produto_id is not None else "Produto"
-
-            descricao_paragraph = Paragraph(descricao, styleN_small)
-            quantidade = item.get("quantidade", 0)
-            valor_unitario = item.get("valor_unitario", 0)
-            valor_total = item.get("valor_total", 0)
-
+        else:
             data.append([
-                descricao_paragraph,
+                descricao,
                 f"{quantidade:.2f}",
                 f"{valor_unitario:.2f}",
                 f"{valor_total:.2f}"
             ])
-        col_widths = [33 * mm, 10 * mm, 12 * mm, 15 * mm]
 
+    # Cálculo da altura dinâmica
     altura_base = 95 * mm
     altura_linha_item = 7.5 * mm
     altura_tabela = len(data) * altura_linha_item
@@ -171,126 +161,114 @@ def gerar_nfce_pdf_bobina_bytesio(
     espacamentos = 20 * mm
     altura_total = altura_base + altura_tabela + altura_rodape + espacamentos
 
+    # Criação do PDF
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=(largura, altura_total))
     y = altura_total - 10 * mm
 
+    # Cabeçalho
     c.setFont("Helvetica-Bold", 12)
-    c.drawCentredString(largura / 2, y, "CAVALCANTI RAÇÕES")
-    y -= 3 * mm
+    c.drawCentredString(largura/2, y, "CAVALCANTI RAÇÕES")
+    y -= 5 * mm
     
     c.setFont("Helvetica", 7)
-    c.drawCentredString(largura / 2, y, "Contato: (87) 9 8152-1788")
-    y -= 3 * mm
-    c.drawCentredString(largura / 2, y, "Av. Fernando Bezerra, 123 - Centro - Ouricuri-PE")
+    c.drawCentredString(largura/2, y, "Contato: (87) 9 8152-1788")
+    y -= 4 * mm
+    c.drawCentredString(largura/2, y, "Av. Fernando Bezerra, 123 - Centro - Ouricuri-PE")
     y -= 10 * mm
 
+    # Informações da nota
     c.setFont("Helvetica-Bold", 8)
-    c.drawString(5 * mm, y, f"Operador: {nome_operador}")
-    y -= 4 * mm
+    c.drawString(5*mm, y, f"Operador: {safe_str(operador.get('nome'))}")
+    y -= 5 * mm
 
-    emissao = dados_nota.get("data_emissao") or datetime.now()
     c.setFont("Helvetica", 7)
-    c.drawString(5 * mm, y, f"Emissão: {emissao.strftime('%d/%m/%Y %H:%M')}")
+    c.drawString(5*mm, y, f"Emissão: {emissao.strftime('%d/%m/%Y %H:%M')}")
     y -= 8 * mm
 
+    # Tabela de produtos
     tabela = Table(data, colWidths=col_widths, repeatRows=1)
-    estilos = [
-        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 6.7),
-        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
-        ('LEFTPADDING', (0, 0), (-1, -1), 3),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-        ('LEADING', (0, 0), (-1, -1), 9),
+    estilo = [
+        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+        ('ALIGN', (1,1), (-1,-1), 'RIGHT'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 7),
+        ('BOTTOMPADDING', (0,0), (-1,0), 5),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('LEADING', (0,0), (-1,-1), 8),
     ]
+    
+    # Linhas alternadas
     for i in range(1, len(data)):
-        cor_fundo = colors.whitesmoke if i % 2 == 1 else colors.white
-        estilos.append(('BACKGROUND', (0, i), (-1, i), cor_fundo))
+        estilo.append(('BACKGROUND', (0,i), (-1,i), colors.whitesmoke if i%2 else colors.white))
 
-    tabela.setStyle(TableStyle(estilos))
+    tabela.setStyle(TableStyle(estilo))
     tabela.wrapOn(c, largura, altura_total)
-    tabela.drawOn(c, 5 * mm, y - altura_tabela)
-    y -= altura_tabela + 4 * mm
+    tabela.drawOn(c, 5*mm, y - altura_tabela)
+    y -= altura_tabela + 5 * mm
 
-    total = sum(item.get("valor_total", 0) for item in itens)
-    desconto_total = dados_nota.get("valor_desconto_total", 0)
-
+    # Totais
     if desconto_total > 0:
         c.setFont("Helvetica", 7)
-        c.drawRightString(largura - 5 * mm, y, f"DESCONTO TOTAL: -{desconto_total:.2f}")
+        c.drawRightString(largura-5*mm, y, f"DESCONTO: -{desconto_total:.2f}")
         y -= 4 * mm
 
     c.setFont("Helvetica-Bold", 9)
-    c.drawRightString(largura - 5 * mm, y, f"TOTAL R$: {total:.2f}")
-    y -= 6 * mm
-
-    valor_recebido = dados_nota.get("valor_recebido")
-    if valor_recebido is not None:
-        troco = float(valor_recebido) - total
-        c.setFont("Helvetica", 7)
-        c.drawString(5 * mm, y, f"Recebido: R$ {valor_recebido:.2f}")
-        c.drawRightString(largura - 5 * mm, y, f"Troco: R$ {troco:.2f}")
-        y -= 6 * mm
-
-    forma_pagamento = dados_nota.get("forma_pagamento", "")
-    if hasattr(forma_pagamento, 'value'):
-        forma_pagamento = forma_pagamento.value
-    c.setFont("Helvetica", 7)
-    c.drawString(5 * mm, y, f"Pagamento: {forma_pagamento}")
+    c.drawRightString(largura-5*mm, y, f"TOTAL R$: {valor_total_nota:.2f}")
     y -= 8 * mm
 
-    if nome_cliente:
-        c.setFont("Helvetica-Bold", 8)
-        c.drawString(5 * mm, y, f"Cliente: {nome_cliente}")
-        y -= 6 * mm
-
-    if endereco_entrega:
-        endereco_formatado = formatar_endereco_entrega(endereco_entrega)
-        if endereco_formatado:
-            c.setFont("Helvetica-Bold", 7)
-            c.drawString(5 * mm, y, "Endereço de entrega:")
+    # Formas de pagamento
+    if formas_pagamento:
+        c.setFont("Helvetica-Bold", 7)
+        c.drawString(5*mm, y, "Pagamentos:")
+        y -= 5 * mm
+        
+        c.setFont("Helvetica", 7)
+        for pgto in formas_pagamento:
+            if not pgto or not isinstance(pgto, dict):
+                continue
+            forma = safe_str(pgto.get("forma_pagamento")).replace("_", " ").title()
+            valor = safe_float(pgto.get("valor"))
+            c.drawString(10*mm, y, f"{forma}: R$ {valor:.2f}")
             y -= 4 * mm
-            c.setFont("Helvetica", 6.5)
-            for linha in endereco_formatado.split('\n'):
-                if linha.strip():
-                    c.drawString(5 * mm, y, linha)
-                    y -= 4 * mm
     else:
-        y -= 4 * mm
+        pgto_especifico = dados_nota.get("pagamento_especifico", {})
+        if pgto_especifico and isinstance(pgto_especifico, dict):
+            forma = safe_str(pgto_especifico.get("forma_pagamento")).replace("_", " ").title()
+            c.setFont("Helvetica", 7)
+            c.drawString(5*mm, y, f"Pagamento: {forma}")
+            y -= 6 * mm
 
-    obs = dados_nota.get("observacao", "")
-    if obs:
-        c.setFont("Helvetica-Oblique", 6)
-        for linha in wrap(f"Obs: {obs}", width=65):
-            c.drawString(5 * mm, y, linha)
-            y -= 4.5 * mm
+    # Endereço de entrega
+    if metadados.get("possui_entrega", False) and endereco_entrega:
+        endereco = formatar_endereco_entrega(endereco_entrega)
+        if endereco:
+            c.setFont("Helvetica-Bold", 7)
+            c.drawString(5*mm, y, "Entrega:")
+            y -= 4 * mm
+            
+            c.setFont("Helvetica", 6.5)
+            for linha in endereco.split('\n'):
+                c.drawString(5*mm, y, linha)
+                y -= 4 * mm
 
-    y -= 4 * mm
-
-    altura_minima_rodape = 55 * mm
-    if y > altura_minima_rodape:
-        y = altura_minima_rodape
-
-    linha_assinatura_largura = 30 * mm
-    linha_assinatura_y = y
-
-    c.line(5 * mm, linha_assinatura_y, 5 * mm + linha_assinatura_largura, linha_assinatura_y)
+    # Rodapé
+    y = max(y, 30*mm)  # Garante espaço mínimo para o rodapé
+    
+    # Linhas de assinatura
+    c.line(5*mm, y, 35*mm, y)
+    c.line(largura-35*mm, y, largura-5*mm, y)
+    
     c.setFont("Helvetica", 6)
-    c.drawString(5 * mm, linha_assinatura_y - 5, "Assinatura do Operador")
-
-    x_cliente = largura - 5 * mm - linha_assinatura_largura
-    c.line(x_cliente, linha_assinatura_y, x_cliente + linha_assinatura_largura, linha_assinatura_y)
-    c.drawString(x_cliente, linha_assinatura_y - 5, "Assinatura do Cliente")
-
-    y = linha_assinatura_y - 12 * mm
-
+    c.drawString(5*mm, y-5, "Assinatura do Operador")
+    c.drawString(largura-35*mm, y-5, "Assinatura do Cliente")
+    
+    y -= 12 * mm
     c.setFont("Helvetica-Oblique", 6)
-    c.drawCentredString(largura / 2, y, "Documento sem valor fiscal")
+    c.drawCentredString(largura/2, y, "Documento sem valor fiscal")
 
+    # Finalização
     c.showPage()
     c.save()
     buffer.seek(0)

@@ -18,13 +18,15 @@ from typing import Dict, List, Any, Optional
 from decimal import Decimal
 from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy import func
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Union, Tuple
+
 
 from app.models.entities import (
     Caixa,
     NotaFiscal,
     NotaFiscalItem,
-    MovimentacaoEstoque
+    MovimentacaoEstoque,
+    PagamentoNotaFiscal
 )
 
 from app.utils.conversor_unidade import converter_quantidade
@@ -896,6 +898,155 @@ def cancelar_nota_fiscal(db: Session, nota_id: int, motivo: str = "") -> bool:
         db.rollback()
         raise ValueError("Erro ao cancelar nota fiscal no banco de dados.")
 
+
+def buscar_pagamentos_notas_fiscais(db: Session, ids_pagamentos: Union[int, List[int], Tuple[int], str]):
+    """
+    Busca informações detalhadas sobre pagamentos de notas fiscais por IDs.
+    Inclui cálculo detalhado de descontos por produto, desconto total e endereço de entrega.
+
+    Args:
+        db: Sessão do banco de dados
+        ids_pagamentos: Pode ser um único ID (int), lista/tupla de IDs ou string com IDs separados por vírgula
+
+    Returns:
+        dict: {
+            "count": número de notas encontradas,
+            "data": lista de dicionários com informações completas,
+            "success": booleano
+        }
+    """
+    # Normalização da entrada
+    if ids_pagamentos is None:
+        return {"count": 0, "data": [], "success": True}
+
+    if isinstance(ids_pagamentos, str):
+        ids_pagamentos = [int(id.strip()) for id in ids_pagamentos.split(',') if id.strip().isdigit()]
+    elif not isinstance(ids_pagamentos, (list, tuple)):
+        ids_pagamentos = [ids_pagamentos]
+
+    # Remove duplicatas mantendo a ordem
+    seen = set()
+    ids_unicos = [x for x in ids_pagamentos if not (x in seen or seen.add(x))]
+
+    # Validação dos IDs
+    try:
+        ids_unicos = [int(id) for id in ids_unicos]
+    except (ValueError, TypeError):
+        raise ValueError("Todos os IDs devem ser valores numéricos")
+
+    # Consulta otimizada ao banco de dados
+    pagamentos = db.query(PagamentoNotaFiscal)\
+        .options(
+            joinedload(PagamentoNotaFiscal.nota_fiscal)
+            .joinedload(NotaFiscal.itens)
+            .joinedload(NotaFiscalItem.produto),
+            joinedload(PagamentoNotaFiscal.nota_fiscal)
+            .joinedload(NotaFiscal.operador),
+            joinedload(PagamentoNotaFiscal.nota_fiscal)
+            .joinedload(NotaFiscal.pagamentos),
+            joinedload(PagamentoNotaFiscal.nota_fiscal)
+            .joinedload(NotaFiscal.entrega)
+        )\
+        .filter(PagamentoNotaFiscal.id.in_(ids_unicos))\
+        .all()
+
+    pagamentos_por_id = {p.id: p for p in pagamentos}
+    resultados = []
+
+    for id_solicitado in ids_pagamentos:
+        id_solicitado = int(id_solicitado)
+        if id_solicitado not in pagamentos_por_id:
+            continue
+
+        pagamento = pagamentos_por_id[id_solicitado]
+        nota_fiscal = pagamento.nota_fiscal
+
+        # Cálculo dos valores totais
+        valor_total_sem_desconto = sum(
+            float(item.valor_unitario) * float(item.quantidade)
+            for item in nota_fiscal.itens
+        )
+        desconto_total = valor_total_sem_desconto - float(nota_fiscal.valor_total)
+
+        # Processamento dos produtos
+        produtos = []
+        for item in nota_fiscal.itens:
+            valor_item_sem_desconto = float(item.valor_unitario) * float(item.quantidade)
+            valor_item_com_desconto = float(item.valor_total)
+            desconto_item = valor_item_sem_desconto - valor_item_com_desconto
+
+            produtos.append({
+                'id': item.produto.id,
+                'nome': item.produto.nome,
+                'codigo': item.produto.codigo,
+                'quantidade': float(item.quantidade),
+                'valor_unitario': float(item.valor_unitario),
+                'valor_total_sem_desconto': valor_item_sem_desconto,
+                'valor_total_com_desconto': valor_item_com_desconto,
+                'desconto_aplicado': float(item.desconto_aplicado) if item.desconto_aplicado else None,
+                'tipo_desconto': item.tipo_desconto.value if item.tipo_desconto else None,
+                'valor_desconto': desconto_item,
+                'percentual_desconto': round((desconto_item / valor_item_sem_desconto * 100), 2) if valor_item_sem_desconto > 0 else 0
+            })
+
+        # Formas de pagamento
+        formas_pagamento = [{
+            'id': pg.id,
+            'forma_pagamento': pg.forma_pagamento.value,
+            'valor': float(pg.valor),
+            'data': pg.data.isoformat()
+        } for pg in nota_fiscal.pagamentos]
+
+        # Endereço de entrega (se existir)
+        endereco_entrega = None
+        if nota_fiscal.entrega:
+            endereco_entrega = {
+                'logradouro': nota_fiscal.entrega.logradouro,
+                'numero': nota_fiscal.entrega.numero,
+                'complemento': nota_fiscal.entrega.complemento,
+                'bairro': nota_fiscal.entrega.bairro,
+                'cidade': nota_fiscal.entrega.cidade,
+                'estado': nota_fiscal.entrega.estado,
+                'cep': nota_fiscal.entrega.cep,
+                'instrucoes': nota_fiscal.entrega.instrucoes
+            }
+
+        # Resultado final para esta nota
+        resultados.append({
+            'pagamento_id': pagamento.id,
+            'nota_fiscal_id': nota_fiscal.id,
+            'data_emissao': nota_fiscal.data_emissao.isoformat(),
+            'valor_total_nota': float(nota_fiscal.valor_total),
+            'valor_total_sem_desconto': valor_total_sem_desconto,
+            'desconto_total_calculado': desconto_total,
+            'percentual_desconto_total': round((desconto_total / valor_total_sem_desconto * 100), 2) if valor_total_sem_desconto > 0 else 0,
+            'valor_desconto_nota': float(nota_fiscal.valor_desconto) if nota_fiscal.valor_desconto else None,
+            'operador': {
+                'id': nota_fiscal.operador.id,
+                'nome': nota_fiscal.operador.nome,
+                'tipo': nota_fiscal.operador.tipo.value
+            },
+            'produtos': produtos,
+            'formas_pagamento': formas_pagamento,
+            'endereco_entrega': endereco_entrega,
+            'pagamento_especifico': {
+                'forma_pagamento': pagamento.forma_pagamento.value,
+                'valor': float(pagamento.valor),
+                'data': pagamento.data.isoformat()
+            },
+            'encontrado': True,
+            'metadados': {
+                'total_itens': len(nota_fiscal.itens),
+                'total_formas_pagamento': len(nota_fiscal.pagamentos),
+                'possui_entrega': endereco_entrega is not None
+            }
+        })
+
+    return {
+        "count": len(resultados),
+        "data": resultados,
+        "success": True
+    }
 # ===== Contas a Receber =====
 def create_conta_receber(db: Session, conta: schemas.ContaReceberCreate) -> entities.ContaReceber:
     if conta.valor_original <= 0:

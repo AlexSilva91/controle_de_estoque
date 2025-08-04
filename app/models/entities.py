@@ -46,6 +46,7 @@ class FormaPagamento(str, enum.Enum):
     pix_fabiano = "pix_fabiano"
     pix_maquineta = "pix_maquineta"
     pix_edfrance = "pix_edfrance"
+    pix_loja = "pix_loja"
     dinheiro = "dinheiro"
     cartao_credito = "cartao_credito"
     cartao_debito = "cartao_debito"
