@@ -784,43 +784,38 @@ def rota_estornar_venda(sale_id):
 @login_required
 @operador_required
 def gerar_pdf_vendas_dia():
-    """
-    Rota para gerar PDF com o relatório diário de vendas
-    Identifica notas de estorno (valores negativos) e formata adequadamente
-    """
-    # Obtém parâmetros da requisição
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.pdfgen import canvas
+    from reportlab.platypus import Table, TableStyle
+    from io import BytesIO
+    from flask import send_file, request, jsonify
+    from datetime import datetime
+
     data_str = request.args.get('data')
     caixa_id = request.args.get('caixa_id')
     operador_id = request.args.get('operador_id')
-    
-    # Converte a data se fornecida
     data = None
+
     if data_str:
         try:
             data = datetime.strptime(data_str, '%Y-%m-%d').date()
         except ValueError:
             return jsonify({'success': False, 'message': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
-    
-    # Obtém os dados das vendas
+
     resultado = obter_detalhes_vendas_dia(data, caixa_id, operador_id)
-    
     if not resultado['success']:
         return jsonify(resultado), 400
-    
+
     dados = resultado['data']
-    
-    # Cria o PDF em memória
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=letter)
-    
-    # Configurações do PDF
     width, height = letter
     margin = 50
     linha_atual = height - margin
     espacamento = 20
     espacamento_pequeno = 12
-    
-    # Função para verificar espaço e criar nova página
+
     def verificar_espaco(altura_necessaria):
         nonlocal linha_atual, pdf
         if linha_atual - altura_necessaria < margin:
@@ -829,50 +824,33 @@ def gerar_pdf_vendas_dia():
             pdf.setFont("Helvetica-Bold", 16)
             pdf.drawString(margin, linha_atual, "RELATÓRIO DIÁRIO DETALHADO DE VENDAS (CONTINUAÇÃO)")
             linha_atual -= espacamento * 1.5
-            return True
-        return False
-    
-    # Cabeçalho
+
     pdf.setFont("Helvetica-Bold", 16)
     pdf.drawString(margin, linha_atual, "RELATÓRIO DIÁRIO DETALHADO DE VENDAS")
     linha_atual -= espacamento * 1.5
-    
+
     data_relatorio = data if data else datetime.now().date()
     pdf.setFont("Helvetica", 12)
     pdf.drawString(margin, linha_atual, f"Data: {data_relatorio.strftime('%d/%m/%Y')}")
     linha_atual -= espacamento_pequeno
-    
+
     if caixa_id:
         pdf.drawString(margin, linha_atual, f"Caixa ID: {caixa_id}")
         linha_atual -= espacamento_pequeno
-    
     if operador_id:
         pdf.drawString(margin, linha_atual, f"Operador ID: {operador_id}")
         linha_atual -= espacamento_pequeno
-    
+
     linha_atual -= espacamento
-    
-    # Resumo Financeiro (agora considerando estornos)
+
     total_vendas_positivas = sum(v['valor_total'] for v in dados['vendas'] if v['valor_total'] > 0)
     total_estornos = sum(abs(v['valor_total']) for v in dados['vendas'] if v['valor_total'] < 0)
     total_liquido = total_vendas_positivas - total_estornos
-    
-    altura_tabela_resumo = len([
-        ["Total de Vendas:", f"R$ {total_vendas_positivas:.2f}"],
-        ["Total de Estornos:", f"R$ {total_estornos:.2f}"],
-        ["Total de Descontos:", f"R$ {dados['total_descontos']:.2f}"],
-        ["Total de Entradas:", f"R$ {dados['total_entradas']:.2f}"],
-        ["Total de Saídas:", f"R$ {dados['total_saidas']:.2f}"],
-        ["Saldo Líquido:", f"R$ {total_liquido:.2f}"]
-    ]) * 20 + espacamento
-    
-    verificar_espaco(altura_tabela_resumo + 50)
-    
+
     pdf.setFont("Helvetica-Bold", 14)
     pdf.drawString(margin, linha_atual, "RESUMO FINANCEIRO")
     linha_atual -= espacamento
-    
-    # Tabela de resumo atualizada
+
     dados_resumo = [
         ["Total de Vendas:", f"R$ {total_vendas_positivas:.2f}"],
         ["Total de Estornos:", f"R$ {total_estornos:.2f}"],
@@ -881,43 +859,27 @@ def gerar_pdf_vendas_dia():
         ["Total de Saídas:", f"R$ {dados['total_saidas']:.2f}"],
         ["Saldo Líquido:", f"R$ {total_liquido:.2f}"]
     ]
-    
-    tabela_resumo = Table(dados_resumo, colWidths=[150, 100])
+
+    tabela_resumo = Table(dados_resumo, colWidths=[180, 120])
     tabela_resumo.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 12),
-        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('TEXTCOLOR', (1, 1), (1, 1), colors.red)  # Destaca estornos em vermelho
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
+        ('TEXTCOLOR', (0, 1), (1, 1), colors.red),
+        ('FONTNAME', (0, 5), (1, 5), 'Helvetica-Bold'),
     ]))
-    
-    tabela_resumo.wrapOn(pdf, width - 2 * margin, height)
-    tabela_resumo.drawOn(pdf, margin, linha_atual - (len(dados_resumo) * 20))
-    linha_atual -= (len(dados_resumo) * 20 + espacamento * 2)
-    
-    # Detalhes das Vendas (com tratamento especial para estornos)
+
+    altura_resumo = tabela_resumo.wrap(width - 2 * margin, height)[1]
+    verificar_espaco(altura_resumo)
+    tabela_resumo.drawOn(pdf, margin, linha_atual - altura_resumo)
+    linha_atual -= altura_resumo + espacamento
+
     for venda in dados['vendas']:
-        # Verifica se é estorno
         is_estorno = venda['valor_total'] < 0
         valor_exibicao = abs(venda['valor_total'])
-        
-        # Calcular altura necessária
-        altura_info_venda = len([
-            ["Cliente:", venda['cliente']],
-            ["Data/Hora:", datetime.fromisoformat(venda['data']).strftime('%d/%m/%Y %H:%M')],
-            ["Operador:", venda['operador']],
-            ["Valor Total:", f"R$ {valor_exibicao:.2f}"],
-            ["Desconto:", f"R$ {venda['valor_desconto']:.2f}"],
-            ["Forma Pagamento:", venda['forma_pagamento']],
-            ["A Prazo:", "Sim" if venda['a_prazo'] else "Não"],
-            ["Tipo:", "ESTORNO" if is_estorno else "VENDA NORMAL"]
-        ]) * 15 + espacamento
-        
-        verificar_espaco(altura_info_venda + 100)
-        
-        # Cabeçalho da venda com destaque para estornos
+
         pdf.setFont("Helvetica-Bold", 14)
         if is_estorno:
             pdf.setFillColor(colors.red)
@@ -926,8 +888,7 @@ def gerar_pdf_vendas_dia():
         else:
             pdf.drawString(margin, linha_atual, f"DETALHES DA VENDA #{venda['id']}")
         linha_atual -= espacamento
-        
-        # Informações básicas da venda
+
         info_venda = [
             ["Cliente:", venda['cliente']],
             ["Data/Hora:", datetime.fromisoformat(venda['data']).strftime('%d/%m/%Y %H:%M')],
@@ -938,38 +899,34 @@ def gerar_pdf_vendas_dia():
             ["A Prazo:", "Sim" if venda['a_prazo'] else "Não"],
             ["Tipo:", "ESTORNO" if is_estorno else "VENDA NORMAL"]
         ]
-        
+
         tabela_info = Table(info_venda, colWidths=[100, 300])
-        estilo = [
+        estilo_info = [
             ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey)
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('GRID', (0, 0), (-1, -1), 0.25, colors.lightgrey)
         ]
-        
         if is_estorno:
-            estilo.append(('TEXTCOLOR', (0, 7), (1, 7), colors.red))
-            estilo.append(('FONTNAME', (0, 7), (1, 7), 'Helvetica-Bold'))
-        
-        tabela_info.setStyle(TableStyle(estilo))
-        tabela_info.wrapOn(pdf, width - 2 * margin, height)
-        tabela_info.drawOn(pdf, margin, linha_atual - (len(info_venda) * 15))
-        linha_atual -= (len(info_venda) * 15 + espacamento)
-        
-        # Itens da venda (invertidos para estornos)
+            estilo_info.append(('TEXTCOLOR', (0, 7), (1, 7), colors.red))
+            estilo_info.append(('FONTNAME', (0, 7), (1, 7), 'Helvetica-Bold'))
+
+        tabela_info.setStyle(TableStyle(estilo_info))
+        altura_info = tabela_info.wrap(width - 2 * margin, height)[1]
+        verificar_espaco(altura_info)
+        tabela_info.drawOn(pdf, margin, linha_atual - altura_info)
+        linha_atual -= altura_info + espacamento
+
         pdf.setFont("Helvetica-Bold", 12)
         pdf.drawString(margin, linha_atual, "ITENS:")
         linha_atual -= espacamento_pequeno
-        
+
         dados_itens = [["Produto", "Qtd", "V. Unit.", "V. Total", "Desconto"]]
         for item in venda['itens']:
             quantidade = -item['quantidade'] if is_estorno else item['quantidade']
             valor_total = -item['valor_total'] if is_estorno else item['valor_total']
             desconto = -item['desconto'] if is_estorno and item['desconto'] else item['desconto']
-            
             dados_itens.append([
                 item['produto'],
                 f"{quantidade:.3f}",
@@ -977,38 +934,41 @@ def gerar_pdf_vendas_dia():
                 f"R$ {valor_total:.2f}",
                 f"R$ {desconto:.2f}" if desconto > 0 else "-"
             ])
-        
+
         tabela_itens = Table(dados_itens, colWidths=[180, 50, 70, 70, 60])
         estilo_itens = [
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+            ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
         ]
-        
         if is_estorno:
-            estilo_itens.append(('TEXTCOLOR', (1, 1), (-1, -1), colors.red))
-        
+            estilo_itens.append(('TEXTCOLOR', (0, 1), (-1, -1), colors.red))
+
         tabela_itens.setStyle(TableStyle(estilo_itens))
-        tabela_itens.wrapOn(pdf, width - 2 * margin, height)
-        tabela_itens.drawOn(pdf, margin, linha_atual - (len(dados_itens) * 15))
-        linha_atual -= (len(dados_itens) * 15 + espacamento * 2)
-    
-    # Finaliza o PDF
+        altura_itens = tabela_itens.wrap(width - 2 * margin, height)[1]
+        verificar_espaco(altura_itens)
+        tabela_itens.drawOn(pdf, margin, linha_atual - altura_itens)
+        linha_atual -= altura_itens + espacamento
+
+        # linha separadora entre vendas
+        pdf.setStrokeColor(colors.lightgrey)
+        pdf.line(margin, linha_atual, width - margin, linha_atual)
+        linha_atual -= espacamento
+
     pdf.save()
     buffer.seek(0)
-    
+
     return send_file(
         buffer,
         as_attachment=False,
         download_name=f"relatorio_vendas_{data_relatorio.strftime('%Y%m%d')}.pdf",
         mimetype='application/pdf'
     )
+
     
 # ===== API SALDO =====
 @operador_bp.route('/api/saldo', methods=['GET'])
