@@ -902,7 +902,7 @@ def cancelar_nota_fiscal(db: Session, nota_id: int, motivo: str = "") -> bool:
 def buscar_pagamentos_notas_fiscais(db: Session, ids_pagamentos: Union[int, List[int], Tuple[int], str]):
     """
     Busca informações detalhadas sobre pagamentos de notas fiscais por IDs.
-    Inclui cálculo detalhado de descontos por produto, desconto total e endereço de entrega.
+    Inclui cálculo detalhado de descontos por produto, desconto total, endereço de entrega e informações do cliente.
 
     Args:
         db: Sessão do banco de dados
@@ -934,7 +934,7 @@ def buscar_pagamentos_notas_fiscais(db: Session, ids_pagamentos: Union[int, List
     except (ValueError, TypeError):
         raise ValueError("Todos os IDs devem ser valores numéricos")
 
-    # Consulta otimizada ao banco de dados
+    # Consulta otimizada ao banco de dados com JOIN para cliente
     pagamentos = db.query(PagamentoNotaFiscal)\
         .options(
             joinedload(PagamentoNotaFiscal.nota_fiscal)
@@ -945,7 +945,9 @@ def buscar_pagamentos_notas_fiscais(db: Session, ids_pagamentos: Union[int, List
             joinedload(PagamentoNotaFiscal.nota_fiscal)
             .joinedload(NotaFiscal.pagamentos),
             joinedload(PagamentoNotaFiscal.nota_fiscal)
-            .joinedload(NotaFiscal.entrega)
+            .joinedload(NotaFiscal.entrega),
+            joinedload(PagamentoNotaFiscal.nota_fiscal)
+            .joinedload(NotaFiscal.cliente)  # Carrega o relacionamento com cliente
         )\
         .filter(PagamentoNotaFiscal.id.in_(ids_unicos))\
         .all()
@@ -960,6 +962,19 @@ def buscar_pagamentos_notas_fiscais(db: Session, ids_pagamentos: Union[int, List
 
         pagamento = pagamentos_por_id[id_solicitado]
         nota_fiscal = pagamento.nota_fiscal
+
+        # Processamento das informações do cliente
+        cliente_info = None
+        if nota_fiscal.cliente:
+            cliente_info = {
+                'id': nota_fiscal.cliente.id,
+                'nome': nota_fiscal.cliente.nome,
+                'documento': nota_fiscal.cliente.documento,
+                'telefone': nota_fiscal.cliente.telefone,
+                'email': nota_fiscal.cliente.email,
+                'endereco': nota_fiscal.cliente.endereco,
+                'limite_credito': float(nota_fiscal.cliente.limite_credito) if nota_fiscal.cliente.limite_credito else None
+            }
 
         # Cálculo dos valores totais
         valor_total_sem_desconto = sum(
@@ -1026,6 +1041,7 @@ def buscar_pagamentos_notas_fiscais(db: Session, ids_pagamentos: Union[int, List
                 'nome': nota_fiscal.operador.nome,
                 'tipo': nota_fiscal.operador.tipo.value
             },
+            'cliente': cliente_info,  # Incluído as informações do cliente
             'produtos': produtos,
             'formas_pagamento': formas_pagamento,
             'endereco_entrega': endereco_entrega,
@@ -1038,7 +1054,8 @@ def buscar_pagamentos_notas_fiscais(db: Session, ids_pagamentos: Union[int, List
             'metadados': {
                 'total_itens': len(nota_fiscal.itens),
                 'total_formas_pagamento': len(nota_fiscal.pagamentos),
-                'possui_entrega': endereco_entrega is not None
+                'possui_entrega': endereco_entrega is not None,
+                'possui_cliente': cliente_info is not None  # Novo metadado
             }
         })
 
@@ -1047,6 +1064,7 @@ def buscar_pagamentos_notas_fiscais(db: Session, ids_pagamentos: Union[int, List
         "data": resultados,
         "success": True
     }
+    
 # ===== Contas a Receber =====
 def create_conta_receber(db: Session, conta: schemas.ContaReceberCreate) -> entities.ContaReceber:
     if conta.valor_original <= 0:

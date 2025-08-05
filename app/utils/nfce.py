@@ -18,6 +18,10 @@ def safe_str(value, default=""):
     """Converte para string com tratamento seguro para None"""
     return str(value) if value is not None else default
 
+def format_number(value):
+    """Formata números com 2 casas decimais, removendo .00 quando inteiro"""
+    return f"{value:.2f}".replace(".00", "") if value == int(value) else f"{value:.2f}"
+
 def formatar_endereco_entrega(endereco) -> str:
     """Formata o endereço de entrega com tratamento seguro para valores nulos"""
     if not endereco or not isinstance(endereco, dict):
@@ -34,7 +38,6 @@ def formatar_endereco_entrega(endereco) -> str:
 
     partes = []
     
-    # Linha 1: Logradouro, número e complemento
     if logradouro:
         linha = logradouro
         if numero:
@@ -43,11 +46,9 @@ def formatar_endereco_entrega(endereco) -> str:
             linha += f" - {complemento}"
         partes.append(linha)
     
-    # Linha 2: Bairro (se diferente do complemento)
     if bairro and (not complemento or bairro.lower() != complemento.lower()):
         partes.append(f"Bairro: {bairro}")
     
-    # Linha 3: Cidade/Estado e CEP
     linha3 = []
     if cidade:
         if estado:
@@ -69,7 +70,6 @@ def formatar_endereco_entrega(endereco) -> str:
     if linha3:
         partes.append("".join(linha3))
     
-    # Instruções de entrega
     if instrucoes:
         partes.append("Instruções:")
         for linha in wrap(instrucoes, width=48):
@@ -78,7 +78,15 @@ def formatar_endereco_entrega(endereco) -> str:
     return "\n".join(partes)
 
 def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> BytesIO:
-    """Gera PDF de nota fiscal no formato bobina com tratamento completo dos dados"""
+    """Gera PDF de nota fiscal no formato bobina com tratamento completo dos dados
+    
+    Args:
+        dados_nota: Dicionário com os dados da nota fiscal no formato retornado por buscar_pagamentos_notas_fiscais
+        logo_path: Caminho opcional para um arquivo de logo
+        
+    Returns:
+        BytesIO: Objeto de bytes com o PDF gerado
+    """
     # Configurações básicas do PDF
     largura = 80 * mm
     styles = getSampleStyleSheet()
@@ -86,13 +94,14 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> By
     styleN_small = ParagraphStyle(
         name="NormalSmall",
         parent=styleN,
-        fontSize=6,
-        leading=8
+        fontSize=5,
+        leading=7
     )
 
     # Extração segura dos dados com valores padrão
     produtos = dados_nota.get("produtos", []) or []
     operador = dados_nota.get("operador", {}) or {}
+    cliente = dados_nota.get("cliente", {}) or {}  # Agora vem diretamente do dicionário
     formas_pagamento = dados_nota.get("formas_pagamento", []) or []
     endereco_entrega = dados_nota.get("endereco_entrega", {}) or {}
     metadados = dados_nota.get("metadados", {}) or {}
@@ -116,19 +125,19 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> By
         if p is not None
     )
 
-    # Prepara tabela de produtos
+    # Prepara tabela de produtos com larguras ajustadas
     if tem_descontos:
         data = [["Produto", "Qtd", "Unit", "Desc", "Total"]]
-        col_widths = [28*mm, 10*mm, 12*mm, 10*mm, 10*mm]
+        col_widths = [30*mm, 8*mm, 10*mm, 8*mm, 9*mm]  # Mais espaço para produto
     else:
         data = [["Produto", "Qtd", "Unit", "Total"]]
-        col_widths = [33*mm, 10*mm, 12*mm, 15*mm]
+        col_widths = [34*mm, 10*mm, 12*mm, 15*mm]
 
     for produto in produtos:
         if not produto or not isinstance(produto, dict):
             continue
             
-        # Extração segura dos dados do produto
+        # Nome completo do produto sem truncamento
         nome_produto = safe_str(produto.get("nome"), f"Produto {produto.get('id', '')}")
         quantidade = safe_float(produto.get("quantidade"))
         valor_unitario = safe_float(produto.get("valor_unitario"))
@@ -140,25 +149,25 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> By
         if tem_descontos:
             data.append([
                 descricao,
-                f"{quantidade:.2f}",
-                f"{valor_unitario:.2f}",
-                f"-{desconto:.2f}" if desconto > 0 else "-",
-                f"{valor_total:.2f}"
+                format_number(quantidade),
+                format_number(valor_unitario),
+                f"-{format_number(desconto)}" if desconto > 0 else "-",
+                format_number(valor_total)
             ])
         else:
             data.append([
                 descricao,
-                f"{quantidade:.2f}",
-                f"{valor_unitario:.2f}",
-                f"{valor_total:.2f}"
+                format_number(quantidade),
+                format_number(valor_unitario),
+                format_number(valor_total)
             ])
 
     # Cálculo da altura dinâmica
     altura_base = 95 * mm
-    altura_linha_item = 7.5 * mm
+    altura_linha_item = 7 * mm
     altura_tabela = len(data) * altura_linha_item
     altura_rodape = 55 * mm
-    espacamentos = 20 * mm
+    espacamentos = 25 * mm
     altura_total = altura_base + altura_tabela + altura_rodape + espacamentos
 
     # Criação do PDF
@@ -181,25 +190,35 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> By
     c.setFont("Helvetica-Bold", 8)
     c.drawString(5*mm, y, f"Operador: {safe_str(operador.get('nome'))}")
     y -= 5 * mm
+    
+    # Nome do cliente - agora vem diretamente do dicionário
+    nome_cliente = safe_str(cliente.get("nome"))
+    if nome_cliente:
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(5*mm, y, f"Cliente: {nome_cliente}")
+        y -= 5 * mm
 
     c.setFont("Helvetica", 7)
     c.drawString(5*mm, y, f"Emissão: {emissao.strftime('%d/%m/%Y %H:%M')}")
     y -= 8 * mm
 
-    # Tabela de produtos
+    # Tabela de produtos com estilo melhorado
     tabela = Table(data, colWidths=col_widths, repeatRows=1)
     estilo = [
         ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
         ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+        ('ALIGN', (1,0), (-1,0), 'RIGHT'),
         ('ALIGN', (1,1), (-1,-1), 'RIGHT'),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 7),
-        ('BOTTOMPADDING', (0,0), (-1,0), 5),
+        ('FONTSIZE', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,0), 3),
+        ('TOPPADDING', (0,0), (-1,-1), 1),
         ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-        ('LEADING', (0,0), (-1,-1), 8),
+        ('LEADING', (0,0), (-1,-1), 7),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('WORDWRAP', (0,0), (-1,-1), True),
     ]
     
-    # Linhas alternadas
     for i in range(1, len(data)):
         estilo.append(('BACKGROUND', (0,i), (-1,i), colors.whitesmoke if i%2 else colors.white))
 
@@ -211,11 +230,11 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> By
     # Totais
     if desconto_total > 0:
         c.setFont("Helvetica", 7)
-        c.drawRightString(largura-5*mm, y, f"DESCONTO: -{desconto_total:.2f}")
+        c.drawRightString(largura-5*mm, y, f"DESCONTO: -{format_number(desconto_total)}")
         y -= 4 * mm
 
     c.setFont("Helvetica-Bold", 9)
-    c.drawRightString(largura-5*mm, y, f"TOTAL R$: {valor_total_nota:.2f}")
+    c.drawRightString(largura-5*mm, y, f"TOTAL R$: {format_number(valor_total_nota)}")
     y -= 8 * mm
 
     # Formas de pagamento
@@ -230,7 +249,7 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> By
                 continue
             forma = safe_str(pgto.get("forma_pagamento")).replace("_", " ").title()
             valor = safe_float(pgto.get("valor"))
-            c.drawString(10*mm, y, f"{forma}: R$ {valor:.2f}")
+            c.drawString(10*mm, y, f"{forma}: R$ {format_number(valor)}")
             y -= 4 * mm
     else:
         pgto_especifico = dados_nota.get("pagamento_especifico", {})
@@ -254,7 +273,7 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> By
                 y -= 4 * mm
 
     # Rodapé
-    y = max(y, 30*mm)  # Garante espaço mínimo para o rodapé
+    y = max(y, 30*mm)
     
     # Linhas de assinatura
     c.line(5*mm, y, 35*mm, y)

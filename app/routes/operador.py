@@ -292,14 +292,6 @@ def api_registrar_venda():
                         'message': f'Produto não encontrado: ID {produto_id}'
                     }), 404
 
-                if produto.estoque_loja < quantidade:
-                    msg = f'Estoque insuficiente para {produto.nome} (estoque: {produto.estoque_loja}, solicitado: {quantidade})'
-                    app.logger.error(msg)
-                    return jsonify({
-                        'success': False,
-                        'message': msg
-                    }), 400
-
             except (ValueError, InvalidOperation, TypeError) as e:
                 app.logger.error(f"Erro ao processar item: {str(e)}")
                 return jsonify({
@@ -499,7 +491,7 @@ def visualizar_pdf_venda(id_list):
         
         # Pegar os dados da primeira nota (mesmo para múltiplas notas)
         dados_nota = resultado_busca['data'][0]
-        
+        print(dados_nota)
         # Gerar PDF em memória com os dados completos
         pdf_buffer = gerar_nfce_pdf_bobina_bytesio(dados_nota=dados_nota)
         
