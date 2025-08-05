@@ -272,8 +272,17 @@ def api_registrar_venda():
         try:
             cliente_id = int(dados_venda['cliente_id'])
             valor_total = Decimal(str(dados_venda['valor_total']))
-            valor_recebido = Decimal(str(dados_venda.get('valor_recebido', valor_total)))
             total_descontos = Decimal(str(dados_venda.get('total_descontos', 0)))
+            
+            # Calcula o valor total dos pagamentos que não são a prazo
+            valor_a_vista = sum(
+                Decimal(str(p.get('valor'))) 
+                for p in dados_venda['pagamentos'] 
+                if p.get('forma_pagamento') != 'a_prazo'
+            )
+            
+            # O valor recebido é apenas o que não é a prazo
+            valor_recebido = valor_a_vista
         except (ValueError, InvalidOperation) as e:
             app.logger.error(f"Erro na conversão de valores: {str(e)}")
             return jsonify({
@@ -318,7 +327,8 @@ def api_registrar_venda():
             soma_pagamentos = sum(Decimal(str(p.get('valor'))) for p in dados_venda['pagamentos'])
             a_prazo_usado = any(p.get('forma_pagamento') == 'a_prazo' for p in dados_venda['pagamentos'])
             
-            if not a_prazo_usado and abs(soma_pagamentos - valor_total) > Decimal('0.01'):
+            # Verifica se a soma dos pagamentos bate com o valor total
+            if abs(soma_pagamentos - valor_total) > Decimal('0.01'):
                 msg = f'Valor recebido ({soma_pagamentos}) diferente do total da venda ({valor_total})'
                 app.logger.error(msg)
                 return jsonify({
@@ -351,9 +361,9 @@ def api_registrar_venda():
             valor_desconto=total_descontos,
             tipo_desconto=None,
             status=entities.StatusNota.emitida,
-            forma_pagamento=entities.FormaPagamento.dinheiro,
+            forma_pagamento=entities.FormaPagamento.dinheiro,  # Será atualizado abaixo
             valor_recebido=valor_recebido,
-            troco=max(valor_recebido - valor_total, Decimal(0)),
+            troco=max(valor_recebido - valor_total, Decimal(0)) if not a_prazo_usado else Decimal(0),
             a_prazo=a_prazo_usado
         )
 
@@ -409,6 +419,8 @@ def api_registrar_venda():
 
         # Criar pagamentos e armazenar seus IDs
         pagamentos_ids = []
+        valor_a_prazo = Decimal(0)
+        
         for pagamento_data in dados_venda['pagamentos']:
             forma = pagamento_data.get('forma_pagamento')
             valor = Decimal(str(pagamento_data.get('valor')))
@@ -425,28 +437,25 @@ def api_registrar_venda():
             
             pagamentos_ids.append(pagamento_nf.id)
             
-            # Registrar no financeiro
-            financeiro = entities.Financeiro(
-                tipo=entities.TipoMovimentacao.entrada,
-                categoria=entities.CategoriaFinanceira.venda,
-                valor=valor,
-                descricao=f"Pagamento venda NF #{nota.id}",
-                cliente_id=cliente.id,
-                caixa_id=caixa_aberto.id,
-                nota_fiscal_id=nota.id,
-                pagamento_id=pagamento_nf.id,
-                sincronizado=False
-            )
-            db.session.add(financeiro)
+            # Registrar no financeiro APENAS se não for a prazo
+            if forma != 'a_prazo':
+                financeiro = entities.Financeiro(
+                    tipo=entities.TipoMovimentacao.entrada,
+                    categoria=entities.CategoriaFinanceira.venda,
+                    valor=valor,
+                    descricao=f"Pagamento venda NF #{nota.id}",
+                    cliente_id=cliente.id,
+                    caixa_id=caixa_aberto.id,
+                    nota_fiscal_id=nota.id,
+                    pagamento_id=pagamento_nf.id,
+                    sincronizado=False
+                )
+                db.session.add(financeiro)
+            else:
+                valor_a_prazo += valor
 
         # Se houver pagamento a prazo, criar conta a receber
-        if a_prazo_usado:
-            valor_a_prazo = sum(
-                Decimal(str(p.get('valor'))) 
-                for p in dados_venda['pagamentos'] 
-                if p.get('forma_pagamento') == 'a_prazo'
-            )
-            
+        if a_prazo_usado and valor_a_prazo > 0:
             conta_receber = entities.ContaReceber(
                 cliente_id=cliente.id,
                 nota_fiscal_id=nota.id,
@@ -459,16 +468,25 @@ def api_registrar_venda():
             )
             db.session.add(conta_receber)
 
+        # Atualizar a forma de pagamento principal da nota fiscal
+        if len(dados_venda['pagamentos']) == 1:
+            # Se houver apenas um pagamento, usa essa forma
+            nota.forma_pagamento = entities.FormaPagamento(dados_venda['pagamentos'][0]['forma_pagamento'])
+        else:
+            # Se houver múltiplos pagamentos, define como "misto"
+            nota.forma_pagamento = entities.FormaPagamento.dinheiro  # Ou criar um enum para "misto"
+
         db.session.commit()
 
         return jsonify({
             'success': True,
             'message': 'Venda registrada com sucesso',
             'nota_fiscal_id': nota.id,
-            'pagamentos_ids': pagamentos_ids,  # Adicionado os IDs dos pagamentos
+            'pagamentos_ids': pagamentos_ids,
             'valor_total': float(valor_total),
             'valor_recebido': float(valor_recebido),
-            'troco': float(nota.troco) if nota.troco else 0
+            'troco': float(nota.troco) if nota.troco else 0,
+            'valor_a_prazo': float(valor_a_prazo) if a_prazo_usado else 0
         }), 201
 
     except SQLAlchemyError as e:
@@ -488,7 +506,7 @@ def api_registrar_venda():
             'message': 'Erro inesperado ao registrar venda',
             'error': str(e)
         }), 500
-
+        
 @operador_bp.route('/pdf/nota/<id_list>', methods=['GET'])
 @login_required
 @operador_required

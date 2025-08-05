@@ -114,7 +114,7 @@ def get_movimentacoes():
                 'data': mov.data.strftime('%d/%m/%Y'),
                 'tipo': mov.tipo.value.capitalize(),
                 'produto': mov.produto.nome,
-                'quantidade': f"{mov.quantidade} {mov.produto.unidade.value}",
+                'quantidade': f"{mov.quantidade:,.2f} {mov.produto.unidade.value}",
                 'valor': f"R$ {mov.valor_unitario * mov.quantidade:,.2f}"
             })
         
