@@ -700,10 +700,19 @@ def obter_detalhes_venda(venda_id):
         # Busca a nota fiscal principal
         nota_fiscal = entities.NotaFiscal.query.get_or_404(venda_id)
         
-        # Busca os pagamentos associados
+        # Busca os pagamentos associados e remove duplicatas
         pagamentos = entities.PagamentoNotaFiscal.query.filter_by(
             nota_fiscal_id=venda_id
         ).all()
+        
+        # Filtra pagamentos duplicados
+        pagamentos_unicos = []
+        ids_vistos = set()
+        
+        for pagamento in pagamentos:
+            if pagamento.id not in ids_vistos:
+                ids_vistos.add(pagamento.id)
+                pagamentos_unicos.append(pagamento)
         
         # Formata a resposta
         detalhes = {
@@ -742,7 +751,7 @@ def obter_detalhes_venda(venda_id):
                     'valor': float(pagamento.valor),
                     'data': pagamento.data.isoformat()
                 }
-                for pagamento in pagamentos
+                for pagamento in pagamentos_unicos  # Usa a lista filtrada aqui
             ],
             'entrega': {
                 'endereco': nota_fiscal.entrega.logradouro if nota_fiscal.entrega else None,
@@ -756,7 +765,7 @@ def obter_detalhes_venda(venda_id):
             } if nota_fiscal.entrega else None
         }
         
-        print(f'Deatlhes: \n{detalhes}\n')
+        print(f'Detalhes: \n{detalhes}\n')
         return jsonify({
             'success': True,
             'data': detalhes
