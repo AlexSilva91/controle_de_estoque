@@ -428,7 +428,6 @@ def criar_produto():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
-
 def to_decimal_or_none(value):
     if value is None:
         return None
@@ -445,9 +444,8 @@ def to_decimal_or_none(value):
 def atualizar_produto(produto_id):
     try:
         data = request.get_json()
-        print("Payload recebido:", data)
-
         produto = get_produto(db.session, produto_id)
+        
         if not produto:
             return jsonify({'success': False, 'message': 'Produto não encontrado'}), 404
 
@@ -496,29 +494,20 @@ def atualizar_produto(produto_id):
                 'message': f'Erro ao atualizar descontos: {str(e)}'
             }), 400
 
-        # Serializar resposta
-        descontos_serializados = [{
-            "id": d.id,
-            "identificador": d.identificador,
-            "valor": float(d.valor),
-            "quantidade_minima": float(d.quantidade_minima),
-            "tipo": d.tipo.name
-        } for d in produto.descontos]
-
         return jsonify({
             'success': True,
             'message': 'Produto atualizado com sucesso',
             'produto': {
                 'id': produto.id,
-                'codigo': produto.codigo or '',
                 'nome': produto.nome,
-                'tipo': produto.tipo,
-                'unidade': produto.unidade.value,
-                'valor_unitario': str(produto.valor_unitario),
-                'estoque_loja': f"{float(produto.estoque_loja or 0):.2f}",
-                'ativo': produto.ativo
-            },
-            'descontos': descontos_serializados
+                'descontos': [{
+                    'id': d.id,
+                    'identificador': d.identificador,
+                    'valor': float(d.valor),
+                    'quantidade_minima': float(d.quantidade_minima),
+                    'tipo': d.tipo.name
+                } for d in produto.descontos]
+            }
         })
 
     except Exception as e:
@@ -531,26 +520,41 @@ def atualizar_produto(produto_id):
 def obter_produto(produto_id):
     try:
         produto = get_produto(db.session, produto_id)
-        descontos = buscar_todos_os_descontos(db.session)
-
+        
         if not produto:
             return jsonify({'success': False, 'message': 'Produto não encontrado'}), 404
 
-        descontos_serializados = []
-        for d in descontos:
-            descontos_serializados.append({
-                "id": d.id,
-                "identificador": d.identificador,
-                "descricao": d.descricao,
-                "tipo": d.tipo.name if d.tipo else None,
-                "valor": float(d.valor),
-                "quantidade_minima": float(d.quantidade_minima),
-                "quantidade_maxima": float(d.quantidade_maxima) if d.quantidade_maxima is not None else None,
-                "valido_ate": d.valido_ate.isoformat() if d.valido_ate else None,
-                "ativo": d.ativo,
-                "criado_em": d.criado_em.isoformat(),
-                "atualizado_em": d.atualizado_em.isoformat(),
-                "sincronizado": d.sincronizado,
+        # Obter todos os descontos disponíveis
+        todos_descontos = buscar_todos_os_descontos(db.session)
+        
+        # Serializar descontos disponíveis
+        descontos_disponiveis = []
+        for desconto in todos_descontos:
+            descontos_disponiveis.append({
+                "id": desconto.id,
+                "identificador": desconto.identificador,
+                "descricao": desconto.descricao or "",
+                "tipo": desconto.tipo.name if desconto.tipo else None,
+                "valor": float(desconto.valor),
+                "quantidade_minima": float(desconto.quantidade_minima),
+                "quantidade_maxima": float(desconto.quantidade_maxima) if desconto.quantidade_maxima else None,
+                "valido_ate": desconto.valido_ate.isoformat() if desconto.valido_ate else None,
+                "ativo": desconto.ativo
+            })
+
+        # Serializar descontos do produto
+        descontos_produto = []
+        for desconto in produto.descontos:
+            descontos_produto.append({
+                "id": desconto.id,
+                "identificador": desconto.identificador,
+                "descricao": desconto.descricao or "",
+                "tipo": desconto.tipo.name if desconto.tipo else None,
+                "valor": float(desconto.valor),
+                "quantidade_minima": float(desconto.quantidade_minima),
+                "quantidade_maxima": float(desconto.quantidade_maxima) if desconto.quantidade_maxima else None,
+                "valido_ate": desconto.valido_ate.isoformat() if desconto.valido_ate else None,
+                "ativo": desconto.ativo
             })
 
         return jsonify({
@@ -571,14 +575,14 @@ def obter_produto(produto_id):
                 'estoque_fabrica': f"{float(produto.estoque_fabrica or 0):.2f}",
                 'estoque_minimo': f"{float(produto.estoque_minimo or 0):.2f}",
                 'estoque_maximo': f"{float(produto.estoque_maximo or 0):.2f}",
-                'ativo': produto.ativo
+                'ativo': produto.ativo,
+                'descontos': descontos_produto
             },
-            'descontos': descontos_serializados
+            'todos_descontos': descontos_disponiveis
         })
-
+        print(f'{produto.id} {todos_descontos}')
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
-
 
 @admin_bp.route('/produtos/<int:produto_id>', methods=['DELETE'])
 @login_required
@@ -610,7 +614,6 @@ def remover_produto(produto_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': 'Erro ao remover produto.'}), 500
-
 
 @admin_bp.route('/produtos/<int:produto_id>/movimentacao', methods=['POST'])
 @login_required
@@ -1297,11 +1300,12 @@ def listar_descontos_route():
                 'identificador': d.identificador,
                 'descricao': d.descricao,
                 'quantidade_minima': float(d.quantidade_minima),
-                'quantidade_maxima': float(d.quantidade_maxima),
-                'valor_unitario_com_desconto': formatar_valor_br(d.valor),  # Mapeando valor para valor_unitario_com_desconto
-                'valido_ate': formatar_data_br(d.valido_ate) if d.valido_ate else '-',
+                'quantidade_maxima': float(d.quantidade_maxima) if d.quantidade_maxima else None,
+                'valor': float(d.valor),
+                'tipo': d.tipo.name,
+                'valido_ate': d.valido_ate.isoformat() if d.valido_ate else None,
                 'ativo': d.ativo,
-                'criado_em': formatar_data_br(d.criado_em)
+                'criado_em': d.criado_em.isoformat()
             } for d in descontos]
         }), 200
     except Exception as e:

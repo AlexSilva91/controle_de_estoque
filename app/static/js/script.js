@@ -433,307 +433,324 @@ document.addEventListener('DOMContentLoaded', function() {
   // ===== PRODUTOS =====
   // Carregar dados de produtos
   async function loadProdutosData() {
-    try {
-      const searchText = document.getElementById('searchProduto')?.value.toLowerCase() || '';
-      const data = await fetchWithErrorHandling('/admin/produtos');
-      
-      if (data.success) {
-        const produtosTable = document.querySelector('#produtosTable tbody');
-        if (produtosTable) {
-          produtosTable.innerHTML = '';
+      try {
+          const searchText = document.getElementById('searchProduto')?.value.toLowerCase() || '';
+          const data = await fetchWithErrorHandling('/admin/produtos');
           
-          data.produtos.forEach(produto => {
-            if (searchText && !produto.nome.toLowerCase().includes(searchText)) {
-              return;
-            }
-            
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${produto.id}</td>
-              <td>${produto.nome}</td>
-              <td>${produto.tipo}</td>
-              <td>${produto.unidade}</td>
-              <td>${produto.valor}</td>
-              <td>${produto.estoque_deposito}</td>
-              <td>${produto.estoque_loja}</td>
-              <td>${produto.estoque_fabrica}</td>
-              <td>
-                <div class="table-actions">
-                  <button class="btn-icon btn-info movimentar-estoque" data-id="${produto.id}" title="Transferir entre estoques">
-                    <i class="fas fa-exchange-alt"></i>
-                  </button>
-                  <button class="btn-icon btn-warning editar-produto" data-id="${produto.id}" title="Editar">
-                    <i class="fas fa-edit"></i>
-                  </button>
-                  <button class="btn-icon btn-danger remover-produto" data-id="${produto.id}" title="Remover">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </div>
-              </td>
-            `;
-            produtosTable.appendChild(row);
-          });
-          
-          setupProdutoActions();
-        }
+          if (data.success) {
+              const produtosTable = document.querySelector('#produtosTable tbody');
+              if (produtosTable) {
+                  produtosTable.innerHTML = '';
+                  
+                  data.produtos.forEach(produto => {
+                      if (searchText && !produto.nome.toLowerCase().includes(searchText)) {
+                          return;
+                      }
+                      
+                      const row = document.createElement('tr');
+                      row.innerHTML = `
+                          <td>${produto.id}</td>
+                          <td>${produto.nome}</td>
+                          <td>${produto.tipo}</td>
+                          <td>${produto.unidade}</td>
+                          <td>${produto.valor}</td>
+                          <td>${produto.estoque_deposito}</td>
+                          <td>${produto.estoque_loja}</td>
+                          <td>${produto.estoque_fabrica}</td>
+                          <td>
+                              <div class="table-actions">
+                                  <button class="btn-icon btn-info movimentar-estoque" data-id="${produto.id}" title="Transferir entre estoques">
+                                      <i class="fas fa-exchange-alt"></i>
+                                  </button>
+                                  <button class="btn-icon btn-warning editar-produto" data-id="${produto.id}" title="Editar">
+                                      <i class="fas fa-edit"></i>
+                                  </button>
+                                  <button class="btn-icon btn-danger remover-produto" data-id="${produto.id}" title="Remover">
+                                      <i class="fas fa-trash"></i>
+                                  </button>
+                              </div>
+                          </td>
+                      `;
+                      produtosTable.appendChild(row);
+                  });
+                  
+                  setupProdutoActions();
+              }
+          }
+      } catch (error) {
+          console.error('Erro ao carregar produtos:', error);
+          showFlashMessage('error', 'Erro ao carregar lista de produtos');
       }
-    } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
-      showFlashMessage('error', 'Erro ao carregar lista de produtos');
-    }
   }
 
   function setupProdutoActions() {
-    document.querySelectorAll('.editar-produto').forEach(btn => {
-      btn.addEventListener('click', async function() {
-        const produtoId = this.getAttribute('data-id');
-        
-        try {
-          const data = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
-          
-          if (data.success) {
-            const produto = data.produto;
-            const formBody = document.querySelector('#editarProdutoModal .modal-body');
-            
-            if (!formBody) return;
-            
-            // Tratamento seguro para valor_unitario
-            let valorUnitario = produto.valor_unitario;
-            if (typeof valorUnitario === 'string') {
-              valorUnitario = valorUnitario.replace(/[^\d,.-]/g, '').replace(',', '.');
-            }
-            
-            // Obter descontos atuais do produto
-            const descontosAtuais = produto.descontos || [];
-            const descontosAtuaisIds = descontosAtuais.map(d => d.id);
-            
-            formBody.innerHTML = `
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="editCodigo">Código*</label>
-                  <input type="text" id="editCodigo" class="form-control" value="${produto.codigo || ''}" required>
-                </div>
-                <div class="form-group">
-                  <label for="editMarca">Marca*</label>
-                  <input type="text" id="editMarca" class="form-control" value="${produto.marca || ''}" required>
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="editNome">Nome*</label>
-                  <input type="text" id="editNome" class="form-control" value="${produto.nome}" required>
-                </div>
-                <div class="form-group">
-                  <label for="editTipo">Tipo*</label>
-                  <input type="text" id="editTipo" class="form-control" value="${produto.tipo}" required>
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="editUnidade">Unidade</label>
-                  <input type="text" id="editUnidade" class="form-control" value="${produto.unidade}" disabled>
-                </div>
-                <div class="form-group">
-                  <label for="editValor">Valor Unitário*</label>
-                  <input type="number" id="editValor" class="form-control" value="${valorUnitario}" step="0.01" min="0" required>
-                </div>
-              </div>
+      document.querySelectorAll('.editar-produto').forEach(btn => {
+          btn.addEventListener('click', async function() {
+              const produtoId = this.getAttribute('data-id');
+              
+              try {
+                  // Primeiro, buscamos os dados do produto
+                  const produtoResponse = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
+                  
+                  if (produtoResponse.success) {
+                      const produto = produtoResponse.produto;
+                      
+                      // Depois, buscamos todos os descontos disponíveis
+                      const descontosResponse = await fetchWithErrorHandling('/admin/descontos');
+                      
+                      if (descontosResponse.success) {
+                          const formBody = document.querySelector('#editarProdutoModal .modal-body');
+                          
+                          if (!formBody) return;
+                          
+                          // Tratamento seguro para valor_unitario
+                          let valorUnitario = produto.valor_unitario;
+                          if (typeof valorUnitario === 'string') {
+                              valorUnitario = valorUnitario.replace(/[^\d,.-]/g, '').replace(',', '.');
+                          }
+                          
+                          // Obter descontos atuais do produto
+                          const descontosAtuais = produto.descontos || [];
+                          const descontosAtuaisIds = descontosAtuais.map(d => d.id);
+                          
+                          // Todos os descontos disponíveis
+                          const todosDescontos = descontosResponse.descontos || [];
+                          
+                          formBody.innerHTML = `
+                              <div class="form-row">
+                                  <div class="form-group">
+                                      <label for="editCodigo">Código*</label>
+                                      <input type="text" id="editCodigo" class="form-control" value="${produto.codigo || ''}" required>
+                                  </div>
+                                  <div class="form-group">
+                                      <label for="editMarca">Marca*</label>
+                                      <input type="text" id="editMarca" class="form-control" value="${produto.marca || ''}" required>
+                                  </div>
+                              </div>
+                              <div class="form-row">
+                                  <div class="form-group">
+                                      <label for="editNome">Nome*</label>
+                                      <input type="text" id="editNome" class="form-control" value="${produto.nome}" required>
+                                  </div>
+                                  <div class="form-group">
+                                      <label for="editTipo">Tipo*</label>
+                                      <input type="text" id="editTipo" class="form-control" value="${produto.tipo}" required>
+                                  </div>
+                              </div>
+                              <div class="form-row">
+                                  <div class="form-group">
+                                      <label for="editUnidade">Unidade</label>
+                                      <input type="text" id="editUnidade" class="form-control" value="${produto.unidade}" disabled>
+                                  </div>
+                                  <div class="form-group">
+                                      <label for="editValor">Valor Unitário*</label>
+                                      <input type="number" id="editValor" class="form-control" value="${valorUnitario}" step="0.01" min="0" required>
+                                  </div>
+                              </div>
 
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="editValorCompra">Valor Unitário de Compra</label>
-                  <input type="number" id="editValorCompra" class="form-control" value="${produto.valor_unitario_compra || ''}" step="0.01" min="0">
-                </div>
-                <div class="form-group">
-                  <label for="editValorTotalCompra">Valor Total de Compra</label>
-                  <input type="number" id="editValorTotalCompra" class="form-control" value="${produto.valor_total_compra || ''}" step="0.01" min="0">
-                </div>
-                <div class="form-group">
-                  <label for="editICMS">ICMS (%)</label>
-                  <input type="number" id="editICMS" class="form-control" value="${produto.imcs || ''}" step="0.01" min="0">
-                </div>
-              </div>
+                              <div class="form-row">
+                                  <div class="form-group">
+                                      <label for="editValorCompra">Valor Unitário de Compra</label>
+                                      <input type="number" id="editValorCompra" class="form-control" value="${produto.valor_unitario_compra || ''}" step="0.01" min="0">
+                                  </div>
+                                  <div class="form-group">
+                                      <label for="editValorTotalCompra">Valor Total de Compra</label>
+                                      <input type="number" id="editValorTotalCompra" class="form-control" value="${produto.valor_total_compra || ''}" step="0.01" min="0">
+                                  </div>
+                                  <div class="form-group">
+                                      <label for="editICMS">ICMS (%)</label>
+                                      <input type="number" id="editICMS" class="form-control" value="${produto.imcs || ''}" step="0.01" min="0">
+                                  </div>
+                              </div>
 
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="editEstoqueLoja">Estoque Loja</label>
-                  <input type="number" id="editEstoqueLoja" class="form-control" value="${produto.estoque_loja}" step="0.001" min="0">
-                </div>
-                <div class="form-group">
-                  <label for="editEstoqueDeposito">Estoque Depósito</label>
-                  <input type="number" id="editEstoqueDeposito" class="form-control" value="${produto.estoque_deposito}" step="0.001" min="0">
-                </div>
-                <div class="form-group">
-                  <label for="editEstoqueFabrica">Estoque Fábrica</label>
-                  <input type="number" id="editEstoqueFabrica" class="form-control" value="${produto.estoque_fabrica}" step="0.001" min="0">
-                </div>
-              </div>
+                              <div class="form-row">
+                                  <div class="form-group">
+                                      <label for="editEstoqueLoja">Estoque Loja</label>
+                                      <input type="number" id="editEstoqueLoja" class="form-control" value="${produto.estoque_loja}" step="0.001" min="0">
+                                  </div>
+                                  <div class="form-group">
+                                      <label for="editEstoqueDeposito">Estoque Depósito</label>
+                                      <input type="number" id="editEstoqueDeposito" class="form-control" value="${produto.estoque_deposito}" step="0.001" min="0">
+                                  </div>
+                                  <div class="form-group">
+                                      <label for="editEstoqueFabrica">Estoque Fábrica</label>
+                                      <input type="number" id="editEstoqueFabrica" class="form-control" value="${produto.estoque_fabrica}" step="0.001" min="0">
+                                  </div>
+                              </div>
 
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="editEstoqueMinimo">Estoque Mínimo</label>
-                  <input type="number" id="editEstoqueMinimo" class="form-control" value="${produto.estoque_minimo || 0}" step="0.001" min="0">
-                </div>
-                <div class="form-group">
-                  <label for="editEstoqueMaximo">Estoque Máximo</label>
-                  <input type="number" id="editEstoqueMaximo" class="form-control" value="${produto.estoque_maximo || ''}" step="0.001" min="0">
-                </div>
-                <div class="form-group">
-                  <label for="editAtivo">Ativo</label>
-                  <select id="editAtivo" class="form-control">
-                    <option value="true" ${produto.ativo ? 'selected' : ''}>Sim</option>
-                    <option value="false" ${!produto.ativo ? 'selected' : ''}>Não</option>
-                  </select>
-                </div>
-              </div>
+                              <div class="form-row">
+                                  <div class="form-group">
+                                      <label for="editEstoqueMinimo">Estoque Mínimo</label>
+                                      <input type="number" id="editEstoqueMinimo" class="form-control" value="${produto.estoque_minimo || 0}" step="0.001" min="0">
+                                  </div>
+                                  <div class="form-group">
+                                      <label for="editEstoqueMaximo">Estoque Máximo</label>
+                                      <input type="number" id="editEstoqueMaximo" class="form-control" value="${produto.estoque_maximo || ''}" step="0.001" min="0">
+                                  </div>
+                                  <div class="form-group">
+                                      <label for="editAtivo">Ativo</label>
+                                      <select id="editAtivo" class="form-control">
+                                          <option value="true" ${produto.ativo ? 'selected' : ''}>Sim</option>
+                                          <option value="false" ${!produto.ativo ? 'selected' : ''}>Não</option>
+                                      </select>
+                                  </div>
+                              </div>
 
-              <div class="form-row">
-                <div class="form-group" style="width: 100%;">
-                  <label>Descontos Aplicados</label>
-                  <div id="descontosContainer" class="descontos-container">
-                    ${descontosAtuais.map(desconto => `
-                      <div class="desconto-item" data-id="${desconto.id}">
-                        <span>${desconto.identificador} - 
-                        ${desconto.tipo === 'fixo' ? `R$ ${desconto.valor}` : `${desconto.valor}%`} - 
-                        Mín: ${desconto.quantidade_minima}${desconto.quantidade_maxima ? `, Máx: ${desconto.quantidade_maxima}` : ''}</span>
-                        <button type="button" class="btn-icon btn-danger btn-remover-desconto">
-                          <i class="fas fa-times"></i>
-                        </button>
-                      </div>
-                    `).join('')}
-                  </div>
-                </div>
-              </div>
+                              <div class="form-row">
+                                  <div class="form-group" style="width: 100%;">
+                                      <label>Descontos Aplicados</label>
+                                      <div id="descontosContainer" class="descontos-container">
+                                          ${descontosAtuais.map(desconto => `
+                                              <div class="desconto-item" data-id="${desconto.id}">
+                                                  <span>${desconto.identificador} - 
+                                                  ${desconto.tipo === 'fixo' ? `R$ ${desconto.valor}` : `${desconto.valor}%`} - 
+                                                  Mín: ${desconto.quantidade_minima}${desconto.quantidade_maxima ? `, Máx: ${desconto.quantidade_maxima}` : ''}</span>
+                                                  <button type="button" class="btn-icon btn-danger btn-remover-desconto">
+                                                      <i class="fas fa-times"></i>
+                                                  </button>
+                                              </div>
+                                          `).join('')}
+                                      </div>
+                                  </div>
+                              </div>
 
-              <div class="form-row">
-                <div class="form-group" style="width: 100%;">
-                  <label for="selecionarDesconto">Adicionar Desconto</label>
-                  <div class="desconto-select-container">
-                    <select id="selecionarDesconto" class="form-control">
-                      <option value="">Selecione um desconto...</option>
-                      ${data.descontos
-                        .filter(d => !descontosAtuaisIds.includes(d.id))
-                        .map(desconto => `
-                          <option value="${desconto.id}" 
-                                  data-quantidade-minima="${desconto.quantidade_minima}"
-                                  data-quantidade-maxima="${desconto.quantidade_maxima || ''}"
-                                  data-valor="${desconto.valor}"
-                                  data-tipo="${desconto.tipo}"
-                                  data-identificador="${desconto.identificador}">
-                            ${desconto.identificador} - 
-                            ${desconto.tipo === 'fixo' ? `R$ ${desconto.valor}` : `${desconto.valor}%`} - 
-                            Mín: ${desconto.quantidade_minima}${desconto.quantidade_maxima ? `, Máx: ${desconto.quantidade_maxima}` : ''}
-                          </option>
-                        `).join('')}
-                    </select>
-                    <button type="button" id="btnAdicionarDesconto" class="btn btn-primary">
-                      <i class="fas fa-plus"></i> Adicionar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            `;
-            
-            const editarProdutoForm = document.getElementById('editarProdutoForm');
-            if (editarProdutoForm) {
-              editarProdutoForm.setAttribute('data-produto-id', produtoId);
-            }
-            setupDescontoEvents();
-            openModal('editarProdutoModal');
-          }
-        } catch (error) {
-          console.error('Erro ao carregar dados do produto:', error);
-          showFlashMessage('error', 'Erro ao carregar dados do produto');
-        }
+                              <div class="form-row">
+                                  <div class="form-group" style="width: 100%;">
+                                      <label for="selecionarDesconto">Adicionar Desconto</label>
+                                      <div class="desconto-select-container">
+                                          <select id="selecionarDesconto" class="form-control">
+                                              <option value="">Selecione um desconto...</option>
+                                              ${todosDescontos
+                                                  .filter(d => !descontosAtuaisIds.includes(d.id))
+                                                  .map(desconto => `
+                                                      <option value="${desconto.id}" 
+                                                              data-quantidade-minima="${desconto.quantidade_minima}"
+                                                              data-quantidade-maxima="${desconto.quantidade_maxima || ''}"
+                                                              data-valor="${desconto.valor}"
+                                                              data-tipo="${desconto.tipo}"
+                                                              data-identificador="${desconto.identificador}">
+                                                          ${desconto.identificador} - 
+                                                          ${desconto.tipo === 'fixo' ? `R$ ${desconto.valor}` : `${desconto.valor}%`} - 
+                                                          Mín: ${desconto.quantidade_minima}${desconto.quantidade_maxima ? `, Máx: ${desconto.quantidade_maxima}` : ''}
+                                                      </option>
+                                                  `).join('')}
+                                          </select>
+                                          <button type="button" id="btnAdicionarDesconto" class="btn btn-primary">
+                                              <i class="fas fa-plus"></i> Adicionar
+                                          </button>
+                                      </div>
+                                  </div>
+                              </div>
+                          `;
+                          
+                          const editarProdutoForm = document.getElementById('editarProdutoForm');
+                          if (editarProdutoForm) {
+                              editarProdutoForm.setAttribute('data-produto-id', produtoId);
+                          }
+                          setupDescontoEvents();
+                          openModal('editarProdutoModal');
+                      } else {
+                          throw new Error('Erro ao carregar descontos');
+                      }
+                  } else {
+                      throw new Error('Erro ao carregar dados do produto');
+                  }
+              } catch (error) {
+                  console.error('Erro ao carregar dados do produto:', error);
+                  showFlashMessage('error', 'Erro ao carregar dados do produto');
+              }
+          });
       });
-    });
 
-    document.querySelectorAll('.remover-produto').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const produtoId = this.getAttribute('data-id');
-        const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
-        const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
-        
-        if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir o produto ${produtoId}?`;
-        if (confirmarExclusaoBtn) {
-          confirmarExclusaoBtn.setAttribute('data-id', produtoId);
-          confirmarExclusaoBtn.setAttribute('data-type', 'produto');
-        }
-        openModal('confirmarExclusaoModal');
+      // Restante do código permanece o mesmo...
+      document.querySelectorAll('.remover-produto').forEach(btn => {
+          btn.addEventListener('click', function() {
+              const produtoId = this.getAttribute('data-id');
+              const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
+              const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
+              
+              if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir o produto ${produtoId}?`;
+              if (confirmarExclusaoBtn) {
+                  confirmarExclusaoBtn.setAttribute('data-id', produtoId);
+                  confirmarExclusaoBtn.setAttribute('data-type', 'produto');
+              }
+              openModal('confirmarExclusaoModal');
+          });
       });
-    });
 
-    document.querySelectorAll('.movimentar-estoque').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const produtoId = this.getAttribute('data-id');
-        openTransferenciaModal(produtoId);
+      document.querySelectorAll('.movimentar-estoque').forEach(btn => {
+          btn.addEventListener('click', function() {
+              const produtoId = this.getAttribute('data-id');
+              openTransferenciaModal(produtoId);
+          });
       });
-    });
   }
 
   function setupDescontoEvents() {
-    // Adicionar desconto
-    const btnAdicionarDesconto = document.getElementById('btnAdicionarDesconto');
-    if (btnAdicionarDesconto) {
-      btnAdicionarDesconto.addEventListener('click', function() {
-        const select = document.getElementById('selecionarDesconto');
-        if (!select) return;
-        
-        const selectedOption = select.options[select.selectedIndex];
-        
-        if (!selectedOption.value) {
-          showFlashMessage('warning', 'Selecione um desconto para adicionar');
-          return;
-        }
-        
-        const descontoId = selectedOption.value;
-        const container = document.getElementById('descontosContainer');
-        if (!container) return;
-        
-        // Verificar se o desconto já foi adicionado
-        if (document.querySelector(`.desconto-item[data-id="${descontoId}"]`)) {
-          showFlashMessage('warning', 'Este desconto já foi adicionado');
-          return;
-        }
-        
-        // Criar novo item de desconto
-        const item = document.createElement('div');
-        item.className = 'desconto-item';
-        item.dataset.id = descontoId;
-        item.innerHTML = `
-          <span>${selectedOption.dataset.identificador} - 
-          ${selectedOption.dataset.tipo === 'fixo' ? `R$ ${selectedOption.dataset.valor}` : `${selectedOption.dataset.valor}%`} - 
-          Mín: ${selectedOption.dataset.quantidadeMinima}${selectedOption.dataset.quantidadeMaxima ? `, Máx: ${selectedOption.dataset.quantidadeMaxima}` : ''}</span>
-          <button type="button" class="btn-icon btn-danger btn-remover-desconto">
-            <i class="fas fa-times"></i>
-          </button>
-        `;
-        
-        container.appendChild(item);
-        
-        // Resetar seleção
-        select.value = '';
-        
-        // Adicionar evento de remoção
-        const removeBtn = item.querySelector('.btn-remover-desconto');
-        if (removeBtn) {
-          removeBtn.addEventListener('click', function() {
-            item.remove();
+      // Adicionar desconto
+      const btnAdicionarDesconto = document.getElementById('btnAdicionarDesconto');
+      if (btnAdicionarDesconto) {
+          btnAdicionarDesconto.addEventListener('click', function() {
+              const select = document.getElementById('selecionarDesconto');
+              if (!select) return;
+              
+              const selectedOption = select.options[select.selectedIndex];
+              
+              if (!selectedOption.value) {
+                  showFlashMessage('warning', 'Selecione um desconto para adicionar');
+                  return;
+              }
+              
+              const descontoId = selectedOption.value;
+              const container = document.getElementById('descontosContainer');
+              if (!container) return;
+              
+              // Verificar se o desconto já foi adicionado
+              if (document.querySelector(`.desconto-item[data-id="${descontoId}"]`)) {
+                  showFlashMessage('warning', 'Este desconto já foi adicionado');
+                  return;
+              }
+              
+              // Criar novo item de desconto
+              const item = document.createElement('div');
+              item.className = 'desconto-item';
+              item.dataset.id = descontoId;
+              item.innerHTML = `
+                  <span>${selectedOption.dataset.identificador} - 
+                  ${selectedOption.dataset.tipo === 'fixo' ? `R$ ${selectedOption.dataset.valor}` : `${selectedOption.dataset.valor}%`} - 
+                  Mín: ${selectedOption.dataset.quantidadeMinima}${selectedOption.dataset.quantidadeMaxima ? `, Máx: ${selectedOption.dataset.quantidadeMaxima}` : ''}</span>
+                  <button type="button" class="btn-icon btn-danger btn-remover-desconto">
+                      <i class="fas fa-times"></i>
+                  </button>
+              `;
+              
+              container.appendChild(item);
+              
+              // Resetar seleção
+              select.value = '';
+              
+              // Adicionar evento de remoção
+              const removeBtn = item.querySelector('.btn-remover-desconto');
+              if (removeBtn) {
+                  removeBtn.addEventListener('click', function() {
+                      item.remove();
+                  });
+              }
           });
-        }
+      }
+      
+      // Remover descontos existentes
+      document.querySelectorAll('.btn-remover-desconto').forEach(btn => {
+          btn.addEventListener('click', function() {
+              const item = this.closest('.desconto-item');
+              if (item) {
+                  item.remove();
+              }
+          });
       });
-    }
-    
-    // Remover descontos existentes
-    document.querySelectorAll('.btn-remover-desconto').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const item = this.closest('.desconto-item');
-        if (item) {
-          item.remove();
-        }
-      });
-    });
   }
+
+  // Restante do código permanece o mesmo...
 
   // Função para abrir modal de transferência
   async function openTransferenciaModal(produtoId) {
@@ -779,68 +796,68 @@ document.addEventListener('DOMContentLoaded', function() {
   // Formulário de transferência SEM conversão
   const transferenciaForm = document.getElementById('transferenciaForm');
   if (transferenciaForm) {
-    transferenciaForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const produtoId = document.getElementById('transferenciaProdutoId')?.value;
-        const origem = document.getElementById('transferenciaOrigem')?.value;
-        const destino = document.getElementById('transferenciaDestino')?.value;
-        const quantidade = parseFloat(document.getElementById('transferenciaQuantidade')?.value || 0);
-        const valorUnitarioDestino = parseFloat(document.getElementById('transferenciaValorUnitarioDestino')?.value || 0);
-        const observacao = document.getElementById('transferenciaObservacao')?.value || '';
-        
-        // Validações
-        if (origem === destino) {
-            showFlashMessage('error', 'Origem e destino não podem ser iguais');
-            return;
-        }
-        
-        if (quantidade <= 0 || isNaN(quantidade)) {
-            showFlashMessage('error', 'Informe uma quantidade válida');
-            return;
-        }
-        
-        if (valorUnitarioDestino <= 0 || isNaN(valorUnitarioDestino)) {
-            showFlashMessage('error', 'Informe um valor unitário válido');
-            return;
-        }
-        
-        try {
-            const response = await fetchWithErrorHandling('/admin/transferencias', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    produto_id: produtoId,
-                    estoque_origem: origem,
-                    estoque_destino: destino,
-                    quantidade: quantidade,
-                    valor_unitario_destino: valorUnitarioDestino,
-                    observacao: observacao,
-                    converter_unidade: false
-                })
-            });
-            
-            if (response.success) {
-                showFlashMessage('success', 'Transferência realizada com sucesso');
-                closeModal('transferenciaModal');
-                loadProdutosData();
-                loadMovimentacoesData();
-            } else {
-                showFlashMessage('error', response.message || 'Erro ao realizar transferência');
-            }
-        } catch (error) {
-            console.error('Erro ao realizar transferência:', error);
-            showFlashMessage('error', error.message || 'Erro ao realizar transferência');
-        }
-    });
+      transferenciaForm.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          
+          const produtoId = document.getElementById('transferenciaProdutoId')?.value;
+          const origem = document.getElementById('transferenciaOrigem')?.value;
+          const destino = document.getElementById('transferenciaDestino')?.value;
+          const quantidade = parseFloat(document.getElementById('transferenciaQuantidade')?.value || 0);
+          const valorUnitarioDestino = parseFloat(document.getElementById('transferenciaValorUnitarioDestino')?.value || 0);
+          const observacao = document.getElementById('transferenciaObservacao')?.value || '';
+          
+          // Validações
+          if (origem === destino) {
+              showFlashMessage('error', 'Origem e destino não podem ser iguais');
+              return;
+          }
+          
+          if (quantidade <= 0 || isNaN(quantidade)) {
+              showFlashMessage('error', 'Informe uma quantidade válida');
+              return;
+          }
+          
+          if (valorUnitarioDestino <= 0 || isNaN(valorUnitarioDestino)) {
+              showFlashMessage('error', 'Informe um valor unitário válido');
+              return;
+          }
+          
+          try {
+              const response = await fetchWithErrorHandling('/admin/transferencias', {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                      produto_id: produtoId,
+                      estoque_origem: origem,
+                      estoque_destino: destino,
+                      quantidade: quantidade,
+                      valor_unitario_destino: valorUnitarioDestino,
+                      observacao: observacao,
+                      converter_unidade: false
+                  })
+              });
+              
+              if (response.success) {
+                  showFlashMessage('success', 'Transferência realizada com sucesso');
+                  closeModal('transferenciaModal');
+                  loadProdutosData();
+                  loadMovimentacoesData();
+              } else {
+                  showFlashMessage('error', response.message || 'Erro ao realizar transferência');
+              }
+          } catch (error) {
+              console.error('Erro ao realizar transferência:', error);
+              showFlashMessage('error', error.message || 'Erro ao realizar transferência');
+          }
+      });
   }
 
   // Atualizar estoque disponível quando origem muda
   const transferenciaOrigem = document.getElementById('transferenciaOrigem');
   if (transferenciaOrigem) {
-    transferenciaOrigem.addEventListener('change', updateEstoqueDisponivel);
+      transferenciaOrigem.addEventListener('change', updateEstoqueDisponivel);
   }
 
   function updateEstoqueDisponivel() {
@@ -861,13 +878,13 @@ document.addEventListener('DOMContentLoaded', function() {
                   
                   const transferenciaEstoqueDisponivel = document.getElementById('transferenciaEstoqueDisponivel');
                   if (transferenciaEstoqueDisponivel) {
-                    transferenciaEstoqueDisponivel.textContent = 
-                        `Disponível: ${estoque} ${produto.unidade}`;
+                      transferenciaEstoqueDisponivel.textContent = 
+                          `Disponível: ${estoque} ${produto.unidade}`;
                   }
                   
                   const transferenciaQuantidade = document.getElementById('transferenciaQuantidade');
                   if (transferenciaQuantidade) {
-                    transferenciaQuantidade.max = estoque;
+                      transferenciaQuantidade.max = estoque;
                   }
               }
           })
@@ -879,113 +896,157 @@ document.addEventListener('DOMContentLoaded', function() {
   // Formulário de produto
   const produtoForm = document.getElementById('produtoForm');
   if (produtoForm) {
-    produtoForm.addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const estoqueTipo = document.getElementById('produtoEstoqueTipo')?.value || 'loja';
-      const estoqueQuantidade = parseFloat(document.getElementById('produtoEstoque')?.value) || 0;
-      
-      const formData = {
-        codigo: document.getElementById('produtoCodigo')?.value || '',
-        nome: document.getElementById('produtoNome')?.value || '',
-        tipo: document.getElementById('produtoTipo')?.value || '',
-        marca: document.getElementById('produtoMarca')?.value || '',
-        unidade: document.getElementById('produtoUnidade')?.value || 'kg',
-        valor_unitario: parseFloat(document.getElementById('produtoValor')?.value) || 0,
-        estoque_loja: estoqueTipo === 'loja' ? estoqueQuantidade : 0,
-        estoque_deposito: estoqueTipo === 'deposito' ? estoqueQuantidade : 0,
-        estoque_fabrica: estoqueTipo === 'fabrica' ? estoqueQuantidade : 0
-      };
+      produtoForm.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          
+          const estoqueTipo = document.getElementById('produtoEstoqueTipo')?.value || 'loja';
+          const estoqueQuantidade = parseFloat(document.getElementById('produtoEstoque')?.value) || 0;
+          
+          const formData = {
+              codigo: document.getElementById('produtoCodigo')?.value || '',
+              nome: document.getElementById('produtoNome')?.value || '',
+              tipo: document.getElementById('produtoTipo')?.value || '',
+              marca: document.getElementById('produtoMarca')?.value || '',
+              unidade: document.getElementById('produtoUnidade')?.value || 'kg',
+              valor_unitario: parseFloat(document.getElementById('produtoValor')?.value) || 0,
+              estoque_loja: estoqueTipo === 'loja' ? estoqueQuantidade : 0,
+              estoque_deposito: estoqueTipo === 'deposito' ? estoqueQuantidade : 0,
+              estoque_fabrica: estoqueTipo === 'fabrica' ? estoqueQuantidade : 0
+          };
 
-      const valorCompra = parseFloat(document.getElementById('produtoValorCompra')?.value);
-      const valorTotal = parseFloat(document.getElementById('produtoValorTotalCompra')?.value);
-      const icms = parseFloat(document.getElementById('produtoICMS')?.value);
-      const estoqueMinimo = parseFloat(document.getElementById('produtoEstoqueMinimo')?.value);
+          const valorCompra = parseFloat(document.getElementById('produtoValorCompra')?.value);
+          const valorTotal = parseFloat(document.getElementById('produtoValorTotalCompra')?.value);
+          const icms = parseFloat(document.getElementById('produtoICMS')?.value);
+          const estoqueMinimo = parseFloat(document.getElementById('produtoEstoqueMinimo')?.value);
 
-      if (!isNaN(valorCompra)) formData.valor_unitario_compra = valorCompra;
-      if (!isNaN(valorTotal)) formData.valor_total_compra = valorTotal;
-      if (!isNaN(icms)) formData.imcs = icms;
-      if (!isNaN(estoqueMinimo)) formData.estoque_minimo = estoqueMinimo;
-      
-      try {
-        const response = await fetchWithErrorHandling('/admin/produtos', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(formData)
-        });
-        
-        if (response.success) {
-          showFlashMessage('success', 'Produto cadastrado com sucesso');
-          closeModal('produtoModal');
-          loadProdutosData();
-        } else {
-          showFlashMessage('error', response.message || 'Erro ao cadastrar produto');
-        }
-      } catch (error) {
-        console.error('Erro ao cadastrar produto:', error);
-        showFlashMessage('error', 'Erro ao cadastrar produto');
-      }
-    });
+          if (!isNaN(valorCompra)) formData.valor_unitario_compra = valorCompra;
+          if (!isNaN(valorTotal)) formData.valor_total_compra = valorTotal;
+          if (!isNaN(icms)) formData.imcs = icms;
+          if (!isNaN(estoqueMinimo)) formData.estoque_minimo = estoqueMinimo;
+          
+          try {
+              const response = await fetchWithErrorHandling('/admin/produtos', {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(formData)
+              });
+              
+              if (response.success) {
+                  showFlashMessage('success', 'Produto cadastrado com sucesso');
+                  closeModal('produtoModal');
+                  loadProdutosData();
+              } else {
+                  showFlashMessage('error', response.message || 'Erro ao cadastrar produto');
+              }
+          } catch (error) {
+              console.error('Erro ao cadastrar produto:', error);
+              showFlashMessage('error', 'Erro ao cadastrar produto');
+          }
+      });
   }
 
   // Formulário de edição de produto
   const editarProdutoForm = document.getElementById('editarProdutoForm');
   if (editarProdutoForm) {
-    editarProdutoForm.addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const produtoId = this.getAttribute('data-produto-id');
-      if (!produtoId) return;
-      
-      // Coletar descontos selecionados
-      const descontos = [];
-      document.querySelectorAll('#descontosContainer .desconto-item').forEach(item => {
-        descontos.push(item.dataset.id);
+      editarProdutoForm.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          
+          const produtoId = this.getAttribute('data-produto-id');
+          if (!produtoId) return;
+          
+          // Coletar descontos selecionados
+          const descontos = [];
+          document.querySelectorAll('#descontosContainer .desconto-item').forEach(item => {
+              descontos.push(item.dataset.id);
+          });
+          
+          const formData = {
+              codigo: document.getElementById('editCodigo')?.value || '',
+              nome: document.getElementById('editNome')?.value || '',
+              tipo: document.getElementById('editTipo')?.value || '',
+              marca: document.getElementById('editMarca')?.value || '',
+              valor_unitario: parseFloat(document.getElementById('editValor')?.value) || 0,
+              valor_unitario_compra: parseFloat(document.getElementById('editValorCompra')?.value) || 0,
+              valor_total_compra: parseFloat(document.getElementById('editValorTotalCompra')?.value) || 0,
+              imcs: parseFloat(document.getElementById('editICMS')?.value) || 0,
+              estoque_loja: parseFloat(document.getElementById('editEstoqueLoja')?.value) || 0,
+              estoque_deposito: parseFloat(document.getElementById('editEstoqueDeposito')?.value) || 0,
+              estoque_fabrica: parseFloat(document.getElementById('editEstoqueFabrica')?.value) || 0,
+              estoque_minimo: parseFloat(document.getElementById('editEstoqueMinimo')?.value) || 0,
+              estoque_maximo: parseFloat(document.getElementById('editEstoqueMaximo')?.value) || 0,
+              ativo: document.getElementById('editAtivo')?.value === 'true',
+              descontos: descontos
+          };
+          
+          try {
+              const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`, {
+                  method: 'PUT',
+                  headers: {
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(formData)
+              });
+              
+              if (response.success) {
+                  showFlashMessage('success', 'Produto atualizado com sucesso');
+                  closeModal('editarProdutoModal');
+                  loadProdutosData();
+              } else {
+                  showFlashMessage('error', response.message || 'Erro ao atualizar produto');
+              }
+          } catch (error) {
+              console.error('Erro ao atualizar produto:', error);
+              showFlashMessage('error', 'Erro ao atualizar produto');
+          }
       });
-      
-      const formData = {
-        codigo: document.getElementById('editCodigo')?.value || '',
-        nome: document.getElementById('editNome')?.value || '',
-        tipo: document.getElementById('editTipo')?.value || '',
-        marca: document.getElementById('editMarca')?.value || '',
-        valor_unitario: parseFloat(document.getElementById('editValor')?.value) || 0,
-        valor_unitario_compra: parseFloat(document.getElementById('editValorCompra')?.value) || 0,
-        valor_total_compra: parseFloat(document.getElementById('editValorTotalCompra')?.value) || 0,
-        imcs: parseFloat(document.getElementById('editICMS')?.value) || 0,
-        estoque_loja: parseFloat(document.getElementById('editEstoqueLoja')?.value) || 0,
-        estoque_deposito: parseFloat(document.getElementById('editEstoqueDeposito')?.value) || 0,
-        estoque_fabrica: parseFloat(document.getElementById('editEstoqueFabrica')?.value) || 0,
-        estoque_minimo: parseFloat(document.getElementById('editEstoqueMinimo')?.value) || 0,
-        estoque_maximo: parseFloat(document.getElementById('editEstoqueMaximo')?.value) || 0,
-        ativo: document.getElementById('editAtivo')?.value === 'true',
-        descontos: descontos
-      };
-      
-      try {
-        const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(formData)
-        });
-        
-        if (response.success) {
-          showFlashMessage('success', 'Produto atualizado com sucesso');
-          closeModal('editarProdutoModal');
-          loadProdutosData();
-        } else {
-          showFlashMessage('error', response.message || 'Erro ao atualizar produto');
-        }
-      } catch (error) {
-        console.error('Erro ao atualizar produto:', error);
-        showFlashMessage('error', 'Erro ao atualizar produto');
-      }
-    });
   }
 
+  // Inicialização do modal de cadastro de produto
+  document.addEventListener('DOMContentLoaded', function() {
+      const produtoModal = document.getElementById('produtoModal');
+      if (produtoModal) {
+          produtoModal.addEventListener('show.bs.modal', async function() {
+              try {
+                  // Carregar descontos disponíveis
+                  const response = await fetchWithErrorHandling('/admin/descontos');
+                  if (response.success && response.descontos) {
+                      const select = document.getElementById('produtoDescontos');
+                      if (select) {
+                          select.innerHTML = '<option value="">Selecione um desconto...</option>';
+                          response.descontos.forEach(desconto => {
+                              const option = document.createElement('option');
+                              option.value = desconto.id;
+                              option.textContent = `${desconto.identificador} - ${desconto.tipo === 'fixo' ? `R$ ${desconto.valor}` : `${desconto.valor}%`}`;
+                              option.dataset.quantidadeMinima = desconto.quantidade_minima;
+                              option.dataset.quantidadeMaxima = desconto.quantidade_maxima || '';
+                              option.dataset.valor = desconto.valor;
+                              option.dataset.tipo = desconto.tipo;
+                              select.appendChild(option);
+                          });
+                      }
+                  }
+              } catch (error) {
+                  console.error('Erro ao carregar descontos:', error);
+              }
+          });
+      }
+  });
+
+  // Função auxiliar para buscar descontos
+  async function fetchDescontos() {
+      try {
+          const response = await fetchWithErrorHandling('/admin/descontos');
+          if (response.success) {
+              return response.descontos || [];
+          }
+          return [];
+      } catch (error) {
+          console.error('Erro ao buscar descontos:', error);
+          return [];
+      }
+  }
   // ===== MOVIMENTAÇÕES =====
   // Carregar dados de movimentações
   async function loadMovimentacoesData() {

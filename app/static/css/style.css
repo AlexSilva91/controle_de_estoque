@@ -2158,3 +2158,47 @@ footer {
 .details-totals .total-value.negative {
     color: var(--danger-color);
 }
+/* Estilos para a seção de descontos */
+.descontos-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #0051ff;
+}
+
+.desconto-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #0051ff;
+    border: 1px solid #eee;
+    border-radius: 4px;
+}
+
+.desconto-item span {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+.btn-remover-desconto {
+    padding: 4px;
+    background: none;
+    border: none;
+    color: #dc3545;
+    cursor: pointer;
+}
+
+.desconto-select-container {
+    display: flex;
+    gap: 8px;
+}
+
+.desconto-select-container select {
+    flex-grow: 1;
+}
