@@ -99,9 +99,11 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict) -> BytesIO:
         leading=7
     )
 
-    # Caminho da logo
-    logo_path = "/home/n2/Documentos/projetos/controle_de_estoque/app/static/assets/logo.jpeg"
-    
+    from flask import current_app
+    import os
+
+    logo_path = os.path.join(current_app.root_path, 'static', 'assets', 'logo.jpeg')
+
     # Extração segura dos dados com valores padrão
     produtos = dados_nota.get("produtos", []) or []
     operador = dados_nota.get("operador", {}) or {}
