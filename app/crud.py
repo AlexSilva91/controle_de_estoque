@@ -23,6 +23,7 @@ from typing import Dict, Any, List, Union, Tuple
 
 from app.models.entities import (
     Caixa,
+    Financeiro,
     NotaFiscal,
     NotaFiscalItem,
     MovimentacaoEstoque,
@@ -1554,7 +1555,259 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
     except Exception as e:
         db.rollback()
         raise
+
+def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
+    """
+    Estorna uma venda vinculando ao caixa original da nota fiscal
+    """
+    try:
+        # Busca a nota fiscal original
+        nota_original = NotaFiscal.query.get(nota_fiscal_id)
+        if not nota_original:
+            return {'success': False, 'message': 'Nota fiscal não encontrada'}
+        
+        if nota_original.status == StatusNota.cancelada:
+            return {'success': False, 'message': 'Esta nota já foi cancelada anteriormente'}
+        
+        # Usa o mesmo caixa da nota original em vez de buscar caixa aberto
+        caixa_id = nota_original.caixa_id
+        
+        # Cria uma nova nota fiscal de estorno (com valores negativos)
+        nota_estorno = NotaFiscal(
+            cliente_id=nota_original.cliente_id,
+            operador_id=usuario_id,
+            caixa_id=caixa_id,  # Usa o mesmo caixa da nota original
+            data_emissao=datetime.now(ZoneInfo('America/Sao_Paulo')),
+            valor_total=-nota_original.valor_total,
+            valor_desconto=-nota_original.valor_desconto if nota_original.valor_desconto else 0.00,
+            tipo_desconto=nota_original.tipo_desconto,
+            status=StatusNota.emitida,
+            observacao=f"ESTORNO da nota #{nota_original.id}. Motivo: {motivo_estorno}",
+            forma_pagamento=nota_original.forma_pagamento,
+            a_prazo=nota_original.a_prazo,
+            sincronizado=False
+        )
+        
+        db.session.add(nota_estorno)
+        db.session.flush()
+        
+        # Cria os itens de estorno (com quantidades negativas)
+        for item in nota_original.itens:
+            item_estorno = NotaFiscalItem(
+                nota_id=nota_estorno.id,
+                produto_id=item.produto_id,
+                estoque_origem=item.estoque_origem,
+                quantidade=-item.quantidade,
+                valor_unitario=item.valor_unitario,
+                valor_total=-item.valor_total,
+                desconto_aplicado=-item.desconto_aplicado if item.desconto_aplicado else 0.00,
+                tipo_desconto=item.tipo_desconto,
+                sincronizado=False
+            )
+            db.session.add(item_estorno)
+            
+            # Cria movimentação de estoque reversa
+            movimentacao = MovimentacaoEstoque(
+                produto_id=item.produto_id,
+                usuario_id=usuario_id,
+                cliente_id=nota_original.cliente_id,
+                caixa_id=caixa_id,  # Usa o mesmo caixa da nota original
+                tipo=TipoMovimentacao.entrada,
+                estoque_origem=item.estoque_origem,
+                quantidade=item.quantidade,
+                valor_unitario=item.valor_unitario,
+                valor_recebido=0,
+                forma_pagamento=None,
+                observacao=f"Estorno nota #{nota_original.id}",
+                data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                sincronizado=False
+            )
+            db.session.add(movimentacao)
+        
+        # Atualiza status da nota original para cancelada
+        nota_original.status = StatusNota.cancelada
+        nota_original.observacao = f"Cancelada por estorno. Motivo: {motivo_estorno}"
+        nota_original.sincronizado = False
+        
+        # Registra no financeiro
+        financeiro_estorno = Financeiro(
+            tipo=TipoMovimentacao.saida,
+            categoria=CategoriaFinanceira.venda,
+            valor=-nota_original.valor_total,
+            descricao=f"Estorno da nota #{nota_original.id}",
+            caixa_id=caixa_id,  # Usa o mesmo caixa da nota original
+            cliente_id=nota_original.cliente_id,
+            nota_fiscal_id=nota_estorno.id,
+            data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+            sincronizado=False
+        )
+        db.session.add(financeiro_estorno)
+        
+        # Cancela contas a receber associadas
+        for conta in nota_original.contas_receber:
+            if conta.status != StatusPagamento.quitado:
+                conta.status = StatusPagamento.cancelado
+                conta.observacoes = f"Cancelada devido ao estorno da nota #{nota_original.id}"
+                conta.sincronizado = False
+        
+        db.session.commit()
+        
+        return {
+            'success': True,
+            'message': 'Estorno realizado com sucesso',
+            'nota_estorno_id': nota_estorno.id,
+            'nota_original_id': nota_original.id
+        }
+        
+    except Exception as e:
+        db.session.rollback()
+        return {'success': False, 'message': f'Erro ao estornar venda: {str(e)}'}
+
+def obter_detalhes_vendas_dia(data=None, caixa_id=None, operador_id=None):
+    """
+    Obtém todos os detalhes das vendas do dia, incluindo totais de entradas/saídas, categorias e pagamentos
     
+    Args:
+        data (date, optional): Data para filtrar (default: dia atual)
+        caixa_id (int, optional): ID do caixa para filtrar
+        operador_id (int, optional): ID do operador para filtrar
+    
+    Returns:
+        dict: Dicionário com os detalhes consolidados das vendas do dia
+    """
+    try:
+        # Obtém as notas fiscais do dia
+        notas = NotaFiscal.obter_vendas_do_dia(data, caixa_id, operador_id)
+        
+        # Inicializa estruturas para consolidação
+        consolidado = {
+            'total_vendas': 0.0,
+            'total_descontos': 0.0,
+            'total_entradas': 0.0,
+            'total_saidas': 0.0,
+            'por_forma_pagamento': {},
+            'por_categoria': {
+                'venda': 0.0,
+                'abertura_caixa': 0.0,
+                'fechamento_caixa': 0.0,
+                'outro': 0.0
+            },
+            'vendas': [],
+            'movimentacoes_financeiras': []
+        }
+        
+        # Processa cada nota fiscal
+        for nota in notas:
+            # Adiciona aos totais
+            consolidado['total_vendas'] += float(nota.valor_total)
+            consolidado['total_descontos'] += float(nota.valor_desconto) if nota.valor_desconto else 0.0
+            
+            # Obtém os pagamentos da nota fiscal
+            pagamentos = []
+            total_pagamentos = 0.0
+            for pagamento in nota.pagamentos:
+                pagamentos.append({
+                    'forma_pagamento': pagamento.forma_pagamento.value,
+                    'valor': float(pagamento.valor),
+                    'data': pagamento.data.isoformat()
+                })
+                total_pagamentos += float(pagamento.valor)
+            
+            # Forma de pagamento (para compatibilidade com versões antigas)
+            forma_pagamento = nota.forma_pagamento.value if nota.forma_pagamento else 'nao_informado'
+            if forma_pagamento not in consolidado['por_forma_pagamento']:
+                consolidado['por_forma_pagamento'][forma_pagamento] = 0.0
+            consolidado['por_forma_pagamento'][forma_pagamento] += float(nota.valor_total)
+            
+            # Adiciona detalhes da venda
+            venda_info = {
+                'id': nota.id,
+                'data': nota.data_emissao.isoformat(),
+                'cliente': nota.cliente.nome if nota.cliente else 'Consumidor',
+                'operador': nota.operador.nome,
+                'valor_total': float(nota.valor_total),
+                'valor_desconto': float(nota.valor_desconto) if nota.valor_desconto else 0.0,
+                'forma_pagamento': forma_pagamento,  # Mantido para compatibilidade
+                'a_prazo': nota.a_prazo,
+                'pagamentos': pagamentos,  # Novo campo com detalhes dos pagamentos
+                'total_pagamentos': total_pagamentos,  # Soma dos valores pagos
+                'diferenca_pagamentos': float(nota.valor_total) - total_pagamentos,  # Diferença entre total e pagamentos
+                'itens': []
+            }
+            
+            # Adiciona itens da venda
+            for item in nota.itens:
+                venda_info['itens'].append({
+                    'produto': item.produto.nome,
+                    'quantidade': float(item.quantidade),
+                    'valor_unitario': float(item.valor_unitario),
+                    'valor_total': float(item.valor_total),
+                    'desconto': float(item.desconto_aplicado) if item.desconto_aplicado else 0.0
+                })
+            
+            consolidado['vendas'].append(venda_info)
+        
+        # Obtém todas as movimentações financeiras do dia
+        if data is None:
+            data = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
+        
+        inicio_dia = datetime.combine(data, datetime.min.time())
+        fim_dia = datetime.combine(data, datetime.max.time())
+        
+        query = Financeiro.query.join(
+            Caixa,
+            Financeiro.caixa_id == Caixa.id
+        ).filter(
+            Financeiro.data >= inicio_dia,
+            Financeiro.data <= fim_dia,
+            Caixa.status == StatusCaixa.aberto
+        )
+        
+        if caixa_id:
+            query = query.filter(Financeiro.caixa_id == caixa_id)
+        
+        movimentacoes = query.all()
+        
+        # Processa as movimentações financeiras
+        for mov in movimentacoes:
+            valor = float(mov.valor)
+            
+            if mov.tipo == TipoMovimentacao.entrada:
+                consolidado['total_entradas'] += valor
+            else:
+                consolidado['total_saidas'] += valor
+            
+            # Categorias financeiras
+            categoria = mov.categoria.value if mov.categoria else 'outro'
+            if categoria not in consolidado['por_categoria']:
+                consolidado['por_categoria'][categoria] = 0.0
+            consolidado['por_categoria'][categoria] += valor
+            
+            # Adiciona detalhes da movimentação
+            consolidado['movimentacoes_financeiras'].append({
+                'id': mov.id,
+                'tipo': mov.tipo.value,
+                'categoria': categoria,
+                'valor': valor,
+                'descricao': mov.descricao,
+                'data': mov.data.isoformat(),
+                'cliente': mov.cliente.nome if mov.cliente else None,
+                'nota_fiscal_id': mov.nota_fiscal_id,
+                'pagamento_id': mov.pagamento_id
+            })
+        
+        return {
+            'success': True,
+            'data': consolidado,
+            'total_geral': consolidado['total_entradas'] - consolidado['total_saidas']
+        }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'message': f'Erro ao obter detalhes das vendas: {str(e)}'
+        }
+        
 '''
     Secção de descontos de produtos
 '''

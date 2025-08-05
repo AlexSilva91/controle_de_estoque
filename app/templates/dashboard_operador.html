@@ -73,6 +73,80 @@
         .content-header {
             position: relative;
         }
+        
+        /* Estilos para a aba de vendas do dia */
+        .sales-day-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .sales-day-table th, .sales-day-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .sales-day-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        
+        .sales-day-table tr:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .btn-void {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .btn-void:hover {
+            background-color: #c82333;
+        }
+        
+        /* Estilos para o campo de desconto manual */
+        .discount-control {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .discount-control input {
+            flex: 1;
+            margin-right: 10px;
+        }
+        
+        .discount-type-select {
+            width: 120px;
+            margin-right: 10px;
+        }
+        
+        .discount-badge {
+            background-color: #28a745;
+            color: white;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-left: 5px;
+        }
+        
+        .original-price {
+            text-decoration: line-through;
+            color: #6c757d;
+            font-size: 0.9rem;
+            display: block;
+        }
+        
+        .discount-value {
+            color: #28a745;
+            font-size: 0.8rem;
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -112,6 +186,10 @@
                 <button class="menu-item active" id="sales-tab" data-tab="sales">
                     <i class="fas fa-shopping-cart"></i>
                     <span>Vendas</span>
+                </button>
+                <button class="menu-item" id="day-sales-tab" data-tab="day-sales">
+                    <i class="fas fa-list"></i>
+                    <span>Vendas do Dia</span>
                 </button>
                 <button class="menu-item" id="clients-tab" data-tab="clients">
                     <i class="fas fa-users"></i>
@@ -249,30 +327,51 @@
                                 <i class="fas fa-times"></i> Remover
                             </button>
                         </div>
-                            <!-- Substitua o select atual por este bloco -->
-                            <div class="payment-methods-container">
-                                <div class="form-group">
-                                    <label>Formas de Pagamento</label>
-                                    <div class="payment-method-input">
-                                        <select class="form-control payment-method-select">
-                                            <option value="">Selecione...</option>
-                                            <option value="pix_fabiano">Pix - Fabiano</option>
-                                            <option value="pix_edfrance">Pix - Edfrance</option>
-                                            <option value="pix_loja">Pix - Loja</option>
-                                            <option value="pix_maquineta">Pix - Maquineta</option>
-                                            <option value="dinheiro">Dinheiro</option>
-                                            <option value="cartao_credito">Cartão de Crédito</option>
-                                            <option value="cartao_debito">Cartão de Débito</option>
-                                            <option value="a_prazo">A Prazo [Fiado]</option>
-                                        </select>
-                                        <input type="text" class="form-control payment-amount" placeholder="Valor">
-                                        <button class="btn btn-primary add-payment-method">Adicionar</button>
-                                    </div>
+                        
+                        <!-- Controle de Desconto Manual -->
+                        <div class="form-group">
+                            <label>Desconto Manual</label>
+                            <div class="discount-control">
+                                <select class="form-control discount-type-select" id="discount-type">
+                                    <option value="percentual">Percentual (%)</option>
+                                    <option value="fixo">Valor Fixo (R$)</option>
+                                </select>
+                                <input type="text" 
+                                    class="form-control" 
+                                    id="discount-value" 
+                                    placeholder="Valor"
+                                    pattern="[0-9]+([,\.][0-9]+)?" 
+                                    title="Use números com ponto ou vírgula como separador decimal">
+                                <button class="btn-primary" id="apply-discount-btn">
+                                    Aplicar Desconto
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Formas de Pagamento -->
+                        <div class="payment-methods-container">
+                            <div class="form-group">
+                                <label>Formas de Pagamento</label>
+                                <div class="payment-method-input">
+                                    <select class="form-control payment-method-select">
+                                        <option value="">Selecione...</option>
+                                        <option value="pix_fabiano">Pix - Fabiano</option>
+                                        <option value="pix_edfrance">Pix - Edfrance</option>
+                                        <option value="pix_loja">Pix - Loja</option>
+                                        <option value="pix_maquineta">Pix - Maquineta</option>
+                                        <option value="dinheiro">Dinheiro</option>
+                                        <option value="cartao_credito">Cartão de Crédito</option>
+                                        <option value="cartao_debito">Cartão de Débito</option>
+                                        <option value="a_prazo">A Prazo [Fiado]</option>
+                                    </select>
+                                    <input type="text" class="form-control payment-amount" placeholder="Valor">
+                                    <button class="btn btn-primary add-payment-method">Adicionar</button>
                                 </div>
-                                
-                                <div class="selected-payments-list">
-                                    <!-- Os pagamentos adicionados aparecerão aqui -->
-                                </div>
+                            </div>
+                            
+                            <div class="selected-payments-list">
+                                <!-- Os pagamentos adicionados aparecerão aqui -->
+                            </div>
                         </div>
                         
                         <!-- Sale Summary -->
@@ -280,6 +379,11 @@
                             <div class="summary-row">
                                 <span>Subtotal:</span>
                                 <span id="subtotal-value">R$ 0.00</span>
+                            </div>
+                            
+                            <div class="summary-row discount-row">
+                                <span>Descontos:</span>
+                                <span id="discount-value">R$ 0.00</span>
                             </div>
                             
                             <div class="summary-row total">
@@ -303,11 +407,138 @@
                             <button class="btn-primary" id="register-sale-btn">
                                 <i class="fas fa-cash-register"></i> Registrar Venda
                             </button>
+                            <button class="btn-secondary" id="clear-sale-btn">
+                                <i class="fas fa-trash"></i> Limpar Venda
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
             
+            <!-- Vendas do Dia Tab -->
+            <div class="tab-content" id="day-sales">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-header-title">
+                            <i class="fas fa-list"></i>
+                            <h3>Vendas do Dia</h3>
+                        </div>
+                        <div class="card-header-actions">
+                            <button class="btn-primary" id="refresh-sales-btn">
+                                <i class="fas fa-sync-alt"></i> Atualizar
+                            </button>
+                            <button class="btn-secondary" id="generate-pdf-btn">
+                                <i class="fas fa-file-pdf"></i> Gerar PDF
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="search-bar">
+                            <input type="text" class="search-input" id="sales-search" placeholder="Pesquisar venda...">
+                            <button class="btn-search" id="search-sales-btn">
+                                <i class="fas fa-search"></i> Buscar
+                            </button>
+                        </div>
+                        
+                        <table class="sales-day-table" id="day-sales-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Data/Hora</th>
+                                    <th>Cliente</th>
+                                    <th>Valor Total</th>
+                                    <th>Pagamento</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Vendas serão carregadas aqui -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <!-- Sale Details Modal -->
+            <div class="modal" id="sale-details-modal">
+                <div class="modal-content" style="max-width: 800px;">
+                    <div class="modal-header">
+                        <h3>Detalhes da Venda #<span id="sale-details-id"></span></h3>
+                        <button class="modal-close">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="sale-details-container">
+                            <div class="sale-details-section">
+                                <h4>Informações Básicas</h4>
+                                <div class="detail-row">
+                                    <span class="detail-label">Data/Hora:</span>
+                                    <span id="sale-details-date"></span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Cliente:</span>
+                                    <span id="sale-details-client"></span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Operador:</span>
+                                    <span id="sale-details-operator"></span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Valor Total:</span>
+                                    <span id="sale-details-total"></span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Desconto:</span>
+                                    <span id="sale-details-discount"></span>
+                                </div>
+                                <div class="detail-row" id="sale-details-delivery-container" style="display: none;">
+                                    <span class="detail-label">Endereço Entrega:</span>
+                                    <span id="sale-details-delivery"></span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Observações:</span>
+                                    <span id="sale-details-notes"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="sale-details-section">
+                                <h4>Produtos</h4>
+                                <table class="sale-products-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Produto</th>
+                                            <th>Qtd</th>
+                                            <th>Valor Unit.</th>
+                                            <th>Desconto</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sale-details-products">
+                                        <!-- Products will be added here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="sale-details-section">
+                                <h4>Pagamentos</h4>
+                                <table class="sale-payments-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Forma</th>
+                                            <th>Valor</th>
+                                            <th>Data/Hora</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sale-details-payments">
+                                        <!-- Payments will be added here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" onclick="closeModal('sale-details-modal')">Fechar</button>
+                    </div>
+                </div>
+            </div>
             <!-- Clients Tab -->
             <div class="tab-content" id="clients">
                 <div class="card">
@@ -489,6 +720,30 @@
         </div>
     </div>
 
+    <!-- Void Sale Modal -->
+    <div class="modal" id="void-sale-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Estornar Venda #<span id="void-sale-id-display"></span></h3>
+                <button class="modal-close" onclick="closeModal('void-sale-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Você está prestes a estornar esta venda. Esta ação não pode ser desfeita.</p>
+                <div class="form-group">
+                    <label for="void-sale-reason">Motivo do Estorno:</label>
+                    <textarea id="void-sale-reason" class="form-control" rows="3" placeholder="Descreva o motivo do estorno..."></textarea>
+                </div>
+                <input type="hidden" id="void-sale-id">
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('void-sale-modal')">Cancelar</button>
+                <button class="btn-danger" onclick="voidSale()">
+                    <i class="fas fa-undo"></i> Confirmar Estorno
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Notification -->
     <div class="notification" id="notification">
         <div class="notification-icon">
@@ -500,100 +755,5 @@
     </div>
     
     <script src="{{ url_for('static', filename='js/script_operador.js') }}"></script>
-    <script>
-        // Comportamento das abas
-        document.addEventListener('DOMContentLoaded', function() {
-            // Elementos das abas
-            const salesTab = document.getElementById('sales-tab');
-            const clientsTab = document.getElementById('clients-tab');
-            const salesContent = document.getElementById('sales');
-            const clientsContent = document.getElementById('clients');
-            const currentTabTitle = document.getElementById('current-tab-title');
-            
-            // Função para alternar entre abas
-            function switchTab(activeTab, inactiveTab, activeContent, inactiveContent, title) {
-                activeTab.classList.add('active');
-                inactiveTab.classList.remove('active');
-                activeContent.classList.add('active');
-                inactiveContent.classList.remove('active');
-                currentTabTitle.textContent = title;
-            }
-            
-            // Event listeners para as abas
-            salesTab.addEventListener('click', function() {
-                switchTab(salesTab, clientsTab, salesContent, clientsContent, 'Vendas');
-            });
-            
-            clientsTab.addEventListener('click', function() {
-                switchTab(clientsTab, salesTab, clientsContent, salesContent, 'Clientes');
-                // Carrega os clientes quando a aba é aberta
-                if (typeof loadClients === 'function') {
-                    loadClients();
-                }
-            });
-            
-            // Configura mensagens flash para desaparecer após 5 segundos
-            const flashMessages = document.querySelectorAll('.flash-message');
-            flashMessages.forEach(message => {
-                setTimeout(() => {
-                    message.style.opacity = '0';
-                    setTimeout(() => message.remove(), 1000);
-                }, 5000);
-            });
-            
-            // Monitora mudanças no cliente selecionado para atualizar o status do caixa
-            const selectedClientInput = document.getElementById('selected-client');
-            const caixaStatusDisplay = document.getElementById('caixa-status-display');
-            
-            // Função global para atualizar o status do caixa
-            window.updateCaixaStatus = function() {
-                if (selectedClientInput.value.trim() !== '') {
-                    caixaStatusDisplay.className = 'caixa-status caixa-operacao';
-                    caixaStatusDisplay.innerHTML = '<i class="fas fa-user-check"></i><span>CAIXA EM OPERAÇÃO</span>';
-                } else {
-                    caixaStatusDisplay.className = 'caixa-status caixa-livre';
-                    caixaStatusDisplay.innerHTML = '<i class="fas fa-check-circle"></i><span>CAIXA LIVRE</span>';
-                }
-            };
-            
-            // Observa mudanças no campo do cliente selecionado
-            selectedClientInput.addEventListener('input', updateCaixaStatus);
-            
-            // Configura o MutationObserver para detectar alterações programáticas no campo do cliente
-            const observer = new MutationObserver(function(mutations) {
-                mutations.forEach(function(mutation) {
-                    if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
-                        updateCaixaStatus();
-                    }
-                });
-            });
-            
-            observer.observe(selectedClientInput, {
-                attributes: true,
-                attributeFilter: ['value']
-            });
-            
-            // Atualiza o status inicial
-            updateCaixaStatus();
-        });
-
-        // Função para selecionar cliente (deve estar no script_operador.js)
-        function selectClient(client) {
-            const selectedClientInput = document.getElementById('selected-client');
-            const selectedClientIdInput = document.getElementById('selected-client-id');
-            
-            selectedClientInput.value = client.nome;
-            selectedClientIdInput.value = client.id;
-            
-            // Dispara evento de input para garantir a atualização
-            const event = new Event('input', {
-                bubbles: true,
-                cancelable: true,
-            });
-            selectedClientInput.dispatchEvent(event);
-            
-            showMessage(`Cliente selecionado: ${client.nome}`);
-        }
-    </script>
 </body>
 </html>

@@ -491,49 +491,189 @@ async function fetchProductDiscounts(productId) {
     }
 }
 
+
+/**
+ * Calcula o preço com desconto baseado nos descontos disponíveis
+ * @param {number} basePrice - Preço base do produto
+ * @param {number} quantity - Quantidade do produto
+ * @param {Array} discounts - Lista de descontos disponíveis
+ * @returns {Object} Objeto com preço final, flag de desconto aplicado e info do desconto
+ */
 function calculateDiscountedPrice(basePrice, quantity, discounts) {
+    if (!discounts || discounts.length === 0) {
+        return {
+            finalPrice: basePrice,
+            discountApplied: false,
+            discountInfo: null
+        };
+    }
+
     let bestDiscount = null;
-    let finalPrice = basePrice;
-    let discountApplied = false;
+    let bestPrice = basePrice;
     
-    // Verifica cada desconto disponível
-    for (const discount of discounts) {
+    // Ordena descontos por prioridade (percentual primeiro, depois fixo)
+    const sortedDiscounts = [...discounts].sort((a, b) => {
+        if (a.tipo === 'percentual' && b.tipo !== 'percentual') return -1;
+        if (a.tipo !== 'percentual' && b.tipo === 'percentual') return 1;
+        return 0;
+    });
+
+    for (const discount of sortedDiscounts) {
         // Verifica se o desconto está ativo
         if (!discount.ativo) continue;
         
-        // Verifica a data limite (se existir)
+        // Verifica validade do desconto
         if (discount.valido_ate) {
             const validUntil = new Date(discount.valido_ate);
             const today = new Date();
             if (today > validUntil) continue;
         }
         
-        // Verifica a quantidade mínima e máxima
+        // Verifica quantidade mínima
         if (quantity < discount.quantidade_minima) continue;
+        
+        // Verifica quantidade máxima (se aplicável)
         if (discount.quantidade_maxima && quantity > discount.quantidade_maxima) continue;
         
-        // Calcula o valor com desconto
-        let discountedValue;
-        if (discount.tipo === 'fixo') {
-            discountedValue = basePrice - discount.valor;
-        } else if (discount.tipo === 'percentual') {
-            discountedValue = basePrice * (1 - (discount.valor / 100));
+        // Calcula preço com desconto
+        let discountedPrice = basePrice;
+        
+        if (discount.tipo === 'percentual') {
+            discountedPrice = basePrice * (1 - (discount.valor / 100));
+        } else if (discount.tipo === 'fixo') {
+            discountedPrice = Math.max(0, basePrice - discount.valor);
         }
         
         // Mantém o melhor desconto (maior redução)
-        if (!bestDiscount || discountedValue < finalPrice) {
-            bestDiscount = discount;
-            finalPrice = discountedValue;
-            discountApplied = true;
+        if (discountedPrice < bestPrice) {
+            bestPrice = discountedPrice;
+            bestDiscount = {
+                ...discount,
+                valor_aplicado: discount.tipo === 'percentual' 
+                    ? `${discount.valor}%` 
+                    : formatCurrency(discount.valor)
+            };
         }
     }
     
     return {
-        finalPrice: finalPrice,
-        discountApplied: discountApplied,
+        finalPrice: bestPrice,
+        discountApplied: bestDiscount !== null,
         discountInfo: bestDiscount
     };
 }
+
+/**
+ * Atualiza os descontos de todos os produtos na venda
+ */
+function updateAllProductDiscounts() {
+    selectedProducts.forEach(async (product, index) => {
+        // Busca descontos atualizados para o produto
+        const discounts = await fetchProductDiscounts(product.id);
+        
+        // Recalcula desconto com a quantidade atual
+        const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(
+            product.originalPrice, 
+            product.quantity, 
+            discounts
+        );
+        
+        // Atualiza o produto no array
+        selectedProducts[index] = {
+            ...product,
+            price: finalPrice,
+            hasDiscount: discountApplied,
+            discountInfo: discountInfo,
+            availableDiscounts: discounts
+        };
+    });
+    
+    renderProductsList();
+    calculateSaleTotal();
+}
+
+/**
+ * Aplica desconto manual a todos os produtos
+ */
+function applyManualDiscount() {
+    try {
+        const discountType = document.getElementById('discount-type').value;
+        const discountValueInput = document.getElementById('discount-value').value.trim();
+        
+        // Validação inicial
+        if (!discountValueInput) {
+            throw new Error('Digite um valor para o desconto');
+        }
+
+        // Conversão segura para número
+        const discountValue = parseFloat(discountValueInput.replace(',', '.'));
+        if (isNaN(discountValue)) {
+            throw new Error('Valor de desconto inválido. Use apenas números.');
+        }
+
+        // Validações específicas
+        if (discountType === 'percentual') {
+            if (discountValue <= 0 || discountValue > 100) {
+                throw new Error('Percentual deve ser entre 0.01% e 100%');
+            }
+        } else {
+            if (discountValue <= 0) {
+                throw new Error('Valor fixo deve ser maior que zero');
+            }
+            
+            const minProductPrice = Math.min(...selectedProducts.map(p => p.originalPrice));
+            if (discountValue >= minProductPrice) {
+                throw new Error(`Desconto não pode ser maior que ${formatCurrency(minProductPrice)}`);
+            }
+        }
+
+        if (selectedProducts.length === 0) {
+            throw new Error('Adicione produtos antes de aplicar desconto');
+        }
+
+        // Aplica o desconto (só executa se passar por todas as validações)
+        selectedProducts = selectedProducts.map(product => {
+            let newPrice = product.originalPrice;
+            let discountAmount = 0;
+            
+            if (discountType === 'percentual') {
+                discountAmount = product.originalPrice * (discountValue / 100);
+                newPrice = product.originalPrice - discountAmount;
+            } else {
+                discountAmount = Math.min(discountValue, product.originalPrice);
+                newPrice = product.originalPrice - discountAmount;
+            }
+            
+            return {
+                ...product,
+                price: newPrice,
+                hasDiscount: true,
+                discountInfo: {
+                    tipo: discountType,
+                    valor: discountValue,
+                    valor_aplicado: discountType === 'percentual' 
+                        ? `${discountValue}%` 
+                        : formatCurrency(discountValue),
+                    identificador: 'MANUAL',
+                    descricao: 'Desconto manual aplicado'
+                }
+            };
+        });
+
+        renderProductsList();
+        calculateSaleTotal();
+        showMessage('Desconto aplicado com sucesso!');
+        document.getElementById('discount-value').value = '';
+        
+    } catch (error) {
+        showMessage(error.message, 'error');
+        return false; // Impede a continuação do processo
+    }
+    return true;
+}
+
+// Adiciona event listener para o botão de aplicar desconto manual
+document.getElementById('apply-discount-btn')?.addEventListener('click', applyManualDiscount);
 
 /**
  * Verifica e aplica descontos ao produto selecionado
@@ -791,13 +931,6 @@ async function registerSale() {
         } else {
             const amountReceivedText = amountReceivedInput?.value.replace(/\./g, '').replace(',', '.') || '0';
             valor_recebido = parseFloat(amountReceivedText) || 0;
-        }
-
-        // Validação do valor recebido
-        const a_prazo_usado = paymentMethods.some(p => p.forma_pagamento === 'a_prazo');
-        if (!a_prazo_usado && valor_recebido < total) {
-            showMessage('Valor recebido menor que o total da venda', 'error');
-            throw new Error('Valor recebido insuficiente');
         }
 
         // Prepara os itens da venda
@@ -1291,6 +1424,511 @@ async function saveExpense() {
     }
 }
 
+//=====================TABS E RELATÓRIOS ====================
+// Variáveis globais
+let currentOpenModal = null;
+
+// Comportamento das abas
+document.addEventListener('DOMContentLoaded', function() {
+    // Elementos das abas
+    const salesTab = document.getElementById('sales-tab');
+    const daySalesTab = document.getElementById('day-sales-tab');
+    const clientsTab = document.getElementById('clients-tab');
+    const salesContent = document.getElementById('sales');
+    const daySalesContent = document.getElementById('day-sales');
+    const clientsContent = document.getElementById('clients');
+    const currentTabTitle = document.getElementById('current-tab-title');
+    
+    // Função para alternar entre abas
+    function switchTab(activeTab, inactiveTabs, activeContent, inactiveContents, title) {
+        activeTab.classList.add('active');
+        inactiveTabs.forEach(tab => tab.classList.remove('active'));
+        activeContent.classList.add('active');
+        inactiveContents.forEach(content => content.classList.remove('active'));
+        currentTabTitle.textContent = title;
+    }
+    
+    // Event listeners para as abas
+    salesTab.addEventListener('click', function() {
+        switchTab(salesTab, [daySalesTab, clientsTab], salesContent, [daySalesContent, clientsContent], 'Vendas');
+    });
+    
+    daySalesTab.addEventListener('click', function() {
+        switchTab(daySalesTab, [salesTab, clientsTab], daySalesContent, [salesContent, clientsContent], 'Vendas do Dia');
+        loadDaySales();
+    });
+    
+    clientsTab.addEventListener('click', function() {
+        switchTab(clientsTab, [salesTab, daySalesTab], clientsContent, [salesContent, daySalesContent], 'Clientes');
+        if (typeof loadClients === 'function') {
+            loadClients();
+        }
+    });
+    
+    // Configura mensagens flash para desaparecer após 5 segundos
+    const flashMessages = document.querySelectorAll('.flash-message');
+    flashMessages.forEach(message => {
+        setTimeout(() => {
+            message.style.opacity = '0';
+            setTimeout(() => message.remove(), 1000);
+        }, 5000);
+    });
+    
+    // Monitora mudanças no cliente selecionado para atualizar o status do caixa
+    const selectedClientInput = document.getElementById('selected-client');
+    const caixaStatusDisplay = document.getElementById('caixa-status-display');
+    
+    // Função global para atualizar o status do caixa
+    window.updateCaixaStatus = function() {
+        if (selectedClientInput && selectedClientInput.value.trim() !== '') {
+            caixaStatusDisplay.className = 'caixa-status caixa-operacao';
+            caixaStatusDisplay.innerHTML = '<i class="fas fa-user-check"></i><span>CAIXA EM OPERAÇÃO</span>';
+        } else {
+            caixaStatusDisplay.className = 'caixa-status caixa-livre';
+            caixaStatusDisplay.innerHTML = '<i class="fas fa-check-circle"></i><span>CAIXA LIVRE</span>';
+        }
+    };
+    
+    // Observa mudanças no campo do cliente selecionado
+    if (selectedClientInput) {
+        selectedClientInput.addEventListener('input', updateCaixaStatus);
+        
+        // Configura o MutationObserver para detectar alterações programáticas no campo do cliente
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
+                    updateCaixaStatus();
+                }
+            });
+        });
+        
+        observer.observe(selectedClientInput, {
+            attributes: true,
+            attributeFilter: ['value']
+        });
+    }
+    
+    // Atualiza o status inicial
+    updateCaixaStatus();
+    
+    // Botão para limpar venda
+    const clearSaleBtn = document.getElementById('clear-sale-btn');
+    if (clearSaleBtn) {
+        clearSaleBtn.addEventListener('click', resetSaleForm);
+    }
+    
+    // Botão para atualizar lista de vendas do dia
+    const refreshSalesBtn = document.getElementById('refresh-sales-btn');
+    if (refreshSalesBtn) {
+        refreshSalesBtn.addEventListener('click', loadDaySales);
+    }
+    
+    // Botão para aplicar desconto manual
+    const applyDiscountBtn = document.getElementById('apply-discount-btn');
+    if (applyDiscountBtn) {
+        applyDiscountBtn.addEventListener('click', applyManualDiscount);
+    }
+});
+
+// Função para selecionar cliente
+function selectClient(client) {
+    const selectedClientInput = document.getElementById('selected-client');
+    const selectedClientIdInput = document.getElementById('selected-client-id');
+    
+    if (selectedClientInput && selectedClientIdInput) {
+        selectedClientInput.value = client.nome;
+        selectedClientIdInput.value = client.id;
+        
+        // Dispara evento de input para garantir a atualização
+        const event = new Event('input', {
+            bubbles: true,
+            cancelable: true,
+        });
+        selectedClientInput.dispatchEvent(event);
+        
+        showMessage(`Cliente selecionado: ${client.nome}`);
+    }
+}
+
+// Função para carregar as vendas do dia
+async function loadDaySales() {
+    const tableBody = document.querySelector('#day-sales-table tbody');
+    if (!tableBody) return;
+    
+    tableBody.innerHTML = '<tr><td colspan="6"><div class="loading-spinner"></div></td></tr>';
+
+    try {
+        const response = await fetch('/operador/api/vendas/hoje', {
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        });
+
+        const contentType = response.headers.get("content-type");
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Erro HTTP:", response.status, errorText);
+            throw new Error('Erro ao carregar vendas do dia. Código: ' + response.status);
+        }
+
+        if (!contentType || !contentType.includes("application/json")) {
+            const html = await response.text();
+            console.error("Resposta inesperada do servidor (não JSON):", html);
+            throw new Error("Resposta inesperada do servidor. Verifique se você está logado.");
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+            throw new Error(result.message || 'Erro ao carregar vendas');
+        }
+
+        const vendas = result.data;
+
+        tableBody.innerHTML = ''; // Limpa o spinner
+
+        if (!Array.isArray(vendas) || vendas.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td colspan="6" style="text-align: center;">Nenhuma venda encontrada</td>`;
+            tableBody.appendChild(row);
+            return;
+        }
+
+        vendas.forEach(sale => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${sale.id}</td>
+                <td>${new Date(sale.data_emissao).toLocaleString('pt-BR')}</td>
+                <td>${sale.cliente?.nome || 'Consumidor Final'}</td>
+                <td>${formatCurrency(sale.valor_total)}</td>
+                <td>${formatPaymentMethod(sale.forma_pagamento) || '-'}</td>
+                <td>
+                    <button class="btn-view" data-id="${sale.id}">
+                        <i class="fas fa-eye"></i> Detalhes
+                    </button>
+                    <button class="btn-void" data-id="${sale.id}">
+                        <i class="fas fa-undo"></i> Estornar
+                    </button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+
+        // Adiciona os event listeners
+        tableBody.addEventListener('click', function(e) {
+            const viewBtn = e.target.closest('.btn-view');
+            if (viewBtn) {
+                openSaleDetailsModal(viewBtn.dataset.id);
+                return;
+            }
+            
+            const voidBtn = e.target.closest('.btn-void');
+            if (voidBtn) {
+                openVoidSaleModal(voidBtn.dataset.id);
+                return;
+            }
+        });
+
+    } catch (error) {
+        console.error("Erro ao carregar vendas:", error);
+        showMessage(error.message || "Erro inesperado ao carregar vendas.", 'error');
+        tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: red;">${error.message}</td></tr>`;
+    }
+}
+
+// Função para abrir modal de estorno de venda
+function openVoidSaleModal(saleId) {
+    closeModal();
+    
+    const modal = document.getElementById('void-sale-modal');
+    if (!modal) {
+        console.error('Modal de estorno não encontrado');
+        return;
+    }
+    
+    // Preenche os campos do modal
+    document.getElementById('void-sale-id').value = saleId;
+    document.getElementById('void-sale-id-display').textContent = saleId;
+    document.getElementById('void-sale-reason').value = '';
+    
+    modal.style.display = 'flex';
+    currentOpenModal = modal;
+}
+
+// Função para estornar venda (já corrigida anteriormente)
+async function voidSale() {
+    const saleId = document.getElementById('void-sale-id').value;
+    const reason = document.getElementById('void-sale-reason').value || "Sem motivo informado";
+    
+    if (!saleId) {
+        showMessage('ID da venda não informado', 'error');
+        return;
+    }
+
+    try {
+        const button = document.querySelector('#void-sale-modal .btn-danger');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+        button.disabled = true;
+
+        const response = await fetch(`/operador/api/vendas/${saleId}/estornar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                motivo_estorno: reason
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `Erro ${response.status} ao estornar venda`);
+        }
+        
+        const result = await response.json();
+        showMessage(`Venda #${saleId} estornada com sucesso!`, 'success');
+        closeModal('void-sale-modal');
+        loadDaySales();
+        
+    } catch (error) {
+        console.error('Erro ao estornar venda:', error);
+        showMessage(error.message, 'error');
+    } finally {
+        const button = document.querySelector('#void-sale-modal .btn-danger');
+        if (button) {
+            button.innerHTML = '<i class="fas fa-undo"></i> Confirmar Estorno';
+            button.disabled = false;
+        }
+    }
+}
+
+// Adicionar este evento no DOMContentLoaded
+document.getElementById('generate-pdf-btn')?.addEventListener('click', generateDaySalesPDF);
+
+// Função para gerar PDF das vendas do dia
+function generateDaySalesPDF() {
+    try {
+        // Mostrar loading
+        const button = document.getElementById('generate-pdf-btn');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+        button.disabled = true;
+        
+        // Obter a data atual no formato YYYY-MM-DD
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0];
+        
+        // Chamar a função que gera o PDF
+        gerarRelatorioDiario(dateStr);
+        
+    } catch (error) {
+        console.error("Erro ao gerar PDF:", error);
+        showMessage("Erro ao gerar relatório em PDF", "error");
+    } finally {
+        // Restaurar o botão após 2 segundos (tempo estimado para geração)
+        setTimeout(() => {
+            const button = document.getElementById('generate-pdf-btn');
+            if (button) {
+                button.innerHTML = '<i class="fas fa-file-pdf"></i> Gerar PDF';
+                button.disabled = false;
+            }
+        }, 2000);
+    }
+}
+
+// Função existente atualizada para incluir mais parâmetros
+function gerarRelatorioDiario(data = null, caixaId = null, operadorId = null) {
+    let url = '/operador/api/vendas/relatorio-diario-pdf';
+    const params = new URLSearchParams();
+    
+    // Se nenhuma data for fornecida, usa a data atual
+    const reportDate = data || new Date().toISOString().split('T')[0];
+    params.append('data', reportDate);
+    
+    if (caixaId) params.append('caixa_id', caixaId);
+    if (operadorId) params.append('operador_id', operadorId);
+    
+    url += '?' + params.toString();
+    
+    // Abre em nova aba (o servidor deve retornar o PDF)
+    window.open(url, '_blank');
+}
+
+// Função para fechar modal
+function closeModal(modalId = null) {
+    if (modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) modal.style.display = 'none';
+    } else {
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.style.display = 'none';
+        });
+    }
+    currentOpenModal = null;
+}
+
+// Função para abrir modal de detalhes da venda
+async function openSaleDetailsModal(saleId) {
+    try {
+        closeModal();
+        
+        const modal = document.getElementById('sale-details-modal');
+        if (!modal) return;
+        
+        modal.style.display = 'flex';
+        currentOpenModal = modal;
+        
+        document.getElementById('sale-details-id').textContent = saleId;
+        document.getElementById('sale-details-products').innerHTML = '';
+        document.getElementById('sale-details-payments').innerHTML = '';
+        
+        const response = await fetch(`/operador/api/vendas/${saleId}/detalhes`);
+        
+        if (!response.ok) {
+            throw new Error('Erro ao buscar detalhes da venda');
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || 'Erro ao carregar detalhes');
+        }
+        
+        const venda = result.data;
+        
+        // Preenche informações básicas
+        document.getElementById('sale-details-date').textContent = new Date(venda.data_emissao).toLocaleString('pt-BR');
+        document.getElementById('sale-details-client').textContent = `${venda.cliente?.nome || 'Consumidor Final'}${venda.cliente?.documento ? ' (' + venda.cliente.documento + ')' : ''}`;
+        document.getElementById('sale-details-operator').textContent = venda.operador?.nome || 'N/A';
+        document.getElementById('sale-details-total').textContent = formatCurrency(venda.valor_total);
+        document.getElementById('sale-details-discount').textContent = formatCurrency(venda.valor_desconto || 0);
+        document.getElementById('sale-details-notes').textContent = venda.observacao || 'Nenhuma observação';
+        
+        // Preenche endereço de entrega
+        const deliveryContainer = document.getElementById('sale-details-delivery-container');
+        if (venda.entrega) {
+            const endereco = [
+                venda.entrega.logradouro,
+                venda.entrega.numero,
+                venda.entrega.complemento,
+                venda.entrega.bairro,
+                `${venda.entrega.cidade}/${venda.entrega.estado}`,
+                venda.entrega.cep
+            ].filter(Boolean).join(', ');
+            
+            document.getElementById('sale-details-delivery').textContent = endereco;
+            deliveryContainer.style.display = 'flex';
+            
+            if (venda.entrega.instrucoes) {
+                document.getElementById('sale-details-delivery').textContent += ` (Instruções: ${venda.entrega.instrucoes})`;
+            }
+        } else {
+            deliveryContainer.style.display = 'none';
+        }
+        
+        // Preenche produtos
+        const productsTable = document.getElementById('sale-details-products');
+        venda.itens.forEach(item => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${item.produto?.nome || 'Produto não encontrado'}</td>
+                <td>${item.quantidade}</td>
+                <td>${formatCurrency(item.valor_unitario)}</td>
+                <td>${item.desconto_aplicado ? formatCurrency(item.desconto_aplicado) : '-'}</td>
+                <td>${formatCurrency(item.valor_total)}</td>
+            `;
+            productsTable.appendChild(row);
+        });
+        
+        // Preenche pagamentos
+        const paymentsTable = document.getElementById('sale-details-payments');
+        if (venda.pagamentos && venda.pagamentos.length > 0) {
+            venda.pagamentos.forEach(pagamento => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${formatPaymentMethod(pagamento.forma_pagamento)}</td>
+                    <td>${formatCurrency(pagamento.valor)}</td>
+                    <td>${new Date(pagamento.data).toLocaleString('pt-BR')}</td>
+                `;
+                paymentsTable.appendChild(row);
+            });
+        } else {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${formatPaymentMethod(venda.forma_pagamento)}</td>
+                <td>${formatCurrency(venda.valor_total)}</td>
+                <td>${new Date(venda.data_emissao).toLocaleString('pt-BR')}</td>
+            `;
+            paymentsTable.appendChild(row);
+        }
+        
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeModal('sale-details-modal');
+            }
+        });
+        
+    } catch (error) {
+        console.error("Erro ao abrir detalhes da venda:", error);
+        showMessage(error.message || "Erro ao carregar detalhes da venda", 'error');
+        closeModal('sale-details-modal');
+    }
+}
+
+// Funções auxiliares
+function formatCurrency(value) {
+    const parsed = Number(typeof value === 'string' ? value.replace(',', '.') : value);
+    if (isNaN(parsed)) return 'R$ 0,00';
+    
+    return 'R$ ' + parsed.toFixed(2)
+        .replace('.', ',')
+        .replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function formatPaymentMethod(method) {
+    const methods = {
+        'pix_fabiano': 'Pix (Fabiano)',
+        'pix_edfrance': 'Pix (Edfrance)',
+        'pix_loja': 'Pix (Loja)',
+        'pix_maquineta': 'Pix (Maquineta)',
+        'dinheiro': 'Dinheiro',
+        'cartao_credito': 'Cartão de Crédito',
+        'cartao_debito': 'Cartão de Débito',
+        'a_prazo': 'A Prazo'
+    };
+    return methods[method] || method;
+}
+
+function getCurrentUserId() {
+    return localStorage.getItem('userId') || 1;
+}
+
+function logActivity(action, type) {
+    console.log(`Atividade: ${action} (${type})`);
+}
+
+function showMessage(message, type = 'success') {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `flash-message ${type}`;
+    messageDiv.textContent = message;
+    document.body.appendChild(messageDiv);
+    
+    setTimeout(() => {
+        messageDiv.style.opacity = '0';
+        setTimeout(() => messageDiv.remove(), 1000);
+    }, 5000);
+}
+
+// Configurar eventos para o modal de estorno
+document.getElementById('confirm-void-sale')?.addEventListener('click', voidSale);
+document.getElementById('cancel-void-sale')?.addEventListener('click', () => {
+    closeModal('void-sale-modal');
+});
+
 // ==================== FUNÇÕES DE CAIXA ====================
 /**
  * Verifica o status atual do caixa (aberto/fechado)
@@ -1584,6 +2222,7 @@ function closeAllDropdowns() {
     });
     activeSearchDropdown = null;
 }
+
 
 // ==================== FUNÇÕES UTILITÁRIAS ====================
 /**

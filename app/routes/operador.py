@@ -1,10 +1,22 @@
 import base64
 from functools import wraps
+from io import BytesIO
+# Importações do Flask e sistema
+from flask import current_app, request, jsonify, send_file
+from datetime import datetime
+from io import BytesIO
+from reportlab.lib.styles import getSampleStyleSheet
+# Importações do ReportLab
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import Table, TableStyle
 import re
 import threading
 from flask import Blueprint, abort, json, make_response, render_template, request, jsonify, current_app as app
 from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db
@@ -29,7 +41,9 @@ from app.crud import (
     StatusPagamento,
     TipoMovimentacao,
     buscar_pagamentos_notas_fiscais,
+    estornar_venda,
     listar_despesas_do_dia,
+    obter_detalhes_vendas_dia,
     registrar_venda_completa,
     get_caixa_aberto,
     get_clientes,
@@ -507,6 +521,494 @@ def visualizar_pdf_venda(id_list):
     except Exception as e:
         app.logger.error(f"Erro ao gerar PDF: {str(e)}")
         abort(500, description="Ocorreu um erro ao gerar o PDF")
+
+
+@operador_bp.route('/api/vendas/hoje', methods=['GET'])
+@login_required
+@operador_required
+def obter_vendas_hoje():
+    try:
+        # Obtém parâmetros de filtro
+        data_str = request.args.get('data')
+        caixa_id = request.args.get('caixa_id', type=int)
+        operador_id = request.args.get('operador_id', type=int)
+        
+        # Converte a data se fornecida
+        data = None
+        if data_str:
+            data = datetime.strptime(data_str, '%Y-%m-%d').date()
+        
+        # Obtém as vendas (agora já filtradas por caixas abertos)
+        vendas = entities.NotaFiscal.obter_vendas_do_dia(
+            data=data,
+            caixa_id=caixa_id,
+            operador_id=operador_id
+        )
+        
+        # Formata a resposta (mantém o mesmo formato anterior)
+        vendas_formatadas = []
+        for venda in vendas:
+            vendas_formatadas.append({
+                'id': venda.id,
+                'data_emissao': venda.data_emissao.isoformat(),
+                'cliente': {
+                    'id': venda.cliente.id if venda.cliente else None,
+                    'nome': venda.cliente.nome if venda.cliente else 'Consumidor Final'
+                },
+                'operador': {
+                    'id': venda.operador.id,
+                    'nome': venda.operador.nome
+                },
+                'caixa': {
+                    'id': venda.caixa.id,
+                    'status': venda.caixa.status.value,
+                    'valor_abertura': float(venda.caixa.valor_abertura)
+                },
+                'valor_total': float(venda.valor_total),
+                'valor_desconto': float(venda.valor_desconto),
+                'forma_pagamento': venda.forma_pagamento.value if venda.forma_pagamento else None,
+                'a_prazo': venda.a_prazo,
+                'itens': [
+                    {
+                        'produto_id': item.produto.id,
+                        'produto_nome': item.produto.nome,
+                        'quantidade': float(item.quantidade),
+                        'valor_unitario': float(item.valor_unitario),
+                        'valor_total': float(item.valor_total),
+                        'desconto_aplicado': float(item.desconto_aplicado) if item.desconto_aplicado else None
+                    }
+                    for item in venda.itens
+                ],
+                'pagamentos': [
+                    {
+                        'forma_pagamento': pagamento.forma_pagamento.value,
+                        'valor': float(pagamento.valor),
+                        'data': pagamento.data.isoformat()
+                    }
+                    for pagamento in venda.pagamentos
+                ] if venda.pagamentos else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': vendas_formatadas,
+            'total_vendas': len(vendas),
+            'total_valor': sum(float(v.valor_total) for v in vendas)
+        })
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao obter vendas do dia: {str(e)}'
+        }), 500
+
+@operador_bp.route('/api/vendas/resumo-diario', methods=['GET'])
+@login_required
+@operador_required
+def resumo_vendas_diarias():
+    try:
+        data_str = request.args.get('data')
+        data = datetime.strptime(data_str, '%Y-%m-%d').date() if data_str else datetime.now(ZoneInfo('America/Sao_Paulo')).date()
+        
+        inicio_dia = datetime.combine(data, datetime.min.time())
+        fim_dia = datetime.combine(data, datetime.max.time())
+        
+        # Total de vendas (apenas em caixas abertos)
+        total_vendas = db.session.query(func.count(entities.NotaFiscal.id)).join(
+            entities.Caixa,
+            entities.NotaFiscal.caixa_id == entities.Caixa.id
+        ).filter(
+            entities.NotaFiscal.data_emissao >= inicio_dia,
+            entities.NotaFiscal.data_emissao <= fim_dia,
+            entities.NotaFiscal.status == StatusNota.emitida,
+            entities.Caixa.status == StatusCaixa.aberto  # Filtro por caixas abertos
+        ).scalar()
+        
+        # Valor total vendido (apenas em caixas abertos)
+        valor_total = db.session.query(func.coalesce(func.sum(entities.NotaFiscal.valor_total), 0)).join(
+            entities.Caixa,
+            entities.NotaFiscal.caixa_id == entities.Caixa.id
+        ).filter(
+            entities.NotaFiscal.data_emissao >= inicio_dia,
+            entities.NotaFiscal.data_emissao <= fim_dia,
+            entities.NotaFiscal.status == StatusNota.emitida,
+            entities.Caixa.status == StatusCaixa.aberto  # Filtro por caixas abertos
+        ).scalar()
+        
+        # Formas de pagamento (apenas em caixas abertos)
+        formas_pagamento = db.session.query(
+            entities.NotaFiscal.forma_pagamento,
+            func.count(entities.NotaFiscal.id).label('quantidade'),
+            func.sum(entities.NotaFiscalotaFiscal.valor_total).label('valor_total')
+        ).join(
+            entities.Caixa,
+            entities.NotaFiscal.caixa_id == entities.Caixa.id
+        ).filter(
+            entities.NotaFiscal.data_emissao >= inicio_dia,
+            entities.NotaFiscal.data_emissao <= fim_dia,
+            entities.NotaFiscal.status == StatusNota.emitida,
+            entities.Caixa.status == StatusCaixa.aberto  # Filtro por caixas abertos
+        ).group_by(entities.NotaFiscal.forma_pagamento).all()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'data': data.isoformat(),
+                'total_vendas': total_vendas,
+                'valor_total': float(valor_total),
+                'formas_pagamento': [
+                    {
+                        'forma': fp[0].value if fp[0] else None,
+                        'quantidade': fp[1],
+                        'valor_total': float(fp[2])
+                    }
+                    for fp in formas_pagamento
+                ]
+            }
+        })
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao obter resumo diário: {str(e)}'
+        }), 500
+
+
+@operador_bp.route('/api/vendas/<int:venda_id>/detalhes', methods=['GET'])
+@login_required
+@operador_required
+def obter_detalhes_venda(venda_id):
+    try:
+        # Busca a nota fiscal principal
+        nota_fiscal = entities.NotaFiscal.query.get_or_404(venda_id)
+        
+        # Busca os pagamentos associados
+        pagamentos = entities.PagamentoNotaFiscal.query.filter_by(
+            nota_fiscal_id=venda_id
+        ).all()
+        
+        # Formata a resposta
+        detalhes = {
+            'id': nota_fiscal.id,
+            'data_emissao': nota_fiscal.data_emissao.isoformat(),
+            'cliente': {
+                'id': nota_fiscal.cliente.id if nota_fiscal.cliente else None,
+                'nome': nota_fiscal.cliente.nome if nota_fiscal.cliente else 'Consumidor Final',
+                'documento': nota_fiscal.cliente.documento if nota_fiscal.cliente else None,
+                'telefone': nota_fiscal.cliente.telefone if nota_fiscal.cliente else None
+            },
+            'operador': {
+                'id': nota_fiscal.operador.id,
+                'nome': nota_fiscal.operador.nome
+            },
+            'valor_total': float(nota_fiscal.valor_total),
+            'valor_desconto': float(nota_fiscal.valor_desconto),
+            'forma_pagamento': nota_fiscal.forma_pagamento.value if nota_fiscal.forma_pagamento else None,
+            'a_prazo': nota_fiscal.a_prazo,
+            'observacao': nota_fiscal.observacao,
+            'itens': [
+                {
+                    'produto_id': item.produto.id,
+                    'produto_nome': item.produto.nome,
+                    'quantidade': float(item.quantidade),
+                    'valor_unitario': float(item.valor_unitario),
+                    'valor_total': float(item.valor_total),
+                    'desconto_aplicado': float(item.desconto_aplicado) if item.desconto_aplicado else None
+                }
+                for item in nota_fiscal.itens
+            ],
+            'pagamentos': [
+                {
+                    'id': pagamento.id,
+                    'forma_pagamento': pagamento.forma_pagamento.value,
+                    'valor': float(pagamento.valor),
+                    'data': pagamento.data.isoformat()
+                }
+                for pagamento in pagamentos
+            ],
+            'entrega': {
+                'endereco': nota_fiscal.entrega.logradouro if nota_fiscal.entrega else None,
+                'numero': nota_fiscal.entrega.numero if nota_fiscal.entrega else None,
+                'complemento': nota_fiscal.entrega.complemento if nota_fiscal.entrega else None,
+                'bairro': nota_fiscal.entrega.bairro if nota_fiscal.entrega else None,
+                'cidade': nota_fiscal.entrega.cidade if nota_fiscal.entrega else None,
+                'estado': nota_fiscal.entrega.estado if nota_fiscal.entrega else None,
+                'cep': nota_fiscal.entrega.cep if nota_fiscal.entrega else None,
+                'instrucoes': nota_fiscal.entrega.instrucoes if nota_fiscal.entrega else None
+            } if nota_fiscal.entrega else None
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': detalhes
+        })
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao obter detalhes da venda: {str(e)}'
+        }), 500
+        
+@operador_bp.route('/api/vendas/<int:sale_id>/estornar', methods=['POST'])
+@login_required
+@operador_required
+def rota_estornar_venda(sale_id):
+    """
+    Rota para estornar uma venda
+    """
+    try:
+        dados = request.get_json()
+        
+        if not dados:
+            return jsonify({'success': False, 'message': 'Dados não fornecidos'}), 400
+            
+        motivo_estorno = dados.get('motivo_estorno')
+        if not motivo_estorno:
+            return jsonify({'success': False, 'message': 'Motivo do estorno é obrigatório'}), 400
+            
+        usuario_id = current_user.id
+        
+        resultado = estornar_venda(db, sale_id, motivo_estorno, usuario_id)
+        
+        return jsonify(resultado), 200 if resultado['success'] else 400
+            
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Erro ao estornar venda {sale_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Erro interno ao processar estorno'
+        }), 500
+        
+@operador_bp.route('/api/vendas/relatorio-diario-pdf', methods=['GET'])
+@login_required
+@operador_required
+def gerar_pdf_vendas_dia():
+    """
+    Rota para gerar PDF com o relatório diário de vendas
+    Identifica notas de estorno (valores negativos) e formata adequadamente
+    """
+    # Obtém parâmetros da requisição
+    data_str = request.args.get('data')
+    caixa_id = request.args.get('caixa_id')
+    operador_id = request.args.get('operador_id')
+    
+    # Converte a data se fornecida
+    data = None
+    if data_str:
+        try:
+            data = datetime.strptime(data_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
+    
+    # Obtém os dados das vendas
+    resultado = obter_detalhes_vendas_dia(data, caixa_id, operador_id)
+    
+    if not resultado['success']:
+        return jsonify(resultado), 400
+    
+    dados = resultado['data']
+    
+    # Cria o PDF em memória
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+    
+    # Configurações do PDF
+    width, height = letter
+    margin = 50
+    linha_atual = height - margin
+    espacamento = 20
+    espacamento_pequeno = 12
+    
+    # Função para verificar espaço e criar nova página
+    def verificar_espaco(altura_necessaria):
+        nonlocal linha_atual, pdf
+        if linha_atual - altura_necessaria < margin:
+            pdf.showPage()
+            linha_atual = height - margin
+            pdf.setFont("Helvetica-Bold", 16)
+            pdf.drawString(margin, linha_atual, "RELATÓRIO DIÁRIO DETALHADO DE VENDAS (CONTINUAÇÃO)")
+            linha_atual -= espacamento * 1.5
+            return True
+        return False
+    
+    # Cabeçalho
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(margin, linha_atual, "RELATÓRIO DIÁRIO DETALHADO DE VENDAS")
+    linha_atual -= espacamento * 1.5
+    
+    data_relatorio = data if data else datetime.now().date()
+    pdf.setFont("Helvetica", 12)
+    pdf.drawString(margin, linha_atual, f"Data: {data_relatorio.strftime('%d/%m/%Y')}")
+    linha_atual -= espacamento_pequeno
+    
+    if caixa_id:
+        pdf.drawString(margin, linha_atual, f"Caixa ID: {caixa_id}")
+        linha_atual -= espacamento_pequeno
+    
+    if operador_id:
+        pdf.drawString(margin, linha_atual, f"Operador ID: {operador_id}")
+        linha_atual -= espacamento_pequeno
+    
+    linha_atual -= espacamento
+    
+    # Resumo Financeiro (agora considerando estornos)
+    total_vendas_positivas = sum(v['valor_total'] for v in dados['vendas'] if v['valor_total'] > 0)
+    total_estornos = sum(abs(v['valor_total']) for v in dados['vendas'] if v['valor_total'] < 0)
+    total_liquido = total_vendas_positivas - total_estornos
+    
+    altura_tabela_resumo = len([
+        ["Total de Vendas:", f"R$ {total_vendas_positivas:.2f}"],
+        ["Total de Estornos:", f"R$ {total_estornos:.2f}"],
+        ["Total de Descontos:", f"R$ {dados['total_descontos']:.2f}"],
+        ["Total de Entradas:", f"R$ {dados['total_entradas']:.2f}"],
+        ["Total de Saídas:", f"R$ {dados['total_saidas']:.2f}"],
+        ["Saldo Líquido:", f"R$ {total_liquido:.2f}"]
+    ]) * 20 + espacamento
+    
+    verificar_espaco(altura_tabela_resumo + 50)
+    
+    pdf.setFont("Helvetica-Bold", 14)
+    pdf.drawString(margin, linha_atual, "RESUMO FINANCEIRO")
+    linha_atual -= espacamento
+    
+    # Tabela de resumo atualizada
+    dados_resumo = [
+        ["Total de Vendas:", f"R$ {total_vendas_positivas:.2f}"],
+        ["Total de Estornos:", f"R$ {total_estornos:.2f}"],
+        ["Total de Descontos:", f"R$ {dados['total_descontos']:.2f}"],
+        ["Total de Entradas:", f"R$ {dados['total_entradas']:.2f}"],
+        ["Total de Saídas:", f"R$ {dados['total_saidas']:.2f}"],
+        ["Saldo Líquido:", f"R$ {total_liquido:.2f}"]
+    ]
+    
+    tabela_resumo = Table(dados_resumo, colWidths=[150, 100])
+    tabela_resumo.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 12),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('TEXTCOLOR', (1, 1), (1, 1), colors.red)  # Destaca estornos em vermelho
+    ]))
+    
+    tabela_resumo.wrapOn(pdf, width - 2 * margin, height)
+    tabela_resumo.drawOn(pdf, margin, linha_atual - (len(dados_resumo) * 20))
+    linha_atual -= (len(dados_resumo) * 20 + espacamento * 2)
+    
+    # Detalhes das Vendas (com tratamento especial para estornos)
+    for venda in dados['vendas']:
+        # Verifica se é estorno
+        is_estorno = venda['valor_total'] < 0
+        valor_exibicao = abs(venda['valor_total'])
+        
+        # Calcular altura necessária
+        altura_info_venda = len([
+            ["Cliente:", venda['cliente']],
+            ["Data/Hora:", datetime.fromisoformat(venda['data']).strftime('%d/%m/%Y %H:%M')],
+            ["Operador:", venda['operador']],
+            ["Valor Total:", f"R$ {valor_exibicao:.2f}"],
+            ["Desconto:", f"R$ {venda['valor_desconto']:.2f}"],
+            ["Forma Pagamento:", venda['forma_pagamento']],
+            ["A Prazo:", "Sim" if venda['a_prazo'] else "Não"],
+            ["Tipo:", "ESTORNO" if is_estorno else "VENDA NORMAL"]
+        ]) * 15 + espacamento
+        
+        verificar_espaco(altura_info_venda + 100)
+        
+        # Cabeçalho da venda com destaque para estornos
+        pdf.setFont("Helvetica-Bold", 14)
+        if is_estorno:
+            pdf.setFillColor(colors.red)
+            pdf.drawString(margin, linha_atual, f"ESTORNO DA VENDA #{venda['id']}")
+            pdf.setFillColor(colors.black)
+        else:
+            pdf.drawString(margin, linha_atual, f"DETALHES DA VENDA #{venda['id']}")
+        linha_atual -= espacamento
+        
+        # Informações básicas da venda
+        info_venda = [
+            ["Cliente:", venda['cliente']],
+            ["Data/Hora:", datetime.fromisoformat(venda['data']).strftime('%d/%m/%Y %H:%M')],
+            ["Operador:", venda['operador']],
+            ["Valor Total:", f"R$ {valor_exibicao:.2f}"],
+            ["Desconto:", f"R$ {venda['valor_desconto']:.2f}"],
+            ["Forma Pagamento:", venda['forma_pagamento']],
+            ["A Prazo:", "Sim" if venda['a_prazo'] else "Não"],
+            ["Tipo:", "ESTORNO" if is_estorno else "VENDA NORMAL"]
+        ]
+        
+        tabela_info = Table(info_venda, colWidths=[100, 300])
+        estilo = [
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey)
+        ]
+        
+        if is_estorno:
+            estilo.append(('TEXTCOLOR', (0, 7), (1, 7), colors.red))
+            estilo.append(('FONTNAME', (0, 7), (1, 7), 'Helvetica-Bold'))
+        
+        tabela_info.setStyle(TableStyle(estilo))
+        tabela_info.wrapOn(pdf, width - 2 * margin, height)
+        tabela_info.drawOn(pdf, margin, linha_atual - (len(info_venda) * 15))
+        linha_atual -= (len(info_venda) * 15 + espacamento)
+        
+        # Itens da venda (invertidos para estornos)
+        pdf.setFont("Helvetica-Bold", 12)
+        pdf.drawString(margin, linha_atual, "ITENS:")
+        linha_atual -= espacamento_pequeno
+        
+        dados_itens = [["Produto", "Qtd", "V. Unit.", "V. Total", "Desconto"]]
+        for item in venda['itens']:
+            quantidade = -item['quantidade'] if is_estorno else item['quantidade']
+            valor_total = -item['valor_total'] if is_estorno else item['valor_total']
+            desconto = -item['desconto'] if is_estorno and item['desconto'] else item['desconto']
+            
+            dados_itens.append([
+                item['produto'],
+                f"{quantidade:.3f}",
+                f"R$ {item['valor_unitario']:.2f}",
+                f"R$ {valor_total:.2f}",
+                f"R$ {desconto:.2f}" if desconto > 0 else "-"
+            ])
+        
+        tabela_itens = Table(dados_itens, colWidths=[180, 50, 70, 70, 60])
+        estilo_itens = [
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+        ]
+        
+        if is_estorno:
+            estilo_itens.append(('TEXTCOLOR', (1, 1), (-1, -1), colors.red))
+        
+        tabela_itens.setStyle(TableStyle(estilo_itens))
+        tabela_itens.wrapOn(pdf, width - 2 * margin, height)
+        tabela_itens.drawOn(pdf, margin, linha_atual - (len(dados_itens) * 15))
+        linha_atual -= (len(dados_itens) * 15 + espacamento * 2)
+    
+    # Finaliza o PDF
+    pdf.save()
+    buffer.seek(0)
+    
+    return send_file(
+        buffer,
+        as_attachment=False,
+        download_name=f"relatorio_vendas_{data_relatorio.strftime('%Y%m%d')}.pdf",
+        mimetype='application/pdf'
+    )
     
 # ===== API SALDO =====
 @operador_bp.route('/api/saldo', methods=['GET'])

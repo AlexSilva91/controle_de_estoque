@@ -224,6 +224,54 @@ body {
     margin-left: auto;
 }
 
+/* Estilos específicos para os botões Atualizar e Gerar PDF */
+.card-header-actions {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.btn-refresh, 
+.btn-pdf {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+    box-shadow: var(--shadow);
+}
+
+.btn-refresh {
+    background-color: var(--primary);
+    color: var(--secondary);
+}
+
+.btn-refresh:hover {
+    background-color: var(--primary-light);
+    transform: translateY(-1px);
+}
+
+.btn-pdf {
+    background-color: var(--danger);
+    color: var(--text-light);
+}
+
+.btn-pdf:hover {
+    background-color: #c82333;
+    transform: translateY(-1px);
+}
+
+.btn-refresh i, 
+.btn-pdf i {
+    font-size: 14px;
+}
+
 .card-body {
     padding: 20px;
 }
@@ -258,8 +306,8 @@ body {
 
 /* Button Styles */
 .btn {
-    padding: 14px 22px; /* Aumentado */
-    border-radius: 8px; /* Um valor fixo mais elegante */
+    padding: 14px 22px;
+    border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -268,8 +316,8 @@ body {
     align-items: center;
     justify-content: center;
     gap: 10px;
-    font-size: 16px; /* Aumentado */
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* Leve sombra */
+    font-size: 16px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* Botão primário */
@@ -837,6 +885,13 @@ body {
     .search-client-container {
         grid-template-columns: 1fr;
     }
+    
+    /* Ajustes para os botões no mobile */
+    .card-header-actions {
+        margin-top: 10px;
+        width: 100%;
+        justify-content: flex-end;
+    }
 }
 
 @media (max-width: 768px) {
@@ -850,6 +905,13 @@ body {
     
     .modal-content {
         width: 95%;
+    }
+    
+    /* Ajustes para os botões em telas pequenas */
+    .btn-refresh, 
+    .btn-pdf {
+        padding: 8px 12px;
+        font-size: 13px;
     }
 }
 
@@ -1318,4 +1380,297 @@ body {
 .remove-payment {
     color: #dc3545;
     cursor: pointer;
+}
+/* Estilo para o botão de visualizar */
+.btn-view {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: 5px;
+}
+
+.btn-view:hover {
+    background-color: #45a049;
+}
+
+/* Estilo para o modal de detalhes */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 5px;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.btn-close-modal {
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 15px;
+}
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .modal-content {
+        background-color: white;
+        padding: 20px;
+        border-radius: 5px;
+        max-width: 80%;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+/* Sale Details Modal Styles */
+.sale-details-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.sale-details-section {
+    border: 1px solid #eee;
+    border-radius: 5px;
+    padding: 15px;
+}
+
+.sale-details-section h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+}
+
+.detail-row {
+    display: flex;
+    margin-bottom: 8px;
+}
+
+.detail-label {
+    font-weight: bold;
+    min-width: 150px;
+    color: #555;
+}
+
+.sale-products-table, .sale-payments-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.sale-products-table th, 
+.sale-products-table td,
+.sale-payments-table th,
+.sale-payments-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.sale-products-table th,
+.sale-payments-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+.sale-products-table tr:hover,
+.sale-payments-table tr:hover {
+    background-color: #f5f5f5;
+}
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+#generate-pdf-btn {
+    background-color: #d32f2f;
+    color: white;
+    border: none;
+}
+
+#generate-pdf-btn:hover {
+    background-color: #b71c1c;
+}
+
+#void-sale-modal .modal-content {
+    max-width: 500px;
+}
+
+#void-sale-modal .btn-danger {
+    background-color: #d32f2f;
+    color: white;
+}
+
+#void-sale-modal .btn-danger:hover {
+    background-color: #b71c1c;
+}
+
+/* Estilos para o comportamento das abas e mensagens */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.flash-message {
+    transition: opacity 1s ease-out;
+}
+
+/* Estilos para o status do caixa */
+.status-container {
+    position: fixed;
+    top: 20px;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.caixa-status {
+    padding: 12px 25px;
+    border-radius: 30px;
+    font-weight: bold;
+    font-size: 1.1rem;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    display: inline-flex;
+    align-items: center;
+    pointer-events: auto;
+    animation: slideDown 0.5s ease-out;
+}
+
+@keyframes slideDown {
+    from { transform: translateY(-50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.caixa-livre {
+    background-color: #28a745;
+    color: white;
+}
+
+.caixa-operacao {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.caixa-status i {
+    margin-right: 10px;
+    font-size: 1.2rem;
+}
+
+.content-header {
+    position: relative;
+}
+
+/* Estilos para a aba de vendas do dia */
+.sales-day-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.sales-day-table th, .sales-day-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.sales-day-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+.sales-day-table tr:hover {
+    background-color: #f5f5f5;
+}
+
+.btn-void {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-void:hover {
+    background-color: #c82333;
+}
+
+/* Estilos para o campo de desconto manual */
+.discount-control {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.discount-control input {
+    flex: 1;
+    margin-right: 10px;
+}
+
+.discount-type-select {
+    width: 120px;
+    margin-right: 10px;
+}
+
+.discount-badge {
+    background-color: #28a745;
+    color: white;
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-left: 5px;
+}
+
+.original-price {
+    text-decoration: line-through;
+    color: #6c757d;
+    font-size: 0.9rem;
+    display: block;
+}
+
+.discount-value {
+    color: #28a745;
+    font-size: 0.8rem;
+    display: block;
 }

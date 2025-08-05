@@ -473,6 +473,48 @@ class NotaFiscal(Base):
         cascade="all, delete-orphan"
     )
 
+    @classmethod
+    def obter_vendas_do_dia(cls, data=None, caixa_id=None, operador_id=None):
+        """
+        Obtém todas as vendas do dia especificado ou do dia atual se nenhuma data for fornecida
+        Retorna apenas vendas associadas a caixas com status 'aberto'
+        
+        Args:
+            data (date, optional): Data para filtrar as vendas. Defaults to None (hoje).
+            caixa_id (int, optional): ID do caixa para filtrar. Defaults to None.
+            operador_id (int, optional): ID do operador para filtrar. Defaults to None.
+        
+        Returns:
+            List[NotaFiscal]: Lista de notas fiscais do dia
+        """
+        # Define a data como hoje se não for especificada
+        if data is None:
+            data = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
+        
+        # Converte para datetime para comparar com o campo DateTime do banco
+        inicio_dia = datetime.combine(data, datetime.min.time())
+        fim_dia = datetime.combine(data, datetime.max.time())
+        
+        # Cria a query base
+        query = cls.query.join(
+            Caixa,
+            cls.caixa_id == Caixa.id
+        ).filter(
+            cls.data_emissao >= inicio_dia,
+            cls.data_emissao <= fim_dia,
+            cls.status == StatusNota.emitida,
+            Caixa.status == StatusCaixa.aberto  # Filtra apenas caixas abertos
+        )
+        
+        # Aplica filtros adicionais se fornecidos
+        if caixa_id:
+            query = query.filter(cls.caixa_id == caixa_id)
+        
+        if operador_id:
+            query = query.filter(cls.operador_id == operador_id)
+        
+        return query.order_by(cls.data_emissao.desc()).all()
+
 # --------------------
 # Item da Nota Fiscal
 # --------------------
