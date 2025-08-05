@@ -756,6 +756,7 @@ def obter_detalhes_venda(venda_id):
             } if nota_fiscal.entrega else None
         }
         
+        print(f'Deatlhes: \n{detalhes}\n')
         return jsonify({
             'success': True,
             'data': detalhes

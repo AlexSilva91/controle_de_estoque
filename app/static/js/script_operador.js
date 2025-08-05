@@ -1777,15 +1777,40 @@ async function openSaleDetailsModal(saleId) {
         closeModal();
         
         const modal = document.getElementById('sale-details-modal');
-        if (!modal) return;
+        if (!modal) {
+            console.error('Modal de detalhes da venda não encontrado');
+            return;
+        }
         
         modal.style.display = 'flex';
         currentOpenModal = modal;
         
-        document.getElementById('sale-details-id').textContent = saleId;
-        document.getElementById('sale-details-products').innerHTML = '';
-        document.getElementById('sale-details-payments').innerHTML = '';
+        // Reset dos elementos
+        const elementsToReset = [
+            'sale-details-id',
+            'sale-details-date',
+            'sale-details-client',
+            'sale-details-operator',
+            'sale-details-total',
+            'sale-details-discount',
+            'sale-details-notes',
+            'sale-details-delivery',
+            'sale-details-delivery-instructions',
+            'sale-details-products',
+            'sale-details-payments'
+        ];
         
+        elementsToReset.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                if (id === 'sale-details-products' || id === 'sale-details-payments') {
+                    el.innerHTML = '';
+                } else {
+                    el.textContent = '';
+                }
+            }
+        });
+
         const response = await fetch(`/operador/api/vendas/${saleId}/detalhes`);
         
         if (!response.ok) {
@@ -1799,71 +1824,103 @@ async function openSaleDetailsModal(saleId) {
         }
         
         const venda = result.data;
+        console.log('Dados da venda:', venda); // Para debug
         
         // Preenche informações básicas
-        document.getElementById('sale-details-date').textContent = new Date(venda.data_emissao).toLocaleString('pt-BR');
-        document.getElementById('sale-details-client').textContent = `${venda.cliente?.nome || 'Consumidor Final'}${venda.cliente?.documento ? ' (' + venda.cliente.documento + ')' : ''}`;
-        document.getElementById('sale-details-operator').textContent = venda.operador?.nome || 'N/A';
-        document.getElementById('sale-details-total').textContent = formatCurrency(venda.valor_total);
-        document.getElementById('sale-details-discount').textContent = formatCurrency(venda.valor_desconto || 0);
-        document.getElementById('sale-details-notes').textContent = venda.observacao || 'Nenhuma observação';
+        safeSetText('sale-details-id', saleId);
+        safeSetText('sale-details-date', new Date(venda.data_emissao).toLocaleString('pt-BR'));
+        safeSetText('sale-details-client', `${venda.cliente?.nome || 'Consumidor Final'}${venda.cliente?.documento ? ' (' + formatDocument(venda.cliente.documento) + ')' : ''}`);
+        safeSetText('sale-details-operator', venda.operador?.nome || 'N/A');
+        safeSetText('sale-details-total', formatCurrency(venda.valor_total));
+        safeSetText('sale-details-discount', formatCurrency(venda.valor_desconto || 0));
+        safeSetText('sale-details-notes', venda.observacao || 'Nenhuma observação');
         
         // Preenche endereço de entrega
         const deliveryContainer = document.getElementById('sale-details-delivery-container');
-        if (venda.entrega) {
-            const endereco = [
-                venda.entrega.logradouro,
-                venda.entrega.numero,
-                venda.entrega.complemento,
-                venda.entrega.bairro,
-                `${venda.entrega.cidade}/${venda.entrega.estado}`,
-                venda.entrega.cep
-            ].filter(Boolean).join(', ');
-            
-            document.getElementById('sale-details-delivery').textContent = endereco;
-            deliveryContainer.style.display = 'flex';
-            
-            if (venda.entrega.instrucoes) {
-                document.getElementById('sale-details-delivery').textContent += ` (Instruções: ${venda.entrega.instrucoes})`;
+        const deliveryInstructions = document.getElementById('sale-details-delivery-instructions');
+        
+        if (deliveryContainer) {
+            if (venda.entrega) {
+                const endereco = [
+                    venda.entrega.endereco || venda.entrega.logradouro,
+                    venda.entrega.numero,
+                    venda.entrega.complemento,
+                    venda.entrega.bairro,
+                    `${venda.entrega.cidade}/${venda.entrega.estado}`.toUpperCase(),
+                    venda.entrega.cep ? formatCEP(venda.entrega.cep) : ''
+                ].filter(Boolean).join(', ');
+                
+                safeSetText('sale-details-delivery', endereco);
+                deliveryContainer.style.display = 'flex';
+                
+                if (deliveryInstructions) {
+                    if (venda.entrega.instrucoes) {
+                        deliveryInstructions.textContent = `Instruções: ${venda.entrega.instrucoes}`;
+                        deliveryInstructions.style.display = 'block';
+                    } else {
+                        deliveryInstructions.style.display = 'none';
+                    }
+                }
+            } else {
+                deliveryContainer.style.display = 'none';
+                if (deliveryInstructions) {
+                    deliveryInstructions.style.display = 'none';
+                }
             }
-        } else {
-            deliveryContainer.style.display = 'none';
         }
         
         // Preenche produtos
         const productsTable = document.getElementById('sale-details-products');
-        venda.itens.forEach(item => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${item.produto?.nome || 'Produto não encontrado'}</td>
-                <td>${item.quantidade}</td>
-                <td>${formatCurrency(item.valor_unitario)}</td>
-                <td>${item.desconto_aplicado ? formatCurrency(item.desconto_aplicado) : '-'}</td>
-                <td>${formatCurrency(item.valor_total)}</td>
-            `;
-            productsTable.appendChild(row);
-        });
+        if (productsTable && venda.itens) {
+            venda.itens.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.produto_nome || 'Produto não encontrado'}</td>
+                    <td class="text-right">${item.quantidade.toLocaleString('pt-BR')}</td>
+                    <td class="text-right">${formatCurrency(item.valor_unitario)}</td>
+                    <td class="text-right">${item.desconto_aplicado ? formatCurrency(item.desconto_aplicado) : '-'}</td>
+                    <td class="text-right">${formatCurrency(item.valor_total)}</td>
+                `;
+                productsTable.appendChild(row);
+            });
+        }
         
         // Preenche pagamentos
         const paymentsTable = document.getElementById('sale-details-payments');
-        if (venda.pagamentos && venda.pagamentos.length > 0) {
-            venda.pagamentos.forEach(pagamento => {
+        if (paymentsTable) {
+            if (venda.pagamentos && venda.pagamentos.length > 0) {
+                venda.pagamentos.forEach(pagamento => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${formatPaymentMethod(pagamento.forma_pagamento)}</td>
+                        <td class="text-right">${formatCurrency(pagamento.valor)}</td>
+                        <td>${new Date(pagamento.data).toLocaleString('pt-BR')}</td>
+                    `;
+                    paymentsTable.appendChild(row);
+                });
+                
+                // Adiciona total se houver mais de um pagamento
+                if (venda.pagamentos.length > 1) {
+                    const totalPagamentos = venda.pagamentos.reduce((sum, pag) => sum + pag.valor, 0);
+                    const row = document.createElement('tr');
+                    row.className = 'total-row';
+                    row.innerHTML = `
+                        <td><strong>Total</strong></td>
+                        <td class="text-right"><strong>${formatCurrency(totalPagamentos)}</strong></td>
+                        <td></td>
+                    `;
+                    paymentsTable.appendChild(row);
+                }
+            } else {
+                // Caso não tenha pagamentos específicos, usa o método de pagamento principal
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${formatPaymentMethod(pagamento.forma_pagamento)}</td>
-                    <td>${formatCurrency(pagamento.valor)}</td>
-                    <td>${new Date(pagamento.data).toLocaleString('pt-BR')}</td>
+                    <td>${formatPaymentMethod(venda.forma_pagamento)}</td>
+                    <td class="text-right">${formatCurrency(venda.valor_total)}</td>
+                    <td>${new Date(venda.data_emissao).toLocaleString('pt-BR')}</td>
                 `;
                 paymentsTable.appendChild(row);
-            });
-        } else {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${formatPaymentMethod(venda.forma_pagamento)}</td>
-                <td>${formatCurrency(venda.valor_total)}</td>
-                <td>${new Date(venda.data_emissao).toLocaleString('pt-BR')}</td>
-            `;
-            paymentsTable.appendChild(row);
+            }
         }
         
         modal.addEventListener('click', function(e) {
@@ -1880,13 +1937,39 @@ async function openSaleDetailsModal(saleId) {
 }
 
 // Funções auxiliares
+function safeSetText(elementId, text) {
+    const el = document.getElementById(elementId);
+    if (el) {
+        el.textContent = text;
+    } else {
+        console.warn(`Elemento com ID ${elementId} não encontrado`);
+    }
+}
+
+function formatDocument(doc) {
+    if (!doc) return '';
+    if (doc.length === 11) { // CPF
+        return doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    } else if (doc.length === 14) { // CNPJ
+        return doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+    }
+    return doc;
+}
+
+function formatCEP(cep) {
+    if (!cep) return '';
+    return cep.replace(/(\d{5})(\d{3})/, '$1-$2');
+}
+
 function formatCurrency(value) {
-    const parsed = Number(typeof value === 'string' ? value.replace(',', '.') : value);
+    if (value === null || value === undefined) return 'R$ 0,00';
+    const parsed = Number(value);
     if (isNaN(parsed)) return 'R$ 0,00';
     
-    return 'R$ ' + parsed.toFixed(2)
-        .replace('.', ',')
-        .replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return parsed.toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    });
 }
 
 function formatPaymentMethod(method) {
