@@ -1,11 +1,13 @@
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib import colors
-from reportlab.platypus import Table, TableStyle, Paragraph
+from reportlab.platypus import Table, TableStyle, Paragraph, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from io import BytesIO
 from datetime import datetime
 from textwrap import wrap
+import os
+from PIL import Image as PILImage  # Para obter as dimensões originais da imagem
 
 def safe_float(value, default=0.0):
     """Converte para float com tratamento seguro para None e valores inválidos"""
@@ -77,12 +79,11 @@ def formatar_endereco_entrega(endereco) -> str:
     
     return "\n".join(partes)
 
-def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> BytesIO:
+def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict) -> BytesIO:
     """Gera PDF de nota fiscal no formato bobina com tratamento completo dos dados
     
     Args:
         dados_nota: Dicionário com os dados da nota fiscal no formato retornado por buscar_pagamentos_notas_fiscais
-        logo_path: Caminho opcional para um arquivo de logo
         
     Returns:
         BytesIO: Objeto de bytes com o PDF gerado
@@ -98,10 +99,13 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> By
         leading=7
     )
 
+    # Caminho da logo
+    logo_path = "/home/n2/Documentos/projetos/controle_de_estoque/app/static/assets/logo.jpeg"
+    
     # Extração segura dos dados com valores padrão
     produtos = dados_nota.get("produtos", []) or []
     operador = dados_nota.get("operador", {}) or {}
-    cliente = dados_nota.get("cliente", {}) or {}  # Agora vem diretamente do dicionário
+    cliente = dados_nota.get("cliente", {}) or {}
     formas_pagamento = dados_nota.get("formas_pagamento", []) or []
     endereco_entrega = dados_nota.get("endereco_entrega", {}) or {}
     metadados = dados_nota.get("metadados", {}) or {}
@@ -128,7 +132,7 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> By
     # Prepara tabela de produtos com larguras ajustadas
     if tem_descontos:
         data = [["Produto", "Qtd", "Unit", "Desc", "Total"]]
-        col_widths = [30*mm, 8*mm, 10*mm, 8*mm, 9*mm]  # Mais espaço para produto
+        col_widths = [30*mm, 8*mm, 10*mm, 8*mm, 9*mm]
     else:
         data = [["Produto", "Qtd", "Unit", "Total"]]
         col_widths = [34*mm, 10*mm, 12*mm, 15*mm]
@@ -137,7 +141,6 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> By
         if not produto or not isinstance(produto, dict):
             continue
             
-        # Nome completo do produto sem truncamento
         nome_produto = safe_str(produto.get("nome"), f"Produto {produto.get('id', '')}")
         quantidade = safe_float(produto.get("quantidade"))
         valor_unitario = safe_float(produto.get("valor_unitario"))
@@ -168,17 +171,51 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> By
     altura_tabela = len(data) * altura_linha_item
     altura_rodape = 55 * mm
     espacamentos = 25 * mm
-    altura_total = altura_base + altura_tabela + altura_rodape + espacamentos
+    
+    # Altura adicional para a logo (será ajustada abaixo)
+    altura_logo = 25 * mm
+    altura_total = altura_base + altura_tabela + altura_rodape + espacamentos + altura_logo
 
     # Criação do PDF
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=(largura, altura_total))
-    y = altura_total - 10 * mm
+    y = altura_total   # Começa um pouco mais abaixo para a logo
 
-    # Cabeçalho
-    c.setFont("Helvetica-Bold", 12)
-    c.drawCentredString(largura/2, y, "CAVALCANTI RAÇÕES")
-    y -= 5 * mm
+    # Adiciona a logo no topo do PDF
+    if os.path.exists(logo_path):
+        try:
+            # Obtém as dimensões originais da imagem para manter a proporção
+            with PILImage.open(logo_path) as img:
+                img_width, img_height = img.size
+                aspect_ratio = img_width / img_height
+            
+            # Define a largura máxima da logo (largura do PDF menos margens)
+            max_logo_width = largura - 0 * mm  # 5mm de margem em cada lado
+            
+            # Calcula a altura proporcional
+            logo_width = min(max_logo_width, img_width)
+            logo_height = logo_width / aspect_ratio
+            
+            # Desenha a imagem mantendo a proporção original
+            logo = Image(logo_path, width=logo_width, height=logo_height)
+            logo_x = (largura - logo_width) / 2  # Centraliza horizontalmente
+            logo_y = y - logo_height  # Posiciona no topo
+            
+            logo.wrapOn(c, largura, altura_total)
+            logo.drawOn(c, logo_x, logo_y)
+            
+            # Ajusta a posição do restante do conteúdo
+            y -= logo_height + 5 * mm
+            altura_total += logo_height  # Ajusta a altura total do PDF
+            
+        except Exception as e:
+            print(f"Erro ao carregar a logo: {e}")
+            # Continua sem a logo se houver erro
+
+    # Restante do conteúdo (cabeçalho, tabela, etc.)
+    # c.setFont("Helvetica-Bold", 12)
+    # c.drawCentredString(largura/2, y, "CAVALCANTI RAÇÕES")
+    # y -= 5 * mm
     
     c.setFont("Helvetica", 7)
     c.drawCentredString(largura/2, y, "Contato: (87) 9 8152-1788")
@@ -191,7 +228,6 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> By
     c.drawString(5*mm, y, f"Operador: {safe_str(operador.get('nome'))}")
     y -= 5 * mm
     
-    # Nome do cliente - agora vem diretamente do dicionário
     nome_cliente = safe_str(cliente.get("nome"))
     if nome_cliente:
         c.setFont("Helvetica-Bold", 8)
@@ -202,7 +238,7 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict, logo_path: str = None) -> By
     c.drawString(5*mm, y, f"Emissão: {emissao.strftime('%d/%m/%Y %H:%M')}")
     y -= 8 * mm
 
-    # Tabela de produtos com estilo melhorado
+    # Tabela de produtos
     tabela = Table(data, colWidths=col_widths, repeatRows=1)
     estilo = [
         ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),

@@ -35,18 +35,18 @@ def gerar_nfce_pdf_bobina(nome_arquivo: str, dados_nota: dict, logo_path: str = 
     c = canvas.Canvas(nome_arquivo, pagesize=(largura, altura_total))
     y = altura_total - 5 * mm
 
-    # # Logo centralizado
-    # if logo_path and os.path.exists(logo_path):
-    #     try:
-    #         logo_largura = 80 * mm
-    #         logo_altura = 50 * mm
-    #         logo_x = (largura - logo_largura) / 2
-    #         c.drawImage(logo_path, logo_x, y - logo_altura, width=logo_largura, height=logo_altura, preserveAspectRatio=True)
-    #         y -= (logo_altura + 3 * mm)
-    #     except Exception:
-    #         y -= 5 * mm
-    # else:
-    #     y -= 5 * mm
+    # Logo centralizado
+    if logo_path and os.path.exists(logo_path):
+        try:
+            logo_largura = 80 * mm
+            logo_altura = 50 * mm
+            logo_x = (largura - logo_largura) / 2
+            c.drawImage(logo_path, logo_x, y - logo_altura, width=logo_largura, height=logo_altura, preserveAspectRatio=True)
+            y -= (logo_altura + 3 * mm)
+        except Exception:
+            y -= 5 * mm
+    else:
+        y -= 5 * mm
 
     # Nome da empresa
     c.setFont("Helvetica-Bold", 12)
