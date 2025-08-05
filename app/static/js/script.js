@@ -750,8 +750,6 @@ document.addEventListener('DOMContentLoaded', function() {
       });
   }
 
-  // Restante do código permanece o mesmo...
-
   // Função para abrir modal de transferência
   async function openTransferenciaModal(produtoId) {
       try {
