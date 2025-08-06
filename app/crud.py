@@ -109,33 +109,48 @@ def validar_documento(documento: str) -> bool:
     return len(doc) in (11, 14)  # CPF tem 11, CNPJ tem 14
 
 # ===== Caixa =====
-def abrir_caixa(db: Session, operador_id: int, valor_abertura: Decimal, observacao: str = "") -> entities.Caixa:
-    """Abre um novo caixa com o valor de abertura especificado"""
-    if valor_abertura <= 0:
-        raise ValueError("Valor de abertura deve ser maior que zero")
+def abrir_caixa(db: Session, operador_id: int, valor_abertura: Decimal, observacao: str = None):
+    """
+    Abre um novo caixa para um operador específico.
+    Verifica se o operador já tem um caixa aberto antes de criar um novo.
+    """
+    # Verifica se o operador já tem um caixa aberto
+    caixa_existente = get_caixa_aberto(db, operador_id=operador_id)
+    if caixa_existente:
+        raise ValueError(f"Operador já possui um caixa aberto (Caixa #{caixa_existente.id})")
     
-    # Verifica se já existe caixa aberto
-    caixa_aberto = db.query(entities.Caixa).filter(entities.Caixa.status == StatusCaixa.aberto).first()
-    if caixa_aberto:
-        raise ValueError("Já existe um caixa aberto")
-    
-    novo_caixa = entities.Caixa(
-        operador_id=operador_id,
-        valor_abertura=valor_abertura,
-        status=StatusCaixa.aberto,
-        observacoes=observacao,
-        data_abertura=datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
-    )
-    
-    db.add(novo_caixa)
     try:
+        # Cria o novo caixa
+        novo_caixa = Caixa(
+            operador_id=operador_id,
+            valor_abertura=valor_abertura,
+            data_abertura=datetime.now(tz=ZoneInfo('America/Sao_Paulo')),
+            status=StatusCaixa.aberto,
+            observacoes=observacao
+        )
+        
+        db.add(novo_caixa)
+        db.flush()  # Para obter o ID antes do commit
+        
+        # Cria registro financeiro de abertura
+        abertura_financeiro = Financeiro(
+            tipo=TipoMovimentacao.entrada,
+            categoria=CategoriaFinanceira.abertura_caixa,
+            valor=valor_abertura,
+            descricao=f"Abertura do caixa #{novo_caixa.id}",
+            caixa_id=novo_caixa.id,
+            data=novo_caixa.data_abertura
+        )
+        
+        db.add(abertura_financeiro)
         db.commit()
-        db.refresh(novo_caixa)
+        
         return novo_caixa
-    except SQLAlchemyError as e:
+        
+    except Exception as e:
         db.rollback()
-        raise ValueError(f"Erro ao abrir caixa: {str(e)}")
-
+        raise e
+    
 def fechar_caixa(db: Session, operador_id: int, valor_fechamento: Decimal, observacao: str = "") -> entities.Caixa:
     """Fecha o caixa atual com o valor de fechamento especificado"""
     if valor_fechamento <= 0:
@@ -175,9 +190,19 @@ def fechar_caixa(db: Session, operador_id: int, valor_fechamento: Decimal, obser
         db.rollback()
         raise ValueError("Erro ao fechar caixa no banco de dados")
 
-def get_caixa_aberto(db: Session) -> Optional[entities.Caixa]:
-    """Retorna o caixa atualmente aberto, se existir"""
-    return db.query(entities.Caixa).filter(entities.Caixa.status == StatusCaixa.aberto).first()
+def get_caixa_aberto(db: Session, operador_id: int = None):
+    """
+    Retorna o caixa aberto para um operador específico.
+    Se operador_id for fornecido, busca apenas caixas desse operador.
+    Se operador_id for None, busca qualquer caixa aberto (comportamento antigo).
+    """
+    query = db.query(Caixa).filter(Caixa.status == StatusCaixa.aberto)
+    
+    # IMPORTANTE: Filtra pelo operador específico se fornecido
+    if operador_id is not None:
+        query = query.filter(Caixa.operador_id == operador_id)
+    
+    return query.first()
 
 def get_caixa_by_id(db: Session, caixa_id: int) -> Optional[entities.Caixa]:
     """Retorna um caixa pelo ID"""
@@ -187,12 +212,18 @@ def get_caixas(db: Session, skip: int = 0, limit: int = 100) -> List[entities.Ca
     """Lista todos os caixas"""
     return db.query(entities.Caixa).order_by(entities.Caixa.data_abertura.desc()).offset(skip).limit(limit).all()
 
-def get_ultimo_caixa_fechado(db: Session) -> Optional[entities.Caixa]:
-    """Retorna o último caixa fechado"""
-    return db.query(entities.Caixa)\
-            .filter(entities.Caixa.status == StatusCaixa.fechado)\
-            .order_by(entities.Caixa.data_fechamento.desc())\
-            .first()
+def get_ultimo_caixa_fechado(db: Session, operador_id: int = None):
+    """
+    Retorna o último caixa fechado para um operador específico.
+    """
+    query = db.query(Caixa).filter(
+        Caixa.status == StatusCaixa.fechado
+    )
+    
+    if operador_id is not None:
+        query = query.filter(Caixa.operador_id == operador_id)
+        
+    return query.order_by(Caixa.data_fechamento.desc()).first()
 
 # ===== Usuários =====
 def get_user_by_cpf(db: Session, cpf: str):

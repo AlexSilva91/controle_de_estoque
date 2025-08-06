@@ -53,17 +53,19 @@ def login():
         login_user(usuario)
         
         try:
-            # Atualiza último acesso diretamente no objeto
+            # Atualiza último acesso
             usuario.ultimo_acesso = datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
             db.commit()
 
-            # Verificar caixa aberto para operadores
+            # Verificar caixa aberto apenas para operadores
             if usuario.tipo.value == 'operador':
-                caixa_aberto = get_caixa_aberto(db)
+                # CORREÇÃO: Passa o ID do usuário específico para verificar apenas seus caixas
+                caixa_aberto = get_caixa_aberto(db, operador_id=usuario.id)
+                
                 if not caixa_aberto:
-                    ultimo_caixa = get_ultimo_caixa_fechado(db)
-                    # Verifica se ultimo_caixa existe e tem o atributo valor_fechamento
-                    valor_sugerido = float(ultimo_caixa.valor_fechamento) if ultimo_caixa and hasattr(ultimo_caixa, 'valor_fechamento') else 0.0
+                    # Se não tem caixa aberto, verifica último fechado para sugerir valor
+                    ultimo_caixa = get_ultimo_caixa_fechado(db, operador_id=usuario.id)
+                    valor_sugerido = float(ultimo_caixa.valor_fechamento) if ultimo_caixa else 0.0
                     
                     return jsonify({
                         'success': True,
@@ -71,6 +73,9 @@ def login():
                         'valor_sugerido': valor_sugerido,
                         'user_type': 'operador'
                     })
+                else:
+                    # Se já tem caixa aberto, registra no log e segue normalmente
+                    print(f"Usuário {usuario.id} já tem caixa aberto #{caixa_aberto.id}")
 
             return jsonify({
                 'success': True,
@@ -98,11 +103,13 @@ def abrir_caixa_manual():
         }), 403
 
     try:
+        if not request.is_json:
+            return jsonify({'success': False, 'message': 'Content-Type deve ser application/json'}), 400
+
         data = request.get_json()
         if not data:
             return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
 
-        # Verifica e converte o valor de abertura
         try:
             valor_abertura = Decimal(str(data.get('valor_abertura', 0)))
         except Exception as e:
@@ -113,7 +120,17 @@ def abrir_caixa_manual():
 
         observacao = data.get('observacao', 'Abertura manual')
 
-        # Tenta abrir o caixa
+        # CORREÇÃO: Verifica apenas caixas do usuário atual
+        caixa_existente = get_caixa_aberto(db, operador_id=current_user.id)
+        if caixa_existente:
+            return jsonify({
+                'success': False,
+                'message': f'Você já tem um caixa aberto (Caixa #{caixa_existente.id} aberto em {caixa_existente.data_abertura.strftime("%d/%m/%Y %H:%M")})',
+                'caixa_id': caixa_existente.id,
+                'redirect_url': url_for('operador.dashboard')
+            }), 400
+
+        # Tenta abrir o caixa (a função já faz a verificação internamente)
         novo_caixa = abrir_caixa(
             db=db,
             operador_id=current_user.id,
@@ -121,18 +138,18 @@ def abrir_caixa_manual():
             observacao=observacao
         )
         
-        # Verifica se o caixa foi criado corretamente
-        if not novo_caixa or not hasattr(novo_caixa, 'id'):
+        if not novo_caixa:
             raise ValueError("Erro ao criar caixa")
         
         return jsonify({
             'success': True,
-            'message': f'Caixa aberto com R$ {valor_abertura:.2f}',
+            'message': f'Caixa #{novo_caixa.id} aberto com R$ {valor_abertura:.2f}',
             'caixa_id': novo_caixa.id,
             'redirect_url': url_for('operador.dashboard')
         })
 
     except ValueError as e:
+        db.rollback()
         return jsonify({
             'success': False,
             'message': str(e)

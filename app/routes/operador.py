@@ -343,7 +343,8 @@ def api_registrar_venda():
             }), 400
 
         # Verificar caixa aberto
-        caixa_aberto = entities.Caixa.query.filter_by(status='aberto').first()
+        caixa_aberto = get_caixa_aberto(db.session, operador_id=current_user.id)
+        
         if not caixa_aberto:
             app.logger.error("Nenhum caixa aberto encontrado")
             return jsonify({
@@ -1004,14 +1005,16 @@ def gerar_pdf_vendas_dia():
 @operador_required
 def api_get_saldo():
     try:
-        caixa = get_caixa_aberto(db.session)
+        # CORREÇÃO: Busca apenas o caixa do operador logado
+        caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
 
         if not caixa:
             return jsonify({
                 'saldo': 0.00,
                 'saldo_formatado': 'R$ 0,00',
                 'valor_abertura': 0.00,
-                'message': 'Nenhum caixa aberto encontrado'
+                'message': 'Você não possui caixa aberto',
+                'caixa_id': None
             })
 
         # --- Total de VENDAS do dia (entrada, categoria 'venda') ---
@@ -1019,47 +1022,57 @@ def api_get_saldo():
         data_inicio = datetime.combine(hoje, time.min).replace(tzinfo=ZoneInfo('America/Sao_Paulo'))
         data_fim = datetime.combine(hoje, time.max).replace(tzinfo=ZoneInfo('America/Sao_Paulo'))
 
+        # Filtra vendas apenas do caixa do operador atual
         lancamentos = db.session.query(entities.Financeiro).filter(
             entities.Financeiro.tipo == entities.TipoMovimentacao.entrada,
             entities.Financeiro.categoria == entities.CategoriaFinanceira.venda,
             entities.Financeiro.data >= data_inicio,
             entities.Financeiro.data <= data_fim,
-            entities.Financeiro.caixa_id == caixa.id
+            entities.Financeiro.caixa_id == caixa.id  # Já filtra pelo caixa do operador
         ).all()
 
         total_vendas = Decimal('0.00')
         for lanc in lancamentos:
+            print(lanc.valor)
             total_vendas += Decimal(str(lanc.valor))
 
         # --- Total de DESPESAS do dia ---
-        despesas = listar_despesas_do_dia(db.session, fuso="America/Sao_Paulo")
-        print(f"Despesas do dia: {len(despesas)} registros encontrados\n{despesas}")
+        # Busca despesas apenas do caixa do operador atual
+        despesas = db.session.query(entities.Financeiro).filter(
+            entities.Financeiro.tipo == entities.TipoMovimentacao.saida,
+            entities.Financeiro.categoria == entities.CategoriaFinanceira.despesa,
+            entities.Financeiro.data >= data_inicio,
+            entities.Financeiro.data <= data_fim,
+            entities.Financeiro.caixa_id == caixa.id  # Filtra pelo caixa do operador
+        ).all()
+
+        print(f"Despesas do caixa {caixa.id}: {len(despesas)} registros encontrados")
+        
         total_despesas = Decimal('0.00')
         for desp in despesas:
-            if desp.caixa_id == caixa.id:
-                total_despesas += Decimal(str(desp.valor))
-                print(f"Despesa encontrada: {desp.descricao} - Valor: {desp.valor}")
+            total_despesas += Decimal(str(desp.valor))
+            print(f"Despesa encontrada: {desp.descricao} - Valor: {desp.valor}")
 
+        print(f"Caixa ID: {caixa.id} | Operador: {current_user.nome}")
         print(f"Total Vendas: {total_vendas}, Total Despesas: {total_despesas}")
 
-        # --- Lógica do saldo: subtrai despesas das vendas (ou da abertura, se não houver venda) ---
+        # --- Lógica do saldo: abertura + vendas - despesas ---
         abertura = Decimal(str(caixa.valor_abertura))
-        if total_vendas > 0:
-            saldo = total_vendas - total_despesas
-        else:
-            abertura = Decimal(str(caixa.valor_abertura)) - total_despesas
-            saldo = 0
+        saldo = total_vendas - total_despesas
 
         return jsonify({
             'saldo': float(saldo),
             'saldo_formatado': f"R$ {saldo:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
             'valor_abertura': float(abertura),
+            'total_vendas': float(total_vendas),
+            'total_despesas': float(total_despesas),
             'message': 'Saldo atualizado com sucesso',
-            'caixa_id': caixa.id
+            'caixa_id': caixa.id,
+            'operador_nome': current_user.nome
         })
 
     except Exception as e:
-        app.logger.error(f"Erro ao calcular saldo: {str(e)}")
+        app.logger.error(f"Erro ao calcular saldo para operador {current_user.id}: {str(e)}")
         return jsonify({'error': str(e)}), 500
     
 # ===== API ABERTURA DE CAIXA =====

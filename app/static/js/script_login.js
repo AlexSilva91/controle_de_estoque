@@ -139,8 +139,10 @@ async function confirmarAbertura() {
         const response = await fetch('/abrir-caixa', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
             },
+            credentials: 'same-origin',
             body: JSON.stringify({
                 valor_abertura: valor,
                 observacao: observacao
@@ -149,21 +151,40 @@ async function confirmarAbertura() {
         
         const data = await response.json();
         
+        if (!response.ok) {
+            // Se for erro 400 e já existir caixa, redireciona
+            if (response.status === 400 && data.caixa_id) {
+                showMessage(messageDiv, data.message, 'info');
+                setTimeout(() => {
+                    window.location.href = data.redirect_url;
+                }, 1500);
+                return;
+            }
+            throw new Error(data.message || `Erro HTTP ${response.status}`);
+        }
+        
         if (data.success) {
             showMessage(messageDiv, data.message, 'success');
             setTimeout(() => {
-                window.location.href = data.redirect_url || '/operador/dashboard';
+                window.location.href = data.redirect_url;
             }, 1500);
         } else {
             showMessage(messageDiv, data.message, 'error');
         }
     } catch (error) {
         console.error('Abertura de caixa error:', error);
-        showMessage(messageDiv, 'Erro ao conectar com o servidor', 'error');
+        showMessage(messageDiv, error.message, 'error');
     } finally {
         button.disabled = false;
         button.textContent = 'Abrir Caixa';
     }
+}
+
+// Função auxiliar para pegar cookies
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
 }
 
 // Funções auxiliares
