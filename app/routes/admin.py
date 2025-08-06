@@ -40,6 +40,21 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def to_decimal_2(value):
+    """Converte para Decimal com no máximo 2 casas decimais"""
+    if value is None:
+        return None
+    try:
+        # Primeiro converte para string para evitar problemas com float
+        str_value = str(value).strip()
+        if not str_value:
+            return None
+        # Converte para Decimal e arredonda para 2 casas decimais
+        decimal_value = Decimal(str_value).quantize(Decimal('0.01'))
+        return decimal_value
+    except (InvalidOperation, ValueError):
+        return None
+
 # ===== Dashboard Routes =====
 @admin_bp.route('/dashboard')
 @login_required
@@ -449,70 +464,128 @@ def atualizar_produto(produto_id):
         if not produto:
             return jsonify({'success': False, 'message': 'Produto não encontrado'}), 404
 
-        # Atualizar campos básicos
+        # Validação e conversão de todos os campos numéricos
         update_fields = {}
-        for campo in ['codigo', 'nome', 'tipo', 'marca', 'unidade', 'ativo',
-                     'valor_unitario', 'valor_unitario_compra', 'valor_total_compra',
-                     'imcs', 'estoque_loja', 'estoque_deposito', 'estoque_fabrica',
-                     'estoque_minimo', 'estoque_maximo']:
+        
+        # Campos básicos
+        for campo in ['codigo', 'nome', 'tipo', 'marca', 'unidade', 'ativo']:
             if campo in data:
-                valor = data[campo]
-                if campo.startswith('valor_') or campo.startswith('estoque') or campo == 'imcs':
-                    valor = to_decimal_or_none(valor)
-                update_fields[campo] = valor
-
-        produto_data = ProdutoUpdate(**update_fields)
-        produto = update_produto(db.session, produto_id, produto_data)
-
-        # Atualizar descontos
-        try:
-            produto.descontos = []
-            db.session.flush()
-
-            if 'descontos' in data and isinstance(data['descontos'], (list, tuple)):
-                desconto_ids = [int(id) for id in data['descontos']] if data['descontos'] else []
-            elif 'desconto_id' in data and data['desconto_id']:
-                desconto_ids = [int(data['desconto_id'])]
-            else:
-                desconto_ids = []
-
-            for desconto_id in desconto_ids:
-                desconto = buscar_desconto_by_id(db.session, desconto_id)
-                if not desconto:
+                update_fields[campo] = data[campo]
+        
+        # Campos monetários (2 casas decimais)
+        campos_monetarios = [
+            'valor_unitario', 'valor_unitario_compra', 
+            'valor_total_compra', 'imcs'
+        ]
+        for campo in campos_monetarios:
+            if campo in data:
+                valor = to_decimal_2(data[campo])
+                if valor is None:
                     return jsonify({
                         'success': False,
-                        'message': f'Desconto com ID {desconto_id} não encontrado'
+                        'message': f'Valor inválido para {campo}'
                     }), 400
-                produto.descontos.append(desconto)
+                update_fields[campo] = valor
+        
+        # Campos de estoque (3 casas decimais, mas vamos arredondar para 2)
+        campos_estoque = [
+            'estoque_loja', 'estoque_deposito', 'estoque_fabrica',
+            'estoque_minimo', 'estoque_maximo'
+        ]
+        for campo in campos_estoque:
+            if campo in data:
+                try:
+                    # Converte para Decimal com 3 casas e depois arredonda para 2
+                    str_value = str(data[campo]).strip()
+                    if not str_value:
+                        continue
+                    valor = Decimal(str_value).quantize(Decimal('0.001')).quantize(Decimal('0.01'))
+                    update_fields[campo] = valor
+                except (InvalidOperation, ValueError):
+                    return jsonify({
+                        'success': False,
+                        'message': f'Valor de estoque inválido para {campo}'
+                    }), 400
+        
+        # Campos de conversão de unidades
+        for campo in ['peso_kg_por_saco', 'pacotes_por_saco', 'pacotes_por_fardo']:
+            if campo in data:
+                try:
+                    if campo.startswith('peso'):
+                        valor = Decimal(str(data[campo])).quantize(Decimal('0.001'))
+                    else:
+                        valor = int(data[campo])
+                    update_fields[campo] = valor
+                except (ValueError, InvalidOperation):
+                    return jsonify({
+                        'success': False,
+                        'message': f'Valor inválido para {campo}'
+                    }), 400
 
-            db.session.commit()
+        # Criar objeto de atualização
+        produto_data = ProdutoUpdate(**update_fields)
+        
+        # Atualizar o produto
+        produto = update_produto(db.session, produto_id, produto_data)
 
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({
-                'success': False,
-                'message': f'Erro ao atualizar descontos: {str(e)}'
-            }), 400
+        # Atualizar descontos (se fornecido)
+        if 'descontos' in data or 'desconto_id' in data:
+            try:
+                produto.descontos = []
+                db.session.flush()
+
+                if 'descontos' in data and isinstance(data['descontos'], (list, tuple)):
+                    desconto_ids = [int(id) for id in data['descontos']] if data['descontos'] else []
+                elif 'desconto_id' in data and data['desconto_id']:
+                    desconto_ids = [int(data['desconto_id'])]
+                else:
+                    desconto_ids = []
+
+                for desconto_id in desconto_ids:
+                    desconto = buscar_desconto_by_id(db.session, desconto_id)
+                    if not desconto:
+                        return jsonify({
+                            'success': False,
+                            'message': f'Desconto com ID {desconto_id} não encontrado'
+                        }), 400
+                    produto.descontos.append(desconto)
+
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                return jsonify({
+                    'success': False,
+                    'message': f'Erro ao atualizar descontos: {str(e)}'
+                }), 400
+
+        # Formatar os valores para retorno
+        produto_dict = {
+            'id': produto.id,
+            'nome': produto.nome,
+            'valor_unitario': formatar_valor_br(produto.valor_unitario),
+            'estoque_loja': f"{float(produto.estoque_loja):.2f}",
+            'descontos': [{
+                'id': d.id,
+                'identificador': d.identificador,
+                'valor': formatar_valor_br(d.valor),
+                'quantidade_minima': f"{float(d.quantidade_minima):.2f}",
+                'tipo': d.tipo.name
+            } for d in produto.descontos]
+        }
 
         return jsonify({
             'success': True,
             'message': 'Produto atualizado com sucesso',
-            'produto': {
-                'id': produto.id,
-                'nome': produto.nome,
-                'descontos': [{
-                    'id': d.id,
-                    'identificador': d.identificador,
-                    'valor': float(d.valor),
-                    'quantidade_minima': float(d.quantidade_minima),
-                    'tipo': d.tipo.name
-                } for d in produto.descontos]
-            }
+            'produto': produto_dict
         })
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao atualizar produto: {str(e)}'
+        }), 400
+        
         
 @admin_bp.route('/produtos/<int:produto_id>', methods=['GET'])
 @login_required
@@ -663,144 +736,139 @@ def registrar_movimentacao_produto(produto_id):
 @login_required
 @admin_required
 def api_registrar_venda_retroativa():
-    # Verificação inicial do conteúdo da requisição
     if not request.is_json:
-        return jsonify({
-            'success': False,
-            'message': 'Content-Type deve ser application/json'
-        }), 400
+        return jsonify({'success': False, 'message': 'Content-Type deve ser application/json'}), 400
 
     try:
         dados_venda = request.get_json()
-        print(dados_venda)
+        print("Dados recebidos:", dados_venda)  # Log para depuração
         
         if dados_venda is None:
-            return jsonify({
-                'success': False,
-                'message': 'JSON inválido ou não enviado'
-            }), 400
+            return jsonify({'success': False, 'message': 'JSON inválido ou não enviado'}), 400
+
+        # Função auxiliar para converter e validar decimais
+        def validar_decimal(valor, campo, max_digits=12, decimal_places=2):
+            try:
+                if valor is None:
+                    return None
+                str_valor = str(valor).strip()
+                if not str_valor:
+                    return None
+                decimal_val = Decimal(str_valor).quantize(Decimal('0.01'))
+                if abs(decimal_val.as_tuple().exponent) > decimal_places:
+                    raise ValueError(f"O campo {campo} deve ter no máximo {decimal_places} casas decimais")
+                if len(str(decimal_val).replace('.', '').replace('-', '')) > max_digits:
+                    raise ValueError(f"O campo {campo} deve ter no máximo {max_digits} dígitos no total")
+                return decimal_val
+            except (ValueError, InvalidOperation) as e:
+                print(e)
+                raise ValueError(f"Valor inválido para {campo}: {str(e)}")
 
         # Campos obrigatórios
         required_fields = ['cliente_id', 'itens', 'pagamentos', 'valor_total', 'caixa_id', 'data_emissao']
         for field in required_fields:
             if field not in dados_venda:
-                return jsonify({
-                    'success': False,
-                    'message': f'Campo obrigatório faltando: {field}'
-                }), 400
+                return jsonify({'success': False, 'message': f'Campo obrigatório faltando: {field}'}), 400
 
-        # Validar data de emissão (apenas formato e não-futura)
+        # Validar data de emissão
         try:
             data_emissao = datetime.strptime(dados_venda['data_emissao'], '%Y-%m-%d %H:%M:%S')
             if data_emissao > datetime.utcnow():
-                return jsonify({
-                    'success': False,
-                    'message': 'Data de emissão não pode ser futura'
-                }), 400
-        except ValueError as e:
-            return jsonify({
-                'success': False,
-                'message': 'Formato de data inválido. Use YYYY-MM-DD HH:MM:SS'
-            }), 400
+                return jsonify({'success': False, 'message': 'Data de emissão não pode ser futura'}), 400
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Formato de data inválido. Use YYYY-MM-DD HH:MM:SS'}), 400
 
-        # Verificar apenas se o caixa existe e está fechado
+        # Verificar caixa
         caixa = entities.Caixa.query.get(dados_venda['caixa_id'])
         if not caixa:
-            return jsonify({
-                'success': False,
-                'message': f'Caixa não encontrado: ID {dados_venda["caixa_id"]}'
-            }), 404
-
+            return jsonify({'success': False, 'message': f'Caixa não encontrado: ID {dados_venda["caixa_id"]}'}), 404
         if caixa.status == 'aberto':
-            return jsonify({
-                'success': False,
-                'message': 'Para vendas retroativas, o caixa deve estar fechado'
-            }), 400
+            return jsonify({'success': False, 'message': 'Para vendas retroativas, o caixa deve estar fechado'}), 400
 
+        # Validar lista de itens
         if not isinstance(dados_venda['itens'], list) or len(dados_venda['itens']) == 0:
-            return jsonify({
-                'success': False,
-                'message': 'Lista de itens inválida ou vazia'
-            }), 400
+            return jsonify({'success': False, 'message': 'Lista de itens inválida ou vazia'}), 400
 
+        # Validar lista de pagamentos
         if not isinstance(dados_venda['pagamentos'], list) or len(dados_venda['pagamentos']) == 0:
-            return jsonify({
-                'success': False,
-                'message': 'Lista de pagamentos inválida ou vazia'
-            }), 400
+            return jsonify({'success': False, 'message': 'Lista de pagamentos inválida ou vazia'}), 400
 
-        # Conversão e validação de valores
+        # Converter e validar valores principais
         try:
             cliente_id = int(dados_venda['cliente_id'])
-            valor_total = Decimal(str(dados_venda['valor_total']))
-            total_descontos = Decimal(str(dados_venda.get('total_descontos', 0)))
+            valor_total = validar_decimal(dados_venda['valor_total'], 'valor_total')
+            total_descontos = validar_decimal(dados_venda.get('total_descontos', 0), 'total_descontos')
             
-            valor_a_vista = sum(
-                Decimal(str(p.get('valor'))) 
-                for p in dados_venda['pagamentos'] 
-                if p.get('forma_pagamento') != 'a_prazo'
-            )
-            
-            valor_recebido = valor_a_vista
-        except (ValueError, InvalidOperation) as e:
-            return jsonify({
-                'success': False,
-                'message': 'Valores numéricos inválidos'
-            }), 400
+            # Validar cliente
+            cliente = entities.Cliente.query.get(cliente_id)
+            if not cliente:
+                return jsonify({'success': False, 'message': f'Cliente não encontrado: ID {cliente_id}'}), 404
+        except ValueError as e:
+            print(e)
+            return jsonify({'success': False, 'message': str(e)}), 400
 
-        # Verificar cliente
-        cliente = entities.Cliente.query.get(cliente_id)
-        if not cliente:
-            return jsonify({
-                'success': False,
-                'message': f'Cliente não encontrado: ID {cliente_id}'
-            }), 404
-
-        # Validar itens e estoque
-        for item_data in dados_venda['itens']:
+        # Validar itens
+        itens_validados = []
+        for item in dados_venda['itens']:
             try:
-                produto_id = int(item_data.get('produto_id'))
-                quantidade = Decimal(str(item_data.get('quantidade')))
-                valor_unitario = Decimal(str(item_data.get('valor_unitario')))
-                valor_total_item = Decimal(str(item_data.get('valor_total')))
-                
+                produto_id = int(item.get('produto_id'))
                 produto = entities.Produto.query.get(produto_id)
                 if not produto:
-                    return jsonify({
-                        'success': False,
-                        'message': f'Produto não encontrado: ID {produto_id}'
-                    }), 404
+                    return jsonify({'success': False, 'message': f'Produto não encontrado: ID {produto_id}'}), 404
+
+                quantidade = validar_decimal(item.get('quantidade'), 'quantidade', decimal_places=3)
+                valor_unitario = validar_decimal(item.get('valor_unitario'), 'valor_unitario')
+                valor_total_item = validar_decimal(item.get('valor_total'), 'valor_total')
+                desconto_aplicado = validar_decimal(item.get('valor_desconto', 0), 'valor_desconto')
 
                 if produto.estoque_loja < quantidade:
                     return jsonify({
                         'success': False,
-                        'message': f'Estoque insuficiente para o produto: {produto.nome}'
+                        'message': f'Estoque insuficiente para {produto.nome} (disponível: {produto.estoque_loja}, solicitado: {quantidade})'
                     }), 400
 
-            except (ValueError, InvalidOperation, TypeError) as e:
-                return jsonify({
-                    'success': False,
-                    'message': 'Dados do item inválidos'
-                }), 400
+                itens_validados.append({
+                    'produto': produto,
+                    'quantidade': quantidade,
+                    'valor_unitario': valor_unitario,
+                    'valor_total': valor_total_item,
+                    'desconto_aplicado': desconto_aplicado,
+                    'tipo_desconto': item.get('desconto_info', {}).get('tipo')
+                })
+            except ValueError as e:
+                return jsonify({'success': False, 'message': f'Erro no item: {str(e)}'}), 400
+
+        # Validar pagamentos
+        pagamentos_validados = []
+        valor_a_prazo = Decimal('0.00')
+        valor_a_vista = Decimal('0.00')
+        
+        for pagamento in dados_venda['pagamentos']:
+            try:
+                forma = pagamento.get('forma_pagamento')
+                valor = validar_decimal(pagamento.get('valor'), 'valor_pagamento')
+                
+                if forma == 'a_prazo':
+                    valor_a_prazo += valor
+                else:
+                    valor_a_vista += valor
+                
+                pagamentos_validados.append({
+                    'forma': forma,
+                    'valor': valor
+                })
+            except ValueError as e:
+                return jsonify({'success': False, 'message': f'Erro no pagamento: {str(e)}'}), 400
 
         # Verificar soma dos pagamentos
-        try:
-            soma_pagamentos = sum(Decimal(str(p.get('valor'))) for p in dados_venda['pagamentos'])
-            a_prazo_usado = any(p.get('forma_pagamento') == 'a_prazo' for p in dados_venda['pagamentos'])
-            
-            if abs(soma_pagamentos - valor_total) > Decimal('0.01'):
-                msg = f'Valor recebido ({soma_pagamentos}) diferente do total da venda ({valor_total})'
-                return jsonify({
-                    'success': False,
-                    'message': msg
-                }), 400
-        except (ValueError, InvalidOperation, TypeError) as e:
+        soma_pagamentos = valor_a_vista + valor_a_prazo
+        if abs(soma_pagamentos - valor_total) > Decimal('0.01'):
             return jsonify({
                 'success': False,
-                'message': 'Dados de pagamento inválidos'
+                'message': f'Valor recebido ({soma_pagamentos}) diferente do total da venda ({valor_total})'
             }), 400
 
-        # Criar registro de Nota Fiscal
+        # Criar nota fiscal
         nota = entities.NotaFiscal(
             cliente_id=cliente.id,
             operador_id=current_user.id,
@@ -808,26 +876,26 @@ def api_registrar_venda_retroativa():
             data_emissao=data_emissao,
             valor_total=valor_total,
             valor_desconto=total_descontos,
-            tipo_desconto=None,
             status=entities.StatusNota.emitida,
             forma_pagamento=entities.FormaPagamento.dinheiro,
-            valor_recebido=valor_recebido,
-            troco=max(valor_recebido - valor_total, Decimal(0)) if not a_prazo_usado else Decimal(0),
-            a_prazo=a_prazo_usado
+            valor_recebido=valor_a_vista,
+            troco=max(valor_a_vista - valor_total, Decimal('0.00')),
+            a_prazo=valor_a_prazo > Decimal('0.00'),
+            sincronizado=False
         )
 
-        # Criar Entrega, se presente
-        endereco_entrega = dados_venda.get('endereco_entrega')
-        if endereco_entrega and isinstance(endereco_entrega, dict):
+        # Criar entrega se existir
+        if 'endereco_entrega' in dados_venda and isinstance(dados_venda['endereco_entrega'], dict):
+            entrega_data = dados_venda['endereco_entrega']
             entrega = entities.Entrega(
-                logradouro=endereco_entrega.get('logradouro', ''),
-                numero=endereco_entrega.get('numero', ''),
-                complemento=endereco_entrega.get('complemento', ''),
-                bairro=endereco_entrega.get('bairro', ''),
-                cidade=endereco_entrega.get('cidade', ''),
-                estado=endereco_entrega.get('estado', ''),
-                cep=endereco_entrega.get('cep', ''),
-                instrucoes=endereco_entrega.get('instrucoes', ''),
+                logradouro=entrega_data.get('logradouro', ''),
+                numero=entrega_data.get('numero', ''),
+                complemento=entrega_data.get('complemento', ''),
+                bairro=entrega_data.get('bairro', ''),
+                cidade=entrega_data.get('cidade', ''),
+                estado=entrega_data.get('estado', ''),
+                cep=entrega_data.get('cep', ''),
+                instrucoes=entrega_data.get('instrucoes', ''),
                 sincronizado=False
             )
             db.session.add(entrega)
@@ -837,57 +905,41 @@ def api_registrar_venda_retroativa():
         db.session.add(nota)
         db.session.flush()
 
-        # Criar itens da nota fiscal
-        for item_data in dados_venda['itens']:
-            produto_id = item_data.get('produto_id')
-            produto = entities.Produto.query.get(produto_id)
-            quantidade = Decimal(str(item_data.get('quantidade')))
-            valor_unitario = Decimal(str(item_data.get('valor_unitario')))
-            valor_total_item = Decimal(str(item_data.get('valor_total')))
-            desconto_aplicado = Decimal(str(item_data.get('valor_desconto', 0)))
-            
-            desconto_info = item_data.get('desconto_info', {}) or {}
-            tipo_desconto = desconto_info.get('tipo') if isinstance(desconto_info, dict) else None
-
+        # Adicionar itens
+        for item in itens_validados:
             item_nf = entities.NotaFiscalItem(
                 nota_id=nota.id,
-                produto_id=produto_id,
+                produto_id=item['produto'].id,
                 estoque_origem=entities.TipoEstoque.loja,
-                quantidade=quantidade,
-                valor_unitario=valor_unitario,
-                valor_total=valor_total_item,
-                desconto_aplicado=desconto_aplicado,
-                tipo_desconto=entities.TipoDesconto(tipo_desconto) if tipo_desconto else None,
+                quantidade=item['quantidade'],
+                valor_unitario=item['valor_unitario'],
+                valor_total=item['valor_total'],
+                desconto_aplicado=item['desconto_aplicado'],
+                tipo_desconto=entities.TipoDesconto(item['tipo_desconto']) if item['tipo_desconto'] else None,
                 sincronizado=False
             )
             db.session.add(item_nf)
-            produto.estoque_loja -= quantidade
+            item['produto'].estoque_loja -= item['quantidade']
 
-        # Criar pagamentos
+        # Adicionar pagamentos
         pagamentos_ids = []
-        valor_a_prazo = Decimal(0)
-        
-        for pagamento_data in dados_venda['pagamentos']:
-            forma = pagamento_data.get('forma_pagamento')
-            valor = Decimal(str(pagamento_data.get('valor')))
-            
+        for pagamento in pagamentos_validados:
             pagamento_nf = entities.PagamentoNotaFiscal(
                 nota_fiscal_id=nota.id,
-                forma_pagamento=entities.FormaPagamento(forma),
-                valor=valor,
+                forma_pagamento=entities.FormaPagamento(pagamento['forma']),
+                valor=pagamento['valor'],
                 data=data_emissao,
                 sincronizado=False
             )
             db.session.add(pagamento_nf)
             db.session.flush()
             pagamentos_ids.append(pagamento_nf.id)
-            
-            # Registrar no financeiro (exceto para pagamentos a prazo)
-            if forma != 'a_prazo':
+
+            if pagamento['forma'] != 'a_prazo':
                 financeiro = entities.Financeiro(
                     tipo=entities.TipoMovimentacao.entrada,
                     categoria=entities.CategoriaFinanceira.venda,
-                    valor=valor,
+                    valor=pagamento['valor'],
                     descricao=f"Pagamento venda NF #{nota.id}",
                     cliente_id=cliente.id,
                     caixa_id=caixa.id,
@@ -897,11 +949,9 @@ def api_registrar_venda_retroativa():
                     sincronizado=False
                 )
                 db.session.add(financeiro)
-            else:
-                valor_a_prazo += valor
 
-        # Criar conta a receber se houver pagamento a prazo
-        if a_prazo_usado and valor_a_prazo > 0:
+        # Criar conta a receber se houver valor a prazo
+        if valor_a_prazo > Decimal('0.00'):
             conta_receber = entities.ContaReceber(
                 cliente_id=cliente.id,
                 nota_fiscal_id=nota.id,
@@ -915,10 +965,8 @@ def api_registrar_venda_retroativa():
             db.session.add(conta_receber)
 
         # Definir forma de pagamento principal
-        if len(dados_venda['pagamentos']) == 1:
-            nota.forma_pagamento = entities.FormaPagamento(dados_venda['pagamentos'][0]['forma_pagamento'])
-        else:
-            nota.forma_pagamento = entities.FormaPagamento.dinheiro
+        if len(pagamentos_validados) == 1:
+            nota.forma_pagamento = entities.FormaPagamento(pagamentos_validados[0]['forma'])
 
         db.session.commit()
 
@@ -926,28 +974,31 @@ def api_registrar_venda_retroativa():
             'success': True,
             'message': 'Venda retroativa registrada com sucesso',
             'nota_fiscal_id': nota.id,
-            'pagamentos_ids': pagamentos_ids,
-            'valor_total': float(valor_total),
-            'valor_recebido': float(valor_recebido),
-            'troco': float(nota.troco) if nota.troco else 0,
-            'valor_a_prazo': float(valor_a_prazo) if a_prazo_usado else 0,
+            'valor_total': float(valor_total.quantize(Decimal('0.01'))),
+            'valor_recebido': float(valor_a_vista.quantize(Decimal('0.01'))),
+            'troco': float(nota.troco.quantize(Decimal('0.01'))) if nota.troco else 0,
+            'valor_a_prazo': float(valor_a_prazo.quantize(Decimal('0.01'))) if valor_a_prazo > 0 else 0,
             'data_emissao': data_emissao.strftime('%Y-%m-%d %H:%M:%S')
         }), 201
 
     except SQLAlchemyError as e:
+        print(e)
         db.session.rollback()
         return jsonify({
             'success': False,
             'message': 'Erro ao registrar venda retroativa no banco',
-            'error': str(e)
+            'error': str(e),
+            'traceback': traceback.format_exc()
         }), 500
         
     except Exception as e:
+        print(e)
         db.session.rollback()
         return jsonify({
             'success': False,
             'message': 'Erro inesperado ao registrar venda retroativa',
-            'error': str(e)
+            'error': str(e),
+            'traceback': traceback.format_exc()
         }), 500
         
 # Rotas para carregar dados no modal
