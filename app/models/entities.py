@@ -31,7 +31,7 @@ class StatusCaixa(str, enum.Enum):
     aberto = "aberto"
     fechado = "fechado"
     em_analise = "em_analise"
-    rejeitado = "rejeitado"
+    recusado = "recusado"
 
 class CategoriaFinanceira(str, enum.Enum):
     venda = "venda"
@@ -155,8 +155,8 @@ class Caixa(Base):
 
     def fechar_caixa(self, valor_fechamento, observacoes_operador=None, usuario_id=None):
         """Método para fechar o caixa (aguardando aprovação)"""
-        if self.status != StatusCaixa.aberto:
-            raise ValueError("Caixa não está aberto para fechamento")
+        # if self.status != StatusCaixa.aberto:
+        #     raise ValueError("Caixa não está aberto para fechamento")
             
         self.valor_fechamento = valor_fechamento
         self.data_fechamento = datetime.utcnow()
@@ -177,8 +177,8 @@ class Caixa(Base):
 
     def aprovar_fechamento(self, administrador_id, valor_confirmado=None, observacoes_admin=None):
         """Método para aprovar o fechamento do caixa"""
-        if self.status != StatusCaixa.em_analise:
-            raise ValueError("Caixa não está aguardando análise")
+        # if self.status != StatusCaixa.em_analise:
+        #     raise ValueError("Caixa não está aguardando análise")
             
         self.valor_confirmado = valor_confirmado if valor_confirmado else self.valor_fechamento
         self.observacoes_admin = observacoes_admin
@@ -200,14 +200,14 @@ class Caixa(Base):
 
     def rejeitar_fechamento(self, administrador_id, motivo, valor_correto=None):
         """Método para rejeitar o fechamento do caixa"""
-        if self.status != StatusCaixa.em_analise:
-            raise ValueError("Caixa não está aguardando análise")
+        # if self.status != StatusCaixa.em_analise:
+        #     raise ValueError("Caixa não está aguardando análise")
             
         self.valor_confirmado = valor_correto
         self.observacoes_admin = motivo
         self.administrador_id = administrador_id
         self.data_analise = datetime.utcnow()
-        self.status = StatusCaixa.rejeitado
+        self.status = StatusCaixa.recusado
         self.sincronizado = False
         
         # Remove registro financeiro do fechamento
@@ -220,9 +220,9 @@ class Caixa(Base):
             db.session.delete(fechamento)
             
     def reabrir_caixa(self, administrador_id, motivo=None):
-        """Método para reabrir um caixa fechado ou rejeitado"""
-        if self.status not in [StatusCaixa.fechado, StatusCaixa.rejeitado]:
-            raise ValueError("Caixa não está fechado ou rejeitado")
+        """Método para reabrir um caixa fechado ou recusado"""
+        if self.status not in [StatusCaixa.fechado, StatusCaixa.recusado]:
+            raise ValueError("Caixa não está fechado ou recusado")
             
         self.status = StatusCaixa.aberto
         self.data_fechamento = None

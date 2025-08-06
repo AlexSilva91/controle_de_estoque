@@ -1970,7 +1970,7 @@ def aprovar_caixa(caixa_id):
     data = request.get_json()
     valor_confirmado = data.get('valor_confirmado')
     observacoes = data.get('observacoes')
-    
+    print(data)
     try:
         caixa.aprovar_fechamento(
             administrador_id=current_user.id,
@@ -1984,8 +1984,10 @@ def aprovar_caixa(caixa_id):
             'valor_confirmado': float(caixa.valor_confirmado) if caixa.valor_confirmado else None
         }), 200
     except ValueError as e:
+        print(e)
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        print(e)
         db.session.rollback()
         return jsonify({'error': f'Erro ao aprovar caixa: {str(e)}'}), 500
 
@@ -2019,8 +2021,10 @@ def recusar_caixa(caixa_id):
             'observacoes_admin': caixa.observacoes_admin
         }), 200
     except ValueError as e:
+        print(e)
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        print(e)
         db.session.rollback()
         return jsonify({'error': f'Erro ao recusar caixa: {str(e)}'}), 500
 
@@ -2094,7 +2098,9 @@ def reabrir_caixa(caixa_id):
             'status': caixa.status.value
         }), 200
     except ValueError as e:
+        print(e)
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        print(e)
         db.session.rollback()
         return jsonify({'error': f'Erro ao reabrir caixa: {str(e)}'}), 500
