@@ -1,10 +1,10 @@
 from functools import wraps
 from zoneinfo import ZoneInfo
-from flask import Blueprint, current_app, render_template, request, jsonify, session, flash, redirect, url_for
+from flask import Blueprint, app, render_template, request, jsonify
 from flask_login import login_required, current_user
-from datetime import datetime
-from decimal import Decimal
-from sqlalchemy.exc import IntegrityError
+from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 import traceback
 
 from sqlalchemy import func
@@ -656,7 +656,381 @@ def registrar_movimentacao_produto(produto_id):
         })
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
+    
+    
+# ===== Venda com Data Retroativa ====
+@admin_bp.route('/api/vendas/retroativa', methods=['POST'])
+@login_required
+@admin_required
+def api_registrar_venda_retroativa():
+    # Verificação inicial do conteúdo da requisição
+    if not request.is_json:
+        return jsonify({
+            'success': False,
+            'message': 'Content-Type deve ser application/json'
+        }), 400
 
+    try:
+        dados_venda = request.get_json()
+        print(dados_venda)
+        
+        if dados_venda is None:
+            return jsonify({
+                'success': False,
+                'message': 'JSON inválido ou não enviado'
+            }), 400
+
+        # Campos obrigatórios
+        required_fields = ['cliente_id', 'itens', 'pagamentos', 'valor_total', 'caixa_id', 'data_emissao']
+        for field in required_fields:
+            if field not in dados_venda:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo obrigatório faltando: {field}'
+                }), 400
+
+        # Validar data de emissão (apenas formato e não-futura)
+        try:
+            data_emissao = datetime.strptime(dados_venda['data_emissao'], '%Y-%m-%d %H:%M:%S')
+            if data_emissao > datetime.utcnow():
+                return jsonify({
+                    'success': False,
+                    'message': 'Data de emissão não pode ser futura'
+                }), 400
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': 'Formato de data inválido. Use YYYY-MM-DD HH:MM:SS'
+            }), 400
+
+        # Verificar apenas se o caixa existe e está fechado
+        caixa = entities.Caixa.query.get(dados_venda['caixa_id'])
+        if not caixa:
+            return jsonify({
+                'success': False,
+                'message': f'Caixa não encontrado: ID {dados_venda["caixa_id"]}'
+            }), 404
+
+        if caixa.status == 'aberto':
+            return jsonify({
+                'success': False,
+                'message': 'Para vendas retroativas, o caixa deve estar fechado'
+            }), 400
+
+        if not isinstance(dados_venda['itens'], list) or len(dados_venda['itens']) == 0:
+            return jsonify({
+                'success': False,
+                'message': 'Lista de itens inválida ou vazia'
+            }), 400
+
+        if not isinstance(dados_venda['pagamentos'], list) or len(dados_venda['pagamentos']) == 0:
+            return jsonify({
+                'success': False,
+                'message': 'Lista de pagamentos inválida ou vazia'
+            }), 400
+
+        # Conversão e validação de valores
+        try:
+            cliente_id = int(dados_venda['cliente_id'])
+            valor_total = Decimal(str(dados_venda['valor_total']))
+            total_descontos = Decimal(str(dados_venda.get('total_descontos', 0)))
+            
+            valor_a_vista = sum(
+                Decimal(str(p.get('valor'))) 
+                for p in dados_venda['pagamentos'] 
+                if p.get('forma_pagamento') != 'a_prazo'
+            )
+            
+            valor_recebido = valor_a_vista
+        except (ValueError, InvalidOperation) as e:
+            return jsonify({
+                'success': False,
+                'message': 'Valores numéricos inválidos'
+            }), 400
+
+        # Verificar cliente
+        cliente = entities.Cliente.query.get(cliente_id)
+        if not cliente:
+            return jsonify({
+                'success': False,
+                'message': f'Cliente não encontrado: ID {cliente_id}'
+            }), 404
+
+        # Validar itens e estoque
+        for item_data in dados_venda['itens']:
+            try:
+                produto_id = int(item_data.get('produto_id'))
+                quantidade = Decimal(str(item_data.get('quantidade')))
+                valor_unitario = Decimal(str(item_data.get('valor_unitario')))
+                valor_total_item = Decimal(str(item_data.get('valor_total')))
+                
+                produto = entities.Produto.query.get(produto_id)
+                if not produto:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Produto não encontrado: ID {produto_id}'
+                    }), 404
+
+                if produto.estoque_loja < quantidade:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Estoque insuficiente para o produto: {produto.nome}'
+                    }), 400
+
+            except (ValueError, InvalidOperation, TypeError) as e:
+                return jsonify({
+                    'success': False,
+                    'message': 'Dados do item inválidos'
+                }), 400
+
+        # Verificar soma dos pagamentos
+        try:
+            soma_pagamentos = sum(Decimal(str(p.get('valor'))) for p in dados_venda['pagamentos'])
+            a_prazo_usado = any(p.get('forma_pagamento') == 'a_prazo' for p in dados_venda['pagamentos'])
+            
+            if abs(soma_pagamentos - valor_total) > Decimal('0.01'):
+                msg = f'Valor recebido ({soma_pagamentos}) diferente do total da venda ({valor_total})'
+                return jsonify({
+                    'success': False,
+                    'message': msg
+                }), 400
+        except (ValueError, InvalidOperation, TypeError) as e:
+            return jsonify({
+                'success': False,
+                'message': 'Dados de pagamento inválidos'
+            }), 400
+
+        # Criar registro de Nota Fiscal
+        nota = entities.NotaFiscal(
+            cliente_id=cliente.id,
+            operador_id=current_user.id,
+            caixa_id=caixa.id,
+            data_emissao=data_emissao,
+            valor_total=valor_total,
+            valor_desconto=total_descontos,
+            tipo_desconto=None,
+            status=entities.StatusNota.emitida,
+            forma_pagamento=entities.FormaPagamento.dinheiro,
+            valor_recebido=valor_recebido,
+            troco=max(valor_recebido - valor_total, Decimal(0)) if not a_prazo_usado else Decimal(0),
+            a_prazo=a_prazo_usado
+        )
+
+        # Criar Entrega, se presente
+        endereco_entrega = dados_venda.get('endereco_entrega')
+        if endereco_entrega and isinstance(endereco_entrega, dict):
+            entrega = entities.Entrega(
+                logradouro=endereco_entrega.get('logradouro', ''),
+                numero=endereco_entrega.get('numero', ''),
+                complemento=endereco_entrega.get('complemento', ''),
+                bairro=endereco_entrega.get('bairro', ''),
+                cidade=endereco_entrega.get('cidade', ''),
+                estado=endereco_entrega.get('estado', ''),
+                cep=endereco_entrega.get('cep', ''),
+                instrucoes=endereco_entrega.get('instrucoes', ''),
+                sincronizado=False
+            )
+            db.session.add(entrega)
+            db.session.flush()
+            nota.entrega_id = entrega.id
+
+        db.session.add(nota)
+        db.session.flush()
+
+        # Criar itens da nota fiscal
+        for item_data in dados_venda['itens']:
+            produto_id = item_data.get('produto_id')
+            produto = entities.Produto.query.get(produto_id)
+            quantidade = Decimal(str(item_data.get('quantidade')))
+            valor_unitario = Decimal(str(item_data.get('valor_unitario')))
+            valor_total_item = Decimal(str(item_data.get('valor_total')))
+            desconto_aplicado = Decimal(str(item_data.get('valor_desconto', 0)))
+            
+            desconto_info = item_data.get('desconto_info', {}) or {}
+            tipo_desconto = desconto_info.get('tipo') if isinstance(desconto_info, dict) else None
+
+            item_nf = entities.NotaFiscalItem(
+                nota_id=nota.id,
+                produto_id=produto_id,
+                estoque_origem=entities.TipoEstoque.loja,
+                quantidade=quantidade,
+                valor_unitario=valor_unitario,
+                valor_total=valor_total_item,
+                desconto_aplicado=desconto_aplicado,
+                tipo_desconto=entities.TipoDesconto(tipo_desconto) if tipo_desconto else None,
+                sincronizado=False
+            )
+            db.session.add(item_nf)
+            produto.estoque_loja -= quantidade
+
+        # Criar pagamentos
+        pagamentos_ids = []
+        valor_a_prazo = Decimal(0)
+        
+        for pagamento_data in dados_venda['pagamentos']:
+            forma = pagamento_data.get('forma_pagamento')
+            valor = Decimal(str(pagamento_data.get('valor')))
+            
+            pagamento_nf = entities.PagamentoNotaFiscal(
+                nota_fiscal_id=nota.id,
+                forma_pagamento=entities.FormaPagamento(forma),
+                valor=valor,
+                data=data_emissao,
+                sincronizado=False
+            )
+            db.session.add(pagamento_nf)
+            db.session.flush()
+            pagamentos_ids.append(pagamento_nf.id)
+            
+            # Registrar no financeiro (exceto para pagamentos a prazo)
+            if forma != 'a_prazo':
+                financeiro = entities.Financeiro(
+                    tipo=entities.TipoMovimentacao.entrada,
+                    categoria=entities.CategoriaFinanceira.venda,
+                    valor=valor,
+                    descricao=f"Pagamento venda NF #{nota.id}",
+                    cliente_id=cliente.id,
+                    caixa_id=caixa.id,
+                    nota_fiscal_id=nota.id,
+                    pagamento_id=pagamento_nf.id,
+                    data=data_emissao,
+                    sincronizado=False
+                )
+                db.session.add(financeiro)
+            else:
+                valor_a_prazo += valor
+
+        # Criar conta a receber se houver pagamento a prazo
+        if a_prazo_usado and valor_a_prazo > 0:
+            conta_receber = entities.ContaReceber(
+                cliente_id=cliente.id,
+                nota_fiscal_id=nota.id,
+                descricao=f"Venda a prazo NF #{nota.id}",
+                valor_original=valor_a_prazo,
+                valor_aberto=valor_a_prazo,
+                data_vencimento=data_emissao + timedelta(days=30),
+                status=entities.StatusPagamento.pendente,
+                sincronizado=False
+            )
+            db.session.add(conta_receber)
+
+        # Definir forma de pagamento principal
+        if len(dados_venda['pagamentos']) == 1:
+            nota.forma_pagamento = entities.FormaPagamento(dados_venda['pagamentos'][0]['forma_pagamento'])
+        else:
+            nota.forma_pagamento = entities.FormaPagamento.dinheiro
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Venda retroativa registrada com sucesso',
+            'nota_fiscal_id': nota.id,
+            'pagamentos_ids': pagamentos_ids,
+            'valor_total': float(valor_total),
+            'valor_recebido': float(valor_recebido),
+            'troco': float(nota.troco) if nota.troco else 0,
+            'valor_a_prazo': float(valor_a_prazo) if a_prazo_usado else 0,
+            'data_emissao': data_emissao.strftime('%Y-%m-%d %H:%M:%S')
+        }), 201
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': 'Erro ao registrar venda retroativa no banco',
+            'error': str(e)
+        }), 500
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': 'Erro inesperado ao registrar venda retroativa',
+            'error': str(e)
+        }), 500
+        
+# Rotas para carregar dados no modal
+@admin_bp.route('/api/caixas/fechados', methods=['GET'])
+@login_required
+@admin_required
+def api_caixas_fechados():
+    try:
+        caixas = entities.Caixa.query.filter_by(status='fechado').order_by(entities.Caixa.data_fechamento.desc()).all()
+        
+        caixas_data = [{
+            'id': caixa.id,
+            'operador': caixa.operador.nome,
+            'data_abertura': caixa.data_abertura.strftime('%d/%m/%Y %H:%M'),
+            'data_fechamento': caixa.data_fechamento.strftime('%d/%m/%Y %H:%M') if caixa.data_fechamento else None,
+            'valor_abertura': float(caixa.valor_abertura),
+            'valor_fechamento': float(caixa.valor_fechamento) if caixa.valor_fechamento else None
+        } for caixa in caixas]
+        
+        return jsonify({
+            'success': True,
+            'caixas': caixas_data
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': 'Erro ao buscar caixas fechados'
+        }), 500
+
+@admin_bp.route('/api/clientes/ativos', methods=['GET'])
+@login_required
+@admin_required
+def api_clientes_ativos():
+    try:
+        clientes = entities.Cliente.query.filter_by(ativo=True).order_by(entities.Cliente.nome).all()
+        
+        clientes_data = [{
+            'id': cliente.id,
+            'nome': cliente.nome,
+            'documento': cliente.documento or '',
+            'telefone': cliente.telefone or '',
+            'limite_credito': float(cliente.limite_credito)
+        } for cliente in clientes]
+        
+        return jsonify({
+            'success': True,
+            'clientes': clientes_data
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': 'Erro ao buscar clientes'
+        }), 500
+
+@admin_bp.route('/api/produtos/ativos', methods=['GET'])
+@login_required
+@admin_required
+def api_produtos_ativos():
+    try:
+        produtos = entities.Produto.query.filter_by(ativo=True).order_by(entities.Produto.nome).all()
+        
+        produtos_data = [{
+            'id': produto.id,
+            'codigo': produto.codigo or '',
+            'nome': produto.nome,
+            'valor_unitario': float(produto.valor_unitario),
+            'estoque_loja': float(produto.estoque_loja),
+            'unidade': produto.unidade.value,
+            'marca': produto.marca or '',
+            'tipo': produto.tipo
+        } for produto in produtos]
+        
+        return jsonify({
+            'success': True,
+            'produtos': produtos_data
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': 'Erro ao buscar produtos'
+        }), 500
+        
+        
 # ===== Usuário Routes =====
 @admin_bp.route('/usuarios', methods=['GET'])
 @login_required

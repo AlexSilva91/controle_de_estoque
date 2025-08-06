@@ -8,6 +8,7 @@
     <!-- Links de recursos externos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
@@ -146,6 +147,7 @@
                             <span class="user-name">{{ nome_usuario }}</span>
                             <span class="user-role">Administrador</span>
                         </div>
+                    </div>
                 </div>
             </header>
 
@@ -757,33 +759,6 @@
     <!-- Modal Editar Produto -->
     <div id="editarProdutoModal" class="modal">
         <div class="modal-overlay"></div>
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">
-                        <i class="fas fa-edit"></i>
-                        <span>Editar Produto</span>
-                    </h3>
-                    <button class="close-modal" aria-label="Fechar">&times;</button>
-                </div>
-                <form id="editarProdutoForm">
-                    <div class="modal-body">
-                        <!-- Conteúdo será preenchido via JavaScript -->
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i>
-                            <span>Salvar Alterações</span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    <!-- Modal Editar Produto -->
-    <div id="editarProdutoModal" class="modal">
-        <div class="modal-overlay"></div>
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
@@ -808,6 +783,7 @@
             </div>
         </div>
     </div>
+
     <!-- Modal Confirmar Exclusão -->
     <div id="confirmarExclusaoModal" class="modal">
         <div class="modal-overlay"></div>
@@ -829,6 +805,168 @@
                         <i class="fas fa-trash"></i>
                         <span>Confirmar Exclusão</span>
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VENDA RETROATIVA -->
+    <div id="modalVendaRetroativa" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-exchange-alt"></i>
+                        <span>Registrar Venda Retroativa</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="formVendaRetroativa">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="dataEmissaoRetroativa">Data da Venda</label>
+                                    <input type="datetime-local" class="form-control" id="dataEmissaoRetroativa" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="caixaRetroativo">Caixa</label>
+                                    <select class="form-control" id="caixaRetroativo" required>
+                                        <option value="">Selecione o caixa</option>
+                                        <!-- Opções serão preenchidas via JS -->
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="clienteRetroativo">Cliente</label>
+                            <select class="form-control" id="clienteRetroativo" style="width: 100%;" required>
+                                <option value="">Selecione um cliente</option>
+                                <!-- Opções serão preenchidas via JS -->
+                            </select>
+                        </div>
+
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">Produtos</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <select class="form-control" id="produtoRetroativo" style="width: 100%;">
+                                            <option value="">Selecione um produto</option>
+                                            <!-- Opções serão preenchidas via JS -->
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="number" class="form-control" id="quantidadeRetroativa" placeholder="Qtd" min="0.001" step="0.001">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-primary btn-block" id="btnAdicionarProdutoRetroativo">
+                                            <i class="fas fa-plus"></i> Add
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered" id="tabelaProdutosRetroativa">
+                                        <thead class="bg-light">
+                                            <tr>
+                                                <th width="5%">#</th>
+                                                <th width="40%">Produto</th>
+                                                <th width="15%">Qtd</th>
+                                                <th width="15%">Valor Unit.</th>
+                                                <th width="15%">Total</th>
+                                                <th width="10%">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Itens serão adicionados dinamicamente -->
+                                        </tbody>
+                                        <tfoot>
+                                            <tr>
+                                                <th colspan="4" class="text-right">Total:</th>
+                                                <th id="totalVendaRetroativa">R$ 0,00</th>
+                                                <th></th>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">Formas de Pagamento</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <select class="form-control" id="formaPagamentoRetroativo">
+                                            <option value="">Selecione a forma</option>
+                                            <option value="dinheiro">Dinheiro</option>
+                                            <option value="pix_loja">PIX Loja</option>
+                                            <option value="pix_fabiano">PIX Fabiano</option>
+                                            <option value="pix_maquineta">PIX Maquineta</option>
+                                            <option value="pix_edfrance">PIX EDFrance</option>
+                                            <option value="cartao_credito">Cartão Crédito</option>
+                                            <option value="cartao_debito">Cartão Débito</option>
+                                            <option value="a_prazo">A Prazo</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <input type="number" class="form-control" id="valorPagamentoRetroativo" placeholder="Valor" min="0.01" step="0.01">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-primary btn-block" id="btnAdicionarPagamentoRetroativo">
+                                            <i class="fas fa-plus"></i> Add
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered" id="tabelaPagamentosRetroativa">
+                                        <thead class="bg-light">
+                                            <tr>
+                                                <th width="5%">#</th>
+                                                <th width="60%">Forma</th>
+                                                <th width="25%">Valor</th>
+                                                <th width="10%">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Pagamentos serão adicionados dinamicamente -->
+                                        </tbody>
+                                        <tfoot>
+                                            <tr>
+                                                <th colspan="2" class="text-right">Total Recebido:</th>
+                                                <th id="totalRecebidoRetroativo">R$ 0,00</th>
+                                                <th></th>
+                                            </tr>
+                                            <tr>
+                                                <th colspan="2" class="text-right">Troco:</th>
+                                                <th id="trocoRetroativo">R$ 0,00</th>
+                                                <th></th>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="observacaoRetroativa">Observações</label>
+                            <textarea class="form-control" id="observacaoRetroativa" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnSalvarVendaRetroativa">Salvar Venda</button>
                 </div>
             </div>
         </div>
@@ -1280,7 +1418,7 @@
                         
                         <div class="details-section">
                             <div class="section-header">
-                                <h5 id="descontoModalTitle"><i class="fas fa-percentage"></i> Cadastrar Desconto</h5>
+                                <h5><i class="fas fa-percentage"></i> Descontos</h5>
                                 <button class="btn btn-sm btn-primary" id="addDescontoBtn" data-produto-id="">
                                     <i class="fas fa-plus"></i> Adicionar Desconto
                                 </button>
@@ -1313,6 +1451,8 @@
             </div>
         </div>
     </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
