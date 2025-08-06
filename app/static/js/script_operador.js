@@ -1592,7 +1592,7 @@ async function loadDaySales() {
 
         if (!Array.isArray(vendas) || vendas.length === 0) {
             const row = document.createElement('tr');
-            row.innerHTML = `<td colspan="6" style="text-align: center;">Nenhuma venda encontrada</td>`;
+            row.innerHTML = `<td colspan="6" style="text-align: center; padding: 1rem; color: #666;">Nenhuma venda registrada para o dia.</td>`;
             tableBody.appendChild(row);
             return;
         }

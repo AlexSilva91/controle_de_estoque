@@ -541,7 +541,6 @@ def visualizar_pdf_venda(id_list):
         app.logger.error(f"Erro ao gerar PDF: {str(e)}")
         abort(500, description="Ocorreu um erro ao gerar o PDF")
 
-
 @operador_bp.route('/api/vendas/hoje', methods=['GET'])
 @login_required
 @operador_required
@@ -549,9 +548,11 @@ def obter_vendas_hoje():
     try:
         # Obtém parâmetros de filtro
         data_str = request.args.get('data')
-        caixa_id = request.args.get('caixa_id', type=int)
         operador_id = request.args.get('operador_id', type=int)
         
+        caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
+        caixa_id = caixa.id if caixa else None
+        print(f'\nCaixa ID: {caixa_id}\n')
         # Converte a data se fornecida
         data = None
         if data_str:
@@ -609,7 +610,7 @@ def obter_vendas_hoje():
                     for pagamento in venda.pagamentos
                 ] if venda.pagamentos else None
             })
-        
+        print(vendas_formatadas)
         return jsonify({
             'success': True,
             'data': vendas_formatadas,
@@ -824,7 +825,8 @@ def gerar_pdf_vendas_dia():
     from datetime import datetime
 
     data_str = request.args.get('data')
-    caixa_id = request.args.get('caixa_id')
+    caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
+    caixa_id = caixa.id
     operador_id = request.args.get('operador_id')
     data = None
 
