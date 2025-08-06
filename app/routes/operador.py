@@ -557,12 +557,14 @@ def obter_vendas_hoje():
         if data_str:
             data = datetime.strptime(data_str, '%Y-%m-%d').date()
         
-        # Obtém as vendas (agora já filtradas por caixas abertos)
-        vendas = entities.NotaFiscal.obter_vendas_do_dia(
+        vendas_lista = entities.NotaFiscal.obter_vendas_do_dia(
             data=data,
             caixa_id=caixa_id,
             operador_id=operador_id
         )
+        
+        vendas_dict = {venda.id: venda for venda in vendas_lista}
+        vendas = list(vendas_dict.values())
         
         # Formata a resposta (mantém o mesmo formato anterior)
         vendas_formatadas = []
