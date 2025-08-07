@@ -179,8 +179,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const mobileMenuToggle = document.getElementById('mobileMenuToggle');
     const sidebar = document.querySelector('.sidebar');
 
+    // Alternar visibilidade do menu lateral
     if (mobileMenuToggle && sidebar) {
-      mobileMenuToggle.addEventListener('click', function() {
+      mobileMenuToggle.addEventListener('click', function () {
         this.classList.toggle('active');
         sidebar.classList.toggle('active');
       });
@@ -188,7 +189,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Fechar menu ao clicar em um item (para mobile)
     document.querySelectorAll('.sidebar-nav li').forEach(item => {
-      item.addEventListener('click', function() {
+      item.addEventListener('click', function () {
         if (window.innerWidth <= 768 && mobileMenuToggle && sidebar) {
           mobileMenuToggle.classList.remove('active');
           sidebar.classList.remove('active');
@@ -201,25 +202,32 @@ document.addEventListener('DOMContentLoaded', function() {
     const tabContents = document.querySelectorAll('.tab-content');
     const pageTitle = document.getElementById('page-title');
     const breadcrumb = document.querySelector('.breadcrumb');
-    
+
     navItems.forEach(item => {
-      item.addEventListener('click', function() {
+      item.addEventListener('click', function () {
+        // Fecha o menu lateral automaticamente (em qualquer resolução)
+        if (mobileMenuToggle && sidebar && sidebar.classList.contains('active')) {
+          mobileMenuToggle.classList.remove('active');
+          sidebar.classList.remove('active');
+        }
+
+        // Atualiza os itens ativos
         navItems.forEach(nav => nav.classList.remove('active'));
         tabContents.forEach(content => content.classList.remove('active'));
-        
+
         this.classList.add('active');
         const tabId = this.getAttribute('data-tab');
         const tabContent = document.getElementById(tabId);
-        
+
         if (tabContent) {
           tabContent.classList.add('active');
         }
-        
-        const tabName = this.querySelector('span').textContent;
+
+        const tabName = this.querySelector('span')?.textContent || '';
         if (pageTitle) pageTitle.textContent = tabName;
         if (breadcrumb) breadcrumb.textContent = `Home / ${tabName}`;
 
-        // Carregar dados específicos da aba
+        // Carregar dados da aba correspondente
         if (tabId === 'dashboard') loadDashboardData();
         if (tabId === 'clientes') loadClientesData();
         if (tabId === 'produtos') loadProdutosData();
@@ -241,6 +249,9 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
   }
+
+  // Inicialização ao carregar a página
+  document.addEventListener('DOMContentLoaded', setupNavigation);
 
   // ===== DASHBOARD =====
   function toggleMovimentacoes() {
