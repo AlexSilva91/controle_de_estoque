@@ -5,42 +5,6 @@ document.addEventListener('DOMContentLoaded', function() {
   let caixasFechados = [];
   let itensVendaRetroativa = [];
   let pagamentosVendaRetroativa = [];
-  let vendasDespesasChart, formasPagamentoChart, caixasChart, vendasDiariasChart;
-
-  // ===== CONFIGURAÇÃO DOS GRÁFICOS =====
-  // Configuração padrão para os gráficos no tema dark
-  Chart.defaults.color = '#e0e0e0';
-  Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
-
-  // Paleta de cores para os gráficos
-  const chartColors = {
-    green: 'rgba(102, 187, 106, 0.7)',
-    greenBorder: 'rgba(102, 187, 106, 1)',
-    red: 'rgba(239, 83, 80, 0.7)',
-    redBorder: 'rgba(239, 83, 80, 1)',
-    blue: 'rgba(66, 165, 245, 0.7)',
-    blueBorder: 'rgba(66, 165, 245, 1)',
-    yellow: 'rgba(255, 213, 79, 0.7)',
-    yellowBorder: 'rgba(255, 213, 79, 1)',
-    purple: 'rgba(171, 71, 188, 0.7)',
-    purpleBorder: 'rgba(171, 71, 188, 1)',
-    orange: 'rgba(255, 167, 38, 0.7)',
-    orangeBorder: 'rgba(255, 167, 38, 1)',
-    teal: 'rgba(38, 166, 154, 0.7)',
-    tealBorder: 'rgba(38, 166, 154, 1)'
-  };
-
-  // Função para formatar valores monetários nos gráficos
-  function formatMoney(value) {
-    if (typeof value === 'string') {
-      // Remove caracteres não numéricos e substitui vírgula por ponto
-      value = value.replace(/[^\d,]/g, '').replace(',', '.');
-    }
-    return 'R$ ' + parseFloat(value).toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  }
 
   // ===== FUNÇÕES UTILITÁRIAS =====
   function updateDateTime() {
@@ -286,460 +250,543 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
+  // Inicialização ao carregar a página
+  document.addEventListener('DOMContentLoaded', setupNavigation);
+
   // ===== DASHBOARD =====
-  const movimentacoesHeader = document.getElementById('movimentacoesHeader');
-    if (movimentacoesHeader) {
-      movimentacoesHeader.addEventListener('click', function(e) {
-        // Verifica se não foi clique em um botão de ação
-        if (!e.target.closest('.btn-icon')) {
+  document.getElementById('movimentacoesHeader')?.addEventListener('click', function(e) {
+      // Verifica se não foi clique em um botão de ação
+      if (!e.target.closest('.btn-icon')) {
           toggleMovimentacoes();
-        }
-      });
-  }
+      }
+  });
+
   // Função para alternar a visibilidade da seção de movimentações
   function toggleMovimentacoes() {
-    console.log('Função toggleMovimentacoes chamada'); // Adicione esta linha
-    const body = document.getElementById('movimentacoesBody');
-    const icon = document.querySelector('#movimentacoesHeader .toggle-icon i');
-    
-    console.log('Elementos:', body, icon); // Adicione esta linha
-    
-    if (!body || !icon) return;
-    
-    console.log('Estado atual:', body.style.display); // Adicione esta linha
-    
-    if (body.style.display === 'none') {
-      body.style.display = 'block';
-      icon.classList.remove('fa-chevron-down');
-      icon.classList.add('fa-chevron-up');
-    } else {
-      body.style.display = 'none';
-      icon.classList.remove('fa-chevron-up');
-      icon.classList.add('fa-chevron-down');
-    }
+      const body = document.getElementById('movimentacoesBody');
+      const icon = document.querySelector('#movimentacoesHeader .toggle-icon i');
+      
+      if (body.style.display === 'none') {
+          body.style.display = 'block';
+          icon.classList.remove('fa-chevron-down');
+          icon.classList.add('fa-chevron-up');
+      } else {
+          body.style.display = 'none';
+          icon.classList.remove('fa-chevron-up');
+          icon.classList.add('fa-chevron-down');
+      }
   }
 
-  // Função para atualizar os gráficos do dashboard
+  // Variáveis globais para os gráficos
+  let vendasDespesasChart, formasPagamentoChart, caixasChart, vendasDiariasChart;
+
+  // Configuração padrão para os gráficos no tema dark
+  Chart.defaults.color = '#e0e0e0';
+  Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+
+  // Paleta de cores para os gráficos
+  const chartColors = {
+      green: 'rgba(102, 187, 106, 0.7)',
+      greenBorder: 'rgba(102, 187, 106, 1)',
+      red: 'rgba(239, 83, 80, 0.7)',
+      redBorder: 'rgba(239, 83, 80, 1)',
+      blue: 'rgba(66, 165, 245, 0.7)',
+      blueBorder: 'rgba(66, 165, 245, 1)',
+      yellow: 'rgba(255, 213, 79, 0.7)',
+      yellowBorder: 'rgba(255, 213, 79, 1)',
+      purple: 'rgba(171, 71, 188, 0.7)',
+      purpleBorder: 'rgba(171, 71, 188, 1)',
+      orange: 'rgba(255, 167, 38, 0.7)',
+      orangeBorder: 'rgba(255, 167, 38, 1)',
+      teal: 'rgba(38, 166, 154, 0.7)',
+      tealBorder: 'rgba(38, 166, 154, 1)'
+  };
+
+  // Função para formatar valores monetários
+  function formatMoney(value) {
+      if (typeof value === 'string') {
+          // Remove caracteres não numéricos e substitui vírgula por ponto
+          value = value.replace(/[^\d,]/g, '').replace(',', '.');
+      }
+      return 'R$ ' + parseFloat(value).toLocaleString('pt-BR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+      });
+  }
+
+  // Função para fazer requisições com tratamento de erro
+  async function fetchWithErrorHandling(url) {
+      try {
+          const response = await fetch(url);
+          if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return await response.json();
+      } catch (error) {
+          console.error('Erro na requisição:', error);
+          showFlashMessage('error', 'Erro ao carregar dados');
+          return { success: false, message: error.message };
+      }
+  }
+
+  // Função para mostrar mensagens flash
+  function showFlashMessage(type, message) {
+      const flashContainer = document.getElementById('flash-messages');
+      if (flashContainer) {
+          const alert = document.createElement('div');
+          alert.className = `alert alert-${type} alert-dismissible fade show`;
+          alert.role = 'alert';
+          alert.innerHTML = `
+              ${message}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          `;
+          flashContainer.appendChild(alert);
+          
+          setTimeout(() => {
+              alert.classList.remove('show');
+              setTimeout(() => flashContainer.removeChild(alert), 150);
+          }, 5000);
+      }
+  }
+
+  // Função para atualizar os gráficos
   async function updateCharts() {
-    try {
-      // Destruir gráficos existentes se houver
-      if (vendasDespesasChart) vendasDespesasChart.destroy();
-      if (formasPagamentoChart) formasPagamentoChart.destroy();
-      if (caixasChart) caixasChart.destroy();
-      if (vendasDiariasChart) vendasDiariasChart.destroy();
+      try {
+          // Destruir gráficos existentes se houver
+          if (vendasDespesasChart) vendasDespesasChart.destroy();
+          if (formasPagamentoChart) formasPagamentoChart.destroy();
+          if (caixasChart) caixasChart.destroy();
+          if (vendasDiariasChart) vendasDiariasChart.destroy();
 
-      // 1. Gráfico de Vendas vs Despesas (Mensal)
-      const vendasMensaisData = await fetchWithErrorHandling('/admin/dashboard/vendas-mensais');
-      if (vendasMensaisData.success) {
-        const vendasDespesasCtx = document.getElementById('vendasDespesasChart').getContext('2d');
-        vendasDespesasChart = new Chart(vendasDespesasCtx, {
-          type: 'bar',
-          data: {
-            labels: vendasMensaisData.meses,
-            datasets: [
-              {
-                label: 'Vendas',
-                data: vendasMensaisData.vendas,
-                backgroundColor: chartColors.green,
-                borderColor: chartColors.greenBorder,
-                borderWidth: 2
-              },
-              {
-                label: 'Despesas',
-                data: vendasMensaisData.despesas,
-                backgroundColor: chartColors.red,
-                borderColor: chartColors.redBorder,
-                borderWidth: 2
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                position: 'top',
-                labels: {
-                  color: '#e0e0e0'
-                }
-              },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    return `${context.dataset.label}: ${formatMoney(context.raw)}`;
+          // 1. Gráfico de Vendas vs Despesas (Mensal)
+          const vendasMensaisData = await fetchWithErrorHandling('/admin/dashboard/vendas-mensais');
+          if (vendasMensaisData.success) {
+              const vendasDespesasCtx = document.getElementById('vendasDespesasChart').getContext('2d');
+              vendasDespesasChart = new Chart(vendasDespesasCtx, {
+                  type: 'bar',
+                  data: {
+                      labels: vendasMensaisData.meses,
+                      datasets: [
+                          {
+                              label: 'Vendas',
+                              data: vendasMensaisData.vendas,
+                              backgroundColor: chartColors.green,
+                              borderColor: chartColors.greenBorder,
+                              borderWidth: 2
+                          },
+                          {
+                              label: 'Despesas',
+                              data: vendasMensaisData.despesas,
+                              backgroundColor: chartColors.red,
+                              borderColor: chartColors.redBorder,
+                              borderWidth: 2
+                          }
+                      ]
+                  },
+                  options: {
+                      responsive: true,
+                      plugins: {
+                          legend: {
+                              position: 'top',
+                              labels: {
+                                  color: '#e0e0e0'
+                              }
+                          },
+                          tooltip: {
+                              callbacks: {
+                                  label: function(context) {
+                                      return `${context.dataset.label}: ${formatMoney(context.raw)}`;
+                                  }
+                              }
+                          }
+                      },
+                      scales: {
+                          y: {
+                              beginAtZero: true,
+                              grid: {
+                                  color: 'rgba(255, 255, 255, 0.1)'
+                              },
+                              ticks: {
+                                  callback: function(value) {
+                                      return formatMoney(value);
+                                  }
+                              }
+                          },
+                          x: {
+                              grid: {
+                                  color: 'rgba(255, 255, 255, 0.1)'
+                              }
+                          }
+                      }
                   }
-                }
-              }
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-                grid: {
-                  color: 'rgba(255, 255, 255, 0.1)'
-                },
-                ticks: {
-                  callback: function(value) {
-                    return formatMoney(value);
-                  }
-                }
-              },
-              x: {
-                grid: {
-                  color: 'rgba(255, 255, 255, 0.1)'
-                }
-              }
-            }
+              });
           }
-        });
-      }
 
-      // 2. Gráfico de Formas de Pagamento (dos últimos 7 dias)
-      const vendasDiariasData = await fetchWithErrorHandling('/admin/dashboard/vendas-diarias');
-      if (vendasDiariasData.success) {
-        // Consolidar formas de pagamento dos últimos 7 dias
-        const formasPagamentoMap = new Map();
-        
-        vendasDiariasData.dados.forEach(dia => {
-          dia.formas_pagamento.forEach(fp => {
-            const forma = fp.forma.replace('pix_', '').replace(/_/g, ' ').replace('cartao', 'cartão');
-            const total = parseFloat(fp.total.replace(/[^\d,]/g, '').replace(',', '.'));
-            
-            if (formasPagamentoMap.has(forma)) {
-              formasPagamentoMap.set(forma, formasPagamentoMap.get(forma) + total);
-            } else {
-              formasPagamentoMap.set(forma, total);
-            }
-          });
-        });
+          // 2. Gráfico de Formas de Pagamento (dos últimos 7 dias)
+          const vendasDiariasData = await fetchWithErrorHandling('/admin/dashboard/vendas-diarias');
+          if (vendasDiariasData.success) {
+              // Consolidar formas de pagamento dos últimos 7 dias
+              const formasPagamentoMap = new Map();
+              
+              vendasDiariasData.dados.forEach(dia => {
+                  dia.formas_pagamento.forEach(fp => {
+                      const forma = fp.forma.replace('pix_', '').replace(/_/g, ' ').replace('cartao', 'cartão');
+                      const total = parseFloat(fp.total.replace(/[^\d,]/g, '').replace(',', '.'));
+                      
+                      if (formasPagamentoMap.has(forma)) {
+                          formasPagamentoMap.set(forma, formasPagamentoMap.get(forma) + total);
+                      } else {
+                          formasPagamentoMap.set(forma, total);
+                      }
+                  });
+              });
 
-        const formasPagamentoCtx = document.getElementById('formasPagamentoChart').getContext('2d');
-        formasPagamentoChart = new Chart(formasPagamentoCtx, {
-          type: 'doughnut',
-          data: {
-            labels: Array.from(formasPagamentoMap.keys()),
-            datasets: [{
-              data: Array.from(formasPagamentoMap.values()),
-              backgroundColor: [
-                chartColors.green,
-                chartColors.blue,
-                chartColors.yellow,
-                chartColors.purple,
-                chartColors.orange,
-                chartColors.teal,
-                chartColors.red
-              ],
-              borderColor: [
-                chartColors.greenBorder,
-                chartColors.blueBorder,
-                chartColors.yellowBorder,
-                chartColors.purpleBorder,
-                chartColors.orangeBorder,
-                chartColors.tealBorder,
-                chartColors.redBorder
-              ],
-              borderWidth: 2
-            }]
-          },
-          options: {
-            responsive: true,
-            cutout: '70%',
-            plugins: {
-              legend: {
-                position: 'right',
-                labels: {
-                  color: '#e0e0e0',
-                  font: {
-                    size: 12
+              const formasPagamentoCtx = document.getElementById('formasPagamentoChart').getContext('2d');
+              formasPagamentoChart = new Chart(formasPagamentoCtx, {
+                  type: 'doughnut',
+                  data: {
+                      labels: Array.from(formasPagamentoMap.keys()),
+                      datasets: [{
+                          data: Array.from(formasPagamentoMap.values()),
+                          backgroundColor: [
+                              chartColors.green,
+                              chartColors.blue,
+                              chartColors.yellow,
+                              chartColors.purple,
+                              chartColors.orange,
+                              chartColors.teal,
+                              chartColors.red
+                          ],
+                          borderColor: [
+                              chartColors.greenBorder,
+                              chartColors.blueBorder,
+                              chartColors.yellowBorder,
+                              chartColors.purpleBorder,
+                              chartColors.orangeBorder,
+                              chartColors.tealBorder,
+                              chartColors.redBorder
+                          ],
+                          borderWidth: 2
+                      }]
+                  },
+                  options: {
+                      responsive: true,
+                      cutout: '70%',
+                      plugins: {
+                          legend: {
+                              position: 'right',
+                              labels: {
+                                  color: '#e0e0e0',
+                                  font: {
+                                      size: 12
+                                  }
+                              }
+                          },
+                          tooltip: {
+                              callbacks: {
+                                  label: function(context) {
+                                      const label = context.label || '';
+                                      const value = context.raw || 0;
+                                      const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                      const percentage = Math.round((value / total) * 100);
+                                      return `${label}: ${formatMoney(value)} (${percentage}%)`;
+                                  }
+                              }
+                          }
+                      }
                   }
-                }
-              },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    const label = context.label || '';
-                    const value = context.raw || 0;
-                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                    const percentage = Math.round((value / total) * 100);
-                    return `${label}: ${formatMoney(value)} (${percentage}%)`;
-                  }
-                }
-              }
-            }
+              });
           }
-        });
-      }
 
-      // 3. Gráfico de Totais por Caixa
-      if (vendasDiariasData?.success) {
-        const caixasCtx = document.getElementById('caixasChart').getContext('2d');
-        caixasChart = new Chart(caixasCtx, {
-          type: 'bar',
-          data: {
-            labels: vendasDiariasData.vendas_mensais_caixa.map(c => 'Caixa ' + c.caixa_id),
-            datasets: [{
-              label: 'Valor Total',
-              data: vendasDiariasData.vendas_mensais_caixa.map(c => 
-                parseFloat(c.total_vendas.replace(/[^\d,]/g, '').replace(',', '.'))
-              ),
-              backgroundColor: chartColors.blue,
-              borderColor: chartColors.blueBorder,
-              borderWidth: 2
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                display: false,
-                labels: {
-                  color: '#e0e0e0'
-                }
-              },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    return formatMoney(context.raw);
+          // 3. Gráfico de Totais por Caixa
+          if (vendasDiariasData?.success) {
+              const caixasCtx = document.getElementById('caixasChart').getContext('2d');
+              caixasChart = new Chart(caixasCtx, {
+                  type: 'bar',
+                  data: {
+                      labels: vendasDiariasData.vendas_mensais_caixa.map(c => 'Caixa ' + c.caixa_id),
+                      datasets: [{
+                          label: 'Valor Total',
+                          data: vendasDiariasData.vendas_mensais_caixa.map(c => 
+                              parseFloat(c.total_vendas.replace(/[^\d,]/g, '').replace(',', '.'))
+                          ),
+                          backgroundColor: chartColors.blue,
+                          borderColor: chartColors.blueBorder,
+                          borderWidth: 2
+                      }]
+                  },
+                  options: {
+                      responsive: true,
+                      plugins: {
+                          legend: {
+                              display: false,
+                              labels: {
+                                  color: '#e0e0e0'
+                              }
+                          },
+                          tooltip: {
+                              callbacks: {
+                                  label: function(context) {
+                                      return formatMoney(context.raw);
+                                  }
+                              }
+                          }
+                      },
+                      scales: {
+                          y: {
+                              beginAtZero: true,
+                              grid: {
+                                  color: 'rgba(255, 255, 255, 0.1)'
+                              },
+                              ticks: {
+                                  callback: function(value) {
+                                      return formatMoney(value);
+                                  }
+                              }
+                          },
+                          x: {
+                              grid: {
+                                  color: 'rgba(255, 255, 255, 0.1)'
+                              }
+                          }
+                      }
                   }
-                }
-              }
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-                grid: {
-                  color: 'rgba(255, 255, 255, 0.1)'
-                },
-                ticks: {
-                  callback: function(value) {
-                    return formatMoney(value);
-                  }
-                }
-              },
-              x: {
-                grid: {
-                  color: 'rgba(255, 255, 255, 0.1)'
-                }
-              }
-            }
+              });
           }
-        });
-      }
 
-      // 4. Gráfico de Vendas Diárias (últimos 7 dias)
-      if (vendasDiariasData?.success) {
-        const vendasDiariasCtx = document.getElementById('vendasDiariasChart').getContext('2d');
-        
-        // Extrair dados para o gráfico
-        const labels = vendasDiariasData.dados.map(item => item.data);
-        const vendas = vendasDiariasData.dados.map(item => 
-          parseFloat(item.total_vendas.replace(/[^\d,]/g, '').replace(',', '.'))
-        );
-        const despesas = vendasDiariasData.dados.map(item => 
-          parseFloat(item.total_despesas.replace(/[^\d,]/g, '').replace(',', '.'))
-        );
-        
-        vendasDiariasChart = new Chart(vendasDiariasCtx, {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [
-              {
-                label: 'Vendas (R$)',
-                data: vendas,
-                backgroundColor: chartColors.green,
-                borderColor: chartColors.greenBorder,
-                borderWidth: 3,
-                tension: 0.4,
-                fill: false,
-                pointBackgroundColor: '#fff',
-                pointBorderColor: chartColors.greenBorder,
-                pointRadius: 5,
-                pointHoverRadius: 7
-              },
-              {
-                label: 'Despesas (R$)',
-                data: despesas,
-                backgroundColor: chartColors.red,
-                borderColor: chartColors.redBorder,
-                borderWidth: 3,
-                tension: 0.4,
-                fill: false,
-                pointBackgroundColor: '#fff',
-                pointBorderColor: chartColors.redBorder,
-                pointRadius: 5,
-                pointHoverRadius: 7
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                position: 'top',
-                labels: {
-                  color: '#e0e0e0'
-                }
-              },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    return `${context.dataset.label}: ${formatMoney(context.raw)}`;
+          // 4. Gráfico de Vendas Diárias (últimos 7 dias)
+          if (vendasDiariasData?.success) {
+              const vendasDiariasCtx = document.getElementById('vendasDiariasChart').getContext('2d');
+              
+              // Extrair dados para o gráfico
+              const labels = vendasDiariasData.dados.map(item => item.data);
+              const vendas = vendasDiariasData.dados.map(item => 
+                  parseFloat(item.total_vendas.replace(/[^\d,]/g, '').replace(',', '.'))
+              );
+              const despesas = vendasDiariasData.dados.map(item => 
+                  parseFloat(item.total_despesas.replace(/[^\d,]/g, '').replace(',', '.'))
+              );
+              
+              vendasDiariasChart = new Chart(vendasDiariasCtx, {
+                  type: 'line',
+                  data: {
+                      labels: labels,
+                      datasets: [
+                          {
+                              label: 'Vendas (R$)',
+                              data: vendas,
+                              backgroundColor: chartColors.green,
+                              borderColor: chartColors.greenBorder,
+                              borderWidth: 3,
+                              tension: 0.4,
+                              fill: false,
+                              pointBackgroundColor: '#fff',
+                              pointBorderColor: chartColors.greenBorder,
+                              pointRadius: 5,
+                              pointHoverRadius: 7
+                          },
+                          {
+                              label: 'Despesas (R$)',
+                              data: despesas,
+                              backgroundColor: chartColors.red,
+                              borderColor: chartColors.redBorder,
+                              borderWidth: 3,
+                              tension: 0.4,
+                              fill: false,
+                              pointBackgroundColor: '#fff',
+                              pointBorderColor: chartColors.redBorder,
+                              pointRadius: 5,
+                              pointHoverRadius: 7
+                          }
+                      ]
+                  },
+                  options: {
+                      responsive: true,
+                      plugins: {
+                          legend: {
+                              position: 'top',
+                              labels: {
+                                  color: '#e0e0e0'
+                              }
+                          },
+                          tooltip: {
+                              callbacks: {
+                                  label: function(context) {
+                                      return `${context.dataset.label}: ${formatMoney(context.raw)}`;
+                                  }
+                              }
+                          }
+                      },
+                      scales: {
+                          y: {
+                              beginAtZero: true,
+                              grid: {
+                                  color: 'rgba(255, 255, 255, 0.1)'
+                              },
+                              ticks: {
+                                  callback: function(value) {
+                                      return formatMoney(value);
+                                  }
+                              }
+                          },
+                          x: {
+                              grid: {
+                                  color: 'rgba(255, 255, 255, 0.1)'
+                              }
+                          }
+                      }
                   }
-                }
-              }
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-                grid: {
-                  color: 'rgba(255, 255, 255, 0.1)'
-                },
-                ticks: {
-                  callback: function(value) {
-                    return formatMoney(value);
-                  }
-                }
-              },
-              x: {
-                grid: {
-                  color: 'rgba(255, 255, 255, 0.1)'
-                }
-              }
-            }
+              });
           }
-        });
+      } catch (error) {
+          console.error('Erro ao atualizar gráficos:', error);
+          showFlashMessage('error', 'Erro ao atualizar gráficos');
       }
-    } catch (error) {
-      console.error('Erro ao atualizar gráficos:', error);
-      showFlashMessage('error', 'Erro ao atualizar gráficos');
-    }
   }
 
   // Função para carregar as movimentações
   async function loadMovimentacoes() {
-    try {
-      const movData = await fetchWithErrorHandling('/admin/dashboard/movimentacoes');
-      if (movData.success) {
-        const movTable = document.querySelector('#movimentacoesTable tbody');
-        if (movTable) {
-          movTable.innerHTML = movData.movimentacoes.map(mov => `
-            <tr>
-              <td>${mov.data}</td>
-              <td><span class="badge ${mov.tipo === 'Entrada' ? 'badge-success' : 'badge-danger'}">${mov.tipo}</span></td>
-              <td>${mov.produto}</td>
-              <td>${mov.quantidade}</td>
-              <td>${mov.valor}</td>
-            </tr>
-          `).join('');
-        }
+      try {
+          const movData = await fetchWithErrorHandling('/admin/dashboard/movimentacoes');
+          if (movData.success) {
+              const movTable = document.querySelector('#movimentacoesTable tbody');
+              if (movTable) {
+                  movTable.innerHTML = movData.movimentacoes.map(mov => `
+                      <tr>
+                          <td>${mov.data}</td>
+                          <td><span class="badge ${mov.tipo === 'Entrada' ? 'badge-success' : 'badge-danger'}">${mov.tipo}</span></td>
+                          <td>${mov.produto}</td>
+                          <td>${mov.quantidade}</td>
+                          <td>${mov.valor}</td>
+                      </tr>
+                  `).join('');
+              }
+          }
+      } catch (error) {
+          console.error('Erro ao carregar movimentações:', error);
+          showFlashMessage('error', 'Erro ao carregar movimentações');
       }
-    } catch (error) {
-      console.error('Erro ao carregar movimentações:', error);
-      showFlashMessage('error', 'Erro ao carregar movimentações');
-    }
   }
 
   // Função para atualizar as métricas do dashboard
   async function updateMetrics() {
-    try {
-      const metricsData = await fetchWithErrorHandling('/admin/dashboard/metrics');
-      
-      if (metricsData.success) {
-        // Atualizar cards de métricas
-        const metricsContainer = document.querySelector('.metrics-grid');
-        if (metricsContainer) {
-          // Criar os cards de métricas baseados nos dados retornados
-          metricsContainer.innerHTML = `
-            <div class="metric-card">
-              <div class="metric-icon">
-                <i class="fas fa-weight"></i>
-              </div>
-              <div class="metric-info">
-                <h3>Estoque (Kg)</h3>
-                <div class="value">${metricsData.metrics.estoque.kg}</div>
-              </div>
-            </div>
-            <div class="metric-card">
-              <div class="metric-icon">
-                <i class="fa-solid fa-boxes-packing"></i>
-              </div>
-              <div class="metric-info">
-                <h3>Estoque (Sacos)</h3>
-                <div class="value">${metricsData.metrics.estoque.sacos}</div>
-              </div>
-            </div>
-            <div class="metric-card">
-              <div class="metric-icon">
-                <i class="fas fa-boxes"></i>
-              </div>
-              <div class="metric-info">
-                <h3>Estoque (Unidades)</h3>
-                <div class="value">${metricsData.metrics.estoque.unidades}</div>
-              </div>
-            </div>
-            <div class="metric-card">
-              <div class="metric-icon">
-                <i class="fas fa-money-bill-wave"></i>
-              </div>
-              <div class="metric-info">
-                <h3>Entradas (Mês)</h3>
-                <div class="value">${metricsData.metrics.financeiro.entradas_mes}</div>
-              </div>
-            </div>
-            <div class="metric-card">
-              <div class="metric-icon">
-                <i class="fas fa-receipt"></i>
-              </div>
-              <div class="metric-info">
-                <h3>Despesas (Mês)</h3>
-                <div class="value">${metricsData.metrics.financeiro.saidas_mes}</div>
-              </div>
-            </div>
-            <div class="metric-card">
-              <div class="metric-icon">
-                <i class="fas fa-piggy-bank"></i>
-              </div>
-              <div class="metric-info">
-                <h3>Saldo (Mês)</h3>
-                <div class="value">${metricsData.metrics.financeiro.saldo_mes}</div>
-              </div>
-            </div>
-          `;
-        }
+      try {
+          const metricsData = await fetchWithErrorHandling('/admin/dashboard/metrics');
+          
+          if (metricsData.success) {
+              // Atualizar cards de métricas
+              const metricsContainer = document.querySelector('.metrics-grid');
+              if (metricsContainer) {
+                  // Criar os cards de métricas baseados nos dados retornados
+                  metricsContainer.innerHTML = `
+                      <div class="metric-card">
+                          <div class="metric-icon">
+                              <i class="fas fa-weight"></i>
+                          </div>
+                          <div class="metric-info">
+                              <h3>Estoque (Kg)</h3>
+                              <div class="value">${metricsData.metrics.estoque.kg}</div>
+                          </div>
+                      </div>
+                      <div class="metric-card">
+                          <div class="metric-icon">
+                              <i class="fa-solid fa-boxes-packing"></i>
+                          </div>
+                          <div class="metric-info">
+                              <h3>Estoque (Sacos)</h3>
+                              <div class="value">${metricsData.metrics.estoque.sacos}</div>
+                          </div>
+                      </div>
+                      <div class="metric-card">
+                          <div class="metric-icon">
+                              <i class="fas fa-boxes"></i>
+                          </div>
+                          <div class="metric-info">
+                              <h3>Estoque (Unidades)</h3>
+                              <div class="value">${metricsData.metrics.estoque.unidades}</div>
+                          </div>
+                      </div>
+                      <div class="metric-card">
+                          <div class="metric-icon">
+                              <i class="fas fa-money-bill-wave"></i>
+                          </div>
+                          <div class="metric-info">
+                              <h3>Entradas (Mês)</h3>
+                              <div class="value">${metricsData.metrics.financeiro.entradas_mes}</div>
+                          </div>
+                      </div>
+                      <div class="metric-card">
+                          <div class="metric-icon">
+                              <i class="fas fa-receipt"></i>
+                          </div>
+                          <div class="metric-info">
+                              <h3>Despesas (Mês)</h3>
+                              <div class="value">${metricsData.metrics.financeiro.saidas_mes}</div>
+                          </div>
+                      </div>
+                      <div class="metric-card">
+                          <div class="metric-icon">
+                              <i class="fas fa-piggy-bank"></i>
+                          </div>
+                          <div class="metric-info">
+                              <h3>Saldo (Mês)</h3>
+                              <div class="value">${metricsData.metrics.financeiro.saldo_mes}</div>
+                          </div>
+                      </div>
+                  `;
+              }
+          }
+      } catch (error) {
+          console.error('Erro ao atualizar métricas:', error);
+          showFlashMessage('error', 'Erro ao atualizar métricas');
       }
-    } catch (error) {
-      console.error('Erro ao atualizar métricas:', error);
-      showFlashMessage('error', 'Erro ao atualizar métricas');
-    }
   }
 
   // Função principal para carregar os dados do dashboard
   async function loadDashboardData() {
-    try {
-      // Mostrar loading
-      const loadingElement = document.getElementById('loadingIndicator');
-      if (loadingElement) loadingElement.style.display = 'block';
-      
-      // Atualizar métricas
-      await updateMetrics();
-      
-      // Atualizar gráficos
-      await updateCharts();
-      
-      // Carregar movimentações
-      await loadMovimentacoes();
-      
-      // Esconder loading
-      if (loadingElement) loadingElement.style.display = 'none';
-    } catch (error) {
-      console.error('Erro ao carregar dados do dashboard:', error);
-      showFlashMessage('error', 'Erro ao carregar dados do dashboard');
-      
-      // Esconder loading em caso de erro
-      const loadingElement = document.getElementById('loadingIndicator');
-      if (loadingElement) loadingElement.style.display = 'none';
-    }
+      try {
+          // Mostrar loading
+          const loadingElement = document.getElementById('loadingIndicator');
+          if (loadingElement) loadingElement.style.display = 'block';
+          
+          // Atualizar métricas
+          await updateMetrics();
+          
+          // Atualizar gráficos
+          await updateCharts();
+          
+          // Carregar movimentações
+          await loadMovimentacoes();
+          
+          // Esconder loading
+          if (loadingElement) loadingElement.style.display = 'none';
+      } catch (error) {
+          console.error('Erro ao carregar dados do dashboard:', error);
+          showFlashMessage('error', 'Erro ao carregar dados do dashboard');
+          
+          // Esconder loading em caso de erro
+          const loadingElement = document.getElementById('loadingIndicator');
+          if (loadingElement) loadingElement.style.display = 'none';
+      }
   }
 
+  // Evento para o botão de atualizar
+  document.getElementById('refreshData')?.addEventListener('click', loadDashboardData);
+
+  // Carregar dados quando a página é carregada
+  document.addEventListener('DOMContentLoaded', function() {
+      // Inicializar tooltips do Bootstrap
+      const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      tooltipTriggerList.map(function (tooltipTriggerEl) {
+          return new bootstrap.Tooltip(tooltipTriggerEl);
+      });
+      
+      // Carregar dados do dashboard
+      loadDashboardData();
+      
+      // Atualizar a cada 5 minutos
+      setInterval(loadDashboardData, 300000);
+  });
   // ===== CLIENTES =====
   async function loadClientesData() {
     try {
@@ -1906,53 +1953,153 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   async function loadCaixaFinanceiro(caixaId) {
-    try {
-      const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
-      
-      if (response.success) {
-        const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
-        if (tableBody) {
-          tableBody.innerHTML = '';
+      try {
+          const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
           
-          let totalEntradas = 0;
-          let totalSaidas = 0;
-          
-          response.data.forEach(item => {
-            const row = document.createElement('tr');
-            const valor = parseFloat(item.valor);
-            
-            if (item.tipo === 'entrada') {
-              totalEntradas += valor;
-            } else {
-              totalSaidas += valor;
-            }
-            
-            row.innerHTML = `
-              <td>${formatDateTime(item.data)}</td>
-              <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
-              <td>${item.categoria || '-'}</td>
-              <td>${formatarMoeda(valor)}</td>
-              <td>${item.descricao || '-'}</td>
-              <td>${item.forma_pagamento || '-'}</td>
-            `;
-            tableBody.appendChild(row);
-          });
-          
-          if (document.getElementById('caixaTotalEntradas')) {
-            document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(totalEntradas);
+          if (response.success) {
+              // 1. Atualiza a tabela de movimentações
+              const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
+              if (tableBody) {
+                  tableBody.innerHTML = '';
+                  
+                  let totalEntradas = 0;
+                  let totalSaidas = 0;
+                  
+                  response.data.forEach(item => {
+                      const row = document.createElement('tr');
+                      const valor = parseFloat(item.valor);
+                      
+                      if (item.tipo === 'entrada') {
+                          totalEntradas += valor;
+                      } else {
+                          totalSaidas += valor;
+                      }
+                      
+                      row.innerHTML = `
+                          <td>${formatDateTime(item.data)}</td>
+                          <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : item.tipo === 'saida_estorno' ? 'Estorno' : 'Saída'}</span></td>
+                          <td>${item.categoria || '-'}</td>
+                          <td>${formatarMoeda(valor)}</td>
+                          <td>${item.descricao || '-'}</td>
+                      `;
+                      tableBody.appendChild(row);
+                  });
+              }
+              
+              // 2. Atualiza os totais gerais
+              if (document.getElementById('caixaTotalEntradas')) {
+                  document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(response.totais.entradas);
+              }
+              if (document.getElementById('caixaTotalSaidas')) {
+                  document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(response.totais.saidas);
+              }
+              if (document.getElementById('caixaSaldo')) {
+                  document.getElementById('caixaSaldo').textContent = formatarMoeda(response.totais.saldo);
+              }
+              
+              // 3. Adiciona seção de formas de pagamento
+              const formasPagamentoContainer = document.getElementById('formasPagamentoContainer');
+              if (formasPagamentoContainer && response.formas_pagamento) {
+                  formasPagamentoContainer.innerHTML = `
+                      <div class="detail-item full-width">
+                          <label>Formas de Pagamento:</label>
+                          <div class="value">
+                              <table class="payment-methods-table">
+                                  <thead>
+                                      <tr>
+                                          <th>Forma</th>
+                                          <th>Valor</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody>
+                                      ${Object.entries(response.formas_pagamento).map(([forma, valor]) => `
+                                          <tr>
+                                              <td>${formatFormaPagamento(forma)}</td>
+                                              <td class="${valor >= 0 ? 'positive-value' : 'negative-value'}">${formatarMoeda(valor)}</td>
+                                          </tr>
+                                      `).join('')}
+                                  </tbody>
+                              </table>
+                          </div>
+                      </div>
+                  `;
+              }
+              
+              // 4. Adiciona resumo por categoria
+              const categoriasContainer = document.getElementById('categoriasContainer');
+              if (categoriasContainer) {
+                  const categorias = {};
+                  response.data.forEach(item => {
+                      const categoria = item.categoria;
+                      categorias[categoria] = (categorias[categoria] || 0) + parseFloat(item.valor);
+                  });
+                  
+                  categoriasContainer.innerHTML = `
+                      <div class="detail-item full-width">
+                          <label>Resumo por Categoria:</label>
+                          <div class="value">
+                              <table class="categories-table">
+                                  <thead>
+                                      <tr>
+                                          <th>Categoria</th>
+                                          <th>Valor</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody>
+                                      ${Object.entries(categorias).map(([categoria, valor]) => `
+                                          <tr>
+                                              <td>${categoria}</td>
+                                              <td class="${valor >= 0 ? 'positive-value' : 'negative-value'}">${formatarMoeda(valor)}</td>
+                                          </tr>
+                                      `).join('')}
+                                  </tbody>
+                              </table>
+                          </div>
+                      </div>
+                  `;
+              }
+              
+              // 5. Adiciona evento de toggle para mostrar/ocultar a tabela
+              setupTableToggle();
           }
-          if (document.getElementById('caixaTotalSaidas')) {
-            document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(totalSaidas);
-          }
-          if (document.getElementById('caixaSaldo')) {
-            document.getElementById('caixaSaldo').textContent = formatarMoeda(totalEntradas - totalSaidas);
-          }
-        }
+      } catch (error) {
+          console.error('Erro ao carregar financeiro do caixa:', error);
+          showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
       }
-    } catch (error) {
-      console.error('Erro ao carregar financeiro do caixa:', error);
-      showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
-    }
+  }
+
+  // Função auxiliar para formatar nomes de formas de pagamento
+  function formatFormaPagamento(forma) {
+      const formatos = {
+          'pix_fabiano': 'PIX Fabiano',
+          'pix_maquineta': 'PIX Maquineta',
+          'pix_edfrance': 'PIX EDFrance',
+          'pix_loja': 'PIX Loja',
+          'dinheiro': 'Dinheiro',
+          'cartao_credito': 'Cartão Crédito',
+          'cartao_debito': 'Cartão Débito',
+          'a_prazo': 'A Prazo'
+      };
+      return formatos[forma] || forma;
+  }
+
+  // Configura o toggle para mostrar/ocultar a tabela
+  function setupTableToggle() {
+      const toggleHeader = document.querySelector('.toggle-table-header');
+      const tableContainer = document.querySelector('.details-table-container');
+      const toggleIcon = document.querySelector('.toggle-icon');
+      
+      if (toggleHeader && tableContainer) {
+          toggleHeader.addEventListener('click', () => {
+              if (tableContainer.style.display === 'none') {
+                  tableContainer.style.display = 'block';
+                  toggleHeader.classList.add('active');
+              } else {
+                  tableContainer.style.display = 'none';
+                  toggleHeader.classList.remove('active');
+              }
+          });
+      }
   }
 
   // ===== MOVIMENTAÇÕES =====

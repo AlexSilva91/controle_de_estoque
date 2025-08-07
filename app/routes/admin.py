@@ -31,7 +31,7 @@ from app.schemas import (
     UsuarioCreate, UsuarioUpdate, ProdutoCreate, ProdutoUpdate, MovimentacaoEstoqueCreate,
     ClienteCreate, ClienteUpdate, FinanceiroCreate, FinanceiroUpdate
 )
-from app.utils.format_data_moeda import formatar_data_br, formatar_valor_br
+from app.utils.format_data_moeda import formatar_data_br, format_number
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -751,12 +751,12 @@ def atualizar_produto(produto_id):
         produto_dict = {
             'id': produto.id,
             'nome': produto.nome,
-            'valor_unitario': formatar_valor_br(produto.valor_unitario),
+            'valor_unitario': format_number(produto.valor_unitario),
             'estoque_loja': f"{float(produto.estoque_loja):.2f}",
             'descontos': [{
                 'id': d.id,
                 'identificador': d.identificador,
-                'valor': formatar_valor_br(d.valor),
+                'valor': format_number(d.valor),
                 'quantidade_minima': f"{float(d.quantidade_minima):.2f}",
                 'tipo': d.tipo.name
             } for d in produto.descontos]
@@ -1946,7 +1946,7 @@ def buscar_desconto_por_id(desconto_id):
                 'identificador': desconto.identificador,
                 'quantidade_minima': float(desconto.quantidade_minima),
                 'quantidade_maxima': float(desconto.quantidade_maxima),
-                'valor_unitario_com_desconto': formatar_valor_br(desconto.valor),  # Mapeando valor para valor_unitario_com_desconto
+                'valor_unitario_com_desconto': format_number(desconto.valor),  # Mapeando valor para valor_unitario_com_desconto
                 'descricao': desconto.descricao,
                 'valido_ate': valido_ate_formatado,
                 'ativo': desconto.ativo,
