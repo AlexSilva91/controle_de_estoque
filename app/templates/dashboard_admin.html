@@ -1098,12 +1098,18 @@
                                 <label>Observações do Administrador:</label>
                                 <div class="value" id="visualizarCaixaObsAdmin"></div>
                             </div>
+                            <div id="formasPagamentoContainer" class="detail-item full-width"></div>
+                            <div id="categoriasContainer" class="detail-item full-width"></div>
                         </div>
                     </div>
                     
                     <div class="details-table-section">
-                        <h4><i class="fas fa-file-invoice-dollar"></i> Movimentações Financeiras</h4>
-                        <div class="details-table-container">
+                        <h4 class="toggle-table-header" style="cursor: pointer;">
+                            <i class="fas fa-file-invoice-dollar"></i> 
+                            <span>Movimentações Financeiras</span>
+                            <i class="fas fa-chevron-down toggle-icon"></i>
+                        </h4>
+                        <div class="details-table-container" style="display: none;">
                             <table id="caixaFinanceiroTable" class="data-table">
                                 <thead>
                                     <tr>

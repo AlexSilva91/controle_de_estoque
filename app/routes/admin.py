@@ -1940,6 +1940,38 @@ def get_caixa_financeiro(caixa_id):
         total_entradas = sum(mov.valor for mov in movimentacoes if mov.tipo == entities.TipoMovimentacao.entrada)
         total_saidas = sum(mov.valor for mov in movimentacoes if mov.tipo == entities.TipoMovimentacao.saida)
         
+        # Busca pagamentos de notas fiscais diretamente da tabela de pagamentos
+        pagamentos_notas = session.query(
+            entities.PagamentoNotaFiscal.forma_pagamento,
+            func.sum(entities.PagamentoNotaFiscal.valor).label('total')
+        ).join(
+            entities.NotaFiscal,
+            entities.PagamentoNotaFiscal.nota_fiscal_id == entities.NotaFiscal.id
+        ).filter(
+            entities.NotaFiscal.caixa_id == caixa_id
+        ).group_by(
+            entities.PagamentoNotaFiscal.forma_pagamento
+        ).all()
+        
+        # Busca pagamentos de contas a receber diretamente da tabela de pagamentos
+        pagamentos_contas = session.query(
+            entities.PagamentoContaReceber.forma_pagamento,
+            func.sum(entities.PagamentoContaReceber.valor_pago).label('total')
+        ).filter(
+            entities.PagamentoContaReceber.caixa_id == caixa_id
+        ).group_by(
+            entities.PagamentoContaReceber.forma_pagamento
+        ).all()
+        
+        # Combina os resultados
+        formas_pagamento = {}
+        
+        for forma, total in pagamentos_notas:
+            formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + float(total)
+            
+        for forma, total in pagamentos_contas:
+            formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + float(total)
+        
         return jsonify({
             'success': True,
             'data': dados,
@@ -1947,7 +1979,8 @@ def get_caixa_financeiro(caixa_id):
                 'entradas': float(total_entradas),
                 'saidas': float(total_saidas),
                 'saldo': float(total_entradas - total_saidas)
-            }
+            },
+            'formas_pagamento': formas_pagamento
         })
         
     except Exception as e:
@@ -1955,7 +1988,6 @@ def get_caixa_financeiro(caixa_id):
             'success': False,
             'error': str(e)
         }), 500
-        
         
 @admin_bp.route('/caixas/<int:caixa_id>/aprovar', methods=['POST'])
 @login_required

@@ -2202,3 +2202,22 @@ footer {
 .desconto-select-container select {
     flex-grow: 1;
 }
+.payment-methods-table, .categories-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.payment-methods-table th, 
+.payment-methods-table td,
+.categories-table th,
+.categories-table td {
+    padding: 8px;
+    border: 1px solid #685BD8;
+    text-align: left;
+}
+
+.payment-methods-table th,
+.categories-table th {
+    background-color: #1B2535;
+}

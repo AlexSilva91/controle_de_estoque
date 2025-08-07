@@ -1465,53 +1465,153 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   async function loadCaixaFinanceiro(caixaId) {
-    try {
-      const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
-      
-      if (response.success) {
-        const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
-        if (tableBody) {
-          tableBody.innerHTML = '';
+      try {
+          const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
           
-          let totalEntradas = 0;
-          let totalSaidas = 0;
-          
-          response.data.forEach(item => {
-            const row = document.createElement('tr');
-            const valor = parseFloat(item.valor);
-            
-            if (item.tipo === 'entrada') {
-              totalEntradas += valor;
-            } else {
-              totalSaidas += valor;
-            }
-            
-            row.innerHTML = `
-              <td>${formatDateTime(item.data)}</td>
-              <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
-              <td>${item.categoria || '-'}</td>
-              <td>${formatarMoeda(valor)}</td>
-              <td>${item.descricao || '-'}</td>
-              <td>${item.forma_pagamento || '-'}</td>
-            `;
-            tableBody.appendChild(row);
-          });
-          
-          if (document.getElementById('caixaTotalEntradas')) {
-            document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(totalEntradas);
+          if (response.success) {
+              // 1. Atualiza a tabela de movimentações
+              const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
+              if (tableBody) {
+                  tableBody.innerHTML = '';
+                  
+                  let totalEntradas = 0;
+                  let totalSaidas = 0;
+                  
+                  response.data.forEach(item => {
+                      const row = document.createElement('tr');
+                      const valor = parseFloat(item.valor);
+                      
+                      if (item.tipo === 'entrada') {
+                          totalEntradas += valor;
+                      } else {
+                          totalSaidas += valor;
+                      }
+                      
+                      row.innerHTML = `
+                          <td>${formatDateTime(item.data)}</td>
+                          <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
+                          <td>${item.categoria || '-'}</td>
+                          <td>${formatarMoeda(valor)}</td>
+                          <td>${item.descricao || '-'}</td>
+                      `;
+                      tableBody.appendChild(row);
+                  });
+              }
+              
+              // 2. Atualiza os totais gerais
+              if (document.getElementById('caixaTotalEntradas')) {
+                  document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(response.totais.entradas);
+              }
+              if (document.getElementById('caixaTotalSaidas')) {
+                  document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(response.totais.saidas);
+              }
+              if (document.getElementById('caixaSaldo')) {
+                  document.getElementById('caixaSaldo').textContent = formatarMoeda(response.totais.saldo);
+              }
+              
+              // 3. Adiciona seção de formas de pagamento
+              const formasPagamentoContainer = document.getElementById('formasPagamentoContainer');
+              if (formasPagamentoContainer && response.formas_pagamento) {
+                  formasPagamentoContainer.innerHTML = `
+                      <div class="detail-item full-width">
+                          <label>Formas de Pagamento:</label>
+                          <div class="value">
+                              <table class="payment-methods-table">
+                                  <thead>
+                                      <tr>
+                                          <th>Forma</th>
+                                          <th>Valor</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody>
+                                      ${Object.entries(response.formas_pagamento).map(([forma, valor]) => `
+                                          <tr>
+                                              <td>${formatFormaPagamento(forma)}</td>
+                                              <td class="${valor >= 0 ? 'positive-value' : 'negative-value'}">${formatarMoeda(valor)}</td>
+                                          </tr>
+                                      `).join('')}
+                                  </tbody>
+                              </table>
+                          </div>
+                      </div>
+                  `;
+              }
+              
+              // 4. Adiciona resumo por categoria
+              const categoriasContainer = document.getElementById('categoriasContainer');
+              if (categoriasContainer) {
+                  const categorias = {};
+                  response.data.forEach(item => {
+                      const categoria = item.categoria || 'outro';
+                      categorias[categoria] = (categorias[categoria] || 0) + parseFloat(item.valor);
+                  });
+                  
+                  categoriasContainer.innerHTML = `
+                      <div class="detail-item full-width">
+                          <label>Resumo por Categoria:</label>
+                          <div class="value">
+                              <table class="categories-table">
+                                  <thead>
+                                      <tr>
+                                          <th>Categoria</th>
+                                          <th>Valor</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody>
+                                      ${Object.entries(categorias).map(([categoria, valor]) => `
+                                          <tr>
+                                              <td>${categoria}</td>
+                                              <td class="${valor >= 0 ? 'positive-value' : 'negative-value'}">${formatarMoeda(valor)}</td>
+                                          </tr>
+                                      `).join('')}
+                                  </tbody>
+                              </table>
+                          </div>
+                      </div>
+                  `;
+              }
+              
+              // 5. Adiciona evento de toggle para mostrar/ocultar a tabela
+              setupTableToggle();
           }
-          if (document.getElementById('caixaTotalSaidas')) {
-            document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(totalSaidas);
-          }
-          if (document.getElementById('caixaSaldo')) {
-            document.getElementById('caixaSaldo').textContent = formatarMoeda(totalEntradas - totalSaidas);
-          }
-        }
+      } catch (error) {
+          console.error('Erro ao carregar financeiro do caixa:', error);
+          showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
       }
-    } catch (error) {
-      console.error('Erro ao carregar financeiro do caixa:', error);
-      showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
-    }
+  }
+
+  // Função auxiliar para formatar nomes de formas de pagamento
+  function formatFormaPagamento(forma) {
+      const formatos = {
+          'pix_fabiano': 'PIX Fabiano',
+          'pix_maquineta': 'PIX Maquineta',
+          'pix_edfrance': 'PIX EDFrance',
+          'pix_loja': 'PIX Loja',
+          'dinheiro': 'Dinheiro',
+          'cartao_credito': 'Cartão Crédito',
+          'cartao_debito': 'Cartão Débito',
+          'a_prazo': 'A Prazo'
+      };
+      return formatos[forma] || forma;
+  }
+
+  // Configura o toggle para mostrar/ocultar a tabela
+  function setupTableToggle() {
+      const toggleHeader = document.querySelector('.toggle-table-header');
+      const tableContainer = document.querySelector('.details-table-container');
+      const toggleIcon = document.querySelector('.toggle-icon');
+      
+      if (toggleHeader && tableContainer) {
+          toggleHeader.addEventListener('click', () => {
+              if (tableContainer.style.display === 'none') {
+                  tableContainer.style.display = 'block';
+                  toggleHeader.classList.add('active');
+              } else {
+                  tableContainer.style.display = 'none';
+                  toggleHeader.classList.remove('active');
+              }
+          });
+      }
   }
 
   // ===== MOVIMENTAÇÕES =====
