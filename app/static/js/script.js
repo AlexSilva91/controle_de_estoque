@@ -243,61 +243,87 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ===== DASHBOARD =====
-  async function loadDashboardData() {
-    try {
-      // Carregar métricas
-      const metricsData = await fetchWithErrorHandling('/admin/dashboard/metrics');
+  function toggleMovimentacoes() {
+      const body = document.getElementById('movimentacoesBody');
+      const icon = document.querySelector('#movimentacoesHeader .toggle-icon i');
       
-      if (metricsData.success) {
-        const metricsContainer = document.querySelector('.metrics-grid');
-        if (metricsContainer) {
-          metricsContainer.innerHTML = '';
-          
-          metricsData.metrics.forEach(metric => {
-            const card = document.createElement('div');
-            card.className = `metric-card ${metric.color}`;
-            
-            card.innerHTML = `
-              <div class="metric-icon">
-                <i class="fas fa-${metric.icon}"></i>
-              </div>
-              <div class="metric-info">
-                <h3>${metric.title}</h3>
-                <div class="value">${metric.value}</div>
-              </div>
-            `;
-            
-            metricsContainer.appendChild(card);
-          });
-        }
+      if (body.style.display === 'none') {
+          body.style.display = 'block';
+          icon.classList.remove('fa-chevron-up');
+          icon.classList.add('fa-chevron-down');
+      } else {
+          body.style.display = 'none';
+          icon.classList.remove('fa-chevron-down');
+          icon.classList.add('fa-chevron-up');
       }
-      
-      // Carregar movimentações
-      const movData = await fetchWithErrorHandling('/admin/dashboard/movimentacoes');
-      
-      if (movData.success) {
-        const movTable = document.querySelector('#movimentacoesTable tbody');
-        if (movTable) {
-          movTable.innerHTML = '';
-          
-          movData.movimentacoes.forEach(mov => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${mov.data}</td>
-              <td><span class="badge ${mov.tipo === 'Entrada' ? 'badge-success' : 'badge-danger'}">${mov.tipo}</span></td>
-              <td>${mov.produto}</td>
-              <td>${mov.quantidade}</td>
-              <td>${mov.valor}</td>
-            `;
-            movTable.appendChild(row);
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao carregar dados do dashboard:', error);
-      showFlashMessage('error', 'Erro ao carregar dados do dashboard');
-    }
   }
+
+  // Configura o evento de clique
+  document.getElementById('movimentacoesHeader').addEventListener('click', function(e) {
+      // Verifica se não foi clique em um botão de ação
+      if (!e.target.closest('.btn-icon')) {
+          toggleMovimentacoes();
+      }
+  });
+
+  async function loadDashboardData() {
+      try {
+          // Carregar métricas
+          const metricsData = await fetchWithErrorHandling('/admin/dashboard/metrics');
+          
+          if (metricsData.success) {
+              const metricsContainer = document.querySelector('.metrics-grid');
+              if (metricsContainer) {
+                  metricsContainer.innerHTML = '';
+                  
+                  metricsData.metrics.forEach(metric => {
+                      const card = document.createElement('div');
+                      card.className = `metric-card ${metric.color}`;
+                      
+                      card.innerHTML = `
+                          <div class="metric-icon">
+                              <i class="fas fa-${metric.icon}"></i>
+                          </div>
+                          <div class="metric-info">
+                              <h3>${metric.title}</h3>
+                              <div class="value">${metric.value}</div>
+                          </div>
+                      `;
+                      
+                      metricsContainer.appendChild(card);
+                  });
+              }
+          }
+          
+          // Carregar movimentações
+          const movData = await fetchWithErrorHandling('/admin/dashboard/movimentacoes');
+          
+          if (movData.success) {
+              const movTable = document.querySelector('#movimentacoesTable tbody');
+              if (movTable) {
+                  movTable.innerHTML = '';
+                  
+                  movData.movimentacoes.forEach(mov => {
+                      const row = document.createElement('tr');
+                      row.innerHTML = `
+                          <td>${mov.data}</td>
+                          <td><span class="badge ${mov.tipo === 'Entrada' ? 'badge-success' : 'badge-danger'}">${mov.tipo}</span></td>
+                          <td>${mov.produto}</td>
+                          <td>${mov.quantidade}</td>
+                          <td>${mov.valor}</td>
+                      `;
+                      movTable.appendChild(row);
+                  });
+              }
+          }
+      } catch (error) {
+          console.error('Erro ao carregar dados do dashboard:', error);
+          showFlashMessage('error', 'Erro ao carregar dados do dashboard');
+      }
+  }
+
+  // Evento para o botão de atualizar
+  document.getElementById('refreshData').addEventListener('click', loadDashboardData);
 
   // ===== CLIENTES =====
   async function loadClientesData() {
