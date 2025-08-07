@@ -29,7 +29,7 @@ def format_number(value, is_weight=False):
     
     if is_weight:
         # Para pesos (kg, sacos), mostra até 3 casas decimais
-        return "{:,.3f}".format(value).replace(",", "X").replace(".", ",").replace("X", ".")
+        return "{:,.2f}".format(value).replace(",", "X").replace(".", ",").replace("X", ".")
     elif value.is_integer():
         # Para inteiros (contagens)
         return "{:,.0f}".format(value).replace(",", ".")

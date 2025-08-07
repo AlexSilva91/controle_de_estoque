@@ -73,116 +73,62 @@ def dashboard():
 def get_dashboard_metrics():
     try:
         hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
-        inicio_dia = datetime.combine(hoje, datetime.min.time())
-        fim_dia = datetime.combine(hoje, datetime.max.time())
-        primeiro_dia_mes = datetime(hoje.year, hoje.month, 1)
-        caixa = get_caixa_aberto(db.session)
+        primeiro_dia_mes = datetime(hoje.year, hoje.month, 1).date()
 
-        clientes_count = db.session.query(func.count(Cliente.id)).filter(Cliente.ativo == True).scalar() or 0
-        produtos_count = db.session.query(func.count(Produto.id)).filter(Produto.ativo == True).scalar() or 0
-        notas_count = db.session.query(func.count(NotaFiscal.id)).scalar() or 0
+        # Métricas de Estoque (simplificado)
+        estoque_metrics = db.session.query(
+            Produto.unidade,
+            func.sum(Produto.estoque_loja).label('total')
+        ).filter(
+            Produto.ativo == True
+        ).group_by(Produto.unidade).all()
 
-        estoque_kg = db.session.query(func.sum(Produto.estoque_loja)).filter(
-            Produto.unidade == UnidadeMedida.kg, Produto.ativo == True
-        ).scalar() or 0
+        estoque_dict = {
+            'kg': 0,
+            'saco': 0,
+            'unidade': 0
+        }
+        
+        for item in estoque_metrics:
+            if item.unidade == UnidadeMedida.kg:
+                estoque_dict['kg'] = item.total or 0
+            elif item.unidade == UnidadeMedida.saco:
+                estoque_dict['saco'] = item.total or 0
+            elif item.unidade == UnidadeMedida.unidade:
+                estoque_dict['unidade'] = item.total or 0
 
-        estoque_saco = db.session.query(func.sum(Produto.estoque_loja)).filter(
-            Produto.unidade == UnidadeMedida.saco, Produto.ativo == True
-        ).scalar() or 0
-
-        estoque_unidade = db.session.query(func.sum(Produto.estoque_loja)).filter(
-            Produto.unidade == UnidadeMedida.unidade, Produto.ativo == True
-        ).scalar() or 0
-
-        vendas_dia = db.session.query(func.sum(func.distinct(NotaFiscal.valor_total))).filter(
-            NotaFiscal.data_emissao >= inicio_dia,
-            NotaFiscal.data_emissao <= fim_dia,
-            NotaFiscal.status == StatusNota.emitida
-        ).scalar() or 0
-
-        despesas_dia = db.session.query(func.sum(func.distinct(Financeiro.valor))).filter(
-            Financeiro.data >= inicio_dia,
-            Financeiro.data <= fim_dia,
-            Financeiro.tipo == TipoMovimentacao.saida,
-            Financeiro.categoria != CategoriaFinanceira.fechamento_caixa
-        ).scalar() or 0
-
-        vendas_mes = db.session.query(func.sum(func.distinct(NotaFiscal.valor_total))).filter(
-            NotaFiscal.data_emissao >= primeiro_dia_mes,
-            NotaFiscal.data_emissao <= fim_dia,
-            NotaFiscal.status == StatusNota.emitida
-        ).scalar() or 0
-
-        despesas_mes = db.session.query(func.sum(func.distinct(Financeiro.valor))).filter(
+        # Métricas Financeiras (simplificado)
+        entradas_mes = db.session.query(
+            func.sum(Financeiro.valor)
+        ).filter(
+            Financeiro.tipo == TipoMovimentacao.entrada,
             Financeiro.data >= primeiro_dia_mes,
-            Financeiro.data <= fim_dia,
+            Financeiro.data <= hoje
+        ).scalar() or 0
+
+        saidas_mes = db.session.query(
+            func.sum(Financeiro.valor)
+        ).filter(
             Financeiro.tipo == TipoMovimentacao.saida,
+            Financeiro.data >= primeiro_dia_mes,
+            Financeiro.data <= hoje,
             Financeiro.categoria != CategoriaFinanceira.fechamento_caixa
         ).scalar() or 0
-
-        formas_pagamento = db.session.query(
-            MovimentacaoEstoque.forma_pagamento,
-            func.sum(MovimentacaoEstoque.valor_recebido).label('total')
-        ).filter(
-            MovimentacaoEstoque.data >= inicio_dia,
-            MovimentacaoEstoque.data <= fim_dia,
-            MovimentacaoEstoque.tipo == TipoMovimentacao.entrada
-        ).group_by(MovimentacaoEstoque.forma_pagamento).all()
-
-        formas_pagamento_dict = [
-            {
-                'forma': fp.forma_pagamento.value,
-                'total': format_currency(fp.total or 0)
-            }
-            for fp in formas_pagamento if fp.forma_pagamento is not None
-        ]
-
-        contas_receber = db.session.query(func.sum(func.distinct(ContaReceber.valor_aberto))).filter(
-            ContaReceber.status != StatusPagamento.quitado
-        ).scalar() or 0
-
-        caixas_abertos = db.session.query(
-            Caixa.id,
-            Caixa.valor_abertura
-        ).filter(
-            Caixa.status == StatusCaixa.aberto
-        ).all()
-
-        caixas_totais = []
-        for caixa in caixas_abertos:
-            total_movimentacoes = db.session.query(func.sum(func.distinct(
-                case(
-                    (Financeiro.tipo == TipoMovimentacao.entrada, Financeiro.valor),
-                    else_=-Financeiro.valor
-                )
-            ))).filter(
-                Financeiro.caixa_id == caixa.id
-            ).scalar() or 0
-
-            total_caixa = float(caixa.valor_abertura) + float(total_movimentacoes)
-            caixas_totais.append({
-                'caixa_id': caixa.id,
-                'total': format_currency(total_caixa)
-            })
 
         return jsonify({
             'success': True,
-            'metrics': [
-                {'title': "Clientes", 'value': format_number(clientes_count), 'icon': "users", 'color': "success"},
-                {'title': "Produtos", 'value': format_number(produtos_count), 'icon': "box", 'color': "info"},
-                {'title': "Notas Fiscais", 'value': format_number(notas_count), 'icon': "file-invoice", 'color': "warning"},
-                {'title': "Estoque (kg)", 'value': f"{format_number(estoque_kg, is_weight=True)} kg", 'icon': "weight", 'color': "secondary"},
-                {'title': "Estoque (sacos)", 'value': f"{format_number(estoque_saco, is_weight=True)} sacos", 'icon': "shopping-bag", 'color': "secondary"},
-                {'title': "Estoque (unidades)", 'value': f"{format_number(estoque_unidade, is_weight=True)} un", 'icon': "cubes", 'color': "secondary"},
-                {'title': "Vendas Hoje", 'value': f"R$ {format_currency(vendas_dia)}", 'icon': "money-bill-wave", 'color': "success"},
-                {'title': "Despesas Hoje", 'value': f"R$ {format_currency(despesas_dia)}", 'icon': "money-bill-wave", 'color': "danger"},
-                {'title': "Vendas Mês", 'value': f"R$ {format_currency(vendas_mes)}", 'icon': "chart-line", 'color': "success"},
-                {'title': "Despesas Mês", 'value': f"R$ {format_currency(despesas_mes)}", 'icon': "chart-line", 'color': "danger"},
-                {'title': "Contas a Receber", 'value': f"R$ {format_currency(contas_receber)}", 'icon': "hand-holding-usd", 'color': "info"},
-            ],
-            'formas_pagamento': formas_pagamento_dict,
-            'caixas_totais': caixas_totais,
-            'caixa_aberto': caixa is not None
+            'metrics': {
+                'estoque': {
+                    'kg': f"{format_number(estoque_dict['kg'], is_weight=True)} kg",
+                    'sacos': f"{format_number(estoque_dict['saco'], is_weight=True)} sacos",
+                    'unidades': f"{format_number(estoque_dict['unidade'], is_weight=True)} un"
+                },
+                'financeiro': {
+                    'entradas_mes': format_currency(entradas_mes),
+                    'saidas_mes': format_currency(saidas_mes),
+                    'saldo_mes': format_currency(entradas_mes - saidas_mes)
+                }
+            }
         })
 
     except Exception as e:
@@ -196,80 +142,102 @@ def get_dashboard_metrics():
 def get_vendas_diarias():
     try:
         hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
+        primeiro_dia_mes = datetime(hoje.year, hoje.month, 1).date()
         dados_diarios = []
 
+        # 1. Vendas mensais por caixa
+        vendas_mensais_caixa = db.session.query(
+            Caixa.id.label('caixa_id'),
+            func.sum(Financeiro.valor).label('total_vendas')
+        ).join(
+            Financeiro, Financeiro.caixa_id == Caixa.id
+        ).filter(
+            Financeiro.tipo == TipoMovimentacao.entrada,
+            Financeiro.categoria == CategoriaFinanceira.venda,
+            Financeiro.data >= primeiro_dia_mes,
+            Financeiro.data <= hoje
+        ).group_by(
+            Caixa.id
+        ).all()
+
+        # 2. Total de vendas no mês
+        total_vendas_mes = db.session.query(
+            func.sum(Financeiro.valor)
+        ).filter(
+            Financeiro.tipo == TipoMovimentacao.entrada,
+            Financeiro.categoria == CategoriaFinanceira.venda,
+            Financeiro.data >= primeiro_dia_mes,
+            Financeiro.data <= hoje
+        ).scalar() or 0
+
+        # 3. Total de despesas no mês
+        total_despesas_mes = db.session.query(
+            func.sum(Financeiro.valor)
+        ).filter(
+            Financeiro.tipo == TipoMovimentacao.saida,
+            Financeiro.categoria != CategoriaFinanceira.fechamento_caixa,
+            Financeiro.data >= primeiro_dia_mes,
+            Financeiro.data <= hoje
+        ).scalar() or 0
+
+        # 4. Dados diários (últimos 7 dias)
         for i in range(6, -1, -1):
             data = hoje - timedelta(days=i)
-            inicio_dia = datetime.combine(data, datetime.min.time())
-            fim_dia = datetime.combine(data, datetime.max.time())
-
+            
+            # Total de vendas do dia
             total_vendas = db.session.query(
-                func.sum(func.distinct(NotaFiscal.valor_total))
+                func.sum(Financeiro.valor)
             ).filter(
-                NotaFiscal.data_emissao >= inicio_dia,
-                NotaFiscal.data_emissao <= fim_dia,
-                NotaFiscal.status == StatusNota.emitida
+                Financeiro.tipo == TipoMovimentacao.entrada,
+                Financeiro.categoria == CategoriaFinanceira.venda,
+                func.date(Financeiro.data) == data
             ).scalar() or 0
 
-            qtd_notas = db.session.query(
-                func.count(func.distinct(NotaFiscal.id))
+            # Total de despesas do dia
+            total_despesas = db.session.query(
+                func.sum(Financeiro.valor)
             ).filter(
-                NotaFiscal.data_emissao >= inicio_dia,
-                NotaFiscal.data_emissao <= fim_dia,
-                NotaFiscal.status == StatusNota.emitida
+                Financeiro.tipo == TipoMovimentacao.saida,
+                Financeiro.categoria != CategoriaFinanceira.fechamento_caixa,
+                func.date(Financeiro.data) == data
             ).scalar() or 0
 
+            # Formas de pagamento
             formas_pagamento = db.session.query(
-                MovimentacaoEstoque.forma_pagamento,
-                func.sum(MovimentacaoEstoque.valor_recebido).label('total')
-            ).filter(
-                MovimentacaoEstoque.data >= inicio_dia,
-                MovimentacaoEstoque.data <= fim_dia,
-                MovimentacaoEstoque.tipo == TipoMovimentacao.entrada,
-                MovimentacaoEstoque.forma_pagamento.isnot(None)
-            ).group_by(
-                MovimentacaoEstoque.forma_pagamento
-            ).all()
-
-            produtos_mais_vendidos = db.session.query(
-                Produto.nome,
-                func.sum(NotaFiscalItem.quantidade).label('quantidade'),
-                func.sum(NotaFiscalItem.valor_total).label('valor_total')
+                PagamentoNotaFiscal.forma_pagamento,
+                func.sum(PagamentoNotaFiscal.valor).label('total')
             ).join(
-                NotaFiscalItem, NotaFiscalItem.produto_id == Produto.id
-            ).join(
-                NotaFiscal, NotaFiscal.id == NotaFiscalItem.nota_id
+                NotaFiscal, NotaFiscal.id == PagamentoNotaFiscal.nota_fiscal_id
             ).filter(
-                NotaFiscal.data_emissao >= inicio_dia,
-                NotaFiscal.data_emissao <= fim_dia,
+                func.date(NotaFiscal.data_emissao) == data,
                 NotaFiscal.status == StatusNota.emitida
             ).group_by(
-                Produto.nome
-            ).order_by(
-                func.sum(NotaFiscalItem.valor_total).desc()
-            ).limit(5).all()
+                PagamentoNotaFiscal.forma_pagamento
+            ).all()
 
             dados_diarios.append({
                 'data': data.strftime('%d/%m'),
                 'total_vendas': format_currency(total_vendas),
-                'qtd_notas': format_number(qtd_notas),
+                'total_despesas': format_currency(total_despesas),
+                'saldo_dia': format_currency(total_vendas - total_despesas),
                 'formas_pagamento': [
                     {'forma': fp.forma_pagamento.value, 'total': format_currency(fp.total or 0)}
                     for fp in formas_pagamento
-                ],
-                'produtos_mais_vendidos': [
-                    {
-                        'nome': p.nome,
-                        'quantidade': format_number(p.quantidade, is_weight=True),
-                        'valor_total': format_currency(p.valor_total)
-                    }
-                    for p in produtos_mais_vendidos
                 ]
             })
-        print(dados_diarios)
+
         return jsonify({
             'success': True,
             'dados': dados_diarios,
+            'vendas_mensais_caixa': [
+                {'caixa_id': caixa.caixa_id, 'total_vendas': format_currency(caixa.total_vendas or 0)}
+                for caixa in vendas_mensais_caixa
+            ],
+            'resumo_mensal': {
+                'total_vendas': format_currency(total_vendas_mes),
+                'total_despesas': format_currency(total_despesas_mes),
+                'saldo_mensal': format_currency(total_vendas_mes - total_despesas_mes)
+            },
             'periodo': {
                 'inicio': (hoje - timedelta(days=6)).strftime('%d/%m/%Y'),
                 'fim': hoje.strftime('%d/%m/%Y')
@@ -279,6 +247,60 @@ def get_vendas_diarias():
         print(e)
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@admin_bp.route('/dashboard/vendas-mensais')
+@login_required
+@admin_required
+def get_vendas_mensais():
+    try:
+        hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
+        meses = []
+        vendas = []
+        despesas = []
+        
+        # Obter dados dos últimos 6 meses
+        for i in range(5, -1, -1):
+            mes = hoje.month - i
+            ano = hoje.year
+            if mes <= 0:
+                mes += 12
+                ano -= 1
+            
+            primeiro_dia = datetime(ano, mes, 1).date()
+            ultimo_dia = datetime(ano, mes + 1, 1).date() - timedelta(days=1) if mes < 12 else datetime(ano, 12, 31).date()
+            
+            # Vendas do mês
+            total_vendas = db.session.query(
+                func.sum(Financeiro.valor)
+            ).filter(
+                Financeiro.tipo == TipoMovimentacao.entrada,
+                Financeiro.categoria == CategoriaFinanceira.venda,
+                Financeiro.data >= primeiro_dia,
+                Financeiro.data <= ultimo_dia
+            ).scalar() or 0
+            
+            # Despesas do mês
+            total_despesas = db.session.query(
+                func.sum(Financeiro.valor)
+            ).filter(
+                Financeiro.tipo == TipoMovimentacao.saida,
+                Financeiro.categoria != CategoriaFinanceira.fechamento_caixa,
+                Financeiro.data >= primeiro_dia,
+                Financeiro.data <= ultimo_dia
+            ).scalar() or 0
+            
+            meses.append(f"{primeiro_dia.strftime('%m/%Y')}")
+            vendas.append(float(total_vendas))
+            despesas.append(float(total_despesas))
+        
+        return jsonify({
+            'success': True,
+            'meses': meses,
+            'vendas': vendas,
+            'despesas': despesas
+        })
+    except Exception as e:
+        print(e)
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/dashboard/movimentacoes')
 @login_required
