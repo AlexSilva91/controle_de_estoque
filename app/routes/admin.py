@@ -7,11 +7,16 @@ from decimal import Decimal, InvalidOperation
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 import traceback
 
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 from app import schemas
 from app.models import db
-from app.models import entities
+from app.utils.format_data_moeda import format_currency, format_number
+from app.models.entities import ( 
+    Cliente, Produto, NotaFiscal, UnidadeMedida, StatusNota,
+    Financeiro, TipoMovimentacao, CategoriaFinanceira, MovimentacaoEstoque, ContaReceber,
+    StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
+    Desconto, PagamentoContaReceber)
 from app.crud import (
     TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_todos_os_descontos, criar_desconto, deletar_desconto, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, get_transferencias,
     get_user_by_cpf, get_user_by_id, get_usuarios, create_user, obter_caixas_completo, registrar_transferencia, update_user,
@@ -67,59 +72,221 @@ def dashboard():
 @admin_required
 def get_dashboard_metrics():
     try:
-        # Caixa aberto
+        hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
+        inicio_dia = datetime.combine(hoje, datetime.min.time())
+        fim_dia = datetime.combine(hoje, datetime.max.time())
+        primeiro_dia_mes = datetime(hoje.year, hoje.month, 1)
         caixa = get_caixa_aberto(db.session)
-        
-        # Contadores
-        clientes_count = db.session.query(entities.Cliente).filter(entities.Cliente.ativo == True).count()
-        produtos_count = db.session.query(entities.Produto).filter(entities.Produto.ativo == True).count()
-        notas_count = db.session.query(entities.NotaFiscal).count()
 
-        # Estoque por unidade de medida
-        estoque_kg = db.session.query(
-            func.sum(entities.Produto.estoque_loja)
-        ).filter(
-            entities.Produto.unidade == entities.UnidadeMedida.kg,
-            entities.Produto.ativo == True
+        clientes_count = db.session.query(func.count(Cliente.id)).filter(Cliente.ativo == True).scalar() or 0
+        produtos_count = db.session.query(func.count(Produto.id)).filter(Produto.ativo == True).scalar() or 0
+        notas_count = db.session.query(func.count(NotaFiscal.id)).scalar() or 0
+
+        estoque_kg = db.session.query(func.sum(Produto.estoque_loja)).filter(
+            Produto.unidade == UnidadeMedida.kg, Produto.ativo == True
         ).scalar() or 0
 
-        estoque_saco = db.session.query(
-            func.sum(entities.Produto.estoque_loja)
-        ).filter(
-            entities.Produto.unidade == entities.UnidadeMedida.saco,
-            entities.Produto.ativo == True
+        estoque_saco = db.session.query(func.sum(Produto.estoque_loja)).filter(
+            Produto.unidade == UnidadeMedida.saco, Produto.ativo == True
         ).scalar() or 0
 
-        estoque_unidade = db.session.query(
-            func.sum(entities.Produto.estoque_loja)
-        ).filter(
-            entities.Produto.unidade == entities.UnidadeMedida.unidade,
-            entities.Produto.ativo == True
+        estoque_unidade = db.session.query(func.sum(Produto.estoque_loja)).filter(
+            Produto.unidade == UnidadeMedida.unidade, Produto.ativo == True
         ).scalar() or 0
+
+        vendas_dia = db.session.query(func.sum(func.distinct(NotaFiscal.valor_total))).filter(
+            NotaFiscal.data_emissao >= inicio_dia,
+            NotaFiscal.data_emissao <= fim_dia,
+            NotaFiscal.status == StatusNota.emitida
+        ).scalar() or 0
+
+        despesas_dia = db.session.query(func.sum(func.distinct(Financeiro.valor))).filter(
+            Financeiro.data >= inicio_dia,
+            Financeiro.data <= fim_dia,
+            Financeiro.tipo == TipoMovimentacao.saida,
+            Financeiro.categoria != CategoriaFinanceira.fechamento_caixa
+        ).scalar() or 0
+
+        vendas_mes = db.session.query(func.sum(func.distinct(NotaFiscal.valor_total))).filter(
+            NotaFiscal.data_emissao >= primeiro_dia_mes,
+            NotaFiscal.data_emissao <= fim_dia,
+            NotaFiscal.status == StatusNota.emitida
+        ).scalar() or 0
+
+        despesas_mes = db.session.query(func.sum(func.distinct(Financeiro.valor))).filter(
+            Financeiro.data >= primeiro_dia_mes,
+            Financeiro.data <= fim_dia,
+            Financeiro.tipo == TipoMovimentacao.saida,
+            Financeiro.categoria != CategoriaFinanceira.fechamento_caixa
+        ).scalar() or 0
+
+        formas_pagamento = db.session.query(
+            MovimentacaoEstoque.forma_pagamento,
+            func.sum(MovimentacaoEstoque.valor_recebido).label('total')
+        ).filter(
+            MovimentacaoEstoque.data >= inicio_dia,
+            MovimentacaoEstoque.data <= fim_dia,
+            MovimentacaoEstoque.tipo == TipoMovimentacao.entrada
+        ).group_by(MovimentacaoEstoque.forma_pagamento).all()
+
+        formas_pagamento_dict = [
+            {
+                'forma': fp.forma_pagamento.value,
+                'total': format_currency(fp.total or 0)
+            }
+            for fp in formas_pagamento if fp.forma_pagamento is not None
+        ]
+
+        contas_receber = db.session.query(func.sum(func.distinct(ContaReceber.valor_aberto))).filter(
+            ContaReceber.status != StatusPagamento.quitado
+        ).scalar() or 0
+
+        caixas_abertos = db.session.query(
+            Caixa.id,
+            Caixa.valor_abertura
+        ).filter(
+            Caixa.status == StatusCaixa.aberto
+        ).all()
+
+        caixas_totais = []
+        for caixa in caixas_abertos:
+            total_movimentacoes = db.session.query(func.sum(func.distinct(
+                case(
+                    (Financeiro.tipo == TipoMovimentacao.entrada, Financeiro.valor),
+                    else_=-Financeiro.valor
+                )
+            ))).filter(
+                Financeiro.caixa_id == caixa.id
+            ).scalar() or 0
+
+            total_caixa = float(caixa.valor_abertura) + float(total_movimentacoes)
+            caixas_totais.append({
+                'caixa_id': caixa.id,
+                'total': format_currency(total_caixa)
+            })
 
         return jsonify({
             'success': True,
             'metrics': [
-                {'title': "Clientes", 'value': clientes_count, 'icon': "users", 'color': "success"},
-                {'title': "Produtos", 'value': produtos_count, 'icon': "box", 'color': "info"},
-                {'title': "Notas Fiscais", 'value': notas_count, 'icon': "file-invoice", 'color': "warning"},
-                {'title': "Estoque (kg)", 'value': f"{estoque_kg:.2f} kg", 'icon': "weight", 'color': "secondary"},
-                {'title': "Estoque (sacos)", 'value': f"{estoque_saco:.2f} sacos", 'icon': "shopping-bag", 'color': "secondary"},
-                {'title': "Estoque (unidades)", 'value': f"{estoque_unidade:.2f} un", 'icon': "cubes", 'color': "secondary"},
+                {'title': "Clientes", 'value': format_number(clientes_count), 'icon': "users", 'color': "success"},
+                {'title': "Produtos", 'value': format_number(produtos_count), 'icon': "box", 'color': "info"},
+                {'title': "Notas Fiscais", 'value': format_number(notas_count), 'icon': "file-invoice", 'color': "warning"},
+                {'title': "Estoque (kg)", 'value': f"{format_number(estoque_kg, is_weight=True)} kg", 'icon': "weight", 'color': "secondary"},
+                {'title': "Estoque (sacos)", 'value': f"{format_number(estoque_saco, is_weight=True)} sacos", 'icon': "shopping-bag", 'color': "secondary"},
+                {'title': "Estoque (unidades)", 'value': f"{format_number(estoque_unidade, is_weight=True)} un", 'icon': "cubes", 'color': "secondary"},
+                {'title': "Vendas Hoje", 'value': f"R$ {format_currency(vendas_dia)}", 'icon': "money-bill-wave", 'color': "success"},
+                {'title': "Despesas Hoje", 'value': f"R$ {format_currency(despesas_dia)}", 'icon': "money-bill-wave", 'color': "danger"},
+                {'title': "Vendas Mês", 'value': f"R$ {format_currency(vendas_mes)}", 'icon': "chart-line", 'color': "success"},
+                {'title': "Despesas Mês", 'value': f"R$ {format_currency(despesas_mes)}", 'icon': "chart-line", 'color': "danger"},
+                {'title': "Contas a Receber", 'value': f"R$ {format_currency(contas_receber)}", 'icon': "hand-holding-usd", 'color': "info"},
             ],
+            'formas_pagamento': formas_pagamento_dict,
+            'caixas_totais': caixas_totais,
             'caixa_aberto': caixa is not None
         })
 
     except Exception as e:
+        print(e)
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@admin_bp.route('/dashboard/vendas-diarias')
+@login_required
+@admin_required
+def get_vendas_diarias():
+    try:
+        hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
+        dados_diarios = []
+
+        for i in range(6, -1, -1):
+            data = hoje - timedelta(days=i)
+            inicio_dia = datetime.combine(data, datetime.min.time())
+            fim_dia = datetime.combine(data, datetime.max.time())
+
+            total_vendas = db.session.query(
+                func.sum(func.distinct(NotaFiscal.valor_total))
+            ).filter(
+                NotaFiscal.data_emissao >= inicio_dia,
+                NotaFiscal.data_emissao <= fim_dia,
+                NotaFiscal.status == StatusNota.emitida
+            ).scalar() or 0
+
+            qtd_notas = db.session.query(
+                func.count(func.distinct(NotaFiscal.id))
+            ).filter(
+                NotaFiscal.data_emissao >= inicio_dia,
+                NotaFiscal.data_emissao <= fim_dia,
+                NotaFiscal.status == StatusNota.emitida
+            ).scalar() or 0
+
+            formas_pagamento = db.session.query(
+                MovimentacaoEstoque.forma_pagamento,
+                func.sum(MovimentacaoEstoque.valor_recebido).label('total')
+            ).filter(
+                MovimentacaoEstoque.data >= inicio_dia,
+                MovimentacaoEstoque.data <= fim_dia,
+                MovimentacaoEstoque.tipo == TipoMovimentacao.entrada,
+                MovimentacaoEstoque.forma_pagamento.isnot(None)
+            ).group_by(
+                MovimentacaoEstoque.forma_pagamento
+            ).all()
+
+            produtos_mais_vendidos = db.session.query(
+                Produto.nome,
+                func.sum(NotaFiscalItem.quantidade).label('quantidade'),
+                func.sum(NotaFiscalItem.valor_total).label('valor_total')
+            ).join(
+                NotaFiscalItem, NotaFiscalItem.produto_id == Produto.id
+            ).join(
+                NotaFiscal, NotaFiscal.id == NotaFiscalItem.nota_id
+            ).filter(
+                NotaFiscal.data_emissao >= inicio_dia,
+                NotaFiscal.data_emissao <= fim_dia,
+                NotaFiscal.status == StatusNota.emitida
+            ).group_by(
+                Produto.nome
+            ).order_by(
+                func.sum(NotaFiscalItem.valor_total).desc()
+            ).limit(5).all()
+
+            dados_diarios.append({
+                'data': data.strftime('%d/%m'),
+                'total_vendas': format_currency(total_vendas),
+                'qtd_notas': format_number(qtd_notas),
+                'formas_pagamento': [
+                    {'forma': fp.forma_pagamento.value, 'total': format_currency(fp.total or 0)}
+                    for fp in formas_pagamento
+                ],
+                'produtos_mais_vendidos': [
+                    {
+                        'nome': p.nome,
+                        'quantidade': format_number(p.quantidade, is_weight=True),
+                        'valor_total': format_currency(p.valor_total)
+                    }
+                    for p in produtos_mais_vendidos
+                ]
+            })
+        print(dados_diarios)
+        return jsonify({
+            'success': True,
+            'dados': dados_diarios,
+            'periodo': {
+                'inicio': (hoje - timedelta(days=6)).strftime('%d/%m/%Y'),
+                'fim': hoje.strftime('%d/%m/%Y')
+            }
+        })
+    except Exception as e:
+        print(e)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 
 @admin_bp.route('/dashboard/movimentacoes')
 @login_required
 @admin_required
 def get_movimentacoes():
     try:
-        movimentacoes = db.session.query(entities.MovimentacaoEstoque)\
-            .order_by(entities.MovimentacaoEstoque.data.desc())\
+        movimentacoes = db.session.query( MovimentacaoEstoque)\
+            .order_by( MovimentacaoEstoque.data.desc())\
             .limit(10)\
             .all()
         
@@ -662,7 +829,7 @@ def obter_produto(produto_id):
 @admin_required
 def remover_produto(produto_id):
     try:
-        produto = db.session.query(entities.Produto).get(produto_id)
+        produto = db.session.query( Produto).get(produto_id)
 
         if not produto:
             return jsonify({'success': False, 'message': 'Produto não encontrado'}), 404
@@ -710,8 +877,8 @@ def registrar_movimentacao_produto(produto_id):
             troco=Decimal(data.get('troco', 0)),
             forma_pagamento=data.get('forma_pagamento'),
             observacao=data.get('observacao'),
-            estoque_origem=data.get('estoque_origem', entities.TipoEstoque.loja),
-            estoque_destino=data.get('estoque_destino', entities.TipoEstoque.loja)
+            estoque_origem=data.get('estoque_origem',  TipoEstoque.loja),
+            estoque_destino=data.get('estoque_destino',  TipoEstoque.loja)
         )
         
         movimentacao = registrar_movimentacao(db.session, mov_data)
@@ -779,7 +946,7 @@ def api_registrar_venda_retroativa():
             return jsonify({'success': False, 'message': 'Formato de data inválido. Use YYYY-MM-DD HH:MM:SS'}), 400
 
         # Verificar caixa
-        caixa = entities.Caixa.query.get(dados_venda['caixa_id'])
+        caixa =  Caixa.query.get(dados_venda['caixa_id'])
         if not caixa:
             return jsonify({'success': False, 'message': f'Caixa não encontrado: ID {dados_venda["caixa_id"]}'}), 404
         if caixa.status == 'aberto':
@@ -800,7 +967,7 @@ def api_registrar_venda_retroativa():
             total_descontos = validar_decimal(dados_venda.get('total_descontos', 0), 'total_descontos')
             
             # Validar cliente
-            cliente = entities.Cliente.query.get(cliente_id)
+            cliente =  Cliente.query.get(cliente_id)
             if not cliente:
                 return jsonify({'success': False, 'message': f'Cliente não encontrado: ID {cliente_id}'}), 404
         except ValueError as e:
@@ -812,7 +979,7 @@ def api_registrar_venda_retroativa():
         for item in dados_venda['itens']:
             try:
                 produto_id = int(item.get('produto_id'))
-                produto = entities.Produto.query.get(produto_id)
+                produto =  Produto.query.get(produto_id)
                 if not produto:
                     return jsonify({'success': False, 'message': f'Produto não encontrado: ID {produto_id}'}), 404
 
@@ -869,15 +1036,15 @@ def api_registrar_venda_retroativa():
             }), 400
 
         # Criar nota fiscal
-        nota = entities.NotaFiscal(
+        nota =  NotaFiscal(
             cliente_id=cliente.id,
             operador_id=current_user.id,
             caixa_id=caixa.id,
             data_emissao=data_emissao,
             valor_total=valor_total,
             valor_desconto=total_descontos,
-            status=entities.StatusNota.emitida,
-            forma_pagamento=entities.FormaPagamento.dinheiro,
+            status= StatusNota.emitida,
+            forma_pagamento= FormaPagamento.dinheiro,
             valor_recebido=valor_a_vista,
             troco=max(valor_a_vista - valor_total, Decimal('0.00')),
             a_prazo=valor_a_prazo > Decimal('0.00'),
@@ -887,7 +1054,7 @@ def api_registrar_venda_retroativa():
         # Criar entrega se existir
         if 'endereco_entrega' in dados_venda and isinstance(dados_venda['endereco_entrega'], dict):
             entrega_data = dados_venda['endereco_entrega']
-            entrega = entities.Entrega(
+            entrega =  Entrega(
                 logradouro=entrega_data.get('logradouro', ''),
                 numero=entrega_data.get('numero', ''),
                 complemento=entrega_data.get('complemento', ''),
@@ -907,15 +1074,15 @@ def api_registrar_venda_retroativa():
 
         # Adicionar itens
         for item in itens_validados:
-            item_nf = entities.NotaFiscalItem(
+            item_nf =  NotaFiscalItem(
                 nota_id=nota.id,
                 produto_id=item['produto'].id,
-                estoque_origem=entities.TipoEstoque.loja,
+                estoque_origem= TipoEstoque.loja,
                 quantidade=item['quantidade'],
                 valor_unitario=item['valor_unitario'],
                 valor_total=item['valor_total'],
                 desconto_aplicado=item['desconto_aplicado'],
-                tipo_desconto=entities.TipoDesconto(item['tipo_desconto']) if item['tipo_desconto'] else None,
+                tipo_desconto= TipoDesconto(item['tipo_desconto']) if item['tipo_desconto'] else None,
                 sincronizado=False
             )
             db.session.add(item_nf)
@@ -924,9 +1091,9 @@ def api_registrar_venda_retroativa():
         # Adicionar pagamentos
         pagamentos_ids = []
         for pagamento in pagamentos_validados:
-            pagamento_nf = entities.PagamentoNotaFiscal(
+            pagamento_nf =  PagamentoNotaFiscal(
                 nota_fiscal_id=nota.id,
-                forma_pagamento=entities.FormaPagamento(pagamento['forma']),
+                forma_pagamento= FormaPagamento(pagamento['forma']),
                 valor=pagamento['valor'],
                 data=data_emissao,
                 sincronizado=False
@@ -936,9 +1103,9 @@ def api_registrar_venda_retroativa():
             pagamentos_ids.append(pagamento_nf.id)
 
             if pagamento['forma'] != 'a_prazo':
-                financeiro = entities.Financeiro(
-                    tipo=entities.TipoMovimentacao.entrada,
-                    categoria=entities.CategoriaFinanceira.venda,
+                financeiro =  Financeiro(
+                    tipo= TipoMovimentacao.entrada,
+                    categoria= CategoriaFinanceira.venda,
                     valor=pagamento['valor'],
                     descricao=f"Pagamento venda NF #{nota.id}",
                     cliente_id=cliente.id,
@@ -952,21 +1119,21 @@ def api_registrar_venda_retroativa():
 
         # Criar conta a receber se houver valor a prazo
         if valor_a_prazo > Decimal('0.00'):
-            conta_receber = entities.ContaReceber(
+            conta_receber =  ContaReceber(
                 cliente_id=cliente.id,
                 nota_fiscal_id=nota.id,
                 descricao=f"Venda a prazo NF #{nota.id}",
                 valor_original=valor_a_prazo,
                 valor_aberto=valor_a_prazo,
                 data_vencimento=data_emissao + timedelta(days=30),
-                status=entities.StatusPagamento.pendente,
+                status= StatusPagamento.pendente,
                 sincronizado=False
             )
             db.session.add(conta_receber)
 
         # Definir forma de pagamento principal
         if len(pagamentos_validados) == 1:
-            nota.forma_pagamento = entities.FormaPagamento(pagamentos_validados[0]['forma'])
+            nota.forma_pagamento =  FormaPagamento(pagamentos_validados[0]['forma'])
 
         db.session.commit()
 
@@ -1007,7 +1174,7 @@ def api_registrar_venda_retroativa():
 @admin_required
 def api_caixas_fechados():
     try:
-        caixas = entities.Caixa.query.filter_by(status='fechado').order_by(entities.Caixa.data_fechamento.desc()).all()
+        caixas =  Caixa.query.filter_by(status='fechado').order_by( Caixa.data_fechamento.desc()).all()
         
         caixas_data = [{
             'id': caixa.id,
@@ -1033,7 +1200,7 @@ def api_caixas_fechados():
 @admin_required
 def api_clientes_ativos():
     try:
-        clientes = entities.Cliente.query.filter_by(ativo=True).order_by(entities.Cliente.nome).all()
+        clientes =  Cliente.query.filter_by(ativo=True).order_by( Cliente.nome).all()
         
         clientes_data = [{
             'id': cliente.id,
@@ -1058,7 +1225,7 @@ def api_clientes_ativos():
 @admin_required
 def api_produtos_ativos():
     try:
-        produtos = entities.Produto.query.filter_by(ativo=True).order_by(entities.Produto.nome).all()
+        produtos =  Produto.query.filter_by(ativo=True).order_by( Produto.nome).all()
         
         produtos_data = [{
             'id': produto.id,
@@ -1577,7 +1744,7 @@ def criar_desconto_route():
             'quantidade_minima': dados['quantidade_minima'],
             'quantidade_maxima': dados.get('quantidade_maxima'),
             'valor': dados['valor_unitario_com_desconto'],  # Mapeando para o campo 'valor' do modelo
-            'tipo': entities.TipoDesconto.fixo,  # Definindo como fixo para manter compatibilidade
+            'tipo':  TipoDesconto.fixo,  # Definindo como fixo para manter compatibilidade
             'descricao': dados.get('descricao', ''),
             'valido_ate': dados.get('valido_ate'),
             'ativo': dados.get('ativo', True)
@@ -1714,8 +1881,8 @@ def deletar_desconto_route(desconto_id):
 def listar_descontos_route():
     try:
         session = Session(db.engine)
-        descontos = session.query(entities.Desconto)\
-            .order_by(entities.Desconto.identificador)\
+        descontos = session.query( Desconto)\
+            .order_by( Desconto.identificador)\
             .all()
 
         return jsonify({
@@ -1743,7 +1910,7 @@ def listar_descontos_route():
 def buscar_desconto_por_id(desconto_id):
     try:
         session = Session(db.engine)
-        desconto = session.query(entities.Desconto).get(desconto_id)
+        desconto = session.query( Desconto).get(desconto_id)
         
         if not desconto:
             return jsonify({'erro': 'Desconto não encontrado'}), 404
@@ -1795,17 +1962,17 @@ def atualizar_caixa_route(caixa_id):
         if not dados:
             return jsonify({"error": "Dados não fornecidos"}), 400
             
-        caixa = db.session.get(entities.Caixa, caixa_id)
+        caixa = db.session.get( Caixa, caixa_id)
         if not caixa:
             return jsonify({"error": "Caixa não encontrado"}), 404
         
         # Atualiza status e datas conforme ação
         if 'status' in dados:
             if dados['status'] == 'fechado':
-                caixa.status = entities.StatusCaixa.fechado
+                caixa.status =  StatusCaixa.fechado
                 caixa.data_fechamento = datetime.utcnow()
             elif dados['status'] == 'analise':
-                caixa.status = entities.StatusCaixa.analise
+                caixa.status =  StatusCaixa.analise
                 caixa.data_analise = datetime.utcnow()
         
         if 'valor_fechamento' in dados:
@@ -1841,7 +2008,7 @@ def caixa_detail(caixa_id):
     if request.method == 'GET':
         try:
             session = Session(db.engine)
-            caixa = session.get(entities.Caixa, caixa_id)
+            caixa = session.get( Caixa, caixa_id)
             
             if not caixa:
                 return jsonify({"success": False, "error": "Caixa não encontrado"}), 404
@@ -1874,17 +2041,17 @@ def caixa_detail(caixa_id):
             if not dados:
                 return jsonify({"success": False, "error": "Dados não fornecidos"}), 400
                 
-            caixa = db.session.get(entities.Caixa, caixa_id)
+            caixa = db.session.get( Caixa, caixa_id)
             if not caixa:
                 return jsonify({"success": False, "error": "Caixa não encontrado"}), 404
             
             # Atualiza status e datas conforme ação
             if 'status' in dados:
-                if dados['status'] == 'fechado' and caixa.status != entities.StatusCaixa.fechado:
-                    caixa.status = entities.StatusCaixa.fechado
+                if dados['status'] == 'fechado' and caixa.status !=  StatusCaixa.fechado:
+                    caixa.status =  StatusCaixa.fechado
                     caixa.data_fechamento = datetime.utcnow()
-                elif dados['status'] == 'analise' and caixa.status != entities.StatusCaixa.analise:
-                    caixa.status = entities.StatusCaixa.analise
+                elif dados['status'] == 'analise' and caixa.status !=  StatusCaixa.analise:
+                    caixa.status =  StatusCaixa.analise
                     caixa.data_analise = datetime.utcnow()
             
             # Atualiza observações se existirem
@@ -1918,9 +2085,9 @@ def get_caixa_financeiro(caixa_id):
         session = Session(db.engine)
         
         # Busca as movimentações financeiras do caixa
-        movimentacoes = session.query(entities.Financeiro)\
+        movimentacoes = session.query( Financeiro)\
             .filter_by(caixa_id=caixa_id)\
-            .order_by(entities.Financeiro.data.desc())\
+            .order_by( Financeiro.data.desc())\
             .all()
         
         # Formata os dados para resposta
@@ -1937,30 +2104,30 @@ def get_caixa_financeiro(caixa_id):
         } for mov in movimentacoes]
         
         # Calcula totais
-        total_entradas = sum(mov.valor for mov in movimentacoes if mov.tipo == entities.TipoMovimentacao.entrada)
-        total_saidas = sum(mov.valor for mov in movimentacoes if mov.tipo == entities.TipoMovimentacao.saida)
+        total_entradas = sum(mov.valor for mov in movimentacoes if mov.tipo ==  TipoMovimentacao.entrada)
+        total_saidas = sum(mov.valor for mov in movimentacoes if mov.tipo ==  TipoMovimentacao.saida)
         
         # Busca pagamentos de notas fiscais diretamente da tabela de pagamentos
         pagamentos_notas = session.query(
-            entities.PagamentoNotaFiscal.forma_pagamento,
-            func.sum(entities.PagamentoNotaFiscal.valor).label('total')
+             PagamentoNotaFiscal.forma_pagamento,
+            func.sum( PagamentoNotaFiscal.valor).label('total')
         ).join(
-            entities.NotaFiscal,
-            entities.PagamentoNotaFiscal.nota_fiscal_id == entities.NotaFiscal.id
+             NotaFiscal,
+             PagamentoNotaFiscal.nota_fiscal_id ==  NotaFiscal.id
         ).filter(
-            entities.NotaFiscal.caixa_id == caixa_id
+             NotaFiscal.caixa_id == caixa_id
         ).group_by(
-            entities.PagamentoNotaFiscal.forma_pagamento
+             PagamentoNotaFiscal.forma_pagamento
         ).all()
         
         # Busca pagamentos de contas a receber diretamente da tabela de pagamentos
         pagamentos_contas = session.query(
-            entities.PagamentoContaReceber.forma_pagamento,
-            func.sum(entities.PagamentoContaReceber.valor_pago).label('total')
+             PagamentoContaReceber.forma_pagamento,
+            func.sum( PagamentoContaReceber.valor_pago).label('total')
         ).filter(
-            entities.PagamentoContaReceber.caixa_id == caixa_id
+             PagamentoContaReceber.caixa_id == caixa_id
         ).group_by(
-            entities.PagamentoContaReceber.forma_pagamento
+             PagamentoContaReceber.forma_pagamento
         ).all()
         
         # Combina os resultados
@@ -1994,7 +2161,7 @@ def get_caixa_financeiro(caixa_id):
 @admin_required
 def aprovar_caixa(caixa_id):
     """Rota para aprovar o fechamento de um caixa"""
-    caixa = entities.Caixa.query.get_or_404(caixa_id)
+    caixa =  Caixa.query.get_or_404(caixa_id)
     
     if current_user.tipo != 'admin':
         return jsonify({'error': 'Apenas administradores podem aprovar caixas'}), 403
@@ -2028,7 +2195,7 @@ def aprovar_caixa(caixa_id):
 @admin_required
 def recusar_caixa(caixa_id):
     """Rota para recusar o fechamento de um caixa"""
-    caixa = entities.Caixa.query.get_or_404(caixa_id)
+    caixa =  Caixa.query.get_or_404(caixa_id)
     
     if current_user.tipo != 'admin':
         return jsonify({'error': 'Apenas administradores podem recusar caixas'}), 403
@@ -2068,7 +2235,7 @@ def enviar_para_analise(caixa_id):
     print(f"Recebendo solicitação para caixa {caixa_id}")  # Log de depuração
     
     try:
-        caixa = entities.Caixa.query.get_or_404(caixa_id)
+        caixa =  Caixa.query.get_or_404(caixa_id)
         print(f"Caixa encontrado: {caixa.id}, status: {caixa.status}")  # Log de depuração
         
         data = request.get_json()
@@ -2111,7 +2278,7 @@ def enviar_para_analise(caixa_id):
 @admin_required
 def reabrir_caixa(caixa_id):
     """Rota para reabrir um caixa fechado ou recusado"""
-    caixa = entities.Caixa.query.get_or_404(caixa_id)
+    caixa =  Caixa.query.get_or_404(caixa_id)
     
     if current_user.tipo != 'admin':
         return jsonify({'error': 'Apenas administradores podem reabrir caixas'}), 403

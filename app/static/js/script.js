@@ -277,21 +277,375 @@ document.addEventListener('DOMContentLoaded', function() {
       }
   });
 
+  // Variáveis globais para os gráficos
+  let vendasDespesasChart, formasPagamentoChart, caixasChart, vendasDiariasChart;
+
+  // Configuração padrão para os gráficos no tema dark
+  Chart.defaults.color = '#e0e0e0';
+  Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+
+  // Paleta de cores para os gráficos
+  const chartColors = {
+      green: 'rgba(102, 187, 106, 0.7)',
+      greenBorder: 'rgba(102, 187, 106, 1)',
+      red: 'rgba(239, 83, 80, 0.7)',
+      redBorder: 'rgba(239, 83, 80, 1)',
+      blue: 'rgba(66, 165, 245, 0.7)',
+      blueBorder: 'rgba(66, 165, 245, 1)',
+      yellow: 'rgba(255, 213, 79, 0.7)',
+      yellowBorder: 'rgba(255, 213, 79, 1)',
+      purple: 'rgba(171, 71, 188, 0.7)',
+      purpleBorder: 'rgba(171, 71, 188, 1)',
+      orange: 'rgba(255, 167, 38, 0.7)',
+      orangeBorder: 'rgba(255, 167, 38, 1)',
+      teal: 'rgba(38, 166, 154, 0.7)',
+      tealBorder: 'rgba(38, 166, 154, 1)'
+  };
+
+  // Função para formatar valores monetários
+  function formatMoney(value) {
+      if (typeof value === 'string') {
+          value = value.replace(/[^\d,]/g, '').replace(',', '.');
+      }
+      return 'R$ ' + parseFloat(value).toLocaleString('pt-BR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+      });
+  }
+
+  // Função para fazer requisições com tratamento de erro
+  async function fetchWithErrorHandling(url) {
+      try {
+          const response = await fetch(url);
+          if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return await response.json();
+      } catch (error) {
+          console.error('Erro na requisição:', error);
+          showFlashMessage('error', 'Erro ao carregar dados');
+          return { success: false, message: error.message };
+      }
+  }
+
+  // Função para mostrar mensagens flash
+  function showFlashMessage(type, message) {
+      const flashContainer = document.getElementById('flash-messages');
+      if (flashContainer) {
+          const alert = document.createElement('div');
+          alert.className = `alert alert-${type} alert-dismissible fade show`;
+          alert.role = 'alert';
+          alert.innerHTML = `
+              ${message}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          `;
+          flashContainer.appendChild(alert);
+          
+          setTimeout(() => {
+              alert.classList.remove('show');
+              setTimeout(() => flashContainer.removeChild(alert), 150);
+          }, 5000);
+      }
+  }
+
+  // Função para atualizar os gráficos
+  async function updateCharts(metricsData) {
+      try {
+          // Destruir gráficos existentes se houver
+          if (vendasDespesasChart) vendasDespesasChart.destroy();
+          if (formasPagamentoChart) formasPagamentoChart.destroy();
+          if (caixasChart) caixasChart.destroy();
+          if (vendasDiariasChart) vendasDiariasChart.destroy();
+
+          // 1. Gráfico de Vendas vs Despesas
+          const vendasDespesasCtx = document.getElementById('vendasDespesasChart').getContext('2d');
+          vendasDespesasChart = new Chart(vendasDespesasCtx, {
+              type: 'bar',
+              data: {
+                  labels: ['Vendas', 'Despesas'],
+                  datasets: [{
+                      label: 'Valor (R$)',
+                      data: [
+                          parseFloat(metricsData.metrics[6].value.replace(/[^\d,]/g, '').replace(',', '.')),
+                          parseFloat(metricsData.metrics[7].value.replace(/[^\d,]/g, '').replace(',', '.'))
+                      ],
+                      backgroundColor: [
+                          chartColors.green,
+                          chartColors.red
+                      ],
+                      borderColor: [
+                          chartColors.greenBorder,
+                          chartColors.redBorder
+                      ],
+                      borderWidth: 2
+                  }]
+              },
+              options: {
+                  responsive: true,
+                  plugins: {
+                      legend: {
+                          display: false,
+                          labels: {
+                              color: '#e0e0e0'
+                          }
+                      },
+                      tooltip: {
+                          callbacks: {
+                              label: function(context) {
+                                  return formatMoney(context.raw);
+                              }
+                          }
+                      }
+                  },
+                  scales: {
+                      y: {
+                          beginAtZero: true,
+                          grid: {
+                              color: 'rgba(255, 255, 255, 0.1)'
+                          },
+                          ticks: {
+                              callback: function(value) {
+                                  return formatMoney(value);
+                              }
+                          }
+                      },
+                      x: {
+                          grid: {
+                              color: 'rgba(255, 255, 255, 0.1)'
+                          }
+                      }
+                  }
+              }
+          });
+
+          // 2. Gráfico de Formas de Pagamento
+          const formasPagamentoCtx = document.getElementById('formasPagamentoChart').getContext('2d');
+          formasPagamentoChart = new Chart(formasPagamentoCtx, {
+              type: 'doughnut',
+              data: {
+                  labels: metricsData.formas_pagamento.map(fp => 
+                      fp.forma.replace('pix_', '').replace(/_/g, ' ').replace('cartao', 'cartão')
+                  ),
+                  datasets: [{
+                      data: metricsData.formas_pagamento.map(fp => 
+                          parseFloat(fp.total.replace(/[^\d,]/g, '').replace(',', '.'))
+                      ),
+                      backgroundColor: [
+                          chartColors.green,
+                          chartColors.blue,
+                          chartColors.yellow,
+                          chartColors.purple,
+                          chartColors.orange,
+                          chartColors.teal,
+                          chartColors.red
+                      ],
+                      borderColor: [
+                          chartColors.greenBorder,
+                          chartColors.blueBorder,
+                          chartColors.yellowBorder,
+                          chartColors.purpleBorder,
+                          chartColors.orangeBorder,
+                          chartColors.tealBorder,
+                          chartColors.redBorder
+                      ],
+                      borderWidth: 2
+                  }]
+              },
+              options: {
+                  responsive: true,
+                  cutout: '70%',
+                  plugins: {
+                      legend: {
+                          position: 'right',
+                          labels: {
+                              color: '#e0e0e0',
+                              font: {
+                                  size: 12
+                              }
+                          }
+                      },
+                      tooltip: {
+                          callbacks: {
+                              label: function(context) {
+                                  const label = context.label || '';
+                                  const value = context.raw || 0;
+                                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                  const percentage = Math.round((value / total) * 100);
+                                  return `${label}: ${formatMoney(value)} (${percentage}%)`;
+                              }
+                          }
+                      }
+                  }
+              }
+          });
+
+          // 3. Gráfico de Totais por Caixa
+          const caixasCtx = document.getElementById('caixasChart').getContext('2d');
+          caixasChart = new Chart(caixasCtx, {
+              type: 'bar',
+              data: {
+                  labels: metricsData.caixas_totais.map(c => 'Caixa ' + c.caixa_id),
+                  datasets: [{
+                      label: 'Valor Total',
+                      data: metricsData.caixas_totais.map(c => 
+                          parseFloat(c.total.replace(/[^\d,]/g, '').replace(',', '.'))
+                      ),
+                      backgroundColor: chartColors.blue,
+                      borderColor: chartColors.blueBorder,
+                      borderWidth: 2
+                  }]
+              },
+              options: {
+                  responsive: true,
+                  plugins: {
+                      legend: {
+                          display: false,
+                          labels: {
+                              color: '#e0e0e0'
+                          }
+                      },
+                      tooltip: {
+                          callbacks: {
+                              label: function(context) {
+                                  return formatMoney(context.raw);
+                              }
+                          }
+                      }
+                  },
+                  scales: {
+                      y: {
+                          beginAtZero: true,
+                          grid: {
+                              color: 'rgba(255, 255, 255, 0.1)'
+                          },
+                          ticks: {
+                              callback: function(value) {
+                                  return formatMoney(value);
+                              }
+                          }
+                      },
+                      x: {
+                          grid: {
+                              color: 'rgba(255, 255, 255, 0.1)'
+                          }
+                      }
+                  }
+              }
+          });
+
+          // 4. Gráfico de Vendas Diárias (últimos 7 dias)
+          const vendasDiariasData = await fetchWithErrorHandling('/admin/dashboard/vendas-diarias');
+          if (vendasDiariasData.success) {
+              const vendasDiariasCtx = document.getElementById('vendasDiariasChart').getContext('2d');
+              
+              // Extrair dados para o gráfico
+              const labels = vendasDiariasData.dados.map(item => item.data);
+              const vendas = vendasDiariasData.dados.map(item => 
+                  parseFloat(item.total_vendas.replace(/[^\d,]/g, '').replace(',', '.'))
+              );
+              
+              vendasDiariasChart = new Chart(vendasDiariasCtx, {
+                  type: 'line',
+                  data: {
+                      labels: labels,
+                      datasets: [{
+                          label: 'Vendas (R$)',
+                          data: vendas,
+                          backgroundColor: chartColors.purple,
+                          borderColor: chartColors.purpleBorder,
+                          borderWidth: 3,
+                          tension: 0.4,
+                          fill: true,
+                          pointBackgroundColor: '#fff',
+                          pointBorderColor: chartColors.purpleBorder,
+                          pointRadius: 5,
+                          pointHoverRadius: 7
+                      }]
+                  },
+                  options: {
+                      responsive: true,
+                      plugins: {
+                          legend: {
+                              display: false,
+                              labels: {
+                                  color: '#e0e0e0'
+                              }
+                          },
+                          tooltip: {
+                              callbacks: {
+                                  label: function(context) {
+                                      return formatMoney(context.raw);
+                                  }
+                              }
+                          }
+                      },
+                      scales: {
+                          y: {
+                              beginAtZero: true,
+                              grid: {
+                                  color: 'rgba(255, 255, 255, 0.1)'
+                              },
+                              ticks: {
+                                  callback: function(value) {
+                                      return formatMoney(value);
+                                  }
+                              }
+                          },
+                          x: {
+                              grid: {
+                                  color: 'rgba(255, 255, 255, 0.1)'
+                              }
+                          }
+                      }
+                  }
+              });
+          }
+      } catch (error) {
+          console.error('Erro ao atualizar gráficos:', error);
+          showFlashMessage('error', 'Erro ao atualizar gráficos');
+      }
+  }
+
+  // Função para carregar as movimentações
+  async function loadMovimentacoes() {
+      try {
+          const movData = await fetchWithErrorHandling('/admin/dashboard/movimentacoes');
+          if (movData.success) {
+              const movTable = document.querySelector('#movimentacoesTable tbody');
+              if (movTable) {
+                  movTable.innerHTML = movData.movimentacoes.map(mov => `
+                      <tr>
+                          <td>${mov.data}</td>
+                          <td><span class="badge ${mov.tipo === 'Entrada' ? 'badge-success' : 'badge-danger'}">${mov.tipo}</span></td>
+                          <td>${mov.produto}</td>
+                          <td>${mov.quantidade}</td>
+                          <td>${mov.valor}</td>
+                      </tr>
+                  `).join('');
+              }
+          }
+      } catch (error) {
+          console.error('Erro ao carregar movimentações:', error);
+          showFlashMessage('error', 'Erro ao carregar movimentações');
+      }
+  }
+
+  // Função principal para carregar os dados do dashboard
   async function loadDashboardData() {
       try {
+          // Mostrar loading
+          const loadingElement = document.getElementById('loadingIndicator');
+          if (loadingElement) loadingElement.style.display = 'block';
+          
           // Carregar métricas
           const metricsData = await fetchWithErrorHandling('/admin/dashboard/metrics');
           
           if (metricsData.success) {
+              // Atualizar cards de métricas
               const metricsContainer = document.querySelector('.metrics-grid');
               if (metricsContainer) {
-                  metricsContainer.innerHTML = '';
-                  
-                  metricsData.metrics.forEach(metric => {
-                      const card = document.createElement('div');
-                      card.className = `metric-card ${metric.color}`;
-                      
-                      card.innerHTML = `
+                  metricsContainer.innerHTML = metricsData.metrics.map(metric => `
+                      <div class="metric-card bg-${metric.color}">
                           <div class="metric-icon">
                               <i class="fas fa-${metric.icon}"></i>
                           </div>
@@ -299,42 +653,64 @@ document.addEventListener('DOMContentLoaded', function() {
                               <h3>${metric.title}</h3>
                               <div class="value">${metric.value}</div>
                           </div>
-                      `;
-                      
-                      metricsContainer.appendChild(card);
-                  });
+                      </div>
+                  `).join('');
               }
+              
+              // Atualizar status do caixa
+              const caixaStatus = document.getElementById('caixaStatus');
+              if (caixaStatus) {
+                  if (metricsData.caixa_aberto) {
+                      caixaStatus.innerHTML = `
+                          <span class="badge bg-success">
+                              <i class="fas fa-cash-register me-1"></i> Caixa Aberto
+                          </span>
+                      `;
+                  } else {
+                      caixaStatus.innerHTML = `
+                          <span class="badge bg-danger">
+                              <i class="fas fa-cash-register me-1"></i> Caixa Fechado
+                          </span>
+                      `;
+                  }
+              }
+              
+              // Atualizar gráficos
+              await updateCharts(metricsData);
           }
           
           // Carregar movimentações
-          const movData = await fetchWithErrorHandling('/admin/dashboard/movimentacoes');
+          await loadMovimentacoes();
           
-          if (movData.success) {
-              const movTable = document.querySelector('#movimentacoesTable tbody');
-              if (movTable) {
-                  movTable.innerHTML = '';
-                  
-                  movData.movimentacoes.forEach(mov => {
-                      const row = document.createElement('tr');
-                      row.innerHTML = `
-                          <td>${mov.data}</td>
-                          <td><span class="badge ${mov.tipo === 'Entrada' ? 'badge-success' : 'badge-danger'}">${mov.tipo}</span></td>
-                          <td>${mov.produto}</td>
-                          <td>${mov.quantidade}</td>
-                          <td>${mov.valor}</td>
-                      `;
-                      movTable.appendChild(row);
-                  });
-              }
-          }
+          // Esconder loading
+          if (loadingElement) loadingElement.style.display = 'none';
       } catch (error) {
           console.error('Erro ao carregar dados do dashboard:', error);
           showFlashMessage('error', 'Erro ao carregar dados do dashboard');
+          
+          // Esconder loading em caso de erro
+          const loadingElement = document.getElementById('loadingIndicator');
+          if (loadingElement) loadingElement.style.display = 'none';
       }
   }
 
   // Evento para o botão de atualizar
-  document.getElementById('refreshData').addEventListener('click', loadDashboardData);
+  document.getElementById('refreshData')?.addEventListener('click', loadDashboardData);
+
+  // Carregar dados quando a página é carregada
+  document.addEventListener('DOMContentLoaded', function() {
+      // Inicializar tooltips do Bootstrap
+      const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      tooltipTriggerList.map(function (tooltipTriggerEl) {
+          return new bootstrap.Tooltip(tooltipTriggerEl);
+      });
+      
+      // Carregar dados do dashboard
+      loadDashboardData();
+      
+      // Atualizar a cada 5 minutos
+      setInterval(loadDashboardData, 300000);
+  });
 
   // ===== CLIENTES =====
   async function loadClientesData() {

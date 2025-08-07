@@ -166,6 +166,46 @@
                         <!-- Métricas serão preenchidas via JavaScript -->
                     </div>
 
+                    <!-- Seção de Gráficos -->
+                    <div class="charts-section">
+                        <div class="chart-row">
+                            <!-- Gráfico de Vendas vs Despesas (Mês) -->
+                            <div class="chart-container">
+                                <div class="chart-header">
+                                    <h4>Vendas vs Despesas (Mês)</h4>
+                                </div>
+                                <canvas id="vendasDespesasChart"></canvas>
+                            </div>
+
+                            <!-- Gráfico de Formas de Pagamento (Dia) -->
+                            <div class="chart-container">
+                                <div class="chart-header">
+                                    <h4>Formas de Pagamento (Dia)</h4>
+                                </div>
+                                <canvas id="formasPagamentoChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="chart-row">
+                            <!-- Gráfico de Caixas (Totais) -->
+                            <div class="chart-container">
+                                <div class="chart-header">
+                                    <h4>Totais por Caixa</h4>
+                                </div>
+                                <canvas id="caixasChart"></canvas>
+                            </div>
+
+                            <!-- Gráfico de Vendas Diárias (Últimos 7 dias) -->
+                            <div class="chart-container">
+                                <div class="chart-header">
+                                    <h4>Vendas Diárias (Últimos 7 dias)</h4>
+                                </div>
+                                <canvas id="vendasDiariasChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabela de Movimentações -->
                     <div class="card">
                         <div class="card-header" id="movimentacoesHeader" style="cursor: pointer;">
                             <h3><i class="fas fa-history"></i> Últimas Movimentações</h3>
@@ -1458,6 +1498,7 @@
             </div>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
