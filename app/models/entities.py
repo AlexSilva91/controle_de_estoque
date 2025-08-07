@@ -21,6 +21,7 @@ class TipoUsuario(str, enum.Enum):
 class TipoMovimentacao(str, enum.Enum):
     entrada = "entrada"
     saida = "saida"
+    saida_estorno = "saida_estorno"
     transferencia = "transferencia"
 
 class StatusNota(str, enum.Enum):
@@ -37,6 +38,7 @@ class CategoriaFinanceira(str, enum.Enum):
     venda = "venda"
     compra = "compra"
     despesa = "despesa"
+    estorno = "estorno"
     salario = "salario"
     outro = "outro"
     abertura_caixa = "abertura_caixa"

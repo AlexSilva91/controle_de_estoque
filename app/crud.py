@@ -1662,8 +1662,8 @@ def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
         
         # Registra no financeiro
         financeiro_estorno = Financeiro(
-            tipo=TipoMovimentacao.saida,
-            categoria=CategoriaFinanceira.venda,
+            tipo=TipoMovimentacao.saida_estorno,
+            categoria=CategoriaFinanceira.estorno,
             valor=-nota_original.valor_total,
             descricao=f"Estorno da nota #{nota_original.id}",
             caixa_id=caixa_id,  # Usa o mesmo caixa da nota original

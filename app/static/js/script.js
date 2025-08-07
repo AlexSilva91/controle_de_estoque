@@ -691,7 +691,7 @@ document.addEventListener('DOMContentLoaded', function() {
                       </div>
                       <div class="metric-card">
                           <div class="metric-icon">
-                              <i class="fas fa-sack"></i>
+                              <i class="fa-solid fa-boxes-packing"></i>
                           </div>
                           <div class="metric-info">
                               <h3>Estoque (Sacos)</h3>
@@ -1978,7 +1978,7 @@ document.addEventListener('DOMContentLoaded', function() {
                       
                       row.innerHTML = `
                           <td>${formatDateTime(item.data)}</td>
-                          <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
+                          <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : item.tipo === 'saida_estorno' ? 'Estorno' : 'Saída'}</span></td>
                           <td>${item.categoria || '-'}</td>
                           <td>${formatarMoeda(valor)}</td>
                           <td>${item.descricao || '-'}</td>
@@ -2031,7 +2031,7 @@ document.addEventListener('DOMContentLoaded', function() {
               if (categoriasContainer) {
                   const categorias = {};
                   response.data.forEach(item => {
-                      const categoria = item.categoria || 'outro';
+                      const categoria = item.categoria;
                       categorias[categoria] = (categorias[categoria] || 0) + parseFloat(item.valor);
                   });
                   
