@@ -6,6 +6,15 @@ from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 import traceback
+from flask import send_file, make_response, jsonify
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    Table as PlatypusTable
+)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+from io import BytesIO
 
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
@@ -32,6 +41,7 @@ from app.schemas import (
     ClienteCreate, ClienteUpdate, FinanceiroCreate, FinanceiroUpdate
 )
 from app.utils.format_data_moeda import formatar_data_br, format_number
+from app.utils.signature import SignatureLine
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -2199,7 +2209,142 @@ def get_caixa_financeiro(caixa_id):
             'success': False,
             'error': str(e)
         }), 500
-        
+
+@admin_bp.route('/caixas/<int:caixa_id>/financeiro/pdf')
+@login_required
+@admin_required
+def gerar_pdf_caixa_financeiro(caixa_id):
+    try:
+        session = Session(db.engine)
+
+        # --- Busca movimentações ---
+        movimentacoes = session.query(Financeiro)\
+            .filter_by(caixa_id=caixa_id)\
+            .order_by(Financeiro.data.desc())\
+            .all()
+
+        total_entradas = sum(mov.valor for mov in movimentacoes if mov.tipo == TipoMovimentacao.entrada)
+        total_saidas = sum(mov.valor for mov in movimentacoes if mov.tipo == TipoMovimentacao.saida)
+
+        # --- Vendas por forma de pagamento ---
+        vendas_por_forma_pagamento = session.query(
+            PagamentoNotaFiscal.forma_pagamento,
+            func.sum(PagamentoNotaFiscal.valor)
+        ).join(NotaFiscal).filter(
+            NotaFiscal.caixa_id == caixa_id,
+            NotaFiscal.status == StatusNota.emitida
+        ).group_by(PagamentoNotaFiscal.forma_pagamento).all()
+
+        totais_vendas = {
+            forma.value: float(total)
+            for forma, total in vendas_por_forma_pagamento
+        }
+
+        # --- Geração do PDF ---
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            leftMargin=30,
+            rightMargin=30,
+            topMargin=30,
+            bottomMargin=40
+        )
+        elements = []
+
+        styles = getSampleStyleSheet()
+        normal = styles['Normal']
+
+        left_style = ParagraphStyle(name='Left', parent=normal, alignment=0, fontSize=11)
+        center_style = ParagraphStyle(name='Center', parent=normal, alignment=1, fontSize=11)
+        bold_center = ParagraphStyle(name='BoldCenter', parent=center_style, fontSize=13, leading=14, spaceAfter=10)
+        descricao_style = ParagraphStyle(name='DescricaoPequena', fontSize=8, leading=14, wordWrap='CJK')
+        wrap_style = ParagraphStyle(name='WrapCell', fontSize=9, leading=11, wordWrap='CJK', alignment=0)
+
+        def moeda_br(valor): return format_currency(valor)
+
+        # --- Título ---
+        elements.append(Paragraph(f"RELATÓRIO FINANCEIRO - CAIXA #{caixa_id}", bold_center))
+        elements.append(Spacer(1, 8))
+
+        # --- Totais (esquerda) ---
+        elements.append(Paragraph(f"Total de Entradas: {moeda_br(total_entradas)}", left_style))
+        elements.append(Paragraph(f"Total de Saídas: {moeda_br(total_saidas)}", left_style))
+        elements.append(Paragraph(f"Saldo: {moeda_br(total_entradas - total_saidas)}", left_style))
+        elements.append(Spacer(1, 12))
+
+        # --- Tabela: Vendas por Forma de Pagamento ---
+        elements.append(Paragraph("Vendas por Forma de Pagamento", bold_center))
+        data_vendas = [["Forma de Pagamento", "Total (R$)"]]
+        for forma, valor in totais_vendas.items():
+            data_vendas.append([forma, moeda_br(valor)])
+
+        tabela_vendas = Table(data_vendas, colWidths=[220, 140], hAlign='CENTER')
+        tabela_vendas.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+        ]))
+        elements.append(tabela_vendas)
+        elements.append(Spacer(1, 12))
+
+        # --- Tabela: Movimentações ---
+        elements.append(Paragraph("Movimentações Financeiras", bold_center))
+
+        data_movs = [["ID", "Data", "Tipo", "Categoria", "Valor", "Descrição"]]
+        for mov in movimentacoes:
+            descricao = Paragraph(mov.descricao or "-", descricao_style)
+            data_movs.append([
+                str(mov.id),
+                mov.data.strftime('%d/%m/%Y'),
+                Paragraph(mov.tipo.value, wrap_style),      
+                Paragraph(mov.categoria.value if mov.categoria else "-", wrap_style),
+                moeda_br(mov.valor),
+                descricao
+            ])
+
+        table_movs = Table(
+            data_movs,
+            colWidths=[30, 60, 55, 80, 70, 200],
+            hAlign='CENTER'
+        )
+        table_movs.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP')
+        ]))
+        elements.append(table_movs)
+        elements.append(Spacer(1, 40))
+
+        # --- Área para assinaturas lado a lado ---
+        assinaturas = [
+            SignatureLine(width=240, height=50, label="Assinatura do Operador"),
+            SignatureLine(width=240, height=50, label="Assinatura do Administrador")
+        ]
+
+        assinatura_table = Table([assinaturas], colWidths=[270, 270], hAlign='CENTER')
+        assinatura_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+        ]))
+        elements.append(assinatura_table)
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        response = make_response(send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=False,
+            download_name=f"caixa_{caixa_id}_financeiro.pdf"
+        ))
+        response.headers['Content-Disposition'] = f'inline; filename=caixa_{caixa_id}_financeiro.pdf'
+        return response
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @admin_bp.route('/caixas/<int:caixa_id>/aprovar', methods=['POST'])
 @login_required
 @admin_required

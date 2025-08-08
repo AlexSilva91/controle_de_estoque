@@ -1974,68 +1974,81 @@ document.addEventListener('DOMContentLoaded', function() {
       showFlashMessage('error', 'Erro ao carregar dados do caixa');
     }
   }
+  let caixaIdAtual = null;
 
   async function loadCaixaFinanceiro(caixaId) {
-      try {
-          const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
-          
-          if (response.success) {
-              const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
-              if (tableBody) {
-                  tableBody.innerHTML = '';
-                  
-                  let totalEntradas = 0;
-                  let totalSaidas = 0;
-                  
-                  response.data.forEach(item => {
-                      const row = document.createElement('tr');
-                      const valor = parseFloat(item.valor);
-                      
-                      if (item.tipo === 'entrada') {
-                          totalEntradas += valor;
-                      } else {
-                          totalSaidas += valor;
-                      }
-                      
-                      row.innerHTML = `
-                          <td>${formatDateTime(item.data)}</td>
-                          <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
-                          <td>${item.categoria || '-'}</td>
-                          <td>${formatarMoeda(valor)}</td>
-                          <td>${item.descricao || '-'}</td>
-                      `;
-                      tableBody.appendChild(row);
-                  });
-                  
-                  // Atualiza totais principais
-                  if (document.getElementById('caixaTotalEntradas')) {
-                      document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(totalEntradas);
-                  }
-                  if (document.getElementById('caixaTotalSaidas')) {
-                      document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(totalSaidas);
-                  }
-                  if (document.getElementById('caixaSaldo')) {
-                      document.getElementById('caixaSaldo').textContent = formatarMoeda(totalEntradas - totalSaidas);
-                  }
-                  
-                  // Atualiza totais por forma de pagamento
-                  const formasPagamento = response.vendas_por_forma_pagamento || {};
-                  
-                  document.getElementById('totalPixFabiano').textContent = formatarMoeda(formasPagamento.pix_fabiano || 0);
-                  document.getElementById('totalPixMaquineta').textContent = formatarMoeda(formasPagamento.pix_maquineta || 0);
-                  document.getElementById('totalPixEdFrance').textContent = formatarMoeda(formasPagamento.pix_edfrance || 0);
-                  document.getElementById('totalPixLoja').textContent = formatarMoeda(formasPagamento.pix_loja || 0);
-                  document.getElementById('totalDinheiro').textContent = formatarMoeda(formasPagamento.dinheiro || 0);
-                  document.getElementById('totalCartaoCredito').textContent = formatarMoeda(formasPagamento.cartao_credito || 0);
-                  document.getElementById('totalCartaoDebito').textContent = formatarMoeda(formasPagamento.cartao_debito || 0);
-                  document.getElementById('totalAPrazo').textContent = formatarMoeda(formasPagamento.a_prazo || 0);
-              }
+    try {
+      const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
+      caixaIdAtual = caixaId; // atualiza o id
+
+      if (response.success) {
+        const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
+        if (tableBody) {
+          tableBody.innerHTML = '';
+
+          let totalEntradas = 0;
+          let totalSaidas = 0;
+
+          response.data.forEach(item => {
+            const row = document.createElement('tr');
+            const valor = parseFloat(item.valor);
+
+            if (item.tipo === 'entrada') {
+              totalEntradas += valor;
+            } else {
+              totalSaidas += valor;
+            }
+
+            row.innerHTML = `
+              <td>${formatDateTime(item.data)}</td>
+              <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
+              <td>${item.categoria || '-'}</td>
+              <td>${formatarMoeda(valor)}</td>
+              <td>${item.descricao || '-'}</td>
+            `;
+            tableBody.appendChild(row);
+          });
+
+          // Atualiza totais principais
+          if (document.getElementById('caixaTotalEntradas')) {
+            document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(totalEntradas);
           }
-      } catch (error) {
-          console.error('Erro ao carregar financeiro do caixa:', error);
-          showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
+          if (document.getElementById('caixaTotalSaidas')) {
+            document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(totalSaidas);
+          }
+          if (document.getElementById('caixaSaldo')) {
+            document.getElementById('caixaSaldo').textContent = formatarMoeda(totalEntradas - totalSaidas);
+          }
+
+          // Atualiza totais por forma de pagamento
+          const formasPagamento = response.vendas_por_forma_pagamento || {};
+
+          document.getElementById('totalPixFabiano').textContent = formatarMoeda(formasPagamento.pix_fabiano || 0);
+          document.getElementById('totalPixMaquineta').textContent = formatarMoeda(formasPagamento.pix_maquineta || 0);
+          document.getElementById('totalPixEdFrance').textContent = formatarMoeda(formasPagamento.pix_edfrance || 0);
+          document.getElementById('totalPixLoja').textContent = formatarMoeda(formasPagamento.pix_loja || 0);
+          document.getElementById('totalDinheiro').textContent = formatarMoeda(formasPagamento.dinheiro || 0);
+          document.getElementById('totalCartaoCredito').textContent = formatarMoeda(formasPagamento.cartao_credito || 0);
+          document.getElementById('totalCartaoDebito').textContent = formatarMoeda(formasPagamento.cartao_debito || 0);
+          document.getElementById('totalAPrazo').textContent = formatarMoeda(formasPagamento.a_prazo || 0);
+        }
       }
+    } catch (error) {
+      console.error('Erro ao carregar financeiro do caixa:', error);
+      showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
+    }
   }
+
+  // Evento para o botão abrir PDF
+  document.getElementById('abrirPdfCaixa').addEventListener('click', () => {
+    if (caixaIdAtual) {
+      const url = `/admin/caixas/${caixaIdAtual}/financeiro/pdf`;
+      window.open(url, '_blank');
+    } else {
+      alert('Nenhum caixa selecionado');
+    }
+  });
+
   // ===== MOVIMENTAÇÕES =====
   async function loadMovimentacoesData() {
     try {
