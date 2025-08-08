@@ -2370,3 +2370,9 @@ canvas {
     max-height: 100%;
     display: block;
 }
+.toggle-icon {
+    transition: transform 0.3s ease;
+}
+.toggle-icon.rotated {
+    transform: rotate(180deg);
+}

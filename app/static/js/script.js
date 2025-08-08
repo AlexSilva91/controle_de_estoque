@@ -302,11 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const body = document.getElementById('movimentacoesBody');
     const icon = document.querySelector('#movimentacoesHeader .toggle-icon i');
     
-    console.log('Elementos:', body, icon); // Adicione esta linha
-    
     if (!body || !icon) return;
-    
-    console.log('Estado atual:', body.style.display); // Adicione esta linha
     
     if (body.style.display === 'none') {
       body.style.display = 'block';
@@ -314,6 +310,34 @@ document.addEventListener('DOMContentLoaded', function() {
       icon.classList.add('fa-chevron-up');
     } else {
       body.style.display = 'none';
+      icon.classList.remove('fa-chevron-up');
+      icon.classList.add('fa-chevron-down');
+    }
+  }
+  const toggleHeaders = document.querySelectorAll('.details-table-section .toggle-table-header');
+
+  toggleHeaders.forEach(header => {
+    header.addEventListener('click', (e) => {
+      // Evita ação se o clique for em um botão dentro do header (caso tenha)
+      if (!e.target.closest('button')) {
+        toggleDetailsTable(header);
+      }
+    });
+  });
+
+  function toggleDetailsTable(header) {
+    // O container que será exibido/oculto fica logo após o header
+    const container = header.nextElementSibling;
+    const icon = header.querySelector('.toggle-icon');
+
+    if (!container || !icon) return;
+
+    if (container.style.display === 'none' || container.style.display === '') {
+      container.style.display = 'block';
+      icon.classList.remove('fa-chevron-down');
+      icon.classList.add('fa-chevron-up');
+    } else {
+      container.style.display = 'none';
       icon.classList.remove('fa-chevron-up');
       icon.classList.add('fa-chevron-down');
     }
