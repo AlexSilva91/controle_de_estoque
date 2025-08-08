@@ -2412,7 +2412,7 @@ canvas {
 }
   #abrirPdfCaixa {
     padding: 8px 16px;
-    background-color: #007bff;
+    background-color: #ff0000e5;
     color: white;
     border: none;
     border-radius: 4px;
@@ -2423,10 +2423,10 @@ canvas {
   }
 
   #abrirPdfCaixa:hover {
-    background-color: #0056b3;
+    background-color: #a50a0a;
   }
 
   #abrirPdfCaixa:focus {
-    outline: 2px solid #0056b3;
+    outline: 2px solid #ff0000;
     outline-offset: 2px;
   }
