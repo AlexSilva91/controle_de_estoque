@@ -1957,7 +1957,6 @@ document.addEventListener('DOMContentLoaded', function() {
               <td>${item.categoria || '-'}</td>
               <td>${formatarMoeda(valor)}</td>
               <td>${item.descricao || '-'}</td>
-              <td>${item.forma_pagamento || '-'}</td>
             `;
             tableBody.appendChild(row);
           });
