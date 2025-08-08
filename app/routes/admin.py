@@ -1789,7 +1789,7 @@ def criar_desconto_route():
         }), 201
     except Exception as e:
         print(f"Erro ao criar desconto: {e}")
-        return jsonify({'erro': str(e)}), 500
+        return jsonify({'success': False, 'erro': str(e)}), 500
     finally:
         session.close()
 
@@ -1815,7 +1815,7 @@ def buscar_descontos_produto_route(produto_id):
             } for d in descontos]
         }), 200
     except Exception as e:
-        return jsonify({'erro': str(e)}), 500
+        return jsonify({'success': False, 'erro': str(e)}), 500
     finally:
         session.close()
 
@@ -1923,7 +1923,7 @@ def listar_descontos_route():
             } for d in descontos]
         }), 200
     except Exception as e:
-        return jsonify({'erro': str(e)}), 500
+        return jsonify({'success': False, 'erro': str(e)}), 500
     finally:
         session.close()
 
@@ -1935,7 +1935,7 @@ def buscar_desconto_por_id(desconto_id):
         desconto = session.query( Desconto).get(desconto_id)
         
         if not desconto:
-            return jsonify({'erro': 'Desconto não encontrado'}), 404
+            return jsonify({'success': False, 'erro': 'Desconto não encontrado'}), 404
         
         valido_ate_formatado = desconto.valido_ate.strftime('%Y-%m-%d') if desconto.valido_ate else None
         
@@ -1954,7 +1954,7 @@ def buscar_desconto_por_id(desconto_id):
             }
         }), 200
     except Exception as e:
-        return jsonify({'erro': str(e)}), 500
+        return jsonify({'success': False, 'erro': str(e)}), 500
     finally:
         session.close()
         
@@ -1982,11 +1982,11 @@ def atualizar_caixa_route(caixa_id):
         dados = request.get_json()
         print(f"Dados recebidos para atualização do caixa {caixa_id}: {dados}")
         if not dados:
-            return jsonify({"error": "Dados não fornecidos"}), 400
+            return jsonify({'success': False, "error": "Dados não fornecidos"}), 400
             
         caixa = db.session.get( Caixa, caixa_id)
         if not caixa:
-            return jsonify({"error": "Caixa não encontrado"}), 404
+            return jsonify({'success': False, "error": "Caixa não encontrado"}), 404
         
         # Atualiza status e datas conforme ação
         if 'status' in dados:
@@ -2009,6 +2009,7 @@ def atualizar_caixa_route(caixa_id):
         db.session.commit()
         
         return jsonify({
+            'success': True,
             "message": "Caixa atualizado com sucesso",
             "caixa": {
                 "id": caixa.id,
@@ -2021,7 +2022,7 @@ def atualizar_caixa_route(caixa_id):
             
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": f"Erro ao atualizar caixa: {str(e)}"}), 500
+        return jsonify({'success': False, "error": f"Erro ao atualizar caixa: {str(e)}"}), 500
 
 @admin_bp.route('/caixas/<int:caixa_id>', methods=['GET', 'PUT'])
 @login_required
@@ -2107,9 +2108,9 @@ def get_caixa_financeiro(caixa_id):
         session = Session(db.engine)
         
         # Busca as movimentações financeiras do caixa
-        movimentacoes = session.query( Financeiro)\
+        movimentacoes = session.query(Financeiro)\
             .filter_by(caixa_id=caixa_id)\
-            .order_by( Financeiro.data.desc())\
+            .order_by(Financeiro.data.desc())\
             .all()
         
         # Formata os dados para resposta
@@ -2126,30 +2127,30 @@ def get_caixa_financeiro(caixa_id):
         } for mov in movimentacoes]
         
         # Calcula totais
-        total_entradas = sum(mov.valor for mov in movimentacoes if mov.tipo ==  TipoMovimentacao.entrada)
-        total_saidas = sum(mov.valor for mov in movimentacoes if mov.tipo ==  TipoMovimentacao.saida)
+        total_entradas = sum(mov.valor for mov in movimentacoes if mov.tipo == TipoMovimentacao.entrada)
+        total_saidas = sum(mov.valor for mov in movimentacoes if mov.tipo == TipoMovimentacao.saida)
         
         # Busca pagamentos de notas fiscais diretamente da tabela de pagamentos
         pagamentos_notas = session.query(
-             PagamentoNotaFiscal.forma_pagamento,
-            func.sum( PagamentoNotaFiscal.valor).label('total')
+            PagamentoNotaFiscal.forma_pagamento,
+            func.sum(PagamentoNotaFiscal.valor).label('total')
         ).join(
-             NotaFiscal,
-             PagamentoNotaFiscal.nota_fiscal_id ==  NotaFiscal.id
+            NotaFiscal,
+            PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
         ).filter(
-             NotaFiscal.caixa_id == caixa_id
+            NotaFiscal.caixa_id == caixa_id
         ).group_by(
-             PagamentoNotaFiscal.forma_pagamento
+            PagamentoNotaFiscal.forma_pagamento
         ).all()
         
         # Busca pagamentos de contas a receber diretamente da tabela de pagamentos
         pagamentos_contas = session.query(
-             PagamentoContaReceber.forma_pagamento,
-            func.sum( PagamentoContaReceber.valor_pago).label('total')
+            PagamentoContaReceber.forma_pagamento,
+            func.sum(PagamentoContaReceber.valor_pago).label('total')
         ).filter(
-             PagamentoContaReceber.caixa_id == caixa_id
+            PagamentoContaReceber.caixa_id == caixa_id
         ).group_by(
-             PagamentoContaReceber.forma_pagamento
+            PagamentoContaReceber.forma_pagamento
         ).all()
         
         # Combina os resultados
@@ -2161,6 +2162,26 @@ def get_caixa_financeiro(caixa_id):
         for forma, total in pagamentos_contas:
             formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + float(total)
         
+        # Busca o total de vendas por forma de pagamento apenas da tabela PagamentoNotaFiscal
+        vendas_por_forma_pagamento = session.query(
+            PagamentoNotaFiscal.forma_pagamento,
+            func.sum(PagamentoNotaFiscal.valor).label('total_vendas')
+        ).join(
+            NotaFiscal,
+            PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+        ).filter(
+            NotaFiscal.caixa_id == caixa_id,
+            NotaFiscal.status == StatusNota.emitida
+        ).group_by(
+            PagamentoNotaFiscal.forma_pagamento
+        ).all()
+        
+        # Formata os totais de vendas por forma de pagamento
+        totais_vendas_forma_pagamento = {
+            forma.value: float(total) 
+            for forma, total in vendas_por_forma_pagamento
+        }
+        
         return jsonify({
             'success': True,
             'data': dados,
@@ -2169,7 +2190,8 @@ def get_caixa_financeiro(caixa_id):
                 'saidas': float(total_saidas),
                 'saldo': float(total_entradas - total_saidas)
             },
-            'formas_pagamento': formas_pagamento
+            'formas_pagamento': formas_pagamento,
+            'vendas_por_forma_pagamento': totais_vendas_forma_pagamento
         })
         
     except Exception as e:
@@ -2186,7 +2208,7 @@ def aprovar_caixa(caixa_id):
     caixa =  Caixa.query.get_or_404(caixa_id)
     
     if current_user.tipo != 'admin':
-        return jsonify({'error': 'Apenas administradores podem aprovar caixas'}), 403
+        return jsonify({'success': False, 'error': 'Apenas administradores podem aprovar caixas'}), 403
     
     data = request.get_json()
     valor_confirmado = data.get('valor_confirmado')
@@ -2200,6 +2222,7 @@ def aprovar_caixa(caixa_id):
         )
         db.session.commit()
         return jsonify({
+            'success': True,
             'message': 'Caixa aprovado com sucesso',
             'status': caixa.status.value,
             'valor_confirmado': float(caixa.valor_confirmado) if caixa.valor_confirmado else None
@@ -2210,7 +2233,7 @@ def aprovar_caixa(caixa_id):
     except Exception as e:
         print(e)
         db.session.rollback()
-        return jsonify({'error': f'Erro ao aprovar caixa: {str(e)}'}), 500
+        return jsonify({'success': False, 'error': f'Erro ao aprovar caixa: {str(e)}'}), 500
 
 @admin_bp.route('/caixas/<int:caixa_id>/recusar', methods=['POST'])
 @login_required
@@ -2220,14 +2243,14 @@ def recusar_caixa(caixa_id):
     caixa =  Caixa.query.get_or_404(caixa_id)
     
     if current_user.tipo != 'admin':
-        return jsonify({'error': 'Apenas administradores podem recusar caixas'}), 403
+        return jsonify({'success': False, 'error': 'Apenas administradores podem recusar caixas'}), 403
     
     data = request.get_json()
     motivo = data.get('motivo')
     valor_correto = data.get('valor_correto')
     
     if not motivo:
-        return jsonify({'error': 'Motivo da recusa é obrigatório'}), 400
+        return jsonify({'success': False, 'error': 'Motivo da recusa é obrigatório'}), 400
     
     try:
         caixa.rejeitar_fechamento(
@@ -2237,6 +2260,7 @@ def recusar_caixa(caixa_id):
         )
         db.session.commit()
         return jsonify({
+            'success': True,
             'message': 'Caixa recusado com sucesso',
             'status': caixa.status.value,
             'observacoes_admin': caixa.observacoes_admin
@@ -2247,7 +2271,7 @@ def recusar_caixa(caixa_id):
     except Exception as e:
         print(e)
         db.session.rollback()
-        return jsonify({'error': f'Erro ao recusar caixa: {str(e)}'}), 500
+        return jsonify({'success': False, 'error': f'Erro ao recusar caixa: {str(e)}'}), 500
 
 @admin_bp.route('/caixas/<int:caixa_id>/enviar_analise', methods=['POST'])
 @login_required
@@ -2282,6 +2306,7 @@ def enviar_para_analise(caixa_id):
         
         print("Caixa enviado para análise com sucesso")  # Log de depuração
         return jsonify({
+            'success': True,
             'message': 'Caixa enviado para análise com sucesso',
             'status': caixa.status.value,
             'valor_fechamento': float(caixa.valor_fechamento)
@@ -2289,11 +2314,11 @@ def enviar_para_analise(caixa_id):
         
     except ValueError as e:
         print(f"Erro de valor: {str(e)}")  # Log de depuração
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         print(f"Erro interno: {str(e)}")  # Log de depuração
-        return jsonify({'error': f'Erro ao enviar caixa para análise: {str(e)}'}), 500
+        return jsonify({'success': False, 'error': f'Erro ao enviar caixa para análise: {str(e)}'}), 500
 
 @admin_bp.route('/caixas/<int:caixa_id>/reabrir', methods=['POST'])
 @login_required
@@ -2303,7 +2328,7 @@ def reabrir_caixa(caixa_id):
     caixa =  Caixa.query.get_or_404(caixa_id)
     
     if current_user.tipo != 'admin':
-        return jsonify({'error': 'Apenas administradores podem reabrir caixas'}), 403
+        return jsonify({'success': False, 'error': 'Apenas administradores podem reabrir caixas'}), 403
     
     data = request.get_json()
     motivo = data.get('motivo')
@@ -2315,13 +2340,14 @@ def reabrir_caixa(caixa_id):
         )
         db.session.commit()
         return jsonify({
+            'success': True,
             'message': 'Caixa reaberto com sucesso',
             'status': caixa.status.value
         }), 200
     except ValueError as e:
         print(e)
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         print(e)
         db.session.rollback()
-        return jsonify({'error': f'Erro ao reabrir caixa: {str(e)}'}), 500
+        return jsonify({'success': False, 'error': f'Erro ao reabrir caixa: {str(e)}'}), 500

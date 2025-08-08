@@ -1123,35 +1123,76 @@
                                 <div class="value" id="visualizarCaixaDataAbertura"></div>
                             </div>
                             <div class="detail-item">
+                                <label>Data Fechamento:</label>
+                                <div class="value" id="visualizarCaixaDataFechamento"></div>
+                            </div>
+                            <div class="detail-item">
                                 <label>Valor Abertura:</label>
                                 <div class="value" id="visualizarCaixaValorAbertura"></div>
                             </div>
-                            
-                            <div id="caixaFechamentoInfo" style="display: none;">
-                                <div class="detail-item">
-                                    <label>Data Fechamento:</label>
-                                    <div class="value" id="visualizarCaixaDataFechamento"></div>
-                                </div>
-                                <div class="detail-item">
-                                    <label>Valor Fechamento:</label>
-                                    <div class="value" id="visualizarCaixaValorFechamento"></div>
-                                </div>
+                            <div class="detail-item">
+                                <label>Valor Fechamento:</label>
+                                <div class="value" id="visualizarCaixaValorFechamento"></div>
                             </div>
-                            
-                            <div class="detail-item full-width">
+                            <div class="detail-item">
                                 <label>Observações do Operador:</label>
                                 <div class="value" id="visualizarCaixaObsOperador"></div>
                             </div>
-                            
-                            <div class="detail-item full-width">
+                            <div class="detail-item">
                                 <label>Observações do Administrador:</label>
                                 <div class="value" id="visualizarCaixaObsAdmin"></div>
                             </div>
-                            <div id="formasPagamentoContainer" class="detail-item full-width"></div>
-                            <div id="categoriasContainer" class="detail-item full-width"></div>
                         </div>
                     </div>
-                    
+                                        
+                    <div class="details-totals">
+                        <div class="total-item">
+                            <label>Total Entradas:</label>
+                            <span id="caixaTotalEntradas" class="total-value positive">R$ 0,00</span>
+                        </div>
+                        <div class="total-item">
+                            <label>Total Saídas:</label>
+                            <span id="caixaTotalSaidas" class="total-value negative">R$ 0,00</span>
+                        </div>
+                        <div class="total-item">
+                            <label>Saldo:</label>
+                            <span id="caixaSaldo" class="total-value">R$ 0,00</span>
+                        </div>
+                        
+                        <!-- Totais por forma de pagamento -->
+                        <div class="total-item">
+                            <label>PIX Fabiano:</label>
+                            <span id="totalPixFabiano" class="total-value positive">R$ 0,00</span>
+                        </div>
+                        <div class="total-item">
+                            <label>PIX Maquineta:</label>
+                            <span id="totalPixMaquineta" class="total-value positive">R$ 0,00</span>
+                        </div>
+                        <div class="total-item">
+                            <label>PIX Edfranci:</label>
+                            <span id="totalPixEdFrance" class="total-value positive">R$ 0,00</span>
+                        </div>
+                        <div class="total-item">
+                            <label>PIX Loja:</label>
+                            <span id="totalPixLoja" class="total-value positive">R$ 0,00</span>
+                        </div>
+                        <div class="total-item">
+                            <label>Dinheiro:</label>
+                            <span id="totalDinheiro" class="total-value positive">R$ 0,00</span>
+                        </div>
+                        <div class="total-item">
+                            <label>Cartão Crédito:</label>
+                            <span id="totalCartaoCredito" class="total-value positive">R$ 0,00</span>
+                        </div>
+                        <div class="total-item">
+                            <label>Cartão Débito:</label>
+                            <span id="totalCartaoDebito" class="total-value positive">R$ 0,00</span>
+                        </div>
+                        <div class="total-item">
+                            <label>A Prazo:</label>
+                            <span id="totalAPrazo" class="total-value positive">R$ 0,00</span>
+                        </div>
+                    </div>
                     <div class="details-table-section">
                         <h4 class="toggle-table-header" style="cursor: pointer;">
                             <i class="fas fa-file-invoice-dollar"></i> 
@@ -1173,22 +1214,6 @@
                             </table>
                         </div>
                     </div>
-                    
-                    <div class="details-totals">
-                        <div class="total-item">
-                            <label>Total Entradas:</label>
-                            <span id="caixaTotalEntradas" class="total-value positive">R$ 0,00</span>
-                        </div>
-                        <div class="total-item">
-                            <label>Total Saídas:</label>
-                            <span id="caixaTotalSaidas" class="total-value negative">R$ 0,00</span>
-                        </div>
-                        <div class="total-item">
-                            <label>Saldo:</label>
-                            <span id="caixaSaldo" class="total-value">R$ 0,00</span>
-                        </div>
-                    </div>
-                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline close-modal">Fechar</button>
                 </div>

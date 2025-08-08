@@ -2376,3 +2376,37 @@ canvas {
 .toggle-icon.rotated {
     transform: rotate(180deg);
 }
+.details-totals {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.total-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+}
+
+.total-item label {
+    font-weight: 500;
+    color: #6c757d;
+    margin-right: 10px;
+}
+
+.total-value {
+    font-weight: 600;
+}
+
+.total-value.positive {
+    color: #28a745;
+}
+
+.total-value.negative {
+    color: #dc3545;
+}

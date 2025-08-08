@@ -96,27 +96,73 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   async function fetchWithErrorHandling(url, options = {}) {
-    try {
-      const response = await fetch(url, options);
-      const contentType = response.headers.get('content-type');
-      
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        throw new Error(text || `HTTP error! status: ${response.status}`);
+      try {
+          const response = await fetch(url, options);
+          const contentType = response.headers.get('content-type');
+          
+          if (!response.ok) {
+              // Tentar parsear como JSON primeiro
+              if (contentType && contentType.includes('application/json')) {
+                  const data = await response.json();
+                  
+                  // Verificar se é um array de mensagens
+                  if (Array.isArray(data.message)) {
+                      data.message.forEach(msg => {
+                          showFlashMessage('error', msg);
+                      });
+                  } 
+                  // Verificar se é um objeto com mensagens aninhadas
+                  else if (data.message && typeof data.message === 'object') {
+                      for (const [key, value] of Object.entries(data.message)) {
+                          if (Array.isArray(value)) {
+                              value.forEach(msg => showFlashMessage('error', msg));
+                          } else {
+                              showFlashMessage('error', value);
+                          }
+                      }
+                  }
+                  // Mensagem única
+                  else if (data.message) {
+                      showFlashMessage('error', data.message);
+                  } 
+                  // Sem mensagem específica, usar status
+                  else {
+                      showFlashMessage('error', `HTTP error! status: ${response.status}`);
+                  }
+                  
+                  throw new Error(data.message || `HTTP error! status: ${response.status}`);
+              } 
+              // Se não for JSON, mostrar o texto da resposta
+              else {
+                  const text = await response.text();
+                  showFlashMessage('error', text || `HTTP error! status: ${response.status}`);
+                  throw new Error(text || `HTTP error! status: ${response.status}`);
+              }
+          }
+          
+          // Se a resposta foi bem-sucedida, tratar o conteúdo
+          if (!contentType || !contentType.includes('application/json')) {
+              const text = await response.text();
+              return text;
+          }
+          
+          const data = await response.json();
+          return data;
+          
+      } catch (error) {
+          console.error('Erro na requisição:', error);
+          
+          // Se o erro já foi tratado e as mensagens exibidas, apenas propagar
+          if (error.message && error.message.includes('HTTP error')) {
+              throw error;
+          }
+          
+          // Tratar outros tipos de erro (como falha de rede)
+          showFlashMessage('error', error.message || 'Erro ao comunicar com o servidor');
+          throw error;
       }
-      
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
-      }
-      return data;
-    } catch (error) {
-      console.error('Erro na requisição:', error);
-      showFlashMessage('error', error.message || 'Erro ao comunicar com o servidor');
-      throw error;
-    }
   }
-
+  
   function formatPerfil(perfil) {
     const perfis = {
       'admin': 'Administrador',
@@ -1930,54 +1976,66 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   async function loadCaixaFinanceiro(caixaId) {
-    try {
-      const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
-      
-      if (response.success) {
-        const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
-        if (tableBody) {
-          tableBody.innerHTML = '';
+      try {
+          const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
           
-          let totalEntradas = 0;
-          let totalSaidas = 0;
-          
-          response.data.forEach(item => {
-            const row = document.createElement('tr');
-            const valor = parseFloat(item.valor);
-            
-            if (item.tipo === 'entrada') {
-              totalEntradas += valor;
-            } else {
-              totalSaidas += valor;
-            }
-            
-            row.innerHTML = `
-              <td>${formatDateTime(item.data)}</td>
-              <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
-              <td>${item.categoria || '-'}</td>
-              <td>${formatarMoeda(valor)}</td>
-              <td>${item.descricao || '-'}</td>
-            `;
-            tableBody.appendChild(row);
-          });
-          
-          if (document.getElementById('caixaTotalEntradas')) {
-            document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(totalEntradas);
+          if (response.success) {
+              const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
+              if (tableBody) {
+                  tableBody.innerHTML = '';
+                  
+                  let totalEntradas = 0;
+                  let totalSaidas = 0;
+                  
+                  response.data.forEach(item => {
+                      const row = document.createElement('tr');
+                      const valor = parseFloat(item.valor);
+                      
+                      if (item.tipo === 'entrada') {
+                          totalEntradas += valor;
+                      } else {
+                          totalSaidas += valor;
+                      }
+                      
+                      row.innerHTML = `
+                          <td>${formatDateTime(item.data)}</td>
+                          <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
+                          <td>${item.categoria || '-'}</td>
+                          <td>${formatarMoeda(valor)}</td>
+                          <td>${item.descricao || '-'}</td>
+                      `;
+                      tableBody.appendChild(row);
+                  });
+                  
+                  // Atualiza totais principais
+                  if (document.getElementById('caixaTotalEntradas')) {
+                      document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(totalEntradas);
+                  }
+                  if (document.getElementById('caixaTotalSaidas')) {
+                      document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(totalSaidas);
+                  }
+                  if (document.getElementById('caixaSaldo')) {
+                      document.getElementById('caixaSaldo').textContent = formatarMoeda(totalEntradas - totalSaidas);
+                  }
+                  
+                  // Atualiza totais por forma de pagamento
+                  const formasPagamento = response.vendas_por_forma_pagamento || {};
+                  
+                  document.getElementById('totalPixFabiano').textContent = formatarMoeda(formasPagamento.pix_fabiano || 0);
+                  document.getElementById('totalPixMaquineta').textContent = formatarMoeda(formasPagamento.pix_maquineta || 0);
+                  document.getElementById('totalPixEdFrance').textContent = formatarMoeda(formasPagamento.pix_edfrance || 0);
+                  document.getElementById('totalPixLoja').textContent = formatarMoeda(formasPagamento.pix_loja || 0);
+                  document.getElementById('totalDinheiro').textContent = formatarMoeda(formasPagamento.dinheiro || 0);
+                  document.getElementById('totalCartaoCredito').textContent = formatarMoeda(formasPagamento.cartao_credito || 0);
+                  document.getElementById('totalCartaoDebito').textContent = formatarMoeda(formasPagamento.cartao_debito || 0);
+                  document.getElementById('totalAPrazo').textContent = formatarMoeda(formasPagamento.a_prazo || 0);
+              }
           }
-          if (document.getElementById('caixaTotalSaidas')) {
-            document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(totalSaidas);
-          }
-          if (document.getElementById('caixaSaldo')) {
-            document.getElementById('caixaSaldo').textContent = formatarMoeda(totalEntradas - totalSaidas);
-          }
-        }
+      } catch (error) {
+          console.error('Erro ao carregar financeiro do caixa:', error);
+          showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
       }
-    } catch (error) {
-      console.error('Erro ao carregar financeiro do caixa:', error);
-      showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
-    }
   }
-
   // ===== MOVIMENTAÇÕES =====
   async function loadMovimentacoesData() {
     try {
