@@ -547,33 +547,103 @@ def visualizar_pdf_venda(id_list):
 @operador_required
 def obter_vendas_hoje():
     try:
-        # Obtém parâmetros de filtro
+        # Obtém parâmetros de filtro com validação
         data_str = request.args.get('data')
         operador_id = request.args.get('operador_id', type=int)
         
+        # Verificação robusta do caixa
         caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
-        caixa_id = caixa.id if caixa else None
-        print(f'\nCaixa ID: {caixa_id}\n')
-        # Converte a data se fornecida
-        data = None
+        if not caixa:
+            return jsonify({
+                'success': False,
+                'message': 'Nenhum caixa aberto encontrado para o operador'
+            }), 400
+
+        # Tratamento de data com fuso horário
+        tz = ZoneInfo('America/Sao_Paulo')
+        data_hoje = datetime.now(tz).date()
+        data_filtro = data_hoje
+        
         if data_str:
-            data = datetime.strptime(data_str, '%Y-%m-%d').date()
-        
-        vendas_lista = entities.NotaFiscal.obter_vendas_do_dia(
-            data=data,
-            caixa_id=caixa_id,
-            operador_id=operador_id
+            try:
+                data_filtro = datetime.strptime(data_str, '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'message': 'Formato de data inválido. Use YYYY-MM-DD'
+                }), 400
+
+        # Construção da query com prevenção de duplicatas
+        inicio_dia = datetime.combine(data_filtro, time.min).replace(tzinfo=tz)
+        fim_dia = datetime.combine(data_filtro, time.max).replace(tzinfo=tz)
+
+        # Query principal com distinct para evitar duplicatas no JOIN
+        vendas = db.session.query(entities.NotaFiscal).distinct(
+            entities.NotaFiscal.id
+        ).options(
+            db.joinedload(entities.NotaFiscal.cliente),
+            db.joinedload(entities.NotaFiscal.operador),
+            db.joinedload(entities.NotaFiscal.caixa),
+            db.joinedload(entities.NotaFiscal.itens).joinedload(entities.NotaFiscalItem.produto),
+            db.joinedload(entities.NotaFiscal.pagamentos)
+        ).filter(
+            entities.NotaFiscal.caixa_id == caixa.id,
+            entities.NotaFiscal.status == entities.StatusNota.emitida,
+            entities.NotaFiscal.data_emissao >= inicio_dia,
+            entities.NotaFiscal.data_emissao <= fim_dia
         )
+
+        # Filtro adicional por operador
+        if operador_id and operador_id != current_user.id:
+            # Verifica se o usuário tem permissão para consultar outros operadores
+            if not current_user.tipo == entities.TipoUsuario.admin:
+                return jsonify({
+                    'success': False,
+                    'message': 'Apenas administradores podem filtrar por outros operadores'
+                }), 403
+            vendas = vendas.filter(entities.NotaFiscal.operador_id == operador_id)
+        else:
+            vendas = vendas.filter(entities.NotaFiscal.operador_id == current_user.id)
+
+        # Execução da query
+        vendas_lista = vendas.order_by(entities.NotaFiscal.data_emissao.desc()).all()
+
+        # Processamento dos resultados com verificação de duplicatas
+        ids_vistas = set()
+        vendas_unicas = []
         
-        vendas_dict = {venda.id: venda for venda in vendas_lista}
-        vendas = list(vendas_dict.values())
+        for venda in vendas_lista:
+            if venda.id in ids_vistas:
+                continue
+            ids_vistas.add(venda.id)
+            vendas_unicas.append(venda)
+
+        # Agregação de pagamentos para evitar duplicação
+        def agregar_pagamentos(pagamentos):
+            agregados = {}
+            for pag in pagamentos:
+                chave = (pag.forma_pagamento, pag.data.date())
+                if chave in agregados:
+                    agregados[chave]['valor'] += float(pag.valor)
+                else:
+                    agregados[chave] = {
+                        'forma_pagamento': pag.forma_pagamento.value,
+                        'valor': float(pag.valor),
+                        'data': pag.data.isoformat()
+                    }
+            return list(agregados.values())
+
+        # Formatação final
+        resultado = []
+        total_geral = Decimal('0.00')
         
-        # Formata a resposta (mantém o mesmo formato anterior)
-        vendas_formatadas = []
-        for venda in vendas:
-            vendas_formatadas.append({
+        for venda in vendas_unicas:
+            total_venda = Decimal(str(venda.valor_total))
+            total_geral += total_venda
+            
+            resultado.append({
                 'id': venda.id,
-                'data_emissao': venda.data_emissao.isoformat(),
+                'data_emissao': venda.data_emissao.astimezone(tz).isoformat(),
                 'cliente': {
                     'id': venda.cliente.id if venda.cliente else None,
                     'nome': venda.cliente.nome if venda.cliente else 'Consumidor Final'
@@ -582,49 +652,39 @@ def obter_vendas_hoje():
                     'id': venda.operador.id,
                     'nome': venda.operador.nome
                 },
-                'caixa': {
-                    'id': venda.caixa.id,
-                    'status': venda.caixa.status.value,
-                    'valor_abertura': float(venda.caixa.valor_abertura)
-                },
-                'valor_total': float(venda.valor_total),
+                'valor_total': float(total_venda),
                 'valor_desconto': float(venda.valor_desconto),
-                'forma_pagamento': venda.forma_pagamento.value if venda.forma_pagamento else None,
-                'a_prazo': venda.a_prazo,
                 'itens': [
                     {
                         'produto_id': item.produto.id,
-                        'produto_nome': item.produto.nome,
+                        'nome': item.produto.nome,
                         'quantidade': float(item.quantidade),
                         'valor_unitario': float(item.valor_unitario),
-                        'valor_total': float(item.valor_total),
-                        'desconto_aplicado': float(item.desconto_aplicado) if item.desconto_aplicado else None
+                        'total': float(item.valor_total)
                     }
                     for item in venda.itens
                 ],
-                'pagamentos': [
-                    {
-                        'forma_pagamento': pagamento.forma_pagamento.value,
-                        'valor': float(pagamento.valor),
-                        'data': pagamento.data.isoformat()
-                    }
-                    for pagamento in venda.pagamentos
-                ] if venda.pagamentos else None
+                'pagamentos': agregar_pagamentos(venda.pagamentos) if venda.pagamentos else []
             })
-        print(vendas_formatadas)
+
         return jsonify({
             'success': True,
-            'data': vendas_formatadas,
-            'total_vendas': len(vendas),
-            'total_valor': sum(float(v.valor_total) for v in vendas)
+            'data': resultado,
+            'total_vendas': len(vendas_unicas),
+            'total_valor': float(total_geral),
+            'periodo': {
+                'inicio': inicio_dia.isoformat(),
+                'fim': fim_dia.isoformat()
+            }
         })
-    
+
     except Exception as e:
+        app.logger.error(f"Erro em obter_vendas_hoje: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
-            'message': f'Erro ao obter vendas do dia: {str(e)}'
+            'message': 'Erro interno ao processar vendas'
         }), 500
-
+        
 @operador_bp.route('/api/vendas/resumo-diario', methods=['GET'])
 @login_required
 @operador_required
@@ -1016,7 +1076,7 @@ def gerar_pdf_vendas_dia():
 @operador_required
 def api_get_saldo():
     try:
-        # CORREÇÃO: Busca apenas o caixa do operador logado
+        # Busca apenas o caixa do operador logado
         caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
 
         if not caixa:
@@ -1033,13 +1093,22 @@ def api_get_saldo():
         data_inicio = datetime.combine(hoje, time.min).replace(tzinfo=ZoneInfo('America/Sao_Paulo'))
         data_fim = datetime.combine(hoje, time.max).replace(tzinfo=ZoneInfo('America/Sao_Paulo'))
 
-        # Filtra vendas apenas do caixa do operador atual
-        lancamentos = db.session.query(entities.Financeiro).filter(
+        # Filtra vendas apenas do caixa do operador atual, excluindo notas canceladas
+        lancamentos = db.session.query(entities.Financeiro).join(
+            entities.NotaFiscal,
+            entities.Financeiro.nota_fiscal_id == entities.NotaFiscal.id,
+            isouter=True
+        ).filter(
             entities.Financeiro.tipo == entities.TipoMovimentacao.entrada,
             entities.Financeiro.categoria == entities.CategoriaFinanceira.venda,
             entities.Financeiro.data >= data_inicio,
             entities.Financeiro.data <= data_fim,
-            entities.Financeiro.caixa_id == caixa.id  # Já filtra pelo caixa do operador
+            entities.Financeiro.caixa_id == caixa.id,
+            # Filtro para notas fiscais: ou é nula (não tem nota) ou não está cancelada
+            db.or_(
+                entities.NotaFiscal.id.is_(None),
+                entities.NotaFiscal.status != entities.StatusNota.cancelada
+            )
         ).all()
 
         total_vendas = Decimal('0.00')
@@ -1054,7 +1123,7 @@ def api_get_saldo():
             entities.Financeiro.categoria == entities.CategoriaFinanceira.despesa,
             entities.Financeiro.data >= data_inicio,
             entities.Financeiro.data <= data_fim,
-            entities.Financeiro.caixa_id == caixa.id  # Filtra pelo caixa do operador
+            entities.Financeiro.caixa_id == caixa.id
         ).all()
 
         print(f"Despesas do caixa {caixa.id}: {len(despesas)} registros encontrados")

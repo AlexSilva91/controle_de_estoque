@@ -27,67 +27,18 @@ from app.models.entities import (
     NotaFiscal,
     NotaFiscalItem,
     MovimentacaoEstoque,
-    PagamentoNotaFiscal
+    PagamentoNotaFiscal,
+    StatusCaixa,
+    StatusNota,
+    StatusPagamento,
+    UnidadeMedida, 
+    FormaPagamento
 )
 
 from app.utils.conversor_unidade import converter_quantidade
-
-class TipoUsuario(str, Enum):
-    admin = "admin"
-    operador = "operador"
-
-class TipoMovimentacao(str, Enum):
-    entrada = "entrada"
-    saida = "saida"
-    transferencia = "transferencia"
-
-class StatusNota(str, Enum):
-    emitida = "emitida"
-    cancelada = "cancelada"
-
-class StatusCaixa(str, Enum):
-    aberto = "aberto"
-    fechado = "fechado"
-
-class CategoriaFinanceira(str, Enum):
-    venda = "venda"
-    compra = "compra"
-    despesa = "despesa"
-    salario = "salario"
-    outro = "outro"
-    abertura_caixa = "abertura_caixa"
-    fechamento_caixa = "fechamento_caixa"
-
-class FormaPagamento(str, Enum):
-    pix_fabiano = "pix_fabiano"
-    pix_maquineta = "pix_maquineta"
-    pix_edfrance = "pix_edfrance"
-    dinheiro = "dinheiro"
-    cartao_credito = "cartao_credito"
-    cartao_debito = "cartao_debito"
-    a_prazo = "a_prazo"
-
-class UnidadeMedida(str, Enum):
-    kg = "kg"
-    saco = "saco"
-    unidade = "unidade"
-    fardo = "fardo"
-    pacote = "pacote"
-
-
-class TipoDesconto(str, Enum):
-    fixo = "fixo"
-    percentual = "percentual"
-
-class TipoEstoque(str, Enum):
-    loja = "loja"
-    deposito = "deposito"
-    fabrica = "fabrica"
-
-class StatusPagamento(str, Enum):
-    pendente = "pendente"
-    parcial = "parcial"
-    quitado = "quitado"
+from app.models.entities import (
+    TipoDesconto, TipoEstoque, TipoMovimentacao, TipoUsuario, CategoriaFinanceira, 
+)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
