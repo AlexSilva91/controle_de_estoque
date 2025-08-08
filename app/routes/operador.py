@@ -26,6 +26,7 @@ from app.bot.bot_movimentacao import enviar_resumo_movimentacao_diaria
 from flask import send_file
 from app.utils.preparar_notas import preparar_dados_nota
 from app.utils.converter_endereco import parse_endereco_string
+from app.utils.format_data_moeda import format_number
 from app.utils.nfce import gerar_nfce_pdf_bobina_bytesio
 from app.models import entities
 from app.schemas import (
@@ -430,7 +431,7 @@ def api_registrar_venda():
                 nota_fiscal_id=nota.id,
                 forma_pagamento=entities.FormaPagamento(forma),
                 valor=valor,
-                data=datetime.utcnow(),
+                data=datetime.now(),
                 sincronizado=False
             )
             db.session.add(pagamento_nf)
@@ -463,7 +464,7 @@ def api_registrar_venda():
                 descricao=f"Venda a prazo NF #{nota.id}",
                 valor_original=valor_a_prazo,
                 valor_aberto=valor_a_prazo,
-                data_vencimento=datetime.utcnow() + timedelta(days=30),
+                data_vencimento=datetime.now() + timedelta(days=30),
                 status=entities.StatusPagamento.pendente,
                 sincronizado=False
             )
@@ -827,7 +828,7 @@ def gerar_pdf_vendas_dia():
     data_str = request.args.get('data')
     caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
     caixa_id = caixa.id
-    operador_id = request.args.get('operador_id')
+    operador_id = current_user.id
     data = None
 
     if data_str:
@@ -867,11 +868,18 @@ def gerar_pdf_vendas_dia():
     pdf.drawString(margin, linha_atual, f"Data: {data_relatorio.strftime('%d/%m/%Y')}")
     linha_atual -= espacamento_pequeno
 
-    if caixa_id:
-        pdf.drawString(margin, linha_atual, f"Caixa ID: {caixa_id}")
+    pdf.drawString(margin, linha_atual, f"Caixa ID: {caixa_id}")
+    linha_atual -= espacamento_pequeno
+    pdf.drawString(margin, linha_atual, f"Operador ID: {operador_id}")
+    linha_atual -= espacamento_pequeno
+
+    pdf.drawString(margin, linha_atual, f"Valor de Abertura: {format_number(caixa.valor_abertura)}")
+    linha_atual -= espacamento_pequeno
+    if caixa.valor_fechamento:
+        pdf.drawString(margin, linha_atual, f"Valor de Fechamento: {format_number(caixa.valor_fechamento)}")
         linha_atual -= espacamento_pequeno
-    if operador_id:
-        pdf.drawString(margin, linha_atual, f"Operador ID: {operador_id}")
+    if caixa.valor_confirmado:
+        pdf.drawString(margin, linha_atual, f"Valor Confirmado: {format_number(caixa.valor_confirmado)}")
         linha_atual -= espacamento_pequeno
 
     linha_atual -= espacamento
@@ -885,12 +893,12 @@ def gerar_pdf_vendas_dia():
     linha_atual -= espacamento
 
     dados_resumo = [
-        ["Total de Vendas:", f"R$ {total_vendas_positivas:.2f}"],
-        ["Total de Estornos:", f"R$ {total_estornos:.2f}"],
-        ["Total de Descontos:", f"R$ {dados['total_descontos']:.2f}"],
-        ["Total de Entradas:", f"R$ {dados['total_entradas']:.2f}"],
-        ["Total de Saídas:", f"R$ {dados['total_saidas']:.2f}"],
-        ["Saldo Líquido:", f"R$ {total_liquido:.2f}"]
+        ["Total de Vendas:", format_number(total_vendas_positivas)],
+        ["Total de Estornos:", format_number(total_estornos)],
+        ["Total de Descontos:", format_number(dados['total_descontos'])],
+        ["Total de Entradas:", format_number(dados['total_entradas'])],
+        ["Total de Saídas:", format_number(dados['total_saidas'])],
+        ["Saldo Líquido:", format_number(total_liquido)]
     ]
 
     tabela_resumo = Table(dados_resumo, colWidths=[180, 120])
@@ -926,8 +934,8 @@ def gerar_pdf_vendas_dia():
             ["Cliente:", venda['cliente']],
             ["Data/Hora:", datetime.fromisoformat(venda['data']).strftime('%d/%m/%Y %H:%M')],
             ["Operador:", venda['operador']],
-            ["Valor Total:", f"R$ {valor_exibicao:.2f}"],
-            ["Desconto:", f"R$ {venda['valor_desconto']:.2f}"],
+            ["Valor Total:", format_number(valor_exibicao)],
+            ["Desconto:", format_number(venda['valor_desconto'])],
             ["Forma Pagamento:", venda['forma_pagamento']],
             ["A Prazo:", "Sim" if venda['a_prazo'] else "Não"],
             ["Tipo:", "ESTORNO" if is_estorno else "VENDA NORMAL"]
@@ -963,9 +971,9 @@ def gerar_pdf_vendas_dia():
             dados_itens.append([
                 item['produto'],
                 f"{quantidade:.3f}",
-                f"R$ {item['valor_unitario']:.2f}",
-                f"R$ {valor_total:.2f}",
-                f"R$ {desconto:.2f}" if desconto > 0 else "-"
+                format_number(item['valor_unitario']),
+                format_number(valor_total),
+                format_number(desconto) if desconto > 0 else "-"
             ])
 
         tabela_itens = Table(dados_itens, colWidths=[180, 50, 70, 70, 60])
@@ -987,7 +995,6 @@ def gerar_pdf_vendas_dia():
         tabela_itens.drawOn(pdf, margin, linha_atual - altura_itens)
         linha_atual -= altura_itens + espacamento
 
-        # linha separadora entre vendas
         pdf.setStrokeColor(colors.lightgrey)
         pdf.line(margin, linha_atual, width - margin, linha_atual)
         linha_atual -= espacamento

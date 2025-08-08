@@ -2151,26 +2151,54 @@ async function closeRegister() {
         return showMessage('Valor de fechamento inválido', 'error');
     }
 
-    if (confirm('Deseja realmente fechar o caixa?')) {
-        try {
-            const response = await fetch('/operador/api/fechar-caixa', {
-                ...preventCacheConfig,
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ valor_fechamento: parseFloat(valorFechamento) })
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Erro ao fechar caixa');
+    if (!confirm('Deseja realmente fechar o caixa?')) {
+        return;
+    }
+
+    try {
+        const dataParam = new Date().toISOString().slice(0, 10);
+
+        // PEGAR OPERADOR ID DE VARIÁVEL GLOBAL OU CAMPO HIDDEN
+        let operadorId = '';
+        if (typeof currentOperadorId !== 'undefined') {
+            operadorId = currentOperadorId;
+        } else {
+            const inputHidden = document.getElementById('operador-id');
+            if (inputHidden) {
+                operadorId = inputHidden.value;
             }
-            
-            const now = new Date();
-            showMessage(`Caixa fechado às ${now.toLocaleTimeString('pt-BR')}`);
-            await checkCaixaStatus();
-        } catch (error) {
-            showMessage(error.message, 'error');
         }
+
+        // Abrir o relatório antes de fechar o caixa
+        const urlRelatorio = `/operador/api/vendas/relatorio-diario-pdf?data=${dataParam}&operador_id=${operadorId}`;
+        const novaAba = window.open(urlRelatorio, '_blank');
+
+        if (!novaAba || novaAba.closed || typeof novaAba.closed === 'undefined') {
+            return showMessage('Não foi possível abrir o relatório. Verifique o bloqueador de pop-ups.', 'error');
+        }
+
+        // Aguarda 1 segundo para garantir que o relatório foi requisitado
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Agora sim, fecha o caixa
+        const response = await fetch('/operador/api/fechar-caixa', {
+            ...preventCacheConfig,
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ valor_fechamento: parseFloat(valorFechamento) })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Erro ao fechar caixa');
+        }
+
+        const now = new Date();
+        showMessage(`Caixa fechado às ${now.toLocaleTimeString('pt-BR')}`);
+        await checkCaixaStatus();
+
+    } catch (error) {
+        showMessage(error.message, 'error');
     }
 }
 
