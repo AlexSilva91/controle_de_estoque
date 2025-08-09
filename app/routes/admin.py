@@ -2223,8 +2223,8 @@ def gerar_pdf_caixa_financeiro(caixa_id):
             .order_by(Financeiro.data.desc())\
             .all()
 
-        total_entradas = sum(mov.valor for mov in movimentacoes if mov.tipo == TipoMovimentacao.entrada)
-        total_saidas = sum(mov.valor for mov in movimentacoes if mov.tipo == TipoMovimentacao.saida)
+        total_entradas = sum(mov.valor for mov in movimentacoes if mov.tipo == TipoMovimentacao.entrada and mov.categoria != CategoriaFinanceira.abertura_caixa)
+        total_saidas = sum(mov.valor for mov in movimentacoes if mov.tipo == TipoMovimentacao.saida and mov.categoria != CategoriaFinanceira.abertura_caixa)
 
         # --- Vendas por forma de pagamento ---
         vendas_por_forma_pagamento = session.query(
