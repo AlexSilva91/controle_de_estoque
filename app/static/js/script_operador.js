@@ -1134,14 +1134,39 @@ function resetSaleForm() {
         if (productsList) productsList.innerHTML = '';
         selectedProducts = [];
 
-        // Limpa pagamento
-        const paymentMethod = document.getElementById('payment-method');
-        if (paymentMethod) paymentMethod.value = '';
+        // Limpa formas de pagamento - CORREÇÃO AQUI
+        const selectedPaymentsList = document.querySelector('.selected-payments-list');
+        if (selectedPaymentsList) {
+            selectedPaymentsList.innerHTML = '';
+        }
         
+        // Limpa os selects e inputs de pagamento
+        const paymentMethodSelect = document.querySelector('.payment-method-select');
+        const paymentAmountInput = document.querySelector('.payment-amount');
+        
+        if (paymentMethodSelect) paymentMethodSelect.value = '';
+        if (paymentAmountInput) paymentAmountInput.value = '';
+        
+        // Limpa array de pagamentos se existir
+        if (typeof selectedPayments !== 'undefined') {
+            selectedPayments = [];
+        }
+        
+        // Limpa observações da venda
         const saleNotes = document.getElementById('sale-notes');
         if (saleNotes) saleNotes.value = '';
         
+        // Limpa valor recebido
         if (amountReceivedInput) amountReceivedInput.value = '';
+
+        // Limpa desconto manual
+        const discountValue = document.getElementById('discount-value');
+        const discountType = document.getElementById('discount-type');
+        const discountDisplay = document.getElementById('discount-value-display');
+        
+        if (discountValue) discountValue.value = '';
+        if (discountType) discountType.value = 'percentual';
+        if (discountDisplay) discountDisplay.textContent = 'R$ 0.00';
 
         // Limpa entrega
         deliveryAddress = null;
@@ -1151,6 +1176,15 @@ function resetSaleForm() {
             deliveryBtn.innerHTML = '<i class="fas fa-truck"></i> Adicionar Entrega';
         }
         
+        // Remove display de informações de entrega
+        const deliveryInfoDisplay = document.getElementById('delivery-info-display');
+        if (deliveryInfoDisplay) {
+            deliveryInfoDisplay.style.display = 'none';
+            const deliveryAddressText = document.getElementById('delivery-address-text');
+            if (deliveryAddressText) deliveryAddressText.textContent = '';
+        }
+        
+        // Remove qualquer div de informações de entrega antiga
         const deliveryInfo = document.querySelector('.delivery-info');
         if (deliveryInfo) deliveryInfo.remove();
 
@@ -1158,15 +1192,23 @@ function resetSaleForm() {
         if (subtotalValueElement) subtotalValueElement.textContent = 'R$ 0.00';
         if (saleTotalElement) saleTotalElement.textContent = 'R$ 0.00';
         if (changeValueElement) changeValueElement.textContent = 'R$ 0.00';
-        if (amountReceivedInput) amountReceivedInput.value = '';
-        // Atualiza status
+
+        // Atualiza status do caixa
         updateCaixaStatus();
 
-        // Dispara evento se necessário
+        // Dispara evento para atualização se necessário
         if (selectedClientInput) {
             const event = new Event('input', { bubbles: true, cancelable: true });
             selectedClientInput.dispatchEvent(event);
         }
+        
+        // Recalcula totais para garantir que tudo está zerado
+        if (typeof calculateSaleTotal === 'function') {
+            calculateSaleTotal();
+        }
+        
+        console.log("Formulário de venda resetado com sucesso");
+        
     } catch (error) {
         console.error("Erro ao resetar formulário de venda:", error);
     }
