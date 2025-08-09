@@ -543,22 +543,111 @@
             <div class="tab-content" id="clients">
                 <div class="card">
                     <div class="card-header">
-                        <i class="fas fa-users"></i>
-                        <h3>Clientes Cadastrados</h3>
-                        <button class="btn-primary" id="add-client-btn">
-                            <i class="fas fa-plus"></i> Novo Cliente
-                        </button>
+                        <div class="card-header-title">
+                            <i class="fas fa-users"></i>
+                            <h3>Clientes Cadastrados</h3>
+                        </div>
+                        <div class="card-header-actions">
+                            <button class="btn-primary" id="add-client-btn">
+                                <i class="fas fa-plus"></i> Novo Cliente
+                            </button>
+                            <button class="btn-secondary" id="refresh-clients-btn">
+                                <i class="fas fa-sync-alt"></i> Atualizar
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="search-bar">
-                            <input type="text" class="search-input" id="client-search" placeholder="Pesquisar cliente...">
-                            <button class="btn-search" id="search-client-btn">
+                            <input type="text" class="search-input" id="client-search" placeholder="Pesquisar por nome, documento ou telefone...">
+                            <button class="btn-search" id="search-clients-btn">
                                 <i class="fas fa-search"></i> Buscar
+                            </button>
+                            <button class="btn-secondary" id="clear-search-btn">
+                                <i class="fas fa-times"></i> Limpar
                             </button>
                         </div>
                         
-                        <div class="clients-grid" id="clients-container">
-                            <!-- Client cards will be added here -->
+                        <!-- Filtros rápidos -->
+                        <div class="quick-filters">
+                            <button class="filter-btn active" data-filter="all">
+                                <i class="fas fa-list"></i> Todos
+                            </button>
+                            <button class="filter-btn" data-filter="recent">
+                                <i class="fas fa-clock"></i> Recentes
+                            </button>
+                            <button class="filter-btn" data-filter="frequent">
+                                <i class="fas fa-star"></i> Frequentes
+                            </button>
+                        </div>
+                        
+                        <!-- Tabela de clientes -->
+                        <div class="clients-table-container">
+                            <table class="clients-table" id="clients-table">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable" data-sort="id">
+                                            ID
+                                            <i class="fas fa-sort"></i>
+                                        </th>
+                                        <th class="sortable" data-sort="nome">
+                                            Nome
+                                            <i class="fas fa-sort"></i>
+                                        </th>
+                                        <th class="sortable" data-sort="documento">
+                                            Documento
+                                            <i class="fas fa-sort"></i>
+                                        </th>
+                                        <th class="sortable" data-sort="telefone">
+                                            Telefone
+                                            <i class="fas fa-sort"></i>
+                                        </th>
+                                        <th class="sortable" data-sort="email">
+                                            Email
+                                            <i class="fas fa-sort"></i>
+                                        </th>
+                                        <th class="sortable" data-sort="endereco">
+                                            Endereço
+                                            <i class="fas fa-sort"></i>
+                                        </th>
+                                        <th class="sortable" data-sort="data_cadastro">
+                                            Cadastro
+                                            <i class="fas fa-sort"></i>
+                                        </th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="clients-tbody">
+                                    <!-- Clientes serão carregados aqui -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Informações de paginação/total -->
+                        <div class="table-footer">
+                            <div class="table-info">
+                                <span id="clients-count">0 clientes encontrados</span>
+                            </div>
+                            <div class="pagination-controls" id="pagination-controls">
+                                <!-- Controles de paginação serão adicionados aqui se necessário -->
+                            </div>
+                        </div>
+                        
+                        <!-- Estado vazio -->
+                        <div class="empty-state" id="clients-empty-state" style="display: none;">
+                            <div class="empty-icon">
+                                <i class="fas fa-users-slash"></i>
+                            </div>
+                            <h3>Nenhum cliente encontrado</h3>
+                            <p>Não há clientes cadastrados ou nenhum cliente corresponde aos critérios de busca.</p>
+                            <button class="btn-primary" onclick="document.getElementById('add-client-btn').click()">
+                                <i class="fas fa-plus"></i> Cadastrar Primeiro Cliente
+                            </button>
+                        </div>
+                        
+                        <!-- Loading state -->
+                        <div class="loading-state" id="clients-loading" style="display: none;">
+                            <div class="spinner"></div>
+                            <p>Carregando clientes...</p>
                         </div>
                     </div>
                 </div>

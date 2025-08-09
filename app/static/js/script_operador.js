@@ -21,6 +21,9 @@
 let balanceVisible = true;
 let currentBalance = 0;
 let clients = [];
+let filteredClients = [];
+let currentSort = { field: 'nome', direction: 'asc' };
+let currentFilter = 'all';
 let products = [];
 let currentEditingClient = null;
 let selectedClient = null;
@@ -155,19 +158,381 @@ async function loadCurrentUser() {
  * Carrega a lista de clientes do servidor
  * @async
  */
+// Função principal para carregar clientes
 async function loadClients() {
     try {
+        showClientsLoading(true);
+        
         const response = await fetch('/operador/api/clientes', {
             ...preventCacheConfig,
             method: 'GET'
         });
+        
         if (!response.ok) throw new Error('Erro ao carregar clientes');
         
         clients = await response.json();
-        renderClientCards();
+        filteredClients = [...clients];
+        
+        renderClientsTable();
+        updateClientsCount();
+        
     } catch (error) {
         showMessage(error.message, 'error');
+        showClientsEmptyState(true);
+    } finally {
+        showClientsLoading(false);
     }
+}
+
+// Renderizar tabela de clientes
+function renderClientsTable() {
+    const tbody = document.getElementById('clients-tbody');
+    
+    if (!tbody) return;
+    
+    if (filteredClients.length === 0) {
+        showClientsEmptyState(true);
+        return;
+    }
+    
+    showClientsEmptyState(false);
+    
+    tbody.innerHTML = filteredClients.map(client => `
+        <tr class="client-row" data-client-id="${client.id}">
+            <td class="client-id">#${client.id}</td>
+            <td class="client-name">
+                <div class="client-name-container">
+                    <strong>${client.nome || 'Não informado'}</strong>
+                    ${client.apelido ? `<small class="client-nickname">(${client.apelido})</small>` : ''}
+                </div>
+            </td>
+            <td class="client-document">
+                <span class="document-value">${formatDocument(client.documento) || 'Não informado'}</span>
+            </td>
+            <td class="client-phone">
+                ${client.telefone ? `
+                    <a href="tel:${client.telefone}" class="phone-link">
+                        <i class="fas fa-phone"></i>
+                        ${formatPhone(client.telefone)}
+                    </a>
+                ` : '<span class="text-muted">Não informado</span>'}
+            </td>
+            <td class="client-email">
+                ${client.email ? `
+                    <a href="mailto:${client.email}" class="email-link">
+                        <i class="fas fa-envelope"></i>
+                        ${client.email}
+                    </a>
+                ` : '<span class="text-muted">Não informado</span>'}
+            </td>
+            <td class="client-address">
+                <div class="address-container">
+                    ${client.endereco ? `
+                        <span class="address-text" title="${client.endereco}">
+                            ${truncateText(client.endereco, 30)}
+                        </span>
+                    ` : '<span class="text-muted">Não informado</span>'}
+                </div>
+            </td>
+            <td class="client-date">
+                <span class="date-value" title="${formatDateTime(client.data_cadastro)}">
+                    ${formatDate(client.data_cadastro)}
+                </span>
+            </td>
+            <td class="client-actions">
+                <div class="action-buttons">
+                    <button class="btn-action btn-edit" 
+                            onclick="editClient(${client.id})" 
+                            title="Editar cliente">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-action btn-view" 
+                            onclick="viewClientDetails(${client.id})" 
+                            title="Ver detalhes">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn-action btn-select" 
+                            onclick="selectClientForSale(${client.id})" 
+                            title="Selecionar para venda">
+                        <i class="fas fa-shopping-cart"></i>
+                    </button>
+                    <button class="btn-action btn-delete" 
+                            onclick="confirmDeleteClient(${client.id})" 
+                            title="Excluir cliente">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Função para buscar clientes
+function searchClients(searchTerm) {
+    const term = searchTerm.toLowerCase().trim();
+    
+    if (!term) {
+        filteredClients = [...clients];
+    } else {
+        filteredClients = clients.filter(client => 
+            (client.nome && client.nome.toLowerCase().includes(term)) ||
+            (client.documento && client.documento.includes(term)) ||
+            (client.telefone && client.telefone.includes(term)) ||
+            (client.email && client.email.toLowerCase().includes(term)) ||
+            (client.endereco && client.endereco.toLowerCase().includes(term))
+        );
+    }
+    
+    applySortAndFilter();
+    renderClientsTable();
+    updateClientsCount();
+}
+
+// Função para filtrar clientes
+function filterClients(filterType) {
+    currentFilter = filterType;
+    
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    switch (filterType) {
+        case 'recent':
+            filteredClients = clients.filter(client => 
+                new Date(client.data_cadastro) >= thirtyDaysAgo
+            );
+            break;
+        case 'frequent':
+            // Assumindo que clientes frequentes têm mais vendas
+            filteredClients = clients.filter(client => 
+                client.total_vendas && client.total_vendas > 5
+            );
+            break;
+        default:
+            filteredClients = [...clients];
+    }
+    
+    applySortAndFilter();
+    renderClientsTable();
+    updateClientsCount();
+    
+    // Atualizar botões de filtro
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filterType);
+    });
+}
+
+// Função para ordenar clientes
+function sortClients(field) {
+    if (currentSort.field === field) {
+        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSort.field = field;
+        currentSort.direction = 'asc';
+    }
+    
+    filteredClients.sort((a, b) => {
+        let valueA = a[field] || '';
+        let valueB = b[field] || '';
+        
+        // Tratamento especial para diferentes tipos de dados
+        if (field === 'id') {
+            valueA = parseInt(valueA) || 0;
+            valueB = parseInt(valueB) || 0;
+        } else if (field === 'data_cadastro') {
+            valueA = new Date(valueA);
+            valueB = new Date(valueB);
+        } else {
+            valueA = valueA.toString().toLowerCase();
+            valueB = valueB.toString().toLowerCase();
+        }
+        
+        let comparison = 0;
+        if (valueA > valueB) comparison = 1;
+        if (valueA < valueB) comparison = -1;
+        
+        return currentSort.direction === 'desc' ? -comparison : comparison;
+    });
+    
+    renderClientsTable();
+    updateSortIcons();
+}
+
+// Aplicar ordenação e filtro atual
+function applySortAndFilter() {
+    if (currentSort.field) {
+        sortClients(currentSort.field);
+    }
+}
+
+// Atualizar ícones de ordenação
+function updateSortIcons() {
+    document.querySelectorAll('.sortable i').forEach(icon => {
+        icon.className = 'fas fa-sort';
+    });
+    
+    const activeHeader = document.querySelector(`[data-sort="${currentSort.field}"] i`);
+    if (activeHeader) {
+        activeHeader.className = currentSort.direction === 'asc' 
+            ? 'fas fa-sort-up' 
+            : 'fas fa-sort-down';
+    }
+}
+
+// Atualizar contador de clientes
+function updateClientsCount() {
+    const countElement = document.getElementById('clients-count');
+    if (countElement) {
+        const total = clients.length;
+        const filtered = filteredClients.length;
+        
+        if (total === filtered) {
+            countElement.textContent = `${total} cliente${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`;
+        } else {
+            countElement.textContent = `${filtered} de ${total} clientes`;
+        }
+    }
+}
+
+// Mostrar/ocultar estados da interface
+function showClientsLoading(show) {
+    const loading = document.getElementById('clients-loading');
+    const table = document.querySelector('.clients-table-container');
+    
+    if (loading) loading.style.display = show ? 'block' : 'none';
+    if (table) table.style.display = show ? 'none' : 'block';
+}
+
+function showClientsEmptyState(show) {
+    const emptyState = document.getElementById('clients-empty-state');
+    const table = document.querySelector('.clients-table-container');
+    const tableFooter = document.querySelector('.table-footer');
+    
+    if (emptyState) emptyState.style.display = show ? 'block' : 'none';
+    if (table) table.style.display = show ? 'none' : 'block';
+    if (tableFooter) tableFooter.style.display = show ? 'none' : 'flex';
+}
+
+// Funções utilitárias
+function formatDocument(doc) {
+    if (!doc) return '';
+    // Remove caracteres não numéricos
+    const numbers = doc.replace(/\D/g, '');
+    if (numbers.length === 11) {
+        return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    } else if (numbers.length === 14) {
+        return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+    }
+    return doc;
+}
+
+function formatPhone(phone) {
+    if (!phone) return '';
+    const numbers = phone.replace(/\D/g, '');
+    if (numbers.length === 11) {
+        return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    } else if (numbers.length === 10) {
+        return numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+    }
+    return phone;
+}
+
+function formatDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR');
+}
+
+function formatDateTime(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleString('pt-BR');
+}
+
+function truncateText(text, maxLength) {
+    if (!text) return '';
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Busca de clientes
+    const clientSearchInput = document.getElementById('client-search');
+    const searchBtn = document.getElementById('search-clients-btn');
+    const clearSearchBtn = document.getElementById('clear-search-btn');
+    
+    if (clientSearchInput) {
+        clientSearchInput.addEventListener('input', (e) => {
+            searchClients(e.target.value);
+        });
+    }
+    
+    if (searchBtn) {
+        searchBtn.addEventListener('click', () => {
+            const searchTerm = clientSearchInput ? clientSearchInput.value : '';
+            searchClients(searchTerm);
+        });
+    }
+    
+    if (clearSearchBtn) {
+        clearSearchBtn.addEventListener('click', () => {
+            if (clientSearchInput) clientSearchInput.value = '';
+            searchClients('');
+        });
+    }
+    
+    // Filtros rápidos
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            filterClients(btn.dataset.filter);
+        });
+    });
+    
+    // Ordenação
+    document.querySelectorAll('.sortable').forEach(header => {
+        header.addEventListener('click', () => {
+            sortClients(header.dataset.sort);
+        });
+    });
+    
+    // Botão de atualizar
+    const refreshBtn = document.getElementById('refresh-clients-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', loadClients);
+    }
+});
+
+// Funções de ação (devem ser implementadas conforme necessário)
+function editClient(clientId) {
+    // Implementar edição de cliente
+    console.log('Editar cliente:', clientId);
+}
+
+function viewClientDetails(clientId) {
+    // Implementar visualização de detalhes
+    console.log('Ver detalhes cliente:', clientId);
+}
+
+function selectClientForSale(clientId) {
+    // Selecionar cliente para venda e voltar para aba de vendas
+    const client = clients.find(c => c.id === clientId);
+    if (client) {
+        // Selecionar cliente na aba de vendas
+        const selectedClientInput = document.getElementById('selected-client');
+        const selectedClientIdInput = document.getElementById('selected-client-id');
+        
+        if (selectedClientInput) selectedClientInput.value = client.nome;
+        if (selectedClientIdInput) selectedClientIdInput.value = client.id;
+        
+        // Voltar para aba de vendas
+        switchTab('sales');
+        
+        showMessage(`Cliente ${client.nome} selecionado para venda`, 'success');
+    }
+}
+
+function confirmDeleteClient(clientId) {
+    // Implementar confirmação de exclusão
+    console.log('Excluir cliente:', clientId);
 }
 
 /**
@@ -2330,21 +2695,68 @@ function showSearchResults(results, containerId, type) {
  * @param {string} searchTerm - Termo para busca
  */
 async function searchClients(searchTerm) {
+    if (!searchTerm) {
+        showMessage('Digite um termo para busca', 'error');
+        return;
+    }
+
     try {
         const response = await fetch(`/operador/api/clientes/buscar?q=${encodeURIComponent(searchTerm)}&timestamp=${new Date().getTime()}`, {
-            ...preventCacheConfig,
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            },
             method: 'GET'
         });
+        
         if (!response.ok) throw new Error('Erro ao buscar clientes');
-
+        
         const results = await response.json();
-        showSearchResults(results, 'client-search-results', 'client');
+        
+        if (results.length === 0) {
+            showMessage('Nenhum cliente encontrado', 'info');
+            return;
+        }
+        
+        // Exibe os resultados em um dropdown
+        showClientResultsDropdown(results);
+        
     } catch (error) {
-        console.error('Erro na busca de clientes:', error);
         showMessage(error.message, 'error');
     }
 }
 
+function showClientResultsDropdown(clients) {
+    const dropdown = document.getElementById('client-search-results');
+    if (!dropdown) return;
+    
+    dropdown.innerHTML = '';
+    
+    clients.forEach(client => {
+        const item = document.createElement('div');
+        item.className = 'client-result-item';
+        item.innerHTML = `
+            <div class="client-info">
+                <strong>${client.nome}</strong>
+                <div class="client-details">
+                    <span>${client.documento ? 'CPF: ' + formatDocument(client.documento) : ''}</span>
+                    <span>${client.telefone ? 'Tel: ' + formatPhone(client.telefone) : ''}</span>
+                </div>
+            </div>
+        `;
+        
+        item.addEventListener('click', () => {
+            selectClient(client);
+            dropdown.innerHTML = '';
+            clientSearchInput.value = '';
+        });
+        
+        dropdown.appendChild(item);
+    });
+    
+    dropdown.style.display = 'block';
+}
 /**
  * Busca produtos dinamicamente
  * @async
