@@ -2791,6 +2791,7 @@ document.addEventListener('DOMContentLoaded', function() {
   setupModalEvents();
   setupNavigation();
   setupVendaRetroativaModal();
+  setupClienteActions()
   
   document.getElementById('confirmarExclusaoBtn')?.addEventListener('click', async function() {
     const id = this.getAttribute('data-id');

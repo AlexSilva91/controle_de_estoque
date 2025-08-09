@@ -1094,7 +1094,175 @@
             </div>
         </div>
     </div>
-    
+        <!-- Modal Cliente -->
+    <div id="clienteModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-user-edit"></i>
+                        <span id="clienteModalTitle">Cadastrar Cliente</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <form id="clienteForm">
+                    <div class="modal-body">
+                        <input type="hidden" id="clienteId">
+                        <div class="form-group">
+                            <label for="clienteNome">Nome*</label>
+                            <input type="text" id="clienteNome" class="form-control" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="clienteDocumento">Documento</label>
+                                <input type="text" id="clienteDocumento" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="clienteTelefone">Telefone</label>
+                                <input type="text" id="clienteTelefone" class="form-control">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="clienteEmail">E-mail</label>
+                            <input type="email" id="clienteEmail" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="clienteEndereco">Endereço</label>
+                            <textarea id="clienteEndereco" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="clienteStatus">Status*</label>
+                            <select id="clienteStatus" class="form-control" required>
+                                <option value="true">Ativo</option>
+                                <option value="false">Inativo</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i>
+                            <span id="clienteModalSubmitText">Salvar</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- Modal Visualizar Usuário -->
+    <div id="visualizarUsuarioModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-user"></i>
+                        <span>Detalhes do Usuário</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="user-profile">
+                        <div class="profile-header">
+                            <div class="avatar">
+                                <i class="fas fa-user-circle"></i>
+                            </div>
+                            <div class="profile-info">
+                                <h2 id="visualizarUsuarioNome"></h2>
+                                <div class="badge" id="visualizarUsuarioPerfil"></div>
+                                <div class="badge" id="visualizarUsuarioStatus"></div>
+                            </div>
+                        </div>
+                        <div class="profile-details">
+                            <div class="detail-item">
+                                <label>CPF:</label>
+                                <span id="visualizarUsuarioCPF"></span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Data de Cadastro:</label>
+                                <span id="visualizarUsuarioDataCadastro"></span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Último Acesso:</label>
+                                <span id="visualizarUsuarioUltimoAcesso"></span>
+                            </div>
+                            <div class="detail-item full-width">
+                                <label>Observações:</label>
+                                <div id="visualizarUsuarioObservacoes" class="observacoes"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Modal Desconto Produto -->
+    <div id="descontoModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-percentage"></i>
+                        <span id="descontoModalTitle">Cadastrar Desconto</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <form id="descontoForm">
+                    <input type="hidden" id="descontoId">
+                    <input type="hidden" id="descontoProdutoId">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="descontoIdentificador">Identificador*</label>
+                            <input type="text" id="descontoIdentificador" class="form-control" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="descontoQuantidadeMinima">Quantidade Mínima*</label>
+                                <input type="number" id="descontoQuantidadeMinima" class="form-control" step="0.001" min="0.001" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="descontoQuantidadeMaxima">Quantidade Máxima*</label>
+                                <input type="number" id="descontoQuantidadeMaxima" class="form-control" step="0.001" min="0.001" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="descontoValorUnitario">Valor Unitário com Desconto*</label>
+                                <input type="number" id="descontoValorUnitario" class="form-control" step="0.01" min="0" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="descontoValidoAte">Válido até</label>
+                                <input type="date" id="descontoValidoAte" class="form-control">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="descontoDescricao">Descrição</label>
+                            <textarea id="descontoDescricao" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="descontoAtivo">Status*</label>
+                            <select id="descontoAtivo" class="form-control" required>
+                                <option value="true">Ativo</option>
+                                <option value="false">Inativo</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i>
+                            <span>Salvar</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     <!-- Modal de Visualização do Caixa -->
     <div id="visualizarCaixaModal" class="modal">
         <div class="modal-overlay"></div>
@@ -1267,179 +1435,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Modal Visualizar Usuário -->
-    <div id="visualizarUsuarioModal" class="modal">
-        <div class="modal-overlay"></div>
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">
-                        <i class="fas fa-user"></i>
-                        <span>Detalhes do Usuário</span>
-                    </h3>
-                    <button class="close-modal" aria-label="Fechar">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="user-profile">
-                        <div class="profile-header">
-                            <div class="avatar">
-                                <i class="fas fa-user-circle"></i>
-                            </div>
-                            <div class="profile-info">
-                                <h2 id="visualizarUsuarioNome"></h2>
-                                <div class="badge" id="visualizarUsuarioPerfil"></div>
-                                <div class="badge" id="visualizarUsuarioStatus"></div>
-                            </div>
-                        </div>
-                        <div class="profile-details">
-                            <div class="detail-item">
-                                <label>CPF:</label>
-                                <span id="visualizarUsuarioCPF"></span>
-                            </div>
-                            <div class="detail-item">
-                                <label>Data de Cadastro:</label>
-                                <span id="visualizarUsuarioDataCadastro"></span>
-                            </div>
-                            <div class="detail-item">
-                                <label>Último Acesso:</label>
-                                <span id="visualizarUsuarioUltimoAcesso"></span>
-                            </div>
-                            <div class="detail-item full-width">
-                                <label>Observações:</label>
-                                <div id="visualizarUsuarioObservacoes" class="observacoes"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline close-modal">Fechar</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Cliente -->
-    <div id="clienteModal" class="modal">
-        <div class="modal-overlay"></div>
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">
-                        <i class="fas fa-user-edit"></i>
-                        <span id="clienteModalTitle">Cadastrar Cliente</span>
-                    </h3>
-                    <button class="close-modal" aria-label="Fechar">&times;</button>
-                </div>
-                <form id="clienteForm">
-                    <div class="modal-body">
-                        <input type="hidden" id="clienteId">
-                        <div class="form-group">
-                            <label for="clienteNome">Nome*</label>
-                            <input type="text" id="clienteNome" class="form-control" required>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="clienteDocumento">Documento</label>
-                                <input type="text" id="clienteDocumento" class="form-control">
-                            </div>
-                            <div class="form-group">
-                                <label for="clienteTelefone">Telefone</label>
-                                <input type="text" id="clienteTelefone" class="form-control">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="clienteEmail">E-mail</label>
-                            <input type="email" id="clienteEmail" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label for="clienteEndereco">Endereço</label>
-                            <textarea id="clienteEndereco" class="form-control" rows="2"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="clienteStatus">Status*</label>
-                            <select id="clienteStatus" class="form-control" required>
-                                <option value="true">Ativo</option>
-                                <option value="false">Inativo</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i>
-                            <span id="clienteModalSubmitText">Salvar</span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Desconto Produto -->
-    <div id="descontoModal" class="modal">
-        <div class="modal-overlay"></div>
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">
-                        <i class="fas fa-percentage"></i>
-                        <span id="descontoModalTitle">Cadastrar Desconto</span>
-                    </h3>
-                    <button class="close-modal" aria-label="Fechar">&times;</button>
-                </div>
-                <form id="descontoForm">
-                    <input type="hidden" id="descontoId">
-                    <input type="hidden" id="descontoProdutoId">
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label for="descontoIdentificador">Identificador*</label>
-                            <input type="text" id="descontoIdentificador" class="form-control" required>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="descontoQuantidadeMinima">Quantidade Mínima*</label>
-                                <input type="number" id="descontoQuantidadeMinima" class="form-control" step="0.001" min="0.001" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="descontoQuantidadeMaxima">Quantidade Máxima*</label>
-                                <input type="number" id="descontoQuantidadeMaxima" class="form-control" step="0.001" min="0.001" required>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="descontoValorUnitario">Valor Unitário com Desconto*</label>
-                                <input type="number" id="descontoValorUnitario" class="form-control" step="0.01" min="0" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="descontoValidoAte">Válido até</label>
-                                <input type="date" id="descontoValidoAte" class="form-control">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="descontoDescricao">Descrição</label>
-                            <textarea id="descontoDescricao" class="form-control" rows="2"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="descontoAtivo">Status*</label>
-                            <select id="descontoAtivo" class="form-control" required>
-                                <option value="true">Ativo</option>
-                                <option value="false">Inativo</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i>
-                            <span>Salvar</span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <!-- Modal Visualizar Produto -->
     <div id="visualizarProdutoModal" class="modal">
         <div class="modal-overlay"></div>
