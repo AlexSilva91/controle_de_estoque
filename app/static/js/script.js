@@ -6,13 +6,12 @@ document.addEventListener('DOMContentLoaded', function() {
   let itensVendaRetroativa = [];
   let pagamentosVendaRetroativa = [];
   let vendasDespesasChart, formasPagamentoChart, caixasChart, vendasDiariasChart;
+  let caixaIdAtual = null;
 
   // ===== CONFIGURAÇÃO DOS GRÁFICOS =====
-  // Configuração padrão para os gráficos no tema dark
   Chart.defaults.color = '#e0e0e0';
   Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
 
-  // Paleta de cores para os gráficos
   const chartColors = {
     green: 'rgba(102, 187, 106, 0.7)',
     greenBorder: 'rgba(102, 187, 106, 1)',
@@ -30,10 +29,8 @@ document.addEventListener('DOMContentLoaded', function() {
     tealBorder: 'rgba(38, 166, 154, 1)'
   };
 
-  // Função para formatar valores monetários nos gráficos
   function formatMoney(value) {
     if (typeof value === 'string') {
-      // Remove caracteres não numéricos e substitui vírgula por ponto
       value = value.replace(/[^\d,]/g, '').replace(',', '.');
     }
     return 'R$ ' + parseFloat(value).toLocaleString('pt-BR', {
@@ -62,7 +59,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!flashContainer) return;
     
     const flashId = `flash-${Date.now()}`;
-    
     const flashMessage = document.createElement('div');
     flashMessage.className = `flash-message ${type}`;
     flashMessage.id = flashId;
@@ -96,71 +92,57 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   async function fetchWithErrorHandling(url, options = {}) {
-      try {
-          const response = await fetch(url, options);
-          const contentType = response.headers.get('content-type');
-          
-          if (!response.ok) {
-              // Tentar parsear como JSON primeiro
-              if (contentType && contentType.includes('application/json')) {
-                  const data = await response.json();
-                  
-                  // Verificar se é um array de mensagens
-                  if (Array.isArray(data.message)) {
-                      data.message.forEach(msg => {
-                          showFlashMessage('error', msg);
-                      });
-                  } 
-                  // Verificar se é um objeto com mensagens aninhadas
-                  else if (data.message && typeof data.message === 'object') {
-                      for (const [key, value] of Object.entries(data.message)) {
-                          if (Array.isArray(value)) {
-                              value.forEach(msg => showFlashMessage('error', msg));
-                          } else {
-                              showFlashMessage('error', value);
-                          }
-                      }
-                  }
-                  // Mensagem única
-                  else if (data.message) {
-                      showFlashMessage('error', data.message);
-                  } 
-                  // Sem mensagem específica, usar status
-                  else {
-                      showFlashMessage('error', `HTTP error! status: ${response.status}`);
-                  }
-                  
-                  throw new Error(data.message || `HTTP error! status: ${response.status}`);
-              } 
-              // Se não for JSON, mostrar o texto da resposta
-              else {
-                  const text = await response.text();
-                  showFlashMessage('error', text || `HTTP error! status: ${response.status}`);
-                  throw new Error(text || `HTTP error! status: ${response.status}`);
-              }
-          }
-          
-          // Se a resposta foi bem-sucedida, tratar o conteúdo
-          if (!contentType || !contentType.includes('application/json')) {
-              const text = await response.text();
-              return text;
-          }
-          
+    try {
+      const response = await fetch(url, options);
+      const contentType = response.headers.get('content-type');
+      
+      if (!response.ok) {
+        if (contentType && contentType.includes('application/json')) {
           const data = await response.json();
-          return data;
           
-      } catch (error) {
-          console.error('Erro na requisição:', error);
-          
-          // Se o erro já foi tratado e as mensagens exibidas, apenas propagar
-          if (error.message && error.message.includes('HTTP error')) {
-              throw error;
+          if (Array.isArray(data.message)) {
+            data.message.forEach(msg => {
+              showFlashMessage('error', msg);
+            });
+          } else if (data.message && typeof data.message === 'object') {
+            for (const [key, value] of Object.entries(data.message)) {
+              if (Array.isArray(value)) {
+                value.forEach(msg => showFlashMessage('error', msg));
+              } else {
+                showFlashMessage('error', value);
+              }
+            }
+          } else if (data.message) {
+            showFlashMessage('error', data.message);
+          } else {
+            showFlashMessage('error', `HTTP error! status: ${response.status}`);
           }
           
-          // Tratar outros tipos de erro (como falha de rede)
-          showFlashMessage('error', error.message || 'Erro ao comunicar com o servidor');
-          throw error;
+          throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        } else {
+          const text = await response.text();
+          showFlashMessage('error', text || `HTTP error! status: ${response.status}`);
+          throw new Error(text || `HTTP error! status: ${response.status}`);
+        }
       }
+      
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return text;
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Erro na requisição:', error);
+      
+      if (error.message && error.message.includes('HTTP error')) {
+        throw error;
+      }
+      
+      showFlashMessage('error', error.message || 'Erro ao comunicar com o servidor');
+      throw error;
+    }
   }
   
   function formatPerfil(perfil) {
@@ -220,7 +202,6 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function setupModalEvents() {
-    // Fechar modal com botão de fechar
     document.querySelectorAll('.close-modal').forEach(btn => {
       btn.addEventListener('click', function() {
         const modal = this.closest('.modal');
@@ -230,7 +211,6 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
 
-    // Fechar modal clicando fora
     window.addEventListener('click', (e) => {
       if (e.target.classList.contains('modal-overlay')) {
         const modal = e.target.closest('.modal');
@@ -240,7 +220,6 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
 
-    // Processar mensagens flash existentes
     document.querySelectorAll('.flash-message').forEach(message => {
       const closeBtn = message.querySelector('.close-flash');
       if (closeBtn) {
@@ -261,7 +240,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const mobileMenuToggle = document.getElementById('mobileMenuToggle');
     const sidebar = document.querySelector('.sidebar');
 
-    // Alternar visibilidade do menu lateral
     if (mobileMenuToggle && sidebar) {
       mobileMenuToggle.addEventListener('click', function () {
         this.classList.toggle('active');
@@ -269,9 +247,8 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
 
-    // Fechar menu ao clicar em um item (para mobile)
     document.querySelectorAll('.sidebar-nav li').forEach(item => {
-      item.addEventListener('click', function () {
+      item.addEventListener('click', function() {
         if (window.innerWidth <= 768 && mobileMenuToggle && sidebar) {
           mobileMenuToggle.classList.remove('active');
           sidebar.classList.remove('active');
@@ -279,21 +256,18 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
 
-    // Navegação por abas
     const navItems = document.querySelectorAll('.sidebar-nav li');
     const tabContents = document.querySelectorAll('.tab-content');
     const pageTitle = document.getElementById('page-title');
     const breadcrumb = document.querySelector('.breadcrumb');
 
     navItems.forEach(item => {
-      item.addEventListener('click', function () {
-        // Fecha o menu lateral automaticamente (em qualquer resolução)
+      item.addEventListener('click', function() {
         if (mobileMenuToggle && sidebar && sidebar.classList.contains('active')) {
           mobileMenuToggle.classList.remove('active');
           sidebar.classList.remove('active');
         }
 
-        // Atualiza os itens ativos
         navItems.forEach(nav => nav.classList.remove('active'));
         tabContents.forEach(content => content.classList.remove('active'));
 
@@ -309,7 +283,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (pageTitle) pageTitle.textContent = tabName;
         if (breadcrumb) breadcrumb.textContent = `Home / ${tabName}`;
 
-        // Carregar dados da aba correspondente
         if (tabId === 'dashboard') loadDashboardData();
         if (tabId === 'clientes') loadClientesData();
         if (tabId === 'produtos') loadProdutosData();
@@ -321,7 +294,6 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
 
-    // Botão de logout
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
@@ -333,18 +305,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ===== DASHBOARD =====
-  const movimentacoesHeader = document.getElementById('movimentacoesHeader');
-    if (movimentacoesHeader) {
-      movimentacoesHeader.addEventListener('click', function(e) {
-        // Verifica se não foi clique em um botão de ação
-        if (!e.target.closest('.btn-icon')) {
-          toggleMovimentacoes();
-        }
-      });
-  }
-  // Função para alternar a visibilidade da seção de movimentações
   function toggleMovimentacoes() {
-    console.log('Função toggleMovimentacoes chamada'); // Adicione esta linha
     const body = document.getElementById('movimentacoesBody');
     const icon = document.querySelector('#movimentacoesHeader .toggle-icon i');
     
@@ -360,19 +321,8 @@ document.addEventListener('DOMContentLoaded', function() {
       icon.classList.add('fa-chevron-down');
     }
   }
-  const toggleHeaders = document.querySelectorAll('.details-table-section .toggle-table-header');
-
-  toggleHeaders.forEach(header => {
-    header.addEventListener('click', (e) => {
-      // Evita ação se o clique for em um botão dentro do header (caso tenha)
-      if (!e.target.closest('button')) {
-        toggleDetailsTable(header);
-      }
-    });
-  });
 
   function toggleDetailsTable(header) {
-    // O container que será exibido/oculto fica logo após o header
     const container = header.nextElementSibling;
     const icon = header.querySelector('.toggle-icon');
 
@@ -389,16 +339,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  // Função para atualizar os gráficos do dashboard
   async function updateCharts() {
     try {
-      // Destruir gráficos existentes se houver
       if (vendasDespesasChart) vendasDespesasChart.destroy();
       if (formasPagamentoChart) formasPagamentoChart.destroy();
       if (caixasChart) caixasChart.destroy();
       if (vendasDiariasChart) vendasDiariasChart.destroy();
 
-      // 1. Gráfico de Vendas vs Despesas (Mensal)
       const vendasMensaisData = await fetchWithErrorHandling('/admin/dashboard/vendas-mensais');
       if (vendasMensaisData.success) {
         const vendasDespesasCtx = document.getElementById('vendasDespesasChart').getContext('2d');
@@ -462,10 +409,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
       }
 
-      // 2. Gráfico de Formas de Pagamento (dos últimos 7 dias)
       const vendasDiariasData = await fetchWithErrorHandling('/admin/dashboard/vendas-diarias');
       if (vendasDiariasData.success) {
-        // Consolidar formas de pagamento dos últimos 7 dias
         const formasPagamentoMap = new Map();
         
         vendasDiariasData.dados.forEach(dia => {
@@ -538,7 +483,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
       }
 
-      // 3. Gráfico de Totais por Caixa
       if (vendasDiariasData?.success) {
         const caixasCtx = document.getElementById('caixasChart').getContext('2d');
         caixasChart = new Chart(caixasCtx, {
@@ -594,11 +538,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
       }
 
-      // 4. Gráfico de Vendas Diárias (últimos 7 dias)
       if (vendasDiariasData?.success) {
         const vendasDiariasCtx = document.getElementById('vendasDiariasChart').getContext('2d');
         
-        // Extrair dados para o gráfico
         const labels = vendasDiariasData.dados.map(item => item.data);
         const vendas = vendasDiariasData.dados.map(item => 
           parseFloat(item.total_vendas.replace(/[^\d,]/g, '').replace(',', '.'))
@@ -684,7 +626,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  // Função para carregar as movimentações
   async function loadMovimentacoes() {
     try {
       const movData = await fetchWithErrorHandling('/admin/dashboard/movimentacoes');
@@ -708,16 +649,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  // Função para atualizar as métricas do dashboard
   async function updateMetrics() {
     try {
       const metricsData = await fetchWithErrorHandling('/admin/dashboard/metrics');
       
       if (metricsData.success) {
-        // Atualizar cards de métricas
         const metricsContainer = document.querySelector('.metrics-grid');
         if (metricsContainer) {
-          // Criar os cards de métricas baseados nos dados retornados
           metricsContainer.innerHTML = `
             <div class="metric-card">
               <div class="metric-icon">
@@ -782,33 +720,43 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  // Função principal para carregar os dados do dashboard
   async function loadDashboardData() {
     try {
-      // Mostrar loading
       const loadingElement = document.getElementById('loadingIndicator');
       if (loadingElement) loadingElement.style.display = 'block';
       
-      // Atualizar métricas
       await updateMetrics();
-      
-      // Atualizar gráficos
       await updateCharts();
-      
-      // Carregar movimentações
       await loadMovimentacoes();
       
-      // Esconder loading
       if (loadingElement) loadingElement.style.display = 'none';
     } catch (error) {
       console.error('Erro ao carregar dados do dashboard:', error);
       showFlashMessage('error', 'Erro ao carregar dados do dashboard');
       
-      // Esconder loading em caso de erro
       const loadingElement = document.getElementById('loadingIndicator');
       if (loadingElement) loadingElement.style.display = 'none';
     }
   }
+
+  // Event Listeners para Dashboard
+  const movimentacoesHeader = document.getElementById('movimentacoesHeader');
+  if (movimentacoesHeader) {
+    movimentacoesHeader.addEventListener('click', function(e) {
+      if (!e.target.closest('.btn-icon')) {
+        toggleMovimentacoes();
+      }
+    });
+  }
+
+  const toggleHeaders = document.querySelectorAll('.details-table-section .toggle-table-header');
+  toggleHeaders.forEach(header => {
+    header.addEventListener('click', (e) => {
+      if (!e.target.closest('button')) {
+        toggleDetailsTable(header);
+      }
+    });
+  });
 
   // ===== CLIENTES =====
   async function loadClientesData() {
@@ -867,7 +815,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const clienteStatus = document.getElementById('clienteStatus');
     if (clienteStatus) clienteStatus.value = 'true';
 
-    // Ajustar título e botão
     const clienteModalTitle = document.getElementById('clienteModalTitle');
     if (clienteModalTitle) clienteModalTitle.textContent = 'Editar Cliente';
     
@@ -920,6 +867,65 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         openModal('confirmarExclusaoModal');
       });
+    });
+  }
+
+  // Event Listeners para Clientes
+  document.getElementById('searchCliente')?.addEventListener('input', loadClientesData);
+  document.getElementById('refreshClientes')?.addEventListener('click', loadClientesData);
+  document.getElementById('addCliente')?.addEventListener('click', () => {
+    const clienteForm = document.getElementById('clienteForm');
+    if (clienteForm) clienteForm.reset();
+    
+    if (document.getElementById('clienteId')) document.getElementById('clienteId').value = '';
+    if (document.getElementById('clienteStatus')) document.getElementById('clienteStatus').value = 'true';
+    
+    const clienteModalTitle = document.getElementById('clienteModalTitle');
+    if (clienteModalTitle) clienteModalTitle.textContent = 'Cadastrar Cliente';
+    
+    const clienteModalSubmitText = document.getElementById('clienteModalSubmitText');
+    if (clienteModalSubmitText) clienteModalSubmitText.textContent = 'Cadastrar';
+    openModal('clienteModal');
+  });
+
+  const clienteForm = document.getElementById('clienteForm');
+  if (clienteForm) {
+    clienteForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const clienteId = document.getElementById('clienteId')?.value || '';
+      const isEdit = clienteId !== '';
+
+      const formData = {
+        nome: document.getElementById('clienteNome')?.value || '',
+        documento: document.getElementById('clienteDocumento')?.value || '',
+        telefone: document.getElementById('clienteTelefone')?.value || '',
+        email: document.getElementById('clienteEmail')?.value || '',
+        endereco: document.getElementById('clienteEndereco')?.value || '',
+        ativo: document.getElementById('clienteStatus')?.value === 'true'
+      };
+
+      const url = isEdit ? `/admin/clientes/${clienteId}` : '/admin/clientes';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      try {
+        const response = await fetchWithErrorHandling(url, {
+          method: method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+
+        if (response.success) {
+          showFlashMessage('success', `Cliente ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
+          closeModal('clienteModal');
+          loadClientesData();
+        } else {
+          showFlashMessage('error', response.message || 'Erro ao salvar cliente');
+        }
+      } catch (error) {
+        console.error('Erro ao salvar cliente:', error);
+        showFlashMessage('error', 'Erro ao salvar cliente');
+      }
     });
   }
 
@@ -1006,13 +1012,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
   async function openEditarProdutoModal(produtoId) {
     try {
-      // Primeiro, buscamos os dados do produto
       const produtoResponse = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
       
       if (produtoResponse.success) {
         const produto = produtoResponse.produto;
         
-        // Depois, buscamos todos os descontos disponíveis
         const descontosResponse = await fetchWithErrorHandling('/admin/descontos');
         
         if (descontosResponse.success) {
@@ -1020,17 +1024,14 @@ document.addEventListener('DOMContentLoaded', function() {
           
           if (!formBody) return;
           
-          // Tratamento seguro para valor_unitario
           let valorUnitario = produto.valor_unitario;
           if (typeof valorUnitario === 'string') {
             valorUnitario = valorUnitario.replace(/[^\d,.-]/g, '').replace(',', '.');
           }
           
-          // Obter descontos atuais do produto
           const descontosAtuais = produto.descontos || [];
           const descontosAtuaisIds = descontosAtuais.map(d => d.id);
           
-          // Todos os descontos disponíveis
           const todosDescontos = descontosResponse.descontos || [];
           
           formBody.innerHTML = `
@@ -1179,7 +1180,6 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function setupDescontoEvents() {
-    // Adicionar desconto
     const btnAdicionarDesconto = document.getElementById('btnAdicionarDesconto');
     if (btnAdicionarDesconto) {
       btnAdicionarDesconto.addEventListener('click', function() {
@@ -1197,13 +1197,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('descontosContainer');
         if (!container) return;
         
-        // Verificar se o desconto já foi adicionado
         if (document.querySelector(`.desconto-item[data-id="${descontoId}"]`)) {
           showFlashMessage('warning', 'Este desconto já foi adicionado');
           return;
         }
         
-        // Criar novo item de desconto
         const item = document.createElement('div');
         item.className = 'desconto-item';
         item.dataset.id = descontoId;
@@ -1218,10 +1216,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         container.appendChild(item);
         
-        // Resetar seleção
         select.value = '';
         
-        // Adicionar evento de remoção
         const removeBtn = item.querySelector('.btn-remover-desconto');
         if (removeBtn) {
           removeBtn.addEventListener('click', function() {
@@ -1231,7 +1227,6 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
     
-    // Remover descontos existentes
     document.querySelectorAll('.btn-remover-desconto').forEach(btn => {
       btn.addEventListener('click', function() {
         const item = this.closest('.desconto-item');
@@ -1257,7 +1252,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const transferenciaUnidadeAtual = document.getElementById('transferenciaUnidadeAtual');
         if (transferenciaUnidadeAtual) transferenciaUnidadeAtual.textContent = produto.unidade;
         
-        // Resetar valores
         const transferenciaOrigem = document.getElementById('transferenciaOrigem');
         if (transferenciaOrigem) transferenciaOrigem.value = 'loja';
         
@@ -1314,6 +1308,186 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('Erro ao buscar estoque:', error);
       });
   }
+
+  // Event Listeners para Produtos
+  document.getElementById('searchProduto')?.addEventListener('input', loadProdutosData);
+  document.getElementById('refreshProdutos')?.addEventListener('click', loadProdutosData);
+  document.getElementById('addProduto')?.addEventListener('click', () => {
+    const produtoForm = document.getElementById('produtoForm');
+    if (produtoForm) produtoForm.reset();
+    
+    if (document.getElementById('produtoEstoqueTipo')) document.getElementById('produtoEstoqueTipo').value = 'loja';
+    if (document.getElementById('produtoUnidade')) document.getElementById('produtoUnidade').value = 'kg';
+    openModal('produtoModal');
+  });
+
+  const produtoForm = document.getElementById('produtoForm');
+  if (produtoForm) {
+    produtoForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const estoqueTipo = document.getElementById('produtoEstoqueTipo')?.value || 'loja';
+      const estoqueQuantidade = parseFloat(document.getElementById('produtoEstoque')?.value) || 0;
+      
+      const formData = {
+        codigo: document.getElementById('produtoCodigo')?.value || '',
+        nome: document.getElementById('produtoNome')?.value || '',
+        tipo: document.getElementById('produtoTipo')?.value || '',
+        marca: document.getElementById('produtoMarca')?.value || '',
+        unidade: document.getElementById('produtoUnidade')?.value || 'kg',
+        valor_unitario: parseFloat(document.getElementById('produtoValor')?.value) || 0,
+        estoque_loja: estoqueTipo === 'loja' ? estoqueQuantidade : 0,
+        estoque_deposito: estoqueTipo === 'deposito' ? estoqueQuantidade : 0,
+        estoque_fabrica: estoqueTipo === 'fabrica' ? estoqueQuantidade : 0
+      };
+
+      const valorCompra = parseFloat(document.getElementById('produtoValorCompra')?.value);
+      const valorTotal = parseFloat(document.getElementById('produtoValorTotalCompra')?.value);
+      const icms = parseFloat(document.getElementById('produtoICMS')?.value);
+      const estoqueMinimo = parseFloat(document.getElementById('produtoEstoqueMinimo')?.value);
+
+      if (!isNaN(valorCompra)) formData.valor_unitario_compra = valorCompra;
+      if (!isNaN(valorTotal)) formData.valor_total_compra = valorTotal;
+      if (!isNaN(icms)) formData.imcs = icms;
+      if (!isNaN(estoqueMinimo)) formData.estoque_minimo = estoqueMinimo;
+      
+      try {
+        const response = await fetchWithErrorHandling('/admin/produtos', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+        
+        if (response.success) {
+          showFlashMessage('success', 'Produto cadastrado com sucesso');
+          closeModal('produtoModal');
+          loadProdutosData();
+        } else {
+          showFlashMessage('error', response.message || 'Erro ao cadastrar produto');
+        }
+      } catch (error) {
+        console.error('Erro ao cadastrar produto:', error);
+        showFlashMessage('error', 'Erro ao cadastrar produto');
+      }
+    });
+  }
+
+  const editarProdutoForm = document.getElementById('editarProdutoForm');
+  if (editarProdutoForm) {
+    editarProdutoForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const produtoId = this.getAttribute('data-produto-id');
+      if (!produtoId) return;
+      
+      const descontos = [];
+      document.querySelectorAll('#descontosContainer .desconto-item').forEach(item => {
+        descontos.push(item.dataset.id);
+      });
+      
+      const formData = {
+        codigo: document.getElementById('editCodigo')?.value || '',
+        nome: document.getElementById('editNome')?.value || '',
+        tipo: document.getElementById('editTipo')?.value || '',
+        marca: document.getElementById('editMarca')?.value || '',
+        valor_unitario: parseFloat(document.getElementById('editValor')?.value) || 0,
+        valor_unitario_compra: parseFloat(document.getElementById('editValorCompra')?.value) || 0,
+        valor_total_compra: parseFloat(document.getElementById('editValorTotalCompra')?.value) || 0,
+        imcs: parseFloat(document.getElementById('editICMS')?.value) || 0,
+        estoque_loja: parseFloat(document.getElementById('editEstoqueLoja')?.value) || 0,
+        estoque_deposito: parseFloat(document.getElementById('editEstoqueDeposito')?.value) || 0,
+        estoque_fabrica: parseFloat(document.getElementById('editEstoqueFabrica')?.value) || 0,
+        estoque_minimo: parseFloat(document.getElementById('editEstoqueMinimo')?.value) || 0,
+        estoque_maximo: parseFloat(document.getElementById('editEstoqueMaximo')?.value) || 0,
+        ativo: document.getElementById('editAtivo')?.value === 'true',
+        descontos: descontos
+      };
+      
+      try {
+        const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+        
+        if (response.success) {
+          showFlashMessage('success', 'Produto atualizado com sucesso');
+          closeModal('editarProdutoModal');
+          loadProdutosData();
+        } else {
+          showFlashMessage('error', response.message || 'Erro ao atualizar produto');
+        }
+      } catch (error) {
+        console.error('Erro ao atualizar produto:', error);
+        showFlashMessage('error', 'Erro ao atualizar produto');
+      }
+    });
+  }
+
+  const transferenciaForm = document.getElementById('transferenciaForm');
+  if (transferenciaForm) {
+    transferenciaForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const produtoId = document.getElementById('transferenciaProdutoId')?.value;
+      const origem = document.getElementById('transferenciaOrigem')?.value;
+      const destino = document.getElementById('transferenciaDestino')?.value;
+      const quantidade = parseFloat(document.getElementById('transferenciaQuantidade')?.value || 0);
+      const valorUnitarioDestino = parseFloat(document.getElementById('transferenciaValorUnitarioDestino')?.value || 0);
+      const observacao = document.getElementById('transferenciaObservacao')?.value || '';
+      
+      if (origem === destino) {
+        showFlashMessage('error', 'Origem e destino não podem ser iguais');
+        return;
+      }
+      
+      if (quantidade <= 0 || isNaN(quantidade)) {
+        showFlashMessage('error', 'Informe uma quantidade válida');
+        return;
+      }
+      
+      if (valorUnitarioDestino <= 0 || isNaN(valorUnitarioDestino)) {
+        showFlashMessage('error', 'Informe um valor unitário válido');
+        return;
+      }
+      
+      try {
+        const response = await fetchWithErrorHandling('/admin/transferencias', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            produto_id: produtoId,
+            estoque_origem: origem,
+            estoque_destino: destino,
+            quantidade: quantidade,
+            valor_unitario_destino: valorUnitarioDestino,
+            observacao: observacao,
+            converter_unidade: false
+          })
+        });
+        
+        if (response.success) {
+          showFlashMessage('success', 'Transferência realizada com sucesso');
+          closeModal('transferenciaModal');
+          loadProdutosData();
+          loadMovimentacoesData();
+        } else {
+          showFlashMessage('error', response.message || 'Erro ao realizar transferência');
+        }
+      } catch (error) {
+        console.error('Erro ao realizar transferência:', error);
+        showFlashMessage('error', error.message || 'Erro ao realizar transferência');
+      }
+    });
+  }
+
+  document.getElementById('transferenciaOrigem')?.addEventListener('change', updateEstoqueDisponivel);
 
   // ===== VENDAS RETROATIVAS =====
   function limparFormularioRetroativa() {
@@ -1384,17 +1558,14 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function calcularTotaisRetroativa() {
-    // Calcular total da venda
     const totalVenda = itensVendaRetroativa.reduce((total, item) => total + item.valor_total, 0);
     document.getElementById('totalVendaRetroativa').textContent = formatarMoeda(totalVenda);
 
-    // Calcular total recebido (excluindo pagamentos a prazo)
     const totalRecebido = pagamentosVendaRetroativa
       .filter(p => p.forma_pagamento !== 'a_prazo')
       .reduce((total, pg) => total + pg.valor, 0);
     document.getElementById('totalRecebidoRetroativo').textContent = formatarMoeda(totalRecebido);
 
-    // Calcular troco (apenas se houver pagamento em dinheiro)
     const temDinheiro = pagamentosVendaRetroativa.some(p => p.forma_pagamento === 'dinheiro');
     const troco = temDinheiro ? totalRecebido - totalVenda : 0;
     document.getElementById('trocoRetroativo').textContent = formatarMoeda(Math.max(troco, 0));
@@ -1408,7 +1579,6 @@ document.addEventListener('DOMContentLoaded', function() {
         clientesVendaRetroativa = response.clientes;
         const select = document.getElementById('clienteRetroativo');
         
-        // Limpar e adicionar opções
         select.innerHTML = '<option value="">Selecione um cliente</option>';
         
         response.clientes.forEach(cliente => {
@@ -1418,7 +1588,6 @@ document.addEventListener('DOMContentLoaded', function() {
           select.appendChild(option);
         });
         
-        // Inicializar Select2
         $(select).select2({
           placeholder: "Selecione um cliente",
           width: '100%'
@@ -1438,7 +1607,6 @@ document.addEventListener('DOMContentLoaded', function() {
         produtosVendaRetroativa = response.produtos;
         const select = document.getElementById('produtoRetroativo');
         
-        // Limpar e adicionar opções
         select.innerHTML = '<option value="">Selecione um produto</option>';
         
         response.produtos.forEach(produto => {
@@ -1450,7 +1618,6 @@ document.addEventListener('DOMContentLoaded', function() {
           select.appendChild(option);
         });
         
-        // Inicializar Select2
         $(select).select2({
           placeholder: "Selecione um produto",
           width: '100%'
@@ -1470,7 +1637,6 @@ document.addEventListener('DOMContentLoaded', function() {
         caixasFechados = response.caixas;
         const select = document.getElementById('caixaRetroativo');
         
-        // Limpar e adicionar opções
         select.innerHTML = '<option value="">Selecione o caixa</option>';
         
         response.caixas.forEach(caixa => {
@@ -1504,7 +1670,6 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
     
-    // Verifica se o produto já foi adicionado
     const itemExistente = itensVendaRetroativa.find(item => item.produto_id == produtoId);
     if (itemExistente) {
       itemExistente.quantidade += quantidade;
@@ -1523,7 +1688,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     atualizarTabelaProdutosRetroativa();
     
-    // Limpa os campos
     produtoSelect.value = '';
     $(produtoSelect).trigger('change');
     quantidadeInput.value = '';
@@ -1974,12 +2138,11 @@ document.addEventListener('DOMContentLoaded', function() {
       showFlashMessage('error', 'Erro ao carregar dados do caixa');
     }
   }
-  let caixaIdAtual = null;
 
   async function loadCaixaFinanceiro(caixaId) {
     try {
       const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
-      caixaIdAtual = caixaId; // atualiza o id
+      caixaIdAtual = caixaId;
 
       if (response.success) {
         const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
@@ -2009,7 +2172,6 @@ document.addEventListener('DOMContentLoaded', function() {
             tableBody.appendChild(row);
           });
 
-          // Atualiza totais principais
           if (document.getElementById('caixaTotalEntradas')) {
             document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(totalEntradas);
           }
@@ -2020,7 +2182,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('caixaSaldo').textContent = formatarMoeda(totalEntradas - totalSaidas);
           }
 
-          // Atualiza totais por forma de pagamento
           const formasPagamento = response.vendas_por_forma_pagamento || {};
 
           document.getElementById('totalPixFabiano').textContent = formatarMoeda(formasPagamento.pix_fabiano || 0);
@@ -2039,7 +2200,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  // Evento para o botão abrir PDF
   document.getElementById('abrirPdfCaixa').addEventListener('click', () => {
     if (caixaIdAtual) {
       const url = `/admin/caixas/${caixaIdAtual}/financeiro/pdf`;
@@ -2048,6 +2208,9 @@ document.addEventListener('DOMContentLoaded', function() {
       alert('Nenhum caixa selecionado');
     }
   });
+
+  // Event Listeners para Caixas
+  document.getElementById('refreshData')?.addEventListener('click', loadDashboardData);
 
   // ===== MOVIMENTAÇÕES =====
   async function loadMovimentacoesData() {
@@ -2095,6 +2258,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
+  // Event Listeners para Movimentações
+  document.getElementById('filterMovimentacoes')?.addEventListener('click', loadMovimentacoesData);
+
   // ===== FINANCEIRO =====
   async function loadFinanceiroData() {
     try {
@@ -2109,7 +2275,6 @@ document.addEventListener('DOMContentLoaded', function() {
       const data = await fetchWithErrorHandling(url);
       
       if (data.success) {
-        // Atualizar resumo
         const receitasValue = document.getElementById('receitasValue');
         if (receitasValue) receitasValue.textContent = data.resumo.receitas;
         
@@ -2119,7 +2284,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const saldoValue = document.getElementById('saldoValue');
         if (saldoValue) saldoValue.textContent = data.resumo.saldo;
         
-        // Atualizar tabela
         const financeiroTable = document.querySelector('#financeiroTable tbody');
         if (financeiroTable) {
           financeiroTable.innerHTML = '';
@@ -2143,6 +2307,9 @@ document.addEventListener('DOMContentLoaded', function() {
       showFlashMessage('error', 'Erro ao carregar dados financeiros');
     }
   }
+
+  // Event Listeners para Financeiro
+  document.getElementById('filterFinanceiro')?.addEventListener('click', loadFinanceiroData);
 
   // ===== USUÁRIOS =====
   async function loadUsuariosData() {
@@ -2205,7 +2372,6 @@ document.addEventListener('DOMContentLoaded', function() {
   async function openEditarUsuarioModal(usuarioId = null) {
     const isEdit = usuarioId !== null;
     
-    // Configurar o modal conforme o modo (edição ou cadastro)
     const usuarioModalTitle = document.getElementById('usuarioModalTitle');
     if (usuarioModalTitle) {
       usuarioModalTitle.textContent = isEdit ? 'Editar Usuário' : 'Cadastrar Usuário';
@@ -2216,7 +2382,6 @@ document.addEventListener('DOMContentLoaded', function() {
       usuarioModalSubmitText.textContent = isEdit ? 'Atualizar' : 'Cadastrar';
     }
     
-    // Configurar campos de senha
     const senhaInput = document.getElementById('usuarioSenha');
     const confirmaSenhaInput = document.getElementById('usuarioConfirmaSenha');
 
@@ -2240,7 +2405,6 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
     
-    // Limpar formulário se for novo usuário
     if (!isEdit) {
       const usuarioForm = document.getElementById('usuarioForm');
       if (usuarioForm) usuarioForm.reset();
@@ -2249,7 +2413,6 @@ document.addEventListener('DOMContentLoaded', function() {
       if (usuarioIdField) usuarioIdField.value = '';
     }
     
-    // Se for edição, carregar os dados do usuário
     if (isEdit) {
       try {
         const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`);
@@ -2260,7 +2423,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const usuario = response.usuario;
         
-        // Preencher formulário
         if (document.getElementById('usuarioId')) document.getElementById('usuarioId').value = usuario.id;
         if (document.getElementById('usuarioNome')) document.getElementById('usuarioNome').value = usuario.nome;
         if (document.getElementById('usuarioCpf')) document.getElementById('usuarioCpf').value = usuario.cpf;
@@ -2268,13 +2430,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (document.getElementById('usuarioStatus')) document.getElementById('usuarioStatus').value = usuario.status ? 'true' : 'false';
         if (document.getElementById('usuarioObservacoes')) document.getElementById('usuarioObservacoes').value = usuario.observacoes || '';
         
-        // Limpar campos de senha
         if (document.getElementById('usuarioSenha')) document.getElementById('usuarioSenha').value = '';
         if (document.getElementById('usuarioConfirmaSenha')) document.getElementById('usuarioConfirmaSenha').value = '';
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
         showFlashMessage('error', error.message || 'Erro ao carregar dados do usuário');
-        return; // Não abrir o modal se houver erro
+        return;
       }
     }
     
@@ -2294,7 +2455,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (document.getElementById('visualizarUsuarioDataCadastro')) document.getElementById('visualizarUsuarioDataCadastro').textContent = usuario.data_cadastro || 'Data não disponível';
         if (document.getElementById('visualizarUsuarioObservacoes')) document.getElementById('visualizarUsuarioObservacoes').textContent = usuario.observacoes || 'Nenhuma observação';
         
-        // Configurar badge de perfil
         const perfilBadge = document.getElementById('visualizarUsuarioPerfil');
         if (perfilBadge) {
           perfilBadge.textContent = formatPerfil(usuario.tipo);
@@ -2302,7 +2462,6 @@ document.addEventListener('DOMContentLoaded', function() {
           perfilBadge.classList.add(`badge-${usuario.tipo.toLowerCase()}`);
         }
         
-        // Configurar badge de status
         const statusBadge = document.getElementById('visualizarUsuarioStatus');
         if (statusBadge) {
           statusBadge.textContent = usuario.status ? 'Ativo' : 'Inativo';
@@ -2381,6 +2540,67 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  // Event Listeners para Usuários
+  document.getElementById('searchUsuario')?.addEventListener('input', loadUsuariosData);
+  document.getElementById('refreshUsuarios')?.addEventListener('click', loadUsuariosData);
+  document.getElementById('addUsuario')?.addEventListener('click', () => openEditarUsuarioModal());
+
+  const usuarioForm = document.getElementById('usuarioForm');
+  if (usuarioForm) {
+    usuarioForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const isEdit = document.getElementById('usuarioId')?.value !== '';
+      const usuarioId = document.getElementById('usuarioId')?.value || '';
+      
+      const formData = {
+        nome: document.getElementById('usuarioNome')?.value || '',
+        cpf: document.getElementById('usuarioCpf')?.value || '',
+        tipo: document.getElementById('usuarioPerfil')?.value || '',
+        status: document.getElementById('usuarioStatus')?.value === 'true',
+        observacoes: document.getElementById('usuarioObservacoes')?.value || ''
+      };
+      
+      const senha = document.getElementById('usuarioSenha')?.value || '';
+      const confirmaSenha = document.getElementById('usuarioConfirmaSenha')?.value || '';
+      
+      if (senha || confirmaSenha) {
+        if (senha !== confirmaSenha) {
+          showFlashMessage('error', 'As senhas não coincidem');
+          return;
+        }
+        if (senha.length > 0) {
+          formData.senha = senha;
+          formData.confirma_senha = confirmaSenha;
+        }
+      }
+      
+      try {
+        const url = isEdit ? `/admin/usuarios/${usuarioId}` : '/admin/usuarios';
+        const method = isEdit ? 'PUT' : 'POST';
+        
+        const response = await fetchWithErrorHandling(url, {
+          method: method,
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+        
+        if (response.success) {
+          showFlashMessage('success', `Usuário ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
+          closeModal('usuarioModal');
+          loadUsuariosData();
+        } else {
+          showFlashMessage('error', response.message || `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
+        }
+      } catch (error) {
+        console.error(`Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário:`, error);
+        showFlashMessage('error', `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
+      }
+    });
+  }
+
   // ===== DESCONTOS =====
   async function loadDescontosData() {
     try {
@@ -2436,7 +2656,6 @@ document.addEventListener('DOMContentLoaded', function() {
       if (response.success) {
         const desconto = response.desconto;
 
-        // Preencher o formulário com os dados do desconto
         if (document.getElementById('descontoId')) document.getElementById('descontoId').value = desconto.id;
         if (document.getElementById('descontoProdutoId')) document.getElementById('descontoProdutoId').value = desconto.produto_id;
         if (document.getElementById('descontoIdentificador')) document.getElementById('descontoIdentificador').value = desconto.identificador;
@@ -2444,25 +2663,21 @@ document.addEventListener('DOMContentLoaded', function() {
         if (document.getElementById('descontoQuantidadeMaxima')) document.getElementById('descontoQuantidadeMaxima').value = desconto.quantidade_maxima;
         if (document.getElementById('descontoValorUnitario')) document.getElementById('descontoValorUnitario').value = limparValor(desconto.valor_unitario_com_desconto);
 
-        // Tratamento da data para o formato 'YYYY-MM-DD'
         if (desconto.valido_ate) {
           let dataValidoAte = desconto.valido_ate;
 
-          // Verificar se a data tem formato com hora e minuto
           if (dataValidoAte.includes(' ')) {
-            dataValidoAte = dataValidoAte.split(' ')[0]; // Pega apenas a parte 'YYYY-MM-DD'
+            dataValidoAte = dataValidoAte.split(' ')[0];
           }
 
-          // Definir o valor do input de data
           if (document.getElementById('descontoValidoAte')) document.getElementById('descontoValidoAte').value = dataValidoAte;
         } else {
-          if (document.getElementById('descontoValidoAte')) document.getElementById('descontoValidoAte').value = '';  // Se não houver data, limpa o campo
+          if (document.getElementById('descontoValidoAte')) document.getElementById('descontoValidoAte').value = '';
         }
 
         if (document.getElementById('descontoDescricao')) document.getElementById('descontoDescricao').value = desconto.descricao || '';
         if (document.getElementById('descontoAtivo')) document.getElementById('descontoAtivo').value = desconto.ativo ? 'true' : 'false';
 
-        // Atualizar título do modal
         const descontoModalTitle = document.getElementById('descontoModalTitle');
         if (descontoModalTitle) descontoModalTitle.textContent = 'Editar Desconto';
         openModal('descontoModal');
@@ -2499,279 +2714,21 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // ===== FORMULÁRIOS =====
-  // Formulário de cliente
-  const clienteForm = document.getElementById('clienteForm');
-  if (clienteForm) {
-    clienteForm.addEventListener('submit', async function(e) {
-      e.preventDefault();
+  // Event Listeners para Descontos
+  document.getElementById('searchDesconto')?.addEventListener('input', loadDescontosData);
+  document.getElementById('refreshDescontos')?.addEventListener('click', loadDescontosData);
+  document.getElementById('addDesconto')?.addEventListener('click', () => {
+    const descontoForm = document.getElementById('descontoForm');
+    if (descontoForm) descontoForm.reset();
+    
+    if (document.getElementById('descontoId')) document.getElementById('descontoId').value = '';
+    if (document.getElementById('descontoAtivo')) document.getElementById('descontoAtivo').value = 'true';
+    
+    const descontoModalTitle = document.getElementById('descontoModalTitle');
+    if (descontoModalTitle) descontoModalTitle.textContent = 'Cadastrar Desconto';
+    openModal('descontoModal');
+  });
 
-      const clienteId = document.getElementById('clienteId')?.value || '';
-      const isEdit = clienteId !== '';
-
-      const formData = {
-        nome: document.getElementById('clienteNome')?.value || '',
-        documento: document.getElementById('clienteDocumento')?.value || '',
-        telefone: document.getElementById('clienteTelefone')?.value || '',
-        email: document.getElementById('clienteEmail')?.value || '',
-        endereco: document.getElementById('clienteEndereco')?.value || '',
-        ativo: document.getElementById('clienteStatus')?.value === 'true'
-      };
-
-      const url = isEdit ? `/admin/clientes/${clienteId}` : '/admin/clientes';
-      const method = isEdit ? 'PUT' : 'POST';
-
-      try {
-        const response = await fetchWithErrorHandling(url, {
-          method: method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        });
-
-        if (response.success) {
-          showFlashMessage('success', `Cliente ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
-          closeModal('clienteModal');
-          loadClientesData();
-        } else {
-          showFlashMessage('error', response.message || 'Erro ao salvar cliente');
-        }
-      } catch (error) {
-        console.error('Erro ao salvar cliente:', error);
-        showFlashMessage('error', 'Erro ao salvar cliente');
-      }
-    });
-  }
-
-  // Formulário de produto
-  const produtoForm = document.getElementById('produtoForm');
-  if (produtoForm) {
-    produtoForm.addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const estoqueTipo = document.getElementById('produtoEstoqueTipo')?.value || 'loja';
-      const estoqueQuantidade = parseFloat(document.getElementById('produtoEstoque')?.value) || 0;
-      
-      const formData = {
-        codigo: document.getElementById('produtoCodigo')?.value || '',
-        nome: document.getElementById('produtoNome')?.value || '',
-        tipo: document.getElementById('produtoTipo')?.value || '',
-        marca: document.getElementById('produtoMarca')?.value || '',
-        unidade: document.getElementById('produtoUnidade')?.value || 'kg',
-        valor_unitario: parseFloat(document.getElementById('produtoValor')?.value) || 0,
-        estoque_loja: estoqueTipo === 'loja' ? estoqueQuantidade : 0,
-        estoque_deposito: estoqueTipo === 'deposito' ? estoqueQuantidade : 0,
-        estoque_fabrica: estoqueTipo === 'fabrica' ? estoqueQuantidade : 0
-      };
-
-      const valorCompra = parseFloat(document.getElementById('produtoValorCompra')?.value);
-      const valorTotal = parseFloat(document.getElementById('produtoValorTotalCompra')?.value);
-      const icms = parseFloat(document.getElementById('produtoICMS')?.value);
-      const estoqueMinimo = parseFloat(document.getElementById('produtoEstoqueMinimo')?.value);
-
-      if (!isNaN(valorCompra)) formData.valor_unitario_compra = valorCompra;
-      if (!isNaN(valorTotal)) formData.valor_total_compra = valorTotal;
-      if (!isNaN(icms)) formData.imcs = icms;
-      if (!isNaN(estoqueMinimo)) formData.estoque_minimo = estoqueMinimo;
-      
-      try {
-        const response = await fetchWithErrorHandling('/admin/produtos', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(formData)
-        });
-        
-        if (response.success) {
-          showFlashMessage('success', 'Produto cadastrado com sucesso');
-          closeModal('produtoModal');
-          loadProdutosData();
-        } else {
-          showFlashMessage('error', response.message || 'Erro ao cadastrar produto');
-        }
-      } catch (error) {
-        console.error('Erro ao cadastrar produto:', error);
-        showFlashMessage('error', 'Erro ao cadastrar produto');
-      }
-    });
-  }
-
-  // Formulário de edição de produto
-  const editarProdutoForm = document.getElementById('editarProdutoForm');
-  if (editarProdutoForm) {
-    editarProdutoForm.addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const produtoId = this.getAttribute('data-produto-id');
-      if (!produtoId) return;
-      
-      // Coletar descontos selecionados
-      const descontos = [];
-      document.querySelectorAll('#descontosContainer .desconto-item').forEach(item => {
-        descontos.push(item.dataset.id);
-      });
-      
-      const formData = {
-        codigo: document.getElementById('editCodigo')?.value || '',
-        nome: document.getElementById('editNome')?.value || '',
-        tipo: document.getElementById('editTipo')?.value || '',
-        marca: document.getElementById('editMarca')?.value || '',
-        valor_unitario: parseFloat(document.getElementById('editValor')?.value) || 0,
-        valor_unitario_compra: parseFloat(document.getElementById('editValorCompra')?.value) || 0,
-        valor_total_compra: parseFloat(document.getElementById('editValorTotalCompra')?.value) || 0,
-        imcs: parseFloat(document.getElementById('editICMS')?.value) || 0,
-        estoque_loja: parseFloat(document.getElementById('editEstoqueLoja')?.value) || 0,
-        estoque_deposito: parseFloat(document.getElementById('editEstoqueDeposito')?.value) || 0,
-        estoque_fabrica: parseFloat(document.getElementById('editEstoqueFabrica')?.value) || 0,
-        estoque_minimo: parseFloat(document.getElementById('editEstoqueMinimo')?.value) || 0,
-        estoque_maximo: parseFloat(document.getElementById('editEstoqueMaximo')?.value) || 0,
-        ativo: document.getElementById('editAtivo')?.value === 'true',
-        descontos: descontos
-      };
-      
-      try {
-        const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(formData)
-        });
-        
-        if (response.success) {
-          showFlashMessage('success', 'Produto atualizado com sucesso');
-          closeModal('editarProdutoModal');
-          loadProdutosData();
-        } else {
-          showFlashMessage('error', response.message || 'Erro ao atualizar produto');
-        }
-      } catch (error) {
-        console.error('Erro ao atualizar produto:', error);
-        showFlashMessage('error', 'Erro ao atualizar produto');
-      }
-    });
-  }
-
-  // Formulário de transferência SEM conversão
-  const transferenciaForm = document.getElementById('transferenciaForm');
-  if (transferenciaForm) {
-    transferenciaForm.addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const produtoId = document.getElementById('transferenciaProdutoId')?.value;
-      const origem = document.getElementById('transferenciaOrigem')?.value;
-      const destino = document.getElementById('transferenciaDestino')?.value;
-      const quantidade = parseFloat(document.getElementById('transferenciaQuantidade')?.value || 0);
-      const valorUnitarioDestino = parseFloat(document.getElementById('transferenciaValorUnitarioDestino')?.value || 0);
-      const observacao = document.getElementById('transferenciaObservacao')?.value || '';
-      
-      // Validações
-      if (origem === destino) {
-        showFlashMessage('error', 'Origem e destino não podem ser iguais');
-        return;
-      }
-      
-      if (quantidade <= 0 || isNaN(quantidade)) {
-        showFlashMessage('error', 'Informe uma quantidade válida');
-        return;
-      }
-      
-      if (valorUnitarioDestino <= 0 || isNaN(valorUnitarioDestino)) {
-        showFlashMessage('error', 'Informe um valor unitário válido');
-        return;
-      }
-      
-      try {
-        const response = await fetchWithErrorHandling('/admin/transferencias', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            produto_id: produtoId,
-            estoque_origem: origem,
-            estoque_destino: destino,
-            quantidade: quantidade,
-            valor_unitario_destino: valorUnitarioDestino,
-            observacao: observacao,
-            converter_unidade: false
-          })
-        });
-        
-        if (response.success) {
-          showFlashMessage('success', 'Transferência realizada com sucesso');
-          closeModal('transferenciaModal');
-          loadProdutosData();
-          loadMovimentacoesData();
-        } else {
-          showFlashMessage('error', response.message || 'Erro ao realizar transferência');
-        }
-      } catch (error) {
-        console.error('Erro ao realizar transferência:', error);
-        showFlashMessage('error', error.message || 'Erro ao realizar transferência');
-      }
-    });
-  }
-
-  // Formulário de usuário
-  const usuarioForm = document.getElementById('usuarioForm');
-  if (usuarioForm) {
-    usuarioForm.addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const isEdit = document.getElementById('usuarioId')?.value !== '';
-      const usuarioId = document.getElementById('usuarioId')?.value || '';
-      
-      const formData = {
-        nome: document.getElementById('usuarioNome')?.value || '',
-        cpf: document.getElementById('usuarioCpf')?.value || '',
-        tipo: document.getElementById('usuarioPerfil')?.value || '',
-        status: document.getElementById('usuarioStatus')?.value === 'true',
-        observacoes: document.getElementById('usuarioObservacoes')?.value || ''
-      };
-      
-      // Verificar se há senha sendo enviada (tanto para edição quanto cadastro)
-      const senha = document.getElementById('usuarioSenha')?.value || '';
-      const confirmaSenha = document.getElementById('usuarioConfirmaSenha')?.value || '';
-      
-      if (senha || confirmaSenha) {
-        if (senha !== confirmaSenha) {
-          showFlashMessage('error', 'As senhas não coincidem');
-          return;
-        }
-        if (senha.length > 0) { // Só adiciona se não estiver vazia
-          formData.senha = senha;
-          formData.confirma_senha = confirmaSenha;
-        }
-      }
-      
-      try {
-        const url = isEdit ? `/admin/usuarios/${usuarioId}` : '/admin/usuarios';
-        const method = isEdit ? 'PUT' : 'POST';
-        
-        const response = await fetchWithErrorHandling(url, {
-          method: method,
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(formData)
-        });
-        
-        if (response.success) {
-          showFlashMessage('success', `Usuário ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
-          closeModal('usuarioModal');
-          loadUsuariosData();
-        } else {
-          showFlashMessage('error', response.message || `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
-        }
-      } catch (error) {
-        console.error(`Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário:`, error);
-        showFlashMessage('error', `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
-      }
-    });
-  }
-
-  // Formulário de desconto
   const descontoForm = document.getElementById('descontoForm');
   if (descontoForm) {
     descontoForm.addEventListener('submit', async function(e) {
@@ -2835,64 +2792,6 @@ document.addEventListener('DOMContentLoaded', function() {
   setupNavigation();
   setupVendaRetroativaModal();
   
-  // Configurar eventos de busca
-  document.getElementById('searchCliente')?.addEventListener('input', loadClientesData);
-  document.getElementById('searchProduto')?.addEventListener('input', loadProdutosData);
-  document.getElementById('searchUsuario')?.addEventListener('input', loadUsuariosData);
-  document.getElementById('searchDesconto')?.addEventListener('input', loadDescontosData);
-  
-  // Configurar botões de atualização
-  document.getElementById('refreshData')?.addEventListener('click', loadDashboardData);
-  document.getElementById('refreshClientes')?.addEventListener('click', loadClientesData);
-  document.getElementById('refreshProdutos')?.addEventListener('click', loadProdutosData);
-  document.getElementById('refreshUsuarios')?.addEventListener('click', loadUsuariosData);
-  document.getElementById('refreshDescontos')?.addEventListener('click', loadDescontosData);
-  document.getElementById('filterFinanceiro')?.addEventListener('click', loadFinanceiroData);
-  document.getElementById('filterMovimentacoes')?.addEventListener('click', loadMovimentacoesData);
-  
-  // Botão para adicionar novo usuário
-  document.getElementById('addUsuario')?.addEventListener('click', () => openEditarUsuarioModal());
-  
-  // Botão para adicionar novo cliente
-  document.getElementById('addCliente')?.addEventListener('click', () => {
-    const clienteForm = document.getElementById('clienteForm');
-    if (clienteForm) clienteForm.reset();
-    
-    if (document.getElementById('clienteId')) document.getElementById('clienteId').value = '';
-    if (document.getElementById('clienteStatus')) document.getElementById('clienteStatus').value = 'true';
-    
-    const clienteModalTitle = document.getElementById('clienteModalTitle');
-    if (clienteModalTitle) clienteModalTitle.textContent = 'Cadastrar Cliente';
-    
-    const clienteModalSubmitText = document.getElementById('clienteModalSubmitText');
-    if (clienteModalSubmitText) clienteModalSubmitText.textContent = 'Cadastrar';
-    openModal('clienteModal');
-  });
-  
-  // Botão para adicionar novo produto
-  document.getElementById('addProduto')?.addEventListener('click', () => {
-    const produtoForm = document.getElementById('produtoForm');
-    if (produtoForm) produtoForm.reset();
-    
-    if (document.getElementById('produtoEstoqueTipo')) document.getElementById('produtoEstoqueTipo').value = 'loja';
-    if (document.getElementById('produtoUnidade')) document.getElementById('produtoUnidade').value = 'kg';
-    openModal('produtoModal');
-  });
-
-  // Botão para adicionar novo desconto
-  document.getElementById('addDesconto')?.addEventListener('click', () => {
-    const descontoForm = document.getElementById('descontoForm');
-    if (descontoForm) descontoForm.reset();
-    
-    if (document.getElementById('descontoId')) document.getElementById('descontoId').value = '';
-    if (document.getElementById('descontoAtivo')) document.getElementById('descontoAtivo').value = 'true';
-    
-    const descontoModalTitle = document.getElementById('descontoModalTitle');
-    if (descontoModalTitle) descontoModalTitle.textContent = 'Cadastrar Desconto';
-    openModal('descontoModal');
-  });
-  
-  // Confirmar exclusão
   document.getElementById('confirmarExclusaoBtn')?.addEventListener('click', async function() {
     const id = this.getAttribute('data-id');
     const type = this.getAttribute('data-type');
@@ -2935,7 +2834,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  // Carregar dados iniciais
   async function loadInitialData() {
     try {
       await Promise.all([
