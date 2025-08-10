@@ -42,13 +42,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await response.json();
                 
                 if (data.success) {
+                    // Verifica se precisa abrir caixa
                     if (data.needs_caixa) {
-                        showAberturaCaixaModal(data.valor_sugerido);
+                        // Se é primeiro login, mostra modal de abertura manual
+                        if (data.primeiro_login) {
+                            showAberturaCaixaModal(data.valor_sugerido || 0);
+                        } else {
+                            // Se houve erro na abertura automática, mostra modal com mensagem
+                            if (data.erro_abertura_automatica) {
+                                showFlashMessage(data.message, 'warning', flashContainer);
+                                showAberturaCaixaModal(data.valor_sugerido || 0);
+                            }
+                        }
                     } else {
-                        // Redireciona conforme o tipo de usuário
-                        window.location.href = data.user_type === 'admin' 
-                            ? '/admin/dashboard' 
-                            : '/operador/dashboard';
+                        // Se foi abertura automática, mostra mensagem de sucesso
+                        if (data.abertura_automatica) {
+                            showFlashMessage(data.message, 'success', flashContainer);
+                        }
+                        
+                        // Aguarda um momento para mostrar a mensagem e redireciona
+                        setTimeout(() => {
+                            window.location.href = data.user_type === 'admin' 
+                                ? '/admin/dashboard' 
+                                : '/operador/dashboard';
+                        }, data.abertura_automatica ? 2000 : 500);
                     }
                 } else {
                     showFlashMessage(data.message || 'Erro ao autenticar', 'error', flashContainer);
@@ -71,7 +88,7 @@ function showAberturaCaixaModal(valorSugerido = 0) {
     
     // Cria o modal
     const modalHTML = `
-        <div id="caixa-modal" class="modal">
+        <div id="caixa-modal" class="modal" style="display: block;">
             <div class="modal-content">
                 <div class="modal-header">
                     <h3>Abertura de Caixa</h3>
@@ -84,12 +101,15 @@ function showAberturaCaixaModal(valorSugerido = 0) {
                         <label for="valor-abertura">Valor de Abertura (R$):</label>
                         <input type="number" class="form-control" id="valor-abertura" 
                                value="${valorSugerido.toFixed(2)}" step="0.01" min="0" required>
+                        <small class="form-text text-muted">
+                            ${valorSugerido > 0 ? 'Valor sugerido baseado no último fechamento' : 'Informe o valor inicial do caixa'}
+                        </small>
                     </div>
                     
                     <div class="form-group">
                         <label for="observacao">Observação:</label>
                         <input type="text" class="form-control" id="observacao" 
-                               value="Abertura manual">
+                               value="Abertura manual" placeholder="Observação (opcional)">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -103,18 +123,44 @@ function showAberturaCaixaModal(valorSugerido = 0) {
     
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     
-    // Foca no campo de valor
-    document.getElementById('valor-abertura')?.focus();
+    // Foca no campo de valor após um breve delay para garantir que o modal foi renderizado
+    setTimeout(() => {
+        const valorInput = document.getElementById('valor-abertura');
+        if (valorInput) {
+            valorInput.focus();
+            valorInput.select(); // Seleciona o valor atual para facilitar a edição
+        }
+    }, 100);
     
     // Eventos do modal
-    document.querySelector('.close-modal')?.addEventListener('click', closeModal);
+    document.querySelector('#caixa-modal .close-modal')?.addEventListener('click', closeModal);
     document.getElementById('cancelar-abertura')?.addEventListener('click', closeModal);
     document.getElementById('confirmar-abertura')?.addEventListener('click', confirmarAbertura);
+    
+    // Permite fechar o modal clicando fora dele
+    document.getElementById('caixa-modal')?.addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeModal();
+        }
+    });
+    
+    // Permite confirmar com Enter no campo de valor
+    document.getElementById('valor-abertura')?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            confirmarAbertura();
+        }
+    });
 }
 
 function closeModal() {
     const modal = document.getElementById('caixa-modal');
-    if (modal) modal.remove();
+    if (modal) {
+        modal.style.animation = 'fadeOut 0.3s ease-out';
+        setTimeout(() => modal.remove(), 300);
+    }
+    
+    // Volta para a tela de login
+    window.location.href = '/';
 }
 
 async function confirmarAbertura() {
@@ -122,18 +168,22 @@ async function confirmarAbertura() {
     const observacaoInput = document.getElementById('observacao');
     const messageDiv = document.getElementById('caixa-message');
     const button = document.getElementById('confirmar-abertura');
+    const cancelButton = document.getElementById('cancelar-abertura');
     
-    const valor = parseFloat(valorInput.value);
-    const observacao = observacaoInput.value.trim();
+    const valor = parseFloat(valorInput?.value || 0);
+    const observacao = observacaoInput?.value?.trim() || 'Abertura manual';
     
+    // Validação
     if (isNaN(valor) || valor < 0) {
-        showMessage(messageDiv, 'Por favor, insira um valor válido para abertura.', 'error');
-        valorInput.focus();
+        showMessage(messageDiv, 'Por favor, insira um valor válido para abertura (maior ou igual a zero).', 'error');
+        valorInput?.focus();
         return;
     }
     
+    // Desabilita botões durante o processo
     button.disabled = true;
-    button.textContent = 'Abrindo...';
+    cancelButton.disabled = true;
+    button.textContent = 'Abrindo Caixa...';
     
     try {
         const response = await fetch('/abrir-caixa', {
@@ -152,75 +202,302 @@ async function confirmarAbertura() {
         const data = await response.json();
         
         if (!response.ok) {
-            // Se for erro 400 e já existir caixa, redireciona
-            if (response.status === 400 && data.caixa_id) {
+            // Se for erro 400 e já existir caixa aberto, redireciona para o dashboard
+            if (response.status === 400 && data.caixa_id && data.redirect_url) {
                 showMessage(messageDiv, data.message, 'info');
                 setTimeout(() => {
                     window.location.href = data.redirect_url;
-                }, 1500);
+                }, 2000);
                 return;
             }
+            
+            // Para outros tipos de erro
             throw new Error(data.message || `Erro HTTP ${response.status}`);
         }
         
         if (data.success) {
-            showMessage(messageDiv, data.message, 'success');
+            showMessage(messageDiv, data.message || 'Caixa aberto com sucesso!', 'success');
+            
+            // Aguarda um momento e redireciona
             setTimeout(() => {
-                window.location.href = data.redirect_url;
-            }, 1500);
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    // Fallback para dashboard do operador
+                    window.location.href = '/operador/dashboard';
+                }
+            }, 2000);
         } else {
-            showMessage(messageDiv, data.message, 'error');
+            showMessage(messageDiv, data.message || 'Erro ao abrir caixa', 'error');
+            button.disabled = false;
+            cancelButton.disabled = false;
+            button.textContent = 'Abrir Caixa';
         }
     } catch (error) {
-        console.error('Abertura de caixa error:', error);
-        showMessage(messageDiv, error.message, 'error');
-    } finally {
+        console.error('Erro na abertura de caixa:', error);
+        showMessage(messageDiv, error.message || 'Erro ao conectar com o servidor', 'error');
         button.disabled = false;
+        cancelButton.disabled = false;
         button.textContent = 'Abrir Caixa';
     }
 }
 
-// Função auxiliar para pegar cookies
+// Função auxiliar para pegar cookies (caso necessário)
 function getCookie(name) {
     const value = `; ${document.cookie}`;
     const parts = value.split(`; ${name}=`);
     if (parts.length === 2) return parts.pop().split(';').shift();
 }
 
-// Funções auxiliares
+// Funções auxiliares para mensagens
 function showFlashMessage(text, type, container) {
-    if (!container) return;
+    if (!container) {
+        console.warn('Container para flash message não encontrado');
+        return;
+    }
+    
+    // Remove mensagens antigas do mesmo tipo
+    const existingMessages = container.querySelectorAll(`.flash-${type}`);
+    existingMessages.forEach(msg => msg.remove());
     
     const message = document.createElement('div');
     message.className = `flash-message flash-${type}`;
-    message.textContent = text;
+    message.innerHTML = `
+        <span class="flash-text">${text}</span>
+        <span class="flash-close" onclick="this.parentElement.remove()">&times;</span>
+    `;
     
-    // Adiciona botão de fechar
-    const closeBtn = document.createElement('span');
-    closeBtn.innerHTML = '&times;';
-    closeBtn.style.marginLeft = '15px';
-    closeBtn.style.cursor = 'pointer';
-    closeBtn.onclick = () => message.remove();
-    
-    message.appendChild(closeBtn);
     container.appendChild(message);
     
-    setTimeout(() => {
-        message.style.animation = 'fadeOut 0.5s forwards';
-        message.addEventListener('animationend', () => message.remove());
-    }, 5000);
+    // Auto remove após 5 segundos (exceto para mensagens de erro)
+    if (type !== 'error') {
+        setTimeout(() => {
+            if (message.parentNode) {
+                message.style.animation = 'fadeOut 0.5s forwards';
+                message.addEventListener('animationend', () => {
+                    if (message.parentNode) message.remove();
+                });
+            }
+        }, 5000);
+    }
 }
 
 function showMessage(element, text, type) {
-    if (!element) return;
+    if (!element) {
+        console.warn('Elemento para mensagem não encontrado');
+        return;
+    }
     
     element.innerHTML = `
-        <div class="flash-message flash-${type}">
+        <div class="flash-message flash-${type}" style="margin-top: 15px;">
             ${text}
         </div>
     `;
     
-    setTimeout(() => {
-        element.innerHTML = '';
-    }, 5000);
+    // Auto limpa mensagens de sucesso e info
+    if (type === 'success' || type === 'info') {
+        setTimeout(() => {
+            if (element) element.innerHTML = '';
+        }, 5000);
+    }
+}
+
+// Adiciona estilos CSS para o modal e animações se não existirem
+if (!document.getElementById('login-modal-styles')) {
+    const styles = document.createElement('style');
+    styles.id = 'login-modal-styles';
+    styles.textContent = `
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 9999;
+            display: flex !important;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            max-width: 500px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            animation: slideIn 0.3s ease-out;
+            position: relative;
+            margin: 20px;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            color: #333;
+        }
+        
+        .close-modal {
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+            line-height: 1;
+        }
+        
+        .close-modal:hover {
+            color: #333;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        
+        .form-control:focus {
+            border-color: #007bff;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+        
+        .form-text {
+            font-size: 12px;
+            margin-top: 5px;
+            display: block;
+        }
+        
+        .text-muted {
+            color: #666;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background-color: #0056b3;
+        }
+        
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background-color: #545b62;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .flash-message {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .flash-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .flash-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .flash-warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .flash-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .flash-close {
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+            margin-left: 10px;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        
+        @keyframes slideIn {
+            from { 
+                transform: translateY(-30px) scale(0.95); 
+                opacity: 0; 
+            }
+            to { 
+                transform: translateY(0) scale(1); 
+                opacity: 1; 
+            }
+        }
+    `;
+    document.head.appendChild(styles);
 }

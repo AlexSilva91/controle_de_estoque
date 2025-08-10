@@ -103,16 +103,35 @@ def abrir_caixa(db: Session, operador_id: int, valor_abertura: Decimal, observac
         raise e
     
 def fechar_caixa(db: Session, operador_id: int, valor_fechamento: Decimal, observacao: str = "") -> entities.Caixa:
-    """Fecha o caixa atual com o valor de fechamento especificado"""
+    """
+    Fecha o caixa atual do operador específico com o valor de fechamento especificado.
+    
+    Args:
+        db (Session): Sessão do banco de dados
+        operador_id (int): ID do operador que está fechando o caixa
+        valor_fechamento (Decimal): Valor de fechamento informado pelo operador
+        observacao (str, optional): Observações do operador sobre o fechamento
+    
+    Returns:
+        entities.Caixa: O caixa fechado
+        
+    Raises:
+        ValueError: Se valor_fechamento <= 0, se nenhum caixa do operador estiver aberto,
+                   ou se houver erro no banco de dados
+    """
     if valor_fechamento <= 0:
         raise ValueError("Valor de fechamento deve ser maior que zero")
     
-    caixa = get_caixa_aberto(db)
+    # Busca o caixa aberto APENAS do operador específico
+    caixa = get_caixa_aberto(db, operador_id)
     if not caixa:
-        raise ValueError("Nenhum caixa aberto encontrado")
+        raise ValueError("Nenhum caixa aberto encontrado para este operador")
+    
+    # Validação adicional: verifica se o caixa realmente pertence ao operador
+    if caixa.operador_id != operador_id:
+        raise ValueError("Operador não autorizado a fechar este caixa")
     
     # Atualiza dados do caixa
-    caixa.operador_id = operador_id
     caixa.valor_fechamento = valor_fechamento
     caixa.data_fechamento = datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
     caixa.status = StatusCaixa.fechado
@@ -141,19 +160,21 @@ def fechar_caixa(db: Session, operador_id: int, valor_fechamento: Decimal, obser
         db.rollback()
         raise ValueError("Erro ao fechar caixa no banco de dados")
 
-def get_caixa_aberto(db: Session, operador_id: int = None):
+def get_caixa_aberto(db: Session, operador_id: int):
     """
     Retorna o caixa aberto para um operador específico.
-    Se operador_id for fornecido, busca apenas caixas desse operador.
-    Se operador_id for None, busca qualquer caixa aberto (comportamento antigo).
+    
+    Args:
+        db (Session): Sessão do banco de dados
+        operador_id (int): ID do operador (obrigatório)
+    
+    Returns:
+        Caixa: O caixa aberto do operador ou None se não encontrado
     """
-    query = db.query(Caixa).filter(Caixa.status == StatusCaixa.aberto)
-    
-    # IMPORTANTE: Filtra pelo operador específico se fornecido
-    if operador_id is not None:
-        query = query.filter(Caixa.operador_id == operador_id)
-    
-    return query.first()
+    return db.query(Caixa).filter(
+        Caixa.status == StatusCaixa.aberto,
+        Caixa.operador_id == operador_id
+    ).first()
 
 def get_caixa_by_id(db: Session, caixa_id: int) -> Optional[entities.Caixa]:
     """Retorna um caixa pelo ID"""
