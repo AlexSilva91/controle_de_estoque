@@ -873,15 +873,34 @@ def rota_estornar_venda(sale_id):
 @login_required
 @operador_required
 def gerar_pdf_vendas_dia():
-    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.pagesizes import portrait, mm
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageTemplate, Frame, NextPageTemplate, BaseDocTemplate, KeepTogether
+    from reportlab.platypus.flowables import PageBreak
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
     from io import BytesIO
     from flask import send_file, request, jsonify
     from datetime import datetime
     from sqlalchemy import func
+    import os
+
+    # Configuração para impressora térmica (80mm ~ 72mm de área imprimível)
+    LARGURA_IMPRESSORA = 72 * mm
+    ALTURA_IMPRESSORA = 1000 * mm
+    MARGEM = 2 * mm
+    TAMANHO_FONTE = 6
+    ESPACAMENTO = 1.2
+
+    try:
+        pdfmetrics.registerFont(TTFont('RobotoCondensed', 'RobotoCondensed-Regular.ttf'))
+        pdfmetrics.registerFont(TTFont('RobotoCondensed-Bold', 'RobotoCondensed-Bold.ttf'))
+        FONTE_NORMAL = 'RobotoCondensed'
+        FONTE_NEGRITO = 'RobotoCondensed-Bold'
+    except:
+        FONTE_NORMAL = 'Courier'
+        FONTE_NEGRITO = 'Courier-Bold'
 
     data_str = request.args.get('data')
     caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
@@ -895,277 +914,325 @@ def gerar_pdf_vendas_dia():
         except ValueError:
             return jsonify({'success': False, 'message': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
 
-    # Se não especificar data, usar data atual
     data_relatorio = data if data else datetime.now().date()
 
-    # --- Buscar dados das vendas ---
     resultado = obter_detalhes_vendas_dia(data, caixa_id, operador_id)
     if not resultado['success']:
         return jsonify(resultado), 400
-
     dados = resultado['data']
 
-    # --- Buscar métricas de pagamento por forma de pagamento (do dia atual) ---
-    inicio_dia = datetime.combine(data_relatorio, datetime.min.time())
-    fim_dia = datetime.combine(data_relatorio, datetime.max.time())
+    # Criar métricas de pagamento a partir da tabela PagamentoNotaFiscal
+    metricas_pagamento = {}
+    for venda in dados['vendas']:
+        # Verificar se há pagamentos registrados na tabela PagamentoNotaFiscal
+        if 'pagamentos' in venda and venda['pagamentos']:
+            for pagamento in venda['pagamentos']:
+                forma = pagamento['forma_pagamento']
+                valor = pagamento['valor']
 
-    pagamentos_por_forma = db.session.query(
-        PagamentoNotaFiscal.forma_pagamento,
-        func.sum(PagamentoNotaFiscal.valor).label('total_valor'),
-        func.count(PagamentoNotaFiscal.id).label('total_transacoes')
-    ).join(
-        NotaFiscal, PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
-    ).filter(
-        NotaFiscal.caixa_id == caixa_id,
-        NotaFiscal.operador_id == operador_id,
-        NotaFiscal.status == StatusNota.emitida,
-        PagamentoNotaFiscal.data >= inicio_dia,
-        PagamentoNotaFiscal.data <= fim_dia
-    ).group_by(
-        PagamentoNotaFiscal.forma_pagamento
-    ).all()
+                if forma not in metricas_pagamento:
+                    metricas_pagamento[forma] = {'transacoes': 0, 'total': 0}
 
-    # Converter para dicionário para facilitar o uso
-    metricas_pagamento = {
-        pagamento.forma_pagamento: {
-            'total': float(pagamento.total_valor),
-            'transacoes': pagamento.total_transacoes
-        }
-        for pagamento in pagamentos_por_forma
-    }
+                metricas_pagamento[forma]['transacoes'] += 1
+                metricas_pagamento[forma]['total'] += valor
+        else:
+            # Caso não haja pagamentos registrados, usar a forma de pagamento da venda
+            forma = venda['forma_pagamento']
+            total = venda['valor_total']
 
-    # --- Geração do PDF usando platypus ---
+            if forma not in metricas_pagamento:
+                metricas_pagamento[forma] = {'transacoes': 0, 'total': 0}
+
+            metricas_pagamento[forma]['transacoes'] += 1
+            metricas_pagamento[forma]['total'] += total
+
     buffer = BytesIO()
-    doc = SimpleDocTemplate(
+
+    class PDFComRodape(BaseDocTemplate):
+        def __init__(self, filename, **kw):
+            super().__init__(filename, **kw)
+            template = PageTemplate('normal', [
+                Frame(MARGEM, MARGEM, LARGURA_IMPRESSORA - 2 * MARGEM,
+                      ALTURA_IMPRESSORA - 2 * MARGEM - 15 * mm, id='F1')])
+            self.addPageTemplates(template)
+
+        def afterFlowable(self, flowable):
+            if hasattr(flowable, 'keepWithNext'):
+                self.drawFooter()
+
+        def drawFooter(self):
+            self.saveState()
+            footer = Paragraph(
+                f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')} • Página {self.page}",
+                ParagraphStyle(
+                    name='Rodape',
+                    fontName=FONTE_NORMAL,
+                    fontSize=TAMANHO_FONTE - 1,
+                    alignment=1,
+                    spaceBefore=5
+                )
+            )
+            footer_frame = Frame(MARGEM, 0, LARGURA_IMPRESSORA - 2 * MARGEM, 15 * mm)
+            footer_frame.addFromList([footer], self)
+            self.restoreState()
+
+    doc = PDFComRodape(
         buffer,
-        pagesize=A4,
-        leftMargin=30,
-        rightMargin=30,
-        topMargin=30,
-        bottomMargin=40
+        pagesize=(LARGURA_IMPRESSORA, ALTURA_IMPRESSORA),
+        leftMargin=MARGEM,
+        rightMargin=MARGEM,
+        topMargin=MARGEM,
+        bottomMargin=15 * mm
     )
     elements = []
-
-    # --- Estilos ---
     styles = getSampleStyleSheet()
-    normal = styles['Normal']
 
-    left_style = ParagraphStyle(name='Left', parent=normal, alignment=0, fontSize=11)
-    center_style = ParagraphStyle(name='Center', parent=normal, alignment=1, fontSize=11)
-    bold_center = ParagraphStyle(name='BoldCenter', parent=center_style, fontSize=13, leading=14, spaceAfter=10)
-    bold_left = ParagraphStyle(name='BoldLeft', parent=left_style, fontSize=12, leading=14, spaceAfter=8)
-    descricao_style = ParagraphStyle(name='DescricaoPequena', fontSize=8, leading=10, wordWrap='CJK')
-    wrap_style = ParagraphStyle(name='WrapCell', fontSize=9, leading=11, wordWrap='CJK', alignment=0)
-    estorno_style = ParagraphStyle(name='EstornoStyle', parent=bold_left, textColor=colors.red)
+    def criar_estilo(nome, **kwargs):
+        defaults = {
+            'fontName': FONTE_NORMAL,
+            'fontSize': TAMANHO_FONTE,
+            'leading': TAMANHO_FONTE * ESPACAMENTO,
+            'spaceAfter': 4,
+            'alignment': 0
+        }
+        defaults.update(kwargs)
+        return ParagraphStyle(nome, parent=styles['Normal'], **defaults)
+
+    estilos = {
+        'titulo': criar_estilo('Titulo', fontName=FONTE_NEGRITO, fontSize=10, alignment=1, spaceAfter=8),
+        'subtitulo': criar_estilo('Subtitulo', fontName=FONTE_NEGRITO, alignment=1, spaceAfter=6),
+        'normal': criar_estilo('Normal'),
+        'negrito': criar_estilo('Negrito', fontName=FONTE_NEGRITO),
+        'valor': criar_estilo('Valor', alignment=2),
+        'valor_negrito': criar_estilo('ValorNegrito', fontName=FONTE_NEGRITO, alignment=2),
+        'estorno': criar_estilo('Estorno', textColor=colors.black, backColor=colors.whitesmoke),
+        'rodape': criar_estilo('Rodape', fontSize=TAMANHO_FONTE - 1, alignment=1)
+    }
 
     def moeda_br(valor):
         return format_number(valor)
 
-    # --- Título ---
-    elements.append(Paragraph(f"RELATÓRIO DIÁRIO DETALHADO DE VENDAS", bold_center))
-    elements.append(Spacer(1, 8))
+    def criar_tabela_adaptavel(dados, colWidths=None, estilo=None, quebrar_linhas=True):
+        dados_formatados = []
+        for linha in dados:
+            linha_formatada = []
+            for i, celula in enumerate(linha):
+                if isinstance(celula, (int, float)):
+                    conteudo = moeda_br(celula) if i > 0 else str(celula)
+                    estilo_celula = estilos['valor_negrito'] if i > 0 else estilos['negrito']
+                    linha_formatada.append(Paragraph(conteudo, estilo_celula))
+                else:
+                    largura_coluna = colWidths[i] if colWidths else '*'
+                    max_chars = int(largura_coluna / (TAMANHO_FONTE * 0.6)) if isinstance(largura_coluna, (int, float)) else 30
+                    texto = str(celula)
+                    if quebrar_linhas and len(texto) > max_chars:
+                        texto = '<br/>'.join([texto[j:j + max_chars] for j in range(0, len(texto), max_chars)])
+                    estilo_celula = estilos['negrito'] if i == 0 and linha == dados[0] else estilos['normal']
+                    linha_formatada.append(Paragraph(texto, estilo_celula))
+            dados_formatados.append(linha_formatada)
 
-    # --- Informações do Cabeçalho ---
-    elements.append(Paragraph(f"Data: {data_relatorio.strftime('%d/%m/%Y')}", left_style))
-    elements.append(Paragraph(f"Caixa ID: {caixa_id}", left_style))
-    elements.append(Paragraph(f"Operador ID: {operador_id}", left_style))
-    elements.append(Paragraph(f"Valor de Abertura: {moeda_br(caixa.valor_abertura)}", left_style))
-    
+        if not colWidths:
+            num_colunas = len(dados[0])
+            colWidths = [LARGURA_IMPRESSORA / num_colunas] * num_colunas
+
+        tabela = Table(dados_formatados, colWidths=colWidths, hAlign='LEFT')
+        estilo_base = [
+            ('FONTNAME', (0, 0), (-1, -1), FONTE_NORMAL),
+            ('FONTSIZE', (0, 0), (-1, -1), TAMANHO_FONTE),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEADING', (0, 0), (-1, -1), TAMANHO_FONTE * ESPACAMENTO),
+            ('GRID', (0, 0), (-1, -1), 0.25, colors.black),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ]
+
+        if estilo:
+            estilo_base.extend(estilo)
+
+        if len(dados) > 1:
+            estilo_base.extend([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black), 
+                ('FONTNAME', (0, 0), (-1, 0), FONTE_NEGRITO),
+            ])
+
+        tabela.setStyle(TableStyle(estilo_base))
+        return KeepTogether(tabela)
+
+    # Cabeçalho
+    elements.append(Paragraph("RELATÓRIO DIÁRIO DE VENDAS", estilos['titulo']))
+    elements.append(Spacer(1, 10))
+    info_cabecalho = [
+        ["Data", data_relatorio.strftime('%d/%m/%Y')],
+        ["Caixa", f"#{caixa_id}"],
+        ["Operador", current_user.nome],
+        ["Abertura", moeda_br(caixa.valor_abertura)]
+    ]
     if caixa.valor_fechamento:
-        elements.append(Paragraph(f"Valor de Fechamento: {moeda_br(caixa.valor_fechamento)}", left_style))
+        info_cabecalho.append(["Fechamento", moeda_br(caixa.valor_fechamento)])
     if caixa.valor_confirmado:
-        elements.append(Paragraph(f"Valor Confirmado: {moeda_br(caixa.valor_confirmado)}", left_style))
-    
-    elements.append(Spacer(1, 12))
+        info_cabecalho.append(["Confirmado", moeda_br(caixa.valor_confirmado)])
+    elements.append(criar_tabela_adaptavel(
+        info_cabecalho,
+        colWidths=['30%', '70%'],
+        estilo=[
+            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (0, -1), FONTE_NEGRITO),
+        ],
+        quebrar_linhas=False
+    ))
+    elements.append(Spacer(1, 10))
 
-    # --- Cálculos do Resumo ---
+    # Resumo Financeiro
     total_vendas_positivas = sum(v['valor_total'] for v in dados['vendas'] if v['valor_total'] > 0)
     total_estornos = sum(abs(v['valor_total']) for v in dados['vendas'] if v['valor_total'] < 0)
-    total_liquido = total_vendas_positivas - total_estornos
-
-    # --- Tabela: Resumo Financeiro ---
-    elements.append(Paragraph("RESUMO FINANCEIRO", bold_center))
+    total_liquido = total_vendas_positivas - total_estornos - dados['total_saidas']
     
+    # Calcular total a prazo pendente
+    total_a_prazo_pendente = sum(
+        v['valor_total'] - sum(p['valor'] for p in v['pagamentos']) 
+        for v in dados['vendas'] 
+        if v['a_prazo']
+    )
+
+    elements.append(Paragraph("RESUMO FINANCEIRO", estilos['subtitulo']))
+    elements.append(Spacer(1, 5))
     dados_resumo = [
         ["Descrição", "Valor (R$)"],
-        ["Total de Vendas", moeda_br(total_vendas_positivas)],
-        ["Total de Estornos", moeda_br(total_estornos)],
-        ["Total de Descontos", moeda_br(dados['total_descontos'])],
-        ["Total de Entradas", moeda_br(dados['total_entradas'])],
-        ["Total de Saídas", moeda_br(dados['total_saidas'])],
-        ["Saldo Líquido", moeda_br(total_liquido)]
+        ["Total Vendas", total_vendas_positivas],
+        ["Total Estornos", total_estornos],
+        ["Total Descontos", dados['total_descontos']],
+        ["Total Entradas", total_vendas_positivas],
+        ["Total Saídas", dados['total_saidas']],
+        ["Total a Prazo Pendente", total_a_prazo_pendente],
+        ["Saldo Líquido", total_liquido]
     ]
+    elements.append(criar_tabela_adaptavel(
+        dados_resumo,
+        colWidths=['60%', '40%'],
+        estilo=[
+            ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, -1), (-1, -1), FONTE_NEGRITO),
+        ]
+    ))
+    elements.append(Spacer(1, 10))
 
-    tabela_resumo = Table(dados_resumo, colWidths=[220, 140], hAlign='CENTER')
-    tabela_resumo.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
-        ('TEXTCOLOR', (0, 2), (-1, 2), colors.red),  # Estornos em vermelho
-        ('FONTNAME', (0, 6), (-1, 6), 'Helvetica-Bold'),  # Saldo líquido em negrito
-    ]))
-    elements.append(tabela_resumo)
-    elements.append(Spacer(1, 16))
-
-    # --- NOVA SEÇÃO: Métricas de Pagamento por Forma ---
-    elements.append(Paragraph("PAGAMENTOS POR FORMA DE PAGAMENTO", bold_center))
-    
-    # Preparar dados da tabela de pagamentos
-    dados_pagamentos = [["Forma de Pagamento", "Qtd Transações", "Total (R$)"]]
-    
+    # Formas de Pagamento (agora usando dados da tabela PagamentoNotaFiscal)
+    elements.append(Paragraph("FORMAS DE PAGAMENTO", estilos['subtitulo']))
+    elements.append(Spacer(1, 5))
+    dados_pagamentos = [["Forma de Pagamento", "Qtd", "Total"]]
     total_geral_pagamentos = 0
     total_geral_transacoes = 0
-    
-    # Ordenar por valor total (decrescente)
-    formas_ordenadas = sorted(metricas_pagamento.items(), 
-                             key=lambda x: x[1]['total'], 
-                             reverse=True)
-    
+    formas_ordenadas = sorted(metricas_pagamento.items(), key=lambda x: x[1]['total'], reverse=True)
     for forma, dados_forma in formas_ordenadas:
-        # Converter enum para string mais legível
         forma_nome = forma.value if hasattr(forma, 'value') else str(forma)
         forma_nome = forma_nome.replace('_', ' ').title()
-        
         dados_pagamentos.append([
             forma_nome,
-            str(dados_forma['transacoes']),
-            moeda_br(dados_forma['total'])
+            dados_forma['transacoes'],
+            dados_forma['total']
         ])
-        
         total_geral_pagamentos += dados_forma['total']
         total_geral_transacoes += dados_forma['transacoes']
-    
-    # Adicionar linha de total
-    dados_pagamentos.append([
-        "TOTAL GERAL",
-        str(total_geral_transacoes),
-        moeda_br(total_geral_pagamentos)
-    ])
+    dados_pagamentos.append(["TOTAL GERAL", total_geral_transacoes, total_geral_pagamentos])
+    elements.append(criar_tabela_adaptavel(
+        dados_pagamentos,
+        colWidths=['50%', '20%', '30%'],
+        estilo=[
+            ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, -1), (-1, -1), FONTE_NEGRITO),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ]
+    ))
+    elements.append(Spacer(1, 15))
 
-    tabela_pagamentos = Table(dados_pagamentos, colWidths=[180, 90, 90], hAlign='CENTER')
-    tabela_pagamentos.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.lightblue),  # Linha de total
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),  # Linha de total em negrito
-        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
-        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-    ]))
-    elements.append(tabela_pagamentos)
-    elements.append(Spacer(1, 16))
-
-    # --- Detalhes das Vendas ---
-    elements.append(Paragraph("DETALHES DAS VENDAS", bold_center))
-    elements.append(Spacer(1, 8))
-
+    # Detalhes das Vendas
+    elements.append(Paragraph("DETALHES DAS VENDAS", estilos['subtitulo']))
+    elements.append(Spacer(1, 5))
     for i, venda in enumerate(dados['vendas']):
         is_estorno = venda['valor_total'] < 0
         valor_exibicao = abs(venda['valor_total'])
-
-        # Título da venda
-        if is_estorno:
-            titulo_venda = f"ESTORNO DA VENDA #{venda['id']}"
-            elements.append(Paragraph(titulo_venda, estorno_style))
-        else:
-            titulo_venda = f"VENDA #{venda['id']}"
-            elements.append(Paragraph(titulo_venda, bold_left))
-
-        # Informações da venda
+        titulo_venda = f"ESTORNO - VENDA #{venda['id']}" if is_estorno else f"VENDA #{venda['id']}"
+        elements.append(Paragraph(titulo_venda, estilos['estorno'] if is_estorno else estilos['negrito']))
+        elements.append(Spacer(1, 3))
+        
+        # Calcular valor pendente para vendas a prazo
+        valor_pendente = None
+        if venda['a_prazo']:
+            total_pago = sum(p['valor'] for p in venda['pagamentos'])
+            valor_pendente = venda['valor_total'] - total_pago
+        
         info_venda_data = [
-            ["Cliente:", venda['cliente']],
-            ["Data/Hora:", datetime.fromisoformat(venda['data']).strftime('%d/%m/%Y %H:%M')],
-            ["Operador:", venda['operador']],
-            ["Valor Total:", moeda_br(valor_exibicao)],
-            ["Desconto:", moeda_br(venda['valor_desconto'])],
-            ["Forma Pagamento:", venda['forma_pagamento']],
-            ["A Prazo:", "Sim" if venda['a_prazo'] else "Não"],
-            ["Tipo:", "ESTORNO" if is_estorno else "VENDA NORMAL"]
-        ]
-
-        tabela_info_venda = Table(info_venda_data, colWidths=[100, 200], hAlign='LEFT')
-        estilo_info_venda = [
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('GRID', (0, 0), (-1, -1), 0.25, colors.lightgrey),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP')
+            ["Data|Hora", datetime.fromisoformat(venda['data']).strftime('%d/%m/%Y %H:%M')],
+            ["Cliente", venda['cliente'] or "Não informado"],
+            ["Operador", venda['operador']],
+            ["Pagamento", venda['forma_pagamento']],
+            ["A Prazo", "Sim" if venda['a_prazo'] else "Não"],
+            ["Total", valor_exibicao],
+            ["Desconto", venda['valor_desconto']],
         ]
         
-        if is_estorno:
-            estilo_info_venda.append(('TEXTCOLOR', (0, 7), (1, 7), colors.red))
-            estilo_info_venda.append(('FONTNAME', (0, 7), (1, 7), 'Helvetica-Bold'))
-
-        tabela_info_venda.setStyle(TableStyle(estilo_info_venda))
-        elements.append(tabela_info_venda)
-        elements.append(Spacer(1, 8))
-
-        # Itens da venda
-        elements.append(Paragraph("ITENS:", ParagraphStyle(name='ItemsTitle', parent=left_style, fontSize=10, leading=12)))
+        # Adicionar valor pendente se for venda a prazo
+        if venda['a_prazo']:
+            info_venda_data.append(["Pendente", valor_pendente])
         
-        dados_itens = [["Produto", "Qtd", "V. Unit.", "V. Total", "Desconto"]]
+        elements.append(criar_tabela_adaptavel(
+            info_venda_data,
+            colWidths=['30%', '70%'],
+            estilo=[('FONTNAME', (0, 0), (0, -1), FONTE_NEGRITO)],
+            quebrar_linhas=True
+        ))
+        elements.append(Spacer(1, 5))
         
+        # Detalhes dos pagamentos se for venda a prazo
+        if venda['a_prazo'] and venda['pagamentos']:
+            elements.append(Paragraph("PAGAMENTOS REALIZADOS:", estilos['negrito']))
+            dados_pagamentos = [["Data", "Forma", "Valor"]]
+            for pagamento in venda['pagamentos']:
+                dados_pagamentos.append([
+                    datetime.fromisoformat(pagamento['data']).strftime('%d/%m/%Y %H:%M'),
+                    pagamento['forma_pagamento'],
+                    pagamento['valor']
+                ])
+            elements.append(criar_tabela_adaptavel(
+                dados_pagamentos,
+                colWidths=['40%', '30%', '30%'],
+                estilo=[('ALIGN', (2, 1), (2, -1), 'RIGHT')]
+            ))
+            elements.append(Spacer(1, 5))
+        
+        dados_itens = [["Produto", "Qtd", "Unit.", "Total"]]
         for item in venda['itens']:
             quantidade = -item['quantidade'] if is_estorno else item['quantidade']
             valor_total_item = -item['valor_total'] if is_estorno else item['valor_total']
-            desconto_item = -item['desconto'] if is_estorno and item['desconto'] else item['desconto']
-            
-            produto_paragraph = Paragraph(item['produto'], wrap_style)
-            
             dados_itens.append([
-                produto_paragraph,
-                f"{quantidade:.3f}",
-                moeda_br(item['valor_unitario']),
-                moeda_br(valor_total_item),
-                moeda_br(desconto_item) if desconto_item > 0 else "-"
+                item['produto'],
+                quantidade,
+                item['valor_unitario'],
+                valor_total_item
             ])
-
-        tabela_itens = Table(dados_itens, colWidths=[180, 50, 70, 70, 60], hAlign='CENTER')
-        estilo_itens = [
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-            ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP')
-        ]
-        
-        if is_estorno:
-            estilo_itens.append(('TEXTCOLOR', (0, 1), (-1, -1), colors.red))
-
-        tabela_itens.setStyle(TableStyle(estilo_itens))
-        elements.append(tabela_itens)
-        
-        # Espaçamento entre vendas (exceto na última)
+        elements.append(criar_tabela_adaptavel(
+            dados_itens,
+            colWidths=['40%', '15%', '20%', '25%'],
+            estilo=[('ALIGN', (1, 1), (-1, -1), 'RIGHT')]
+        ))
         if i < len(dados['vendas']) - 1:
-            elements.append(Spacer(1, 16))
+            elements.append(Spacer(1, 10))
 
-    # --- Área para assinaturas ---
-    elements.append(Spacer(1, 30))
-    
-    # Criar linhas de assinatura simples
-    assinatura_data = [
-        ["_" * 40, "_" * 40],
-        ["Assinatura do Operador", "Assinatura do Administrador"]
-    ]
-    
-    tabela_assinaturas = Table(assinatura_data, colWidths=[270, 270], hAlign='CENTER')
-    tabela_assinaturas.setStyle(TableStyle([
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
-        ('TOPPADDING', (0, 1), (-1, 1), 10),
+    # Rodapé
+    elements.append(Spacer(1, 15))
+    elements.append(Table([[""]], colWidths=['*'], style=[
+        ('LINEABOVE', (0, 0), (0, 0), 0.5, colors.black),
     ]))
-    elements.append(tabela_assinaturas)
+    elements.append(Spacer(1, 5))
+    elements.append(Paragraph("Operador: ________________________", estilos['negrito']))
+    elements.append(Spacer(1, 3))
+    elements.append(Paragraph("Administração: ________________________", estilos['negrito']))
+    elements.append(Spacer(1, 5))
+    elements.append(Paragraph(f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')}", estilos['rodape']))
 
-    # --- Build do documento ---
     doc.build(elements)
     buffer.seek(0)
-
     return send_file(
         buffer,
         as_attachment=False,
