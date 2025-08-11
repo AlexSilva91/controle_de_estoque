@@ -722,6 +722,263 @@ async function saveClient() {
     }
 }
 
+function viewClientDetails(clientId) {
+    // Verifica se o modal existe, se não, cria dinamicamente
+    let modal = document.getElementById('clientDetailsModal');
+    if (!modal) {
+        // Cria o modal se não existir
+        modal = document.createElement('div');
+        modal.id = 'clientDetailsModal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 800px;">
+                <div class="modal-header">
+                    <h3>Detalhes do Cliente</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="client-info-section">
+                        <div class="client-info-row">
+                            <span class="info-label">Nome:</span>
+                            <span id="clientName"></span>
+                        </div>
+                        <div class="client-info-row">
+                            <span class="info-label">Documento:</span>
+                            <span id="clientDocument"></span>
+                        </div>
+                        <div class="client-info-row">
+                            <span class="info-label">Limite de Crédito:</span>
+                            <span id="clientCreditLimit"></span>
+                        </div>
+                        <div class="client-info-row">
+                            <span class="info-label">Saldo Devedor:</span>
+                            <span id="clientBalance"></span>
+                        </div>
+                    </div>
+                    
+                    <h4>Compras Realizadas</h4>
+                    <div class="table-responsive">
+                        <table class="client-purchases-table">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Nota Fiscal</th>
+                                    <th>Valor Total</th>
+                                    <th>Status</th>
+                                    <th>Valor Pendente</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientPurchasesTable">
+                                <!-- Dados serão preenchidos via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="closeModal('clientDetailsModal')">Fechar</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    // Modal de pagamento (criado dinamicamente se não existir)
+    let paymentModal = document.getElementById('paymentModal');
+    if (!paymentModal) {
+        paymentModal = document.createElement('div');
+        paymentModal.id = 'paymentModal';
+        paymentModal.className = 'modal';
+        paymentModal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Registrar Pagamento</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="paymentForm">
+                        <input type="hidden" id="contaReceberId">
+                        <input type="hidden" id="notaFiscalId">
+                        <div class="form-group">
+                            <label for="valorPendente">Valor Pendente</label>
+                            <input type="text" class="form-control" id="valorPendente" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="valorPagamento">Valor do Pagamento *</label>
+                            <input type="number" step="0.01" class="form-control" id="valorPagamento" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="formaPagamento">Forma de Pagamento *</label>
+                            <select class="form-control" id="formaPagamento" required>
+                                <option value="">Selecione...</option>
+                                <option value="pix_fabiano">PIX Fabiano</option>
+                                <option value="pix_maquineta">PIX Maquineta</option>
+                                <option value="pix_edfrance">PIX EDFrance</option>
+                                <option value="pix_loja">PIX Loja</option>
+                                <option value="dinheiro">Dinheiro</option>
+                                <option value="cartao_credito">Cartão de Crédito</option>
+                                <option value="cartao_debito">Cartão de Débito</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="observacoes">Observações</label>
+                            <textarea class="form-control" id="observacoes" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="closeModal('paymentModal')">Cancelar</button>
+                    <button class="btn-primary" id="confirmPayment">Confirmar Pagamento</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(paymentModal);
+        
+        // Adiciona o event listener para o botão de confirmar pagamento
+        document.getElementById('confirmPayment').addEventListener('click', confirmPayment);
+    }
+
+    // Limpa o conteúdo anterior
+    document.getElementById('clientPurchasesTable').innerHTML = '<tr><td colspan="6" class="text-center"><div class="spinner"></div> Carregando...</td></tr>';
+    
+    // Mostra o modal
+    modal.style.display = 'flex';
+    currentOpenModal = modal;
+
+    // Faz a requisição para obter os detalhes do cliente
+    fetch(`/operador/api/cliente/detalhes/${clientId}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Erro ao carregar dados');
+            return response.json();
+        })
+        .then(data => {
+            if (!data.success) throw new Error(data.message || 'Erro nos dados');
+            
+            // Preenche dados do cliente
+            document.getElementById('clientName').textContent = data.cliente.nome;
+            document.getElementById('clientDocument').textContent = data.cliente.documento || 'Não informado';
+            document.getElementById('clientCreditLimit').textContent = formatCurrency(data.cliente.limite_credito);
+            document.getElementById('clientBalance').textContent = formatCurrency(data.saldo_devedor);
+            
+            // Preenche tabela de compras
+            const purchasesTable = document.getElementById('clientPurchasesTable');
+            purchasesTable.innerHTML = '';
+            
+            if (data.compras && data.compras.length > 0) {
+                data.compras.forEach(compra => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${new Date(compra.data_emissao).toLocaleDateString('pt-BR')}</td>
+                        <td>${compra.id}</td>
+                        <td>${formatCurrency(compra.valor_total)}</td>
+                        <td>${compra.a_prazo ? 'A Prazo' : 'À Vista'}</td>
+                        <td>${compra.valor_pendente > 0 ? formatCurrency(compra.valor_pendente) : '<span class="badge-success">Quitado</span>'}</td>
+                        <td>
+                            ${compra.valor_pendente > 0 ? 
+                                `<button class="btn-action btn-pay" onclick="openPaymentModal(${compra.conta_id}, ${compra.id}, ${compra.valor_pendente})">
+                                    <i class="fas fa-money-bill-wave"></i> Pagar
+                                </button>` : 
+                                '<span class="badge-success">Quitado</span>'
+                            }
+                        </td>
+                    `;
+                    purchasesTable.appendChild(row);
+                });
+            } else {
+                purchasesTable.innerHTML = '<tr><td colspan="6" class="text-center">Nenhuma compra encontrada</td></tr>';
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            document.getElementById('clientPurchasesTable').innerHTML = `<tr><td colspan="6" class="text-center text-danger">${error.message}</td></tr>`;
+            showMessage('Erro ao carregar detalhes do cliente: ' + error.message, 'error');
+        });
+}
+
+// Função para abrir o modal de pagamento
+function openPaymentModal(contaId, notaFiscalId, valorPendente) {
+    // Formata o valor
+    const valorFormatado = parseFloat(valorPendente).toFixed(2);
+    
+    // Preenche os campos
+    document.getElementById('contaReceberId').value = contaId;
+    document.getElementById('notaFiscalId').value = notaFiscalId;
+    document.getElementById('valorPendente').value = formatCurrency(valorPendente);
+    document.getElementById('valorPagamento').value = valorFormatado;
+    document.getElementById('formaPagamento').value = '';
+    document.getElementById('observacoes').value = '';
+    
+    // Abre o modal
+    const paymentModal = document.getElementById('paymentModal');
+    paymentModal.style.display = 'flex';
+    currentOpenModal = paymentModal;
+}
+
+// Função para confirmar o pagamento
+function confirmPayment() {
+    const contaId = document.getElementById('contaReceberId').value;
+    const notaFiscalId = document.getElementById('notaFiscalId').value;
+    const valorPagamento = parseFloat(document.getElementById('valorPagamento').value);
+    const formaPagamento = document.getElementById('formaPagamento').value;
+    const observacoes = document.getElementById('observacoes').value;
+    
+    // Validações
+    if (!formaPagamento) {
+        showMessage('Selecione uma forma de pagamento', 'error');
+        return;
+    }
+    
+    if (isNaN(valorPagamento) || valorPagamento <= 0) {
+        showMessage('Valor do pagamento inválido', 'error');
+        return;
+    }
+    
+    // Mostra loading
+    const btn = document.getElementById('confirmPayment');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
+    btn.disabled = true;
+    
+    // Envia os dados
+    fetch('/operador/api/cliente/registrar-pagamento', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            conta_id: contaId,
+            nota_fiscal_id: notaFiscalId,
+            valor_pago: valorPagamento,
+            forma_pagamento: formaPagamento,
+            observacoes: observacoes
+        })
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Erro na requisição');
+        return response.json();
+    })
+    .then(data => {
+        if (!data.success) throw new Error(data.message || 'Erro ao registrar pagamento');
+        
+        showMessage('Pagamento registrado com sucesso!', 'success');
+        closeModal('paymentModal');
+        
+        // Recarrega os dados do cliente
+        const clientId = document.querySelector('.client-row[data-client-id]').getAttribute('data-client-id');
+        if (clientId) {
+            viewClientDetails(clientId);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        showMessage(error.message || 'Erro ao registrar pagamento', 'error');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
 // ==================== FUNÇÕES DE PRODUTOS ====================
 async function loadProducts(forceUpdate = false) {
     try {

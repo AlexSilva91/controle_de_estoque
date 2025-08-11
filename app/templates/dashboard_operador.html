@@ -796,7 +796,102 @@
             </div>
         </div>
     </div>
+    <!-- Modal de Detalhes do Cliente -->
+    <div id="clientDetailsModal" class="modal fade" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Detalhes do Cliente</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <h6><strong>Nome:</strong> <span id="clientName"></span></h6>
+                            <h6><strong>Documento:</strong> <span id="clientDocument"></span></h6>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><strong>Limite de Crédito:</strong> R$ <span id="clientCreditLimit"></span></h6>
+                            <h6><strong>Saldo Devedor:</strong> R$ <span id="clientBalance"></span></h6>
+                        </div>
+                    </div>
+                    
+                    <h5 class="mb-3">Compras Realizadas</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Nota Fiscal</th>
+                                    <th>Valor Total</th>
+                                    <th>Status</th>
+                                    <th>Valor Pendente</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientPurchasesTable">
+                                <!-- Dados serão preenchidos via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <!-- Modal de Pagamento -->
+    <div id="paymentModal" class="modal fade" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Registrar Pagamento</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="paymentForm">
+                        <input type="hidden" id="contaReceberId">
+                        <input type="hidden" id="notaFiscalId">
+                        <div class="form-group">
+                            <label for="valorPendente">Valor Pendente</label>
+                            <input type="text" class="form-control" id="valorPendente" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="valorPagamento">Valor do Pagamento *</label>
+                            <input type="number" step="0.01" class="form-control" id="valorPagamento" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="formaPagamento">Forma de Pagamento *</label>
+                            <select class="form-control" id="formaPagamento" required>
+                                <option value="">Selecione...</option>
+                                <option value="pix_fabiano">PIX Fabiano</option>
+                                <option value="pix_maquineta">PIX Maquineta</option>
+                                <option value="pix_edfrance">PIX EDFrance</option>
+                                <option value="pix_loja">PIX Loja</option>
+                                <option value="dinheiro">Dinheiro</option>
+                                <option value="cartao_credito">Cartão de Crédito</option>
+                                <option value="cartao_debito">Cartão de Débito</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="observacoes">Observações</label>
+                            <textarea class="form-control" id="observacoes" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="confirmPayment">Confirmar Pagamento</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <!-- Notification -->
     <div class="notification" id="notification">
         <div class="notification-icon">

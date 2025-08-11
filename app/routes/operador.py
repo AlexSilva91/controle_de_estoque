@@ -1325,7 +1325,123 @@ def api_get_saldo():
     except Exception as e:
         app.logger.error(f"Erro ao calcular saldo para operador {current_user.id}: {str(e)}")
         return jsonify({'error': str(e)}), 500
-    
+
+
+@operador_bp.route('/api/cliente/detalhes/<int:cliente_id>', methods=['GET'])
+@login_required
+@operador_required
+def obter_detalhes_cliente(cliente_id):
+    try:
+        cliente = Cliente.query.get_or_404(cliente_id)
+        
+        # Obtém todas as contas a receber do cliente
+        contas_receber = ContaReceber.query.filter_by(cliente_id=cliente_id).all()
+        
+        # Obtém todas as notas fiscais do cliente
+        notas_fiscais = NotaFiscal.query.filter_by(cliente_id=cliente_id).order_by(NotaFiscal.data_emissao.desc()).all()
+        
+        # Formata os dados para resposta
+        compras = []
+        for nota in notas_fiscais:
+            conta = next((c for c in contas_receber if c.nota_fiscal_id == nota.id), None)
+            compras.append({
+                'id': nota.id,
+                'data_emissao': nota.data_emissao.isoformat(),
+                'valor_total': float(nota.valor_total),
+                'a_prazo': nota.a_prazo,
+                'valor_pendente': float(conta.valor_aberto) if conta else 0.0,
+                'conta_id': conta.id if conta else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'cliente': {
+                'id': cliente.id,
+                'nome': cliente.nome,
+                'documento': cliente.documento,
+                'telefone': cliente.telefone,
+                'email': cliente.email,
+                'endereco': cliente.endereco,
+                'limite_credito': float(cliente.limite_credito)
+            },
+            'saldo_devedor': float(sum(conta.valor_aberto for conta in contas_receber)),
+            'compras': compras
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@operador_bp.route('/api/cliente/registrar-pagamento', methods=['POST'])
+@login_required
+@operador_required
+def registrar_pagamento_cliente():
+    try:
+        data = request.get_json()
+        conta_id = data.get('conta_id')
+        nota_fiscal_id = data.get('nota_fiscal_id')
+        valor_pago = Decimal(data.get('valor_pago'))
+        forma_pagamento = data.get('forma_pagamento')
+        observacoes = data.get('observacoes', '')
+        
+        # Validações
+        if not all([conta_id, nota_fiscal_id, valor_pago, forma_pagamento]):
+            return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
+            
+        conta = ContaReceber.query.get_or_404(conta_id)
+        
+        if valor_pago <= 0:
+            return jsonify({'success': False, 'message': 'Valor deve ser positivo'}), 400
+            
+        if valor_pago > conta.valor_aberto:
+            return jsonify({'success': False, 'message': 'Valor excede o devido'}), 400
+            
+        # Obtém caixa aberto
+        caixa = Caixa.query.filter_by(
+            operador_id=current_user.id,
+            status=StatusCaixa.aberto
+        ).first()
+        
+        if not caixa:
+            return jsonify({'success': False, 'message': 'Nenhum caixa aberto encontrado'}), 400
+        
+        # Registra pagamento
+        conta.registrar_pagamento(
+            valor_pago=valor_pago,
+            forma_pagamento=forma_pagamento,
+            caixa_id=caixa.id,
+            observacoes=observacoes
+        )
+        
+        # Cria registro financeiro
+        financeiro = Financeiro(
+            tipo=TipoMovimentacao.entrada,
+            categoria=CategoriaFinanceira.venda,
+            valor=valor_pago,
+            conta_receber_id=conta.id,
+            cliente_id=conta.cliente_id,
+            caixa_id=caixa.id,
+            descricao=f"Pagamento conta #{conta.id}"
+        )
+        db.session.add(financeiro)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Pagamento registrado com sucesso',
+            'novo_saldo': float(conta.valor_aberto)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+        
+        
 # ===== API ABERTURA DE CAIXA =====
 @operador_bp.route('/api/abrir-caixa', methods=['POST'])
 @login_required
