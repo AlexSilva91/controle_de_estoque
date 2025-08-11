@@ -16,6 +16,7 @@ let activeSearchDropdown = null;
 let clientSearchTimeout;
 let productSearchTimeout;
 let currentOpenModal = null;
+let balanceUpdateInterval = null;
 
 // ==================== ELEMENTOS DOM ====================
 const openingBalanceLabel = document.getElementById('opening-balance')?.querySelector('.balance-value');
@@ -171,6 +172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.addEventListener('keydown', handleKeyDown);
         setInterval(() => loadProducts(true), 10000);
         setInterval(() => updateBalance(true), 10000);
+        startBalanceAutoUpdate();
     } catch (error) {
         console.error('Erro na inicialização:', error);
         showMessage('Erro ao inicializar o sistema', 'error');
@@ -1672,7 +1674,8 @@ async function voidSale() {
         const result = await response.json();
         showMessage(`Venda #${saleId} estornada com sucesso!`, 'success');
         closeModal('void-sale-modal');
-        loadDaySales();
+        await updateBalance(true);
+        await loadDaySales();
     } catch (error) {
         console.error('Erro ao estornar venda:', error);
         showMessage(error.message, 'error');
@@ -2012,6 +2015,15 @@ async function checkCaixaStatus() {
     }
 }
 
+// Função para iniciar a atualização periódica do saldo
+function startBalanceAutoUpdate() {
+    // Atualiza imediatamente e depois a cada 10 segundos
+    updateBalance(true);
+    if (balanceUpdateInterval) clearInterval(balanceUpdateInterval);
+    balanceUpdateInterval = setInterval(() => updateBalance(true), 10000);
+}
+
+// Função modificada para atualizar o saldo
 async function updateBalance(forceUpdate = false) {
     try {
         const url = forceUpdate 
@@ -2022,6 +2034,7 @@ async function updateBalance(forceUpdate = false) {
             ...preventCacheConfig,
             method: 'GET'
         });
+        
         if (!response.ok) throw new Error('Erro ao carregar saldo');
         const data = await response.json();
         
@@ -2031,6 +2044,7 @@ async function updateBalance(forceUpdate = false) {
             return;
         }
 
+        // Atualiza os valores na interface
         if (balanceVisible) {
             if (openingBalanceLabel) openingBalanceLabel.textContent = formatCurrency(data.valor_abertura);
             if (currentBalanceLabel) currentBalanceLabel.textContent = data.saldo_formatado || 'R$ 0,00';
@@ -2038,6 +2052,13 @@ async function updateBalance(forceUpdate = false) {
             if (openingBalanceLabel) openingBalanceLabel.textContent = '******';
             if (currentBalanceLabel) currentBalanceLabel.textContent = '******';
         }
+        
+        // Atualiza o saldo atual na variável global
+        currentBalance = data.saldo || 0;
+        
+        // Dispara evento personalizado para notificar outras partes do sistema
+        document.dispatchEvent(new CustomEvent('balanceUpdated', { detail: data }));
+        
     } catch (error) {
         console.error('Error updating balance:', error);
         if (openingBalanceLabel) openingBalanceLabel.textContent = 'Erro';
@@ -2372,6 +2393,7 @@ function setupEventListeners() {
             }
         });
     }
+    document.addEventListener('balanceUpdated', (event) => console.log('Saldo atualizado:', event.detail));
     document.getElementById('day-sales-tab')?.addEventListener('click', loadDaySales);
     if (amountReceivedInput) {
         amountReceivedInput.addEventListener('input', calculateSaleTotal);
