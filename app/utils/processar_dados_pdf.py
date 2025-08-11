@@ -45,7 +45,7 @@ def processar_venda(session, dados):
             # Verifica validade
             if d.valido_ate:
                 print(f"     ⏳ Validade: {d.valido_ate}")
-                if datetime.utcnow() > d.valido_ate:
+                if datetime.now() > d.valido_ate:
                     print("     ❌ Desconto expirado.")
                     continue
 

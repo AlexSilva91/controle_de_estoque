@@ -972,7 +972,7 @@ def api_registrar_venda_retroativa():
         # Validar data de emissão
         try:
             data_emissao = datetime.strptime(dados_venda['data_emissao'], '%Y-%m-%d %H:%M:%S')
-            if data_emissao > datetime.utcnow():
+            if data_emissao > datetime.now():
                 return jsonify({'success': False, 'message': 'Data de emissão não pode ser futura'}), 400
         except ValueError:
             return jsonify({'success': False, 'message': 'Formato de data inválido. Use YYYY-MM-DD HH:MM:SS'}), 400
@@ -2002,10 +2002,10 @@ def atualizar_caixa_route(caixa_id):
         if 'status' in dados:
             if dados['status'] == 'fechado':
                 caixa.status =  StatusCaixa.fechado
-                caixa.data_fechamento = datetime.utcnow()
+                caixa.data_fechamento = datetime.now()
             elif dados['status'] == 'analise':
                 caixa.status =  StatusCaixa.analise
-                caixa.data_analise = datetime.utcnow()
+                caixa.data_analise = datetime.now()
         
         if 'valor_fechamento' in dados:
             caixa.valor_fechamento = Decimal(dados['valor_fechamento'])
@@ -2082,10 +2082,10 @@ def caixa_detail(caixa_id):
             if 'status' in dados:
                 if dados['status'] == 'fechado' and caixa.status !=  StatusCaixa.fechado:
                     caixa.status =  StatusCaixa.fechado
-                    caixa.data_fechamento = datetime.utcnow()
+                    caixa.data_fechamento = datetime.now()
                 elif dados['status'] == 'analise' and caixa.status !=  StatusCaixa.analise:
                     caixa.status =  StatusCaixa.analise
-                    caixa.data_analise = datetime.utcnow()
+                    caixa.data_analise = datetime.now()
             
             # Atualiza observações se existirem
             if 'observacoes_operador' in dados:

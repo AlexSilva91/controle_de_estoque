@@ -115,7 +115,7 @@ class Usuario(UserMixin, Base):
     cpf = Column(String(14), nullable=False, unique=True)
     senha_hash = Column(Text, nullable=False)
     tipo = Column(Enum(TipoUsuario), nullable=False)
-    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+    criado_em = Column(DateTime, default=datetime.now, nullable=False)
     status = Column(Boolean, default=True, nullable=False)
     ultimo_acesso = Column(DateTime, nullable=True)
     observacoes = Column(Text, nullable=True)
@@ -136,7 +136,7 @@ class Caixa(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     operador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     administrador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
-    data_abertura = Column(DateTime, default=datetime.utcnow, nullable=False)
+    data_abertura = Column(DateTime, default=datetime.now, nullable=False)
     data_fechamento = Column(DateTime, nullable=True)
     data_analise = Column(DateTime, nullable=True)
     valor_abertura = Column(DECIMAL(12, 2), nullable=False)
@@ -161,7 +161,7 @@ class Caixa(Base):
         #     raise ValueError("Caixa não está aberto para fechamento")
             
         self.valor_fechamento = valor_fechamento
-        self.data_fechamento = datetime.utcnow()
+        self.data_fechamento = datetime.now()
         self.observacoes_operador = observacoes_operador
         self.status = StatusCaixa.em_analise
         self.sincronizado = False
@@ -185,7 +185,7 @@ class Caixa(Base):
         self.valor_confirmado = valor_confirmado if valor_confirmado else self.valor_fechamento
         self.observacoes_admin = observacoes_admin
         self.administrador_id = administrador_id
-        self.data_analise = datetime.utcnow()
+        self.data_analise = datetime.now()
         self.status = StatusCaixa.fechado
         self.sincronizado = False
         
@@ -208,7 +208,7 @@ class Caixa(Base):
         self.valor_confirmado = valor_correto
         self.observacoes_admin = motivo
         self.administrador_id = administrador_id
-        self.data_analise = datetime.utcnow()
+        self.data_analise = datetime.now()
         self.status = StatusCaixa.recusado
         self.sincronizado = False
         
@@ -257,8 +257,8 @@ class Desconto(Base):
     quantidade_maxima = Column(DECIMAL(12, 3), nullable=True)
     valido_ate = Column(DateTime, nullable=True)
     ativo = Column(Boolean, default=True, nullable=False)
-    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
-    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    criado_em = Column(DateTime, default=datetime.now, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
     sincronizado = Column(Boolean, default=False, nullable=False)
 
     produtos = relationship(
@@ -326,8 +326,8 @@ class Produto(Base):
     estoque_minimo = Column(DECIMAL(12, 3), nullable=False, default=0.0)
     estoque_maximo = Column(DECIMAL(12, 3), nullable=True)
     ativo = Column(Boolean, default=True, nullable=False)
-    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
-    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    criado_em = Column(DateTime, default=datetime.now, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
     sincronizado = Column(Boolean, default=False, nullable=False)
 
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="produto")
@@ -364,8 +364,8 @@ class Cliente(Base):
     endereco = Column(Text, nullable=True)
     limite_credito = Column(DECIMAL(12, 2), default=0.00, nullable=False)
     ativo = Column(Boolean, default=True, nullable=False)
-    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
-    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    criado_em = Column(DateTime, default=datetime.now, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
     sincronizado = Column(Boolean, default=False, nullable=False)
 
     notas_fiscais = relationship("NotaFiscal", back_populates="cliente")
@@ -393,7 +393,7 @@ class MovimentacaoEstoque(Base):
     troco = Column(DECIMAL(12, 2), nullable=True)
     forma_pagamento = Column(Enum(FormaPagamento), nullable=True)
     observacao = Column(Text, nullable=True)
-    data = Column(DateTime, default=datetime.utcnow, nullable=False)
+    data = Column(DateTime, default=datetime.now, nullable=False)
     sincronizado = Column(Boolean, default=False, nullable=False)
 
     produto = relationship("Produto", back_populates="movimentacoes")
@@ -414,7 +414,7 @@ class TransferenciaEstoque(Base):
     estoque_origem = Column(Enum(TipoEstoque), nullable=False)
     estoque_destino = Column(Enum(TipoEstoque), nullable=False)
     quantidade = Column(DECIMAL(12, 3), nullable=False)
-    data = Column(DateTime, default=datetime.utcnow, nullable=False)
+    data = Column(DateTime, default=datetime.now, nullable=False)
     observacao = Column(Text, nullable=True)
     
     quantidade_destino = Column(Numeric(10, 3), nullable=True)
@@ -449,7 +449,7 @@ class NotaFiscal(Base):
     operador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     caixa_id = Column(Integer, ForeignKey("caixas.id"), nullable=False)
     entrega_id = Column(Integer, ForeignKey("entregas.id"), nullable=True)
-    data_emissao = Column(DateTime, default=datetime.utcnow, nullable=False)
+    data_emissao = Column(DateTime, default=datetime.now, nullable=False)
     valor_total = Column(DECIMAL(12, 2), nullable=False)
     valor_desconto = Column(DECIMAL(12, 2), nullable=False, default=0.00)
     tipo_desconto = Column(Enum(TipoDesconto), nullable=True)
@@ -550,7 +550,7 @@ class ContaReceber(Base):
     valor_original = Column(DECIMAL(12, 2), nullable=False)
     valor_aberto = Column(DECIMAL(12, 2), nullable=False)
     data_vencimento = Column(DateTime, nullable=False)
-    data_emissao = Column(DateTime, default=datetime.utcnow, nullable=False)
+    data_emissao = Column(DateTime, default=datetime.now, nullable=False)
     status = Column(Enum(StatusPagamento), default=StatusPagamento.pendente, nullable=False)
     observacoes = Column(Text, nullable=True)
     sincronizado = Column(Boolean, default=False, nullable=False)
@@ -600,7 +600,7 @@ class PagamentoContaReceber(Base):
     conta_id = Column(Integer, ForeignKey("contas_receber.id"), nullable=False)
     caixa_id = Column(Integer, ForeignKey("caixas.id"), nullable=True)
     valor_pago = Column(DECIMAL(12, 2), nullable=False)
-    data_pagamento = Column(DateTime, default=datetime.utcnow, nullable=False)
+    data_pagamento = Column(DateTime, default=datetime.now, nullable=False)
     forma_pagamento = Column(Enum(FormaPagamento), nullable=False)
     observacoes = Column(Text, nullable=True)
     sincronizado = Column(Boolean, default=False, nullable=False)
@@ -620,7 +620,7 @@ class Financeiro(Base):
     valor = Column(DECIMAL(12, 2), nullable=False)
     valor_desconto = Column(DECIMAL(12, 2), nullable=True, default=0.00)
     descricao = Column(Text, nullable=True)
-    data = Column(DateTime, default=datetime.utcnow, nullable=False)
+    data = Column(DateTime, default=datetime.now, nullable=False)
     sincronizado = Column(Boolean, default=False, nullable=False)
     
     nota_fiscal_id = Column(Integer, ForeignKey("notas_fiscais.id"), nullable=True)

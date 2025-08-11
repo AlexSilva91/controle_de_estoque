@@ -2224,7 +2224,7 @@ def atualizar_caixa(session: Session, caixa_id: int, dados_atualizacao: dict):
         
         # Marca como não sincronizado
         caixa.sincronizado = False
-        caixa.atualizado_em = datetime.utcnow()
+        caixa.atualizado_em = datetime.now()
         
         # Não faz commit aqui - deixa para o chamador controlar a transação
         return caixa, "Caixa atualizado com sucesso"

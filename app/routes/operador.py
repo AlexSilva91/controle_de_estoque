@@ -350,7 +350,7 @@ def api_registrar_venda():
             cliente_id=cliente.id,
             operador_id=current_user.id,
             caixa_id=caixa_aberto.id,
-            data_emissao=datetime.utcnow(),
+            data_emissao=datetime.now(),
             valor_total=valor_total,
             valor_desconto=total_descontos,
             tipo_desconto=None,

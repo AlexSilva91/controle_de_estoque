@@ -52,7 +52,7 @@ def enviar_resumo_movimentacao_diaria():
             print("⚠️ Sem conexão com a internet. O relatório não será enviado.")
             return
 
-        hoje = datetime.utcnow().date()
+        hoje = datetime.now().date()
         db = SessionLocal()
 
         # === Movimentações de Estoque ===
