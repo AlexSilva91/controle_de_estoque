@@ -2067,58 +2067,135 @@ async function updateBalance(forceUpdate = false) {
 }
 
 async function closeRegister() {
-    const valorFechamento = prompt('Informe o valor de fechamento do caixa:');
-    if (!valorFechamento) {
-        return showMessage('Operação cancelada', 'warning');
+    // Criar o modal dinamicamente
+    const modal = document.createElement('div');
+    modal.className = 'custom-modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h3>Fechamento de Caixa</h3>
+            <div class="form-group">
+                <label for="fechamento-valor">Valor de Fechamento:</label>
+                <input type="text" id="fechamento-valor" class="currency-input" placeholder="0,00">
+            </div>
+            <div class="modal-buttons">
+                <button id="confirm-fechamento" class="btn-primary">Confirmar</button>
+                <button id="cancel-fechamento" class="btn-secondary">Cancelar</button>
+            </div>
+        </div>
+    `;
+    
+    // Adicionar ao corpo do documento
+    document.body.appendChild(modal);
+    
+    // Adicionar estilos básicos (você pode mover isso para seu CSS)
+    const style = document.createElement('style');
+    style.textContent = `
+        .custom-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .custom-modal .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        .custom-modal .form-group {
+            margin-bottom: 15px;
+        }
+        .custom-modal label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .custom-modal input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .custom-modal .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Configurar máscara para o input de valor
+    const valorInput = document.getElementById('fechamento-valor');
+    if (valorInput) {
+        valorInput.addEventListener('input', function(e) {
+            // Formatação para moeda
+            let value = e.target.value.replace(/\D/g, '');
+            value = (value/100).toLocaleString('pt-BR', {
+                style: 'decimal',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+            e.target.value = value;
+        });
     }
     
-    // Formata o valor para o padrão brasileiro
-    const valorNumerico = parseFloat(valorFechamento.replace('.', '').replace(',', '.'));
-    if (isNaN(valorNumerico)) {
-        return showMessage('Valor de fechamento inválido', 'error');
-    }
+    // Retornar uma Promise que resolve quando o modal é confirmado ou rejeitado
+    return new Promise(async (resolve, reject) => {
+        // Evento de confirmação
+        document.getElementById('confirm-fechamento')?.addEventListener('click', async () => {
+            const valorText = valorInput?.value.replace(/\./g, '').replace(',', '.');
+            const valorNumerico = parseFloat(valorText);
+            
+            if (!valorText || isNaN(valorNumerico) || valorNumerico <= 0) {
+                showMessage('Valor de fechamento inválido', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/operador/api/fechar-caixa', {
+                    ...preventCacheConfig,
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ valor_fechamento: valorNumerico })
+                });
 
-    if (!confirm('Deseja realmente fechar o caixa?')) {
-        return;
-    }
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Erro ao fechar caixa');
+                }
 
-    try {
-        const dataParam = new Date().toISOString().slice(0, 10);
-        let operadorId = '';
-        if (typeof currentOperadorId !== 'undefined') {
-            operadorId = currentOperadorId;
-        } else {
-            const inputHidden = document.getElementById('operador-id');
-            if (inputHidden) operadorId = inputHidden.value;
-        }
-
-        const urlRelatorio = `/operador/api/vendas/relatorio-diario-pdf?data=${dataParam}&operador_id=${operadorId}`;
-        const novaAba = window.open(urlRelatorio, '_blank');
-
-        if (!novaAba || novaAba.closed || typeof novaAba.closed === 'undefined') {
-            return showMessage('Não foi possível abrir o relatório. Verifique o bloqueador de pop-ups.', 'error');
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        const response = await fetch('/operador/api/fechar-caixa', {
-            ...preventCacheConfig,
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ valor_fechamento: valorNumerico })
+                const now = new Date();
+                showMessage(`Caixa fechado às ${now.toLocaleTimeString('pt-BR')}`);
+                await checkCaixaStatus();
+                
+                // Remover modal e estilos
+                modal.remove();
+                style.remove();
+                
+                resolve(true);
+            } catch (error) {
+                showMessage(error.message, 'error');
+                reject(error);
+            }
         });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Erro ao fechar caixa');
-        }
-
-        const now = new Date();
-        showMessage(`Caixa fechado às ${now.toLocaleTimeString('pt-BR')}`);
-        await checkCaixaStatus();
-    } catch (error) {
-        showMessage(error.message, 'error');
-    }
+        
+        // Evento de cancelamento
+        document.getElementById('cancel-fechamento')?.addEventListener('click', () => {
+            showMessage('Operação cancelada', 'warning');
+            modal.remove();
+            style.remove();
+            resolve(false);
+        });
+    });
 }
 
 window.updateCaixaStatus = function() {
