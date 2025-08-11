@@ -2358,3 +2358,11 @@ body {
     margin-top: 1rem;
     width: 100%;
 }
+.search-result-item.selected {
+    background-color: #f0f0f0;
+    outline: 2px solid #4a90e2;
+}
+
+.search-result-item:focus {
+    outline: 2px solid #4a90e2;
+}

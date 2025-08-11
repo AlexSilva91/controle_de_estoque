@@ -138,7 +138,6 @@ function handleKeyDown(e) {
     const key = e.key;
     const ctrlKey = e.ctrlKey || e.metaKey;
     
-    // Verifica combinações de teclas
     if (ctrlKey) {
         const combo = `Ctrl+${key.toUpperCase()}`;
         if (keyMap[combo]) {
@@ -152,6 +151,26 @@ function handleKeyDown(e) {
             return;
         }
         
+        // Navegação nos resultados da busca
+        if (activeSearchDropdown) {
+            if (key === 'ArrowDown') {
+                e.preventDefault();
+                navigateSearchResults('down');
+                return;
+            } else if (key === 'ArrowUp') {
+                e.preventDefault();
+                navigateSearchResults('up');
+                return;
+            } else if (key === 'Enter') {
+                e.preventDefault();
+                const selectedItem = activeSearchDropdown.querySelector('.search-result-item.selected');
+                if (selectedItem) {
+                    selectedItem.click();
+                }
+                return;
+            }
+        }
+        
         if (keyMap[key]) {
             e.preventDefault();
             keyMap[key]();
@@ -159,6 +178,30 @@ function handleKeyDown(e) {
     }
 }
 
+function navigateSearchResults(direction) {
+    if (!activeSearchDropdown) return;
+
+    const items = activeSearchDropdown.querySelectorAll('.search-result-item');
+    if (items.length === 0) return;
+
+    let selectedIndex = -1;
+    items.forEach((item, index) => {
+        if (item.classList.contains('selected')) {
+            selectedIndex = index;
+            item.classList.remove('selected');
+        }
+    });
+
+    if (direction === 'down') {
+        selectedIndex = (selectedIndex + 1) % items.length;
+    } else if (direction === 'up') {
+        selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+    }
+
+    const newSelectedItem = items[selectedIndex];
+    newSelectedItem.classList.add('selected');
+    newSelectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
 // ==================== INICIALIZAÇÃO ====================
 document.addEventListener('DOMContentLoaded', async () => {
     try {
@@ -497,17 +540,12 @@ function selectClientForSale(clientId) {
     }
 }
 
-// Função auxiliar para buscar cliente por ID
 function findClientById(clientId) {
-    // Assumindo que você tem uma lista de clientes chamada 'clients' ou similar
-    // Ajuste conforme sua estrutura de dados
     
     if (typeof clients !== 'undefined' && Array.isArray(clients)) {
         return clients.find(client => client.id == clientId);
     }
     
-    // Se os clientes estão em outra estrutura, ajuste aqui
-    // Exemplo alternativo se os dados vêm de uma tabela:
     const clientRow = document.querySelector(`[data-client-id="${clientId}"]`);
     if (clientRow) {
         return {
@@ -2233,10 +2271,11 @@ function showSearchResults(results, containerId, type) {
         return;
     }
 
-    results.forEach(item => {
+    results.forEach((item, index) => {
         const resultItem = document.createElement('div');
         resultItem.className = 'search-result-item';
         resultItem.dataset.id = item.id;
+        resultItem.tabIndex = 0; // Torna o item focável
         
         if (type === 'client') {
             resultItem.innerHTML = `
@@ -2261,8 +2300,22 @@ function showSearchResults(results, containerId, type) {
                 if (productSearchInput) productSearchInput.value = '';
             });
         }
+        
+        // Permite selecionar com Enter quando o item está focado
+        resultItem.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                resultItem.click();
+            }
+        });
+        
         resultsContainer.appendChild(resultItem);
     });
+
+    // Seleciona automaticamente o primeiro item
+    if (results.length > 0) {
+        resultsContainer.querySelector('.search-result-item').classList.add('selected');
+    }
 
     resultsContainer.style.display = 'block';
     activeSearchDropdown = resultsContainer;
@@ -2327,6 +2380,9 @@ async function searchProducts(searchTerm) {
 function closeAllDropdowns() {
     document.querySelectorAll('.search-results-dropdown').forEach(dropdown => {
         dropdown.style.display = 'none';
+        dropdown.querySelectorAll('.search-result-item').forEach(item => {
+            item.classList.remove('selected');
+        });
     });
     activeSearchDropdown = null;
 }
@@ -2417,6 +2473,20 @@ function setupEventListeners() {
             btn.addEventListener('click', () => switchTab(btn.dataset.tab));
         });
     }
+    if (clientSearchInput) {
+    clientSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' && activeSearchDropdown) {
+            e.preventDefault();
+            navigateSearchResults('down');
+        }
+    })};
+    if (productSearchInput) {
+    productSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' && activeSearchDropdown) {
+            e.preventDefault();
+            navigateSearchResults('down');
+        }
+    })};
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
             window.location.href = '/logout?' + new Date().getTime();
@@ -2497,6 +2567,7 @@ function setupEventListeners() {
     if (cancelDeliveryBtn) {
         cancelDeliveryBtn.addEventListener('click', closeModal);
     }
+    
     if (clientSearchInput) {
         clientSearchInput.addEventListener('input', function(e) {
             clearTimeout(clientSearchTimeout);
