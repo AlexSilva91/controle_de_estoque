@@ -28,7 +28,11 @@ from app.utils.preparar_notas import preparar_dados_nota
 from app.utils.converter_endereco import parse_endereco_string
 from app.utils.format_data_moeda import format_number
 from app.utils.nfce import gerar_nfce_pdf_bobina_bytesio
-from app.models import entities
+from app.models.entities import (
+     Caixa, Cliente, ContaReceber, Desconto, Entrega, Financeiro, NotaFiscal,
+     NotaFiscalItem, PagamentoNotaFiscal, Produto, TipoDesconto, TipoEstoque, 
+     TipoUsuario, produto_desconto_association, NotaFiscal
+)
 from app.schemas import (
     ClienteCreate,
     ClienteBase,
@@ -292,7 +296,7 @@ def api_registrar_venda():
             }), 400
 
         # Consultar cliente
-        cliente = entities.Cliente.query.get(cliente_id)
+        cliente =  Cliente.query.get(cliente_id)
         if not cliente:
             app.logger.error(f"Cliente não encontrado: ID {cliente_id}")
             return jsonify({
@@ -308,7 +312,7 @@ def api_registrar_venda():
                 valor_unitario = Decimal(str(item_data.get('valor_unitario')))
                 valor_total_item = Decimal(str(item_data.get('valor_total')))
                 
-                produto = entities.Produto.query.get(produto_id)
+                produto =  Produto.query.get(produto_id)
                 if not produto:
                     app.logger.error(f"Produto não encontrado: ID {produto_id}")
                     return jsonify({
@@ -346,7 +350,7 @@ def api_registrar_venda():
             }), 400
 
         # Criar registro de Nota Fiscal
-        nota = entities.NotaFiscal(
+        nota =  NotaFiscal(
             cliente_id=cliente.id,
             operador_id=current_user.id,
             caixa_id=caixa_aberto.id,
@@ -354,8 +358,8 @@ def api_registrar_venda():
             valor_total=valor_total,
             valor_desconto=total_descontos,
             tipo_desconto=None,
-            status=entities.StatusNota.emitida,
-            forma_pagamento=entities.FormaPagamento.dinheiro,  # Será atualizado abaixo
+            status= StatusNota.emitida,
+            forma_pagamento= FormaPagamento.dinheiro,  # Será atualizado abaixo
             valor_recebido=valor_recebido,
             troco=max(valor_recebido - valor_total, Decimal(0)) if not a_prazo_usado else Decimal(0),
             a_prazo=a_prazo_usado
@@ -364,7 +368,7 @@ def api_registrar_venda():
         # Criar Entrega, se presente - COM TRATAMENTO SEGURO
         endereco_entrega = dados_venda.get('endereco_entrega')
         if endereco_entrega and isinstance(endereco_entrega, dict):
-            entrega = entities.Entrega(
+            entrega =  Entrega(
                 logradouro=endereco_entrega.get('logradouro', ''),
                 numero=endereco_entrega.get('numero', ''),
                 complemento=endereco_entrega.get('complemento', ''),
@@ -385,7 +389,7 @@ def api_registrar_venda():
         # Criar itens da nota fiscal
         for item_data in dados_venda['itens']:
             produto_id = item_data.get('produto_id')
-            produto = entities.Produto.query.get(produto_id)
+            produto =  Produto.query.get(produto_id)
             quantidade = Decimal(str(item_data.get('quantidade')))
             valor_unitario = Decimal(str(item_data.get('valor_unitario')))
             valor_total_item = Decimal(str(item_data.get('valor_total')))
@@ -395,15 +399,15 @@ def api_registrar_venda():
             desconto_info = item_data.get('desconto_info', {}) or {}
             tipo_desconto = desconto_info.get('tipo') if isinstance(desconto_info, dict) else None
 
-            item_nf = entities.NotaFiscalItem(
+            item_nf =  NotaFiscalItem(
                 nota_id=nota.id,
                 produto_id=produto_id,
-                estoque_origem=entities.TipoEstoque.loja,
+                estoque_origem= TipoEstoque.loja,
                 quantidade=quantidade,
                 valor_unitario=valor_unitario,
                 valor_total=valor_total_item,
                 desconto_aplicado=desconto_aplicado,
-                tipo_desconto=entities.TipoDesconto(tipo_desconto) if tipo_desconto else None,
+                tipo_desconto= TipoDesconto(tipo_desconto) if tipo_desconto else None,
                 sincronizado=False
             )
             db.session.add(item_nf)
@@ -419,9 +423,9 @@ def api_registrar_venda():
             forma = pagamento_data.get('forma_pagamento')
             valor = Decimal(str(pagamento_data.get('valor')))
             
-            pagamento_nf = entities.PagamentoNotaFiscal(
+            pagamento_nf =  PagamentoNotaFiscal(
                 nota_fiscal_id=nota.id,
-                forma_pagamento=entities.FormaPagamento(forma),
+                forma_pagamento= FormaPagamento(forma),
                 valor=valor,
                 data=datetime.now(),
                 sincronizado=False
@@ -433,9 +437,9 @@ def api_registrar_venda():
             
             # Registrar no financeiro APENAS se não for a prazo
             if forma != 'a_prazo':
-                financeiro = entities.Financeiro(
-                    tipo=entities.TipoMovimentacao.entrada,
-                    categoria=entities.CategoriaFinanceira.venda,
+                financeiro =  Financeiro(
+                    tipo= TipoMovimentacao.entrada,
+                    categoria= CategoriaFinanceira.venda,
                     valor=valor,
                     descricao=f"Pagamento venda NF #{nota.id}",
                     cliente_id=cliente.id,
@@ -450,14 +454,14 @@ def api_registrar_venda():
 
         # Se houver pagamento a prazo, criar conta a receber
         if a_prazo_usado and valor_a_prazo > 0:
-            conta_receber = entities.ContaReceber(
+            conta_receber =  ContaReceber(
                 cliente_id=cliente.id,
                 nota_fiscal_id=nota.id,
                 descricao=f"Venda a prazo NF #{nota.id}",
                 valor_original=valor_a_prazo,
                 valor_aberto=valor_a_prazo,
                 data_vencimento=datetime.now() + timedelta(days=30),
-                status=entities.StatusPagamento.pendente,
+                status= StatusPagamento.pendente,
                 sincronizado=False
             )
             db.session.add(conta_receber)
@@ -465,10 +469,10 @@ def api_registrar_venda():
         # Atualizar a forma de pagamento principal da nota fiscal
         if len(dados_venda['pagamentos']) == 1:
             # Se houver apenas um pagamento, usa essa forma
-            nota.forma_pagamento = entities.FormaPagamento(dados_venda['pagamentos'][0]['forma_pagamento'])
+            nota.forma_pagamento =  FormaPagamento(dados_venda['pagamentos'][0]['forma_pagamento'])
         else:
             # Se houver múltiplos pagamentos, define como "misto"
-            nota.forma_pagamento = entities.FormaPagamento.dinheiro  # Ou criar um enum para "misto"
+            nota.forma_pagamento =  FormaPagamento.dinheiro  # Ou criar um enum para "misto"
 
         db.session.commit()
 
@@ -570,35 +574,35 @@ def obter_vendas_hoje():
         fim_dia = datetime.combine(data_filtro, time.max).replace(tzinfo=tz)
 
         # Query principal com distinct para evitar duplicatas no JOIN
-        vendas = db.session.query(entities.NotaFiscal).distinct(
-            entities.NotaFiscal.id
+        vendas = db.session.query( NotaFiscal).distinct(
+             NotaFiscal.id
         ).options(
-            db.joinedload(entities.NotaFiscal.cliente),
-            db.joinedload(entities.NotaFiscal.operador),
-            db.joinedload(entities.NotaFiscal.caixa),
-            db.joinedload(entities.NotaFiscal.itens).joinedload(entities.NotaFiscalItem.produto),
-            db.joinedload(entities.NotaFiscal.pagamentos)
+            db.joinedload( NotaFiscal.cliente),
+            db.joinedload( NotaFiscal.operador),
+            db.joinedload( NotaFiscal.caixa),
+            db.joinedload( NotaFiscal.itens).joinedload( NotaFiscalItem.produto),
+            db.joinedload( NotaFiscal.pagamentos)
         ).filter(
-            entities.NotaFiscal.caixa_id == caixa.id,
-            entities.NotaFiscal.status == entities.StatusNota.emitida,
-            entities.NotaFiscal.data_emissao >= inicio_dia,
-            entities.NotaFiscal.data_emissao <= fim_dia
+             NotaFiscal.caixa_id == caixa.id,
+             NotaFiscal.status ==  StatusNota.emitida,
+             NotaFiscal.data_emissao >= inicio_dia,
+             NotaFiscal.data_emissao <= fim_dia
         )
 
         # Filtro adicional por operador
         if operador_id and operador_id != current_user.id:
             # Verifica se o usuário tem permissão para consultar outros operadores
-            if not current_user.tipo == entities.TipoUsuario.admin:
+            if not current_user.tipo ==  TipoUsuario.admin:
                 return jsonify({
                     'success': False,
                     'message': 'Apenas administradores podem filtrar por outros operadores'
                 }), 403
-            vendas = vendas.filter(entities.NotaFiscal.operador_id == operador_id)
+            vendas = vendas.filter( NotaFiscal.operador_id == operador_id)
         else:
-            vendas = vendas.filter(entities.NotaFiscal.operador_id == current_user.id)
+            vendas = vendas.filter( NotaFiscal.operador_id == current_user.id)
 
         # Execução da query
-        vendas_lista = vendas.order_by(entities.NotaFiscal.data_emissao.desc()).all()
+        vendas_lista = vendas.order_by( NotaFiscal.data_emissao.desc()).all()
 
         # Processamento dos resultados com verificação de duplicatas
         ids_vistas = set()
@@ -689,41 +693,41 @@ def resumo_vendas_diarias():
         fim_dia = datetime.combine(data, datetime.max.time())
         
         # Total de vendas (apenas em caixas abertos)
-        total_vendas = db.session.query(func.count(entities.NotaFiscal.id)).join(
-            entities.Caixa,
-            entities.NotaFiscal.caixa_id == entities.Caixa.id
+        total_vendas = db.session.query(func.count( NotaFiscal.id)).join(
+             Caixa,
+             NotaFiscal.caixa_id ==  Caixa.id
         ).filter(
-            entities.NotaFiscal.data_emissao >= inicio_dia,
-            entities.NotaFiscal.data_emissao <= fim_dia,
-            entities.NotaFiscal.status == StatusNota.emitida,
-            entities.Caixa.status == StatusCaixa.aberto  # Filtro por caixas abertos
+             NotaFiscal.data_emissao >= inicio_dia,
+             NotaFiscal.data_emissao <= fim_dia,
+             NotaFiscal.status == StatusNota.emitida,
+             Caixa.status == StatusCaixa.aberto  # Filtro por caixas abertos
         ).scalar()
         
         # Valor total vendido (apenas em caixas abertos)
-        valor_total = db.session.query(func.coalesce(func.sum(entities.NotaFiscal.valor_total), 0)).join(
-            entities.Caixa,
-            entities.NotaFiscal.caixa_id == entities.Caixa.id
+        valor_total = db.session.query(func.coalesce(func.sum( NotaFiscal.valor_total), 0)).join(
+             Caixa,
+             NotaFiscal.caixa_id ==  Caixa.id
         ).filter(
-            entities.NotaFiscal.data_emissao >= inicio_dia,
-            entities.NotaFiscal.data_emissao <= fim_dia,
-            entities.NotaFiscal.status == StatusNota.emitida,
-            entities.Caixa.status == StatusCaixa.aberto  # Filtro por caixas abertos
+             NotaFiscal.data_emissao >= inicio_dia,
+             NotaFiscal.data_emissao <= fim_dia,
+             NotaFiscal.status == StatusNota.emitida,
+             Caixa.status == StatusCaixa.aberto  # Filtro por caixas abertos
         ).scalar()
         
         # Formas de pagamento (apenas em caixas abertos)
         formas_pagamento = db.session.query(
-            entities.NotaFiscal.forma_pagamento,
-            func.count(entities.NotaFiscal.id).label('quantidade'),
-            func.sum(entities.NotaFiscalotaFiscal.valor_total).label('valor_total')
+             NotaFiscal.forma_pagamento,
+            func.count( NotaFiscal.id).label('quantidade'),
+            func.sum( NotaFiscal.valor_total).label('valor_total')
         ).join(
-            entities.Caixa,
-            entities.NotaFiscal.caixa_id == entities.Caixa.id
+             Caixa,
+             NotaFiscal.caixa_id ==  Caixa.id
         ).filter(
-            entities.NotaFiscal.data_emissao >= inicio_dia,
-            entities.NotaFiscal.data_emissao <= fim_dia,
-            entities.NotaFiscal.status == StatusNota.emitida,
-            entities.Caixa.status == StatusCaixa.aberto  # Filtro por caixas abertos
-        ).group_by(entities.NotaFiscal.forma_pagamento).all()
+             NotaFiscal.data_emissao >= inicio_dia,
+             NotaFiscal.data_emissao <= fim_dia,
+             NotaFiscal.status == StatusNota.emitida,
+             Caixa.status == StatusCaixa.aberto  # Filtro por caixas abertos
+        ).group_by( NotaFiscal.forma_pagamento).all()
         
         return jsonify({
             'success': True,
@@ -755,10 +759,10 @@ def resumo_vendas_diarias():
 def obter_detalhes_venda(venda_id):
     try:
         # Busca a nota fiscal principal
-        nota_fiscal = entities.NotaFiscal.query.get_or_404(venda_id)
+        nota_fiscal =  NotaFiscal.query.get_or_404(venda_id)
         
         # Busca os pagamentos associados e remove duplicatas
-        pagamentos = entities.PagamentoNotaFiscal.query.filter_by(
+        pagamentos =  PagamentoNotaFiscal.query.filter_by(
             nota_fiscal_id=venda_id
         ).all()
         
@@ -869,13 +873,15 @@ def rota_estornar_venda(sale_id):
 @login_required
 @operador_required
 def gerar_pdf_vendas_dia():
-    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
-    from reportlab.pdfgen import canvas
-    from reportlab.platypus import Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.units import cm
     from io import BytesIO
     from flask import send_file, request, jsonify
     from datetime import datetime
+    from sqlalchemy import func
 
     data_str = request.args.get('data')
     caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
@@ -889,169 +895,275 @@ def gerar_pdf_vendas_dia():
         except ValueError:
             return jsonify({'success': False, 'message': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
 
+    # Se não especificar data, usar data atual
+    data_relatorio = data if data else datetime.now().date()
+
+    # --- Buscar dados das vendas ---
     resultado = obter_detalhes_vendas_dia(data, caixa_id, operador_id)
     if not resultado['success']:
         return jsonify(resultado), 400
 
     dados = resultado['data']
+
+    # --- Buscar métricas de pagamento por forma de pagamento (do dia atual) ---
+    inicio_dia = datetime.combine(data_relatorio, datetime.min.time())
+    fim_dia = datetime.combine(data_relatorio, datetime.max.time())
+
+    pagamentos_por_forma = db.session.query(
+        PagamentoNotaFiscal.forma_pagamento,
+        func.sum(PagamentoNotaFiscal.valor).label('total_valor'),
+        func.count(PagamentoNotaFiscal.id).label('total_transacoes')
+    ).join(
+        NotaFiscal, PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+    ).filter(
+        NotaFiscal.caixa_id == caixa_id,
+        NotaFiscal.operador_id == operador_id,
+        NotaFiscal.status == StatusNota.emitida,
+        PagamentoNotaFiscal.data >= inicio_dia,
+        PagamentoNotaFiscal.data <= fim_dia
+    ).group_by(
+        PagamentoNotaFiscal.forma_pagamento
+    ).all()
+
+    # Converter para dicionário para facilitar o uso
+    metricas_pagamento = {
+        pagamento.forma_pagamento: {
+            'total': float(pagamento.total_valor),
+            'transacoes': pagamento.total_transacoes
+        }
+        for pagamento in pagamentos_por_forma
+    }
+
+    # --- Geração do PDF usando platypus ---
     buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
-    margin = 50
-    linha_atual = height - margin
-    espacamento = 20
-    espacamento_pequeno = 12
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=30,
+        rightMargin=30,
+        topMargin=30,
+        bottomMargin=40
+    )
+    elements = []
 
-    def verificar_espaco(altura_necessaria):
-        nonlocal linha_atual, pdf
-        if linha_atual - altura_necessaria < margin:
-            pdf.showPage()
-            linha_atual = height - margin
-            pdf.setFont("Helvetica-Bold", 16)
-            pdf.drawString(margin, linha_atual, "RELATÓRIO DIÁRIO DETALHADO DE VENDAS (CONTINUAÇÃO)")
-            linha_atual -= espacamento * 1.5
+    # --- Estilos ---
+    styles = getSampleStyleSheet()
+    normal = styles['Normal']
 
-    pdf.setFont("Helvetica-Bold", 16)
-    pdf.drawString(margin, linha_atual, "RELATÓRIO DIÁRIO DETALHADO DE VENDAS")
-    linha_atual -= espacamento * 1.5
+    left_style = ParagraphStyle(name='Left', parent=normal, alignment=0, fontSize=11)
+    center_style = ParagraphStyle(name='Center', parent=normal, alignment=1, fontSize=11)
+    bold_center = ParagraphStyle(name='BoldCenter', parent=center_style, fontSize=13, leading=14, spaceAfter=10)
+    bold_left = ParagraphStyle(name='BoldLeft', parent=left_style, fontSize=12, leading=14, spaceAfter=8)
+    descricao_style = ParagraphStyle(name='DescricaoPequena', fontSize=8, leading=10, wordWrap='CJK')
+    wrap_style = ParagraphStyle(name='WrapCell', fontSize=9, leading=11, wordWrap='CJK', alignment=0)
+    estorno_style = ParagraphStyle(name='EstornoStyle', parent=bold_left, textColor=colors.red)
 
-    data_relatorio = data if data else datetime.now().date()
-    pdf.setFont("Helvetica", 12)
-    pdf.drawString(margin, linha_atual, f"Data: {data_relatorio.strftime('%d/%m/%Y')}")
-    linha_atual -= espacamento_pequeno
+    def moeda_br(valor):
+        return format_number(valor)
 
-    pdf.drawString(margin, linha_atual, f"Caixa ID: {caixa_id}")
-    linha_atual -= espacamento_pequeno
-    pdf.drawString(margin, linha_atual, f"Operador ID: {operador_id}")
-    linha_atual -= espacamento_pequeno
+    # --- Título ---
+    elements.append(Paragraph(f"RELATÓRIO DIÁRIO DETALHADO DE VENDAS", bold_center))
+    elements.append(Spacer(1, 8))
 
-    pdf.drawString(margin, linha_atual, f"Valor de Abertura: {format_number(caixa.valor_abertura)}")
-    linha_atual -= espacamento_pequeno
+    # --- Informações do Cabeçalho ---
+    elements.append(Paragraph(f"Data: {data_relatorio.strftime('%d/%m/%Y')}", left_style))
+    elements.append(Paragraph(f"Caixa ID: {caixa_id}", left_style))
+    elements.append(Paragraph(f"Operador ID: {operador_id}", left_style))
+    elements.append(Paragraph(f"Valor de Abertura: {moeda_br(caixa.valor_abertura)}", left_style))
+    
     if caixa.valor_fechamento:
-        pdf.drawString(margin, linha_atual, f"Valor de Fechamento: {format_number(caixa.valor_fechamento)}")
-        linha_atual -= espacamento_pequeno
+        elements.append(Paragraph(f"Valor de Fechamento: {moeda_br(caixa.valor_fechamento)}", left_style))
     if caixa.valor_confirmado:
-        pdf.drawString(margin, linha_atual, f"Valor Confirmado: {format_number(caixa.valor_confirmado)}")
-        linha_atual -= espacamento_pequeno
+        elements.append(Paragraph(f"Valor Confirmado: {moeda_br(caixa.valor_confirmado)}", left_style))
+    
+    elements.append(Spacer(1, 12))
 
-    linha_atual -= espacamento
-
+    # --- Cálculos do Resumo ---
     total_vendas_positivas = sum(v['valor_total'] for v in dados['vendas'] if v['valor_total'] > 0)
     total_estornos = sum(abs(v['valor_total']) for v in dados['vendas'] if v['valor_total'] < 0)
     total_liquido = total_vendas_positivas - total_estornos
 
-    pdf.setFont("Helvetica-Bold", 14)
-    pdf.drawString(margin, linha_atual, "RESUMO FINANCEIRO")
-    linha_atual -= espacamento
-
+    # --- Tabela: Resumo Financeiro ---
+    elements.append(Paragraph("RESUMO FINANCEIRO", bold_center))
+    
     dados_resumo = [
-        ["Total de Vendas:", format_number(total_vendas_positivas)],
-        ["Total de Estornos:", format_number(total_estornos)],
-        ["Total de Descontos:", format_number(dados['total_descontos'])],
-        ["Total de Entradas:", format_number(dados['total_entradas'])],
-        ["Total de Saídas:", format_number(dados['total_saidas'])],
-        ["Saldo Líquido:", format_number(total_liquido)]
+        ["Descrição", "Valor (R$)"],
+        ["Total de Vendas", moeda_br(total_vendas_positivas)],
+        ["Total de Estornos", moeda_br(total_estornos)],
+        ["Total de Descontos", moeda_br(dados['total_descontos'])],
+        ["Total de Entradas", moeda_br(dados['total_entradas'])],
+        ["Total de Saídas", moeda_br(dados['total_saidas'])],
+        ["Saldo Líquido", moeda_br(total_liquido)]
     ]
 
-    tabela_resumo = Table(dados_resumo, colWidths=[180, 120])
+    tabela_resumo = Table(dados_resumo, colWidths=[220, 140], hAlign='CENTER')
     tabela_resumo.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
-        ('TEXTCOLOR', (0, 1), (1, 1), colors.red),
-        ('FONTNAME', (0, 5), (1, 5), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+        ('TEXTCOLOR', (0, 2), (-1, 2), colors.red),  # Estornos em vermelho
+        ('FONTNAME', (0, 6), (-1, 6), 'Helvetica-Bold'),  # Saldo líquido em negrito
     ]))
+    elements.append(tabela_resumo)
+    elements.append(Spacer(1, 16))
 
-    altura_resumo = tabela_resumo.wrap(width - 2 * margin, height)[1]
-    verificar_espaco(altura_resumo)
-    tabela_resumo.drawOn(pdf, margin, linha_atual - altura_resumo)
-    linha_atual -= altura_resumo + espacamento
+    # --- NOVA SEÇÃO: Métricas de Pagamento por Forma ---
+    elements.append(Paragraph("PAGAMENTOS POR FORMA DE PAGAMENTO", bold_center))
+    
+    # Preparar dados da tabela de pagamentos
+    dados_pagamentos = [["Forma de Pagamento", "Qtd Transações", "Total (R$)"]]
+    
+    total_geral_pagamentos = 0
+    total_geral_transacoes = 0
+    
+    # Ordenar por valor total (decrescente)
+    formas_ordenadas = sorted(metricas_pagamento.items(), 
+                             key=lambda x: x[1]['total'], 
+                             reverse=True)
+    
+    for forma, dados_forma in formas_ordenadas:
+        # Converter enum para string mais legível
+        forma_nome = forma.value if hasattr(forma, 'value') else str(forma)
+        forma_nome = forma_nome.replace('_', ' ').title()
+        
+        dados_pagamentos.append([
+            forma_nome,
+            str(dados_forma['transacoes']),
+            moeda_br(dados_forma['total'])
+        ])
+        
+        total_geral_pagamentos += dados_forma['total']
+        total_geral_transacoes += dados_forma['transacoes']
+    
+    # Adicionar linha de total
+    dados_pagamentos.append([
+        "TOTAL GERAL",
+        str(total_geral_transacoes),
+        moeda_br(total_geral_pagamentos)
+    ])
 
-    for venda in dados['vendas']:
+    tabela_pagamentos = Table(dados_pagamentos, colWidths=[180, 90, 90], hAlign='CENTER')
+    tabela_pagamentos.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.lightblue),  # Linha de total
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),  # Linha de total em negrito
+        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+    ]))
+    elements.append(tabela_pagamentos)
+    elements.append(Spacer(1, 16))
+
+    # --- Detalhes das Vendas ---
+    elements.append(Paragraph("DETALHES DAS VENDAS", bold_center))
+    elements.append(Spacer(1, 8))
+
+    for i, venda in enumerate(dados['vendas']):
         is_estorno = venda['valor_total'] < 0
         valor_exibicao = abs(venda['valor_total'])
 
-        pdf.setFont("Helvetica-Bold", 14)
+        # Título da venda
         if is_estorno:
-            pdf.setFillColor(colors.red)
-            pdf.drawString(margin, linha_atual, f"ESTORNO DA VENDA #{venda['id']}")
-            pdf.setFillColor(colors.black)
+            titulo_venda = f"ESTORNO DA VENDA #{venda['id']}"
+            elements.append(Paragraph(titulo_venda, estorno_style))
         else:
-            pdf.drawString(margin, linha_atual, f"DETALHES DA VENDA #{venda['id']}")
-        linha_atual -= espacamento
+            titulo_venda = f"VENDA #{venda['id']}"
+            elements.append(Paragraph(titulo_venda, bold_left))
 
-        info_venda = [
+        # Informações da venda
+        info_venda_data = [
             ["Cliente:", venda['cliente']],
             ["Data/Hora:", datetime.fromisoformat(venda['data']).strftime('%d/%m/%Y %H:%M')],
             ["Operador:", venda['operador']],
-            ["Valor Total:", format_number(valor_exibicao)],
-            ["Desconto:", format_number(venda['valor_desconto'])],
+            ["Valor Total:", moeda_br(valor_exibicao)],
+            ["Desconto:", moeda_br(venda['valor_desconto'])],
             ["Forma Pagamento:", venda['forma_pagamento']],
             ["A Prazo:", "Sim" if venda['a_prazo'] else "Não"],
             ["Tipo:", "ESTORNO" if is_estorno else "VENDA NORMAL"]
         ]
 
-        tabela_info = Table(info_venda, colWidths=[100, 300])
-        estilo_info = [
+        tabela_info_venda = Table(info_venda_data, colWidths=[100, 200], hAlign='LEFT')
+        estilo_info_venda = [
             ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('GRID', (0, 0), (-1, -1), 0.25, colors.lightgrey)
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.25, colors.lightgrey),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP')
         ]
+        
         if is_estorno:
-            estilo_info.append(('TEXTCOLOR', (0, 7), (1, 7), colors.red))
-            estilo_info.append(('FONTNAME', (0, 7), (1, 7), 'Helvetica-Bold'))
+            estilo_info_venda.append(('TEXTCOLOR', (0, 7), (1, 7), colors.red))
+            estilo_info_venda.append(('FONTNAME', (0, 7), (1, 7), 'Helvetica-Bold'))
 
-        tabela_info.setStyle(TableStyle(estilo_info))
-        altura_info = tabela_info.wrap(width - 2 * margin, height)[1]
-        verificar_espaco(altura_info)
-        tabela_info.drawOn(pdf, margin, linha_atual - altura_info)
-        linha_atual -= altura_info + espacamento
+        tabela_info_venda.setStyle(TableStyle(estilo_info_venda))
+        elements.append(tabela_info_venda)
+        elements.append(Spacer(1, 8))
 
-        pdf.setFont("Helvetica-Bold", 12)
-        pdf.drawString(margin, linha_atual, "ITENS:")
-        linha_atual -= espacamento_pequeno
-
+        # Itens da venda
+        elements.append(Paragraph("ITENS:", ParagraphStyle(name='ItemsTitle', parent=left_style, fontSize=10, leading=12)))
+        
         dados_itens = [["Produto", "Qtd", "V. Unit.", "V. Total", "Desconto"]]
+        
         for item in venda['itens']:
             quantidade = -item['quantidade'] if is_estorno else item['quantidade']
-            valor_total = -item['valor_total'] if is_estorno else item['valor_total']
-            desconto = -item['desconto'] if is_estorno and item['desconto'] else item['desconto']
+            valor_total_item = -item['valor_total'] if is_estorno else item['valor_total']
+            desconto_item = -item['desconto'] if is_estorno and item['desconto'] else item['desconto']
+            
+            produto_paragraph = Paragraph(item['produto'], wrap_style)
+            
             dados_itens.append([
-                item['produto'],
+                produto_paragraph,
                 f"{quantidade:.3f}",
-                format_number(item['valor_unitario']),
-                format_number(valor_total),
-                format_number(desconto) if desconto > 0 else "-"
+                moeda_br(item['valor_unitario']),
+                moeda_br(valor_total_item),
+                moeda_br(desconto_item) if desconto_item > 0 else "-"
             ])
 
-        tabela_itens = Table(dados_itens, colWidths=[180, 50, 70, 70, 60])
+        tabela_itens = Table(dados_itens, colWidths=[180, 50, 70, 70, 60], hAlign='CENTER')
         estilo_itens = [
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 8),
             ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
             ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
             ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP')
         ]
+        
         if is_estorno:
             estilo_itens.append(('TEXTCOLOR', (0, 1), (-1, -1), colors.red))
 
         tabela_itens.setStyle(TableStyle(estilo_itens))
-        altura_itens = tabela_itens.wrap(width - 2 * margin, height)[1]
-        verificar_espaco(altura_itens)
-        tabela_itens.drawOn(pdf, margin, linha_atual - altura_itens)
-        linha_atual -= altura_itens + espacamento
+        elements.append(tabela_itens)
+        
+        # Espaçamento entre vendas (exceto na última)
+        if i < len(dados['vendas']) - 1:
+            elements.append(Spacer(1, 16))
 
-        pdf.setStrokeColor(colors.lightgrey)
-        pdf.line(margin, linha_atual, width - margin, linha_atual)
-        linha_atual -= espacamento
+    # --- Área para assinaturas ---
+    elements.append(Spacer(1, 30))
+    
+    # Criar linhas de assinatura simples
+    assinatura_data = [
+        ["_" * 40, "_" * 40],
+        ["Assinatura do Operador", "Assinatura do Administrador"]
+    ]
+    
+    tabela_assinaturas = Table(assinatura_data, colWidths=[270, 270], hAlign='CENTER')
+    tabela_assinaturas.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+        ('TOPPADDING', (0, 1), (-1, 1), 10),
+    ]))
+    elements.append(tabela_assinaturas)
 
-    pdf.save()
+    # --- Build do documento ---
+    doc.build(elements)
     buffer.seek(0)
 
     return send_file(
@@ -1060,7 +1172,6 @@ def gerar_pdf_vendas_dia():
         download_name=f"relatorio_vendas_{data_relatorio.strftime('%Y%m%d')}.pdf",
         mimetype='application/pdf'
     )
-
     
 # ===== API SALDO =====
 @operador_bp.route('/api/saldo', methods=['GET'])
@@ -1087,20 +1198,20 @@ def api_get_saldo():
         data_fim = datetime.combine(hoje, time.max).replace(tzinfo=ZoneInfo('America/Sao_Paulo'))
 
         # Filtra vendas apenas do caixa do operador atual, excluindo notas canceladas
-        lancamentos = db.session.query(entities.Financeiro).join(
-            entities.NotaFiscal,
-            entities.Financeiro.nota_fiscal_id == entities.NotaFiscal.id,
+        lancamentos = db.session.query( Financeiro).join(
+             NotaFiscal,
+             Financeiro.nota_fiscal_id ==  NotaFiscal.id,
             isouter=True
         ).filter(
-            entities.Financeiro.tipo == entities.TipoMovimentacao.entrada,
-            entities.Financeiro.categoria == entities.CategoriaFinanceira.venda,
-            entities.Financeiro.data >= data_inicio,
-            entities.Financeiro.data <= data_fim,
-            entities.Financeiro.caixa_id == caixa.id,
+             Financeiro.tipo ==  TipoMovimentacao.entrada,
+             Financeiro.categoria ==  CategoriaFinanceira.venda,
+             Financeiro.data >= data_inicio,
+             Financeiro.data <= data_fim,
+             Financeiro.caixa_id == caixa.id,
             # Filtro para notas fiscais: ou é nula (não tem nota) ou não está cancelada
             db.or_(
-                entities.NotaFiscal.id.is_(None),
-                entities.NotaFiscal.status != entities.StatusNota.cancelada
+                 NotaFiscal.id.is_(None),
+                 NotaFiscal.status !=  StatusNota.cancelada
             )
         ).all()
 
@@ -1111,12 +1222,12 @@ def api_get_saldo():
 
         # --- Total de DESPESAS do dia ---
         # Busca despesas apenas do caixa do operador atual
-        despesas = db.session.query(entities.Financeiro).filter(
-            entities.Financeiro.tipo == entities.TipoMovimentacao.saida,
-            entities.Financeiro.categoria == entities.CategoriaFinanceira.despesa,
-            entities.Financeiro.data >= data_inicio,
-            entities.Financeiro.data <= data_fim,
-            entities.Financeiro.caixa_id == caixa.id
+        despesas = db.session.query( Financeiro).filter(
+             Financeiro.tipo ==  TipoMovimentacao.saida,
+             Financeiro.categoria ==  CategoriaFinanceira.despesa,
+             Financeiro.data >= data_inicio,
+             Financeiro.data <= data_fim,
+             Financeiro.caixa_id == caixa.id
         ).all()
 
         print(f"Despesas do caixa {caixa.id}: {len(despesas)} registros encontrados")
@@ -1306,9 +1417,9 @@ def registrar_despesa():
         # Pega o horário atual no fuso America/Sao_Paulo (pode ajustar para Fortaleza ou outro)
         agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
 
-        despesa = entities.Financeiro(
-            tipo=entities.TipoMovimentacao.saida,
-            categoria=entities.CategoriaFinanceira.despesa,
+        despesa =  Financeiro(
+            tipo= TipoMovimentacao.saida,
+            categoria= CategoriaFinanceira.despesa,
             valor=Decimal(valor),
             descricao=descricao,
             data=agora, 
@@ -1334,14 +1445,14 @@ def registrar_despesa():
 def api_get_produto_descontos(produto_id):
     try:
         # Busca o produto
-        produto = db.session.query(entities.Produto).get(produto_id)
+        produto = db.session.query( Produto).get(produto_id)
         if not produto:
             return jsonify({'error': 'Produto não encontrado'}), 404
         
         # Busca todos os descontos associados a este produto
-        descontos = db.session.query(entities.Desconto)\
-            .join(entities.produto_desconto_association)\
-            .filter(entities.produto_desconto_association.c.produto_id == produto_id)\
+        descontos = db.session.query( Desconto)\
+            .join( produto_desconto_association)\
+            .filter( produto_desconto_association.c.produto_id == produto_id)\
             .all()
         
         # Filtra os descontos ativos e dentro da validade
