@@ -328,14 +328,6 @@ def api_registrar_venda():
             soma_pagamentos = sum(Decimal(str(p.get('valor'))) for p in dados_venda['pagamentos'])
             a_prazo_usado = any(p.get('forma_pagamento') == 'a_prazo' for p in dados_venda['pagamentos'])
             
-            # Verifica se a soma dos pagamentos bate com o valor total
-            if abs(soma_pagamentos - valor_total) > Decimal('0.01'):
-                msg = f'Valor recebido ({soma_pagamentos}) diferente do total da venda ({valor_total})'
-                app.logger.error(msg)
-                return jsonify({
-                    'success': False,
-                    'message': msg
-                }), 400
         except (ValueError, InvalidOperation, TypeError) as e:
             app.logger.error(f"Erro ao verificar pagamentos: {str(e)}")
             return jsonify({

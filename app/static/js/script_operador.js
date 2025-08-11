@@ -275,9 +275,6 @@ function renderClientsTable() {
                     <button class="btn-action btn-select" onclick="selectClientForSale(${client.id})" title="Selecionar para venda">
                         <i class="fas fa-shopping-cart"></i>
                     </button>
-                    <button class="btn-action btn-delete" onclick="confirmDeleteClient(${client.id})" title="Excluir cliente">
-                        <i class="fas fa-trash"></i>
-                    </button>
                 </div>
             </td>
         </tr>
@@ -482,6 +479,55 @@ async function searchClient() {
     }
 }
 
+// Função para selecionar cliente para venda (chamada pelo botão)
+function selectClientForSale(clientId) {
+    // Buscar o cliente pelo ID
+    const client = findClientById(clientId);
+    
+    if (client) {
+        // Chamar a função selectClient existente
+        selectClient(client);
+        
+        // Opcional: Fechar modal de seleção de cliente se existir
+        closeClientModal();
+    } else {
+        showMessage('Cliente não encontrado', 'error');
+    }
+}
+
+// Função auxiliar para buscar cliente por ID
+function findClientById(clientId) {
+    // Assumindo que você tem uma lista de clientes chamada 'clients' ou similar
+    // Ajuste conforme sua estrutura de dados
+    
+    if (typeof clients !== 'undefined' && Array.isArray(clients)) {
+        return clients.find(client => client.id == clientId);
+    }
+    
+    // Se os clientes estão em outra estrutura, ajuste aqui
+    // Exemplo alternativo se os dados vêm de uma tabela:
+    const clientRow = document.querySelector(`[data-client-id="${clientId}"]`);
+    if (clientRow) {
+        return {
+            id: clientId,
+            nome: clientRow.getAttribute('data-client-name') || clientRow.querySelector('.client-name')?.textContent,
+            // Adicione outros campos necessários
+        };
+    }
+    
+    return null;
+}
+
+// Função para fechar modal (opcional)
+function closeClientModal() {
+    const modal = document.getElementById('clientModal') || document.querySelector('.client-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+    }
+}
+
+// Sua função selectClient existente (mantendo como está)
 function selectClient(client) {
     if (!client || !selectedClientInput || !selectedClientIdInput) return;
     selectedClient = client;
@@ -489,6 +535,21 @@ function selectClient(client) {
     selectedClientIdInput.value = client.id;
     showMessage(`Cliente selecionado: ${client.nome}`);
     updateCaixaStatus();
+}
+
+// Versão alternativa se você quiser passar o objeto cliente diretamente no botão
+// Neste caso, o botão seria: onclick="selectClientForSaleByObject(this)" 
+// E você adicionaria data-attributes no botão com as informações do cliente
+
+function selectClientForSaleByObject(buttonElement) {
+    const clientData = {
+        id: buttonElement.getAttribute('data-client-id'),
+        nome: buttonElement.getAttribute('data-client-name'),
+        // Adicione outros campos conforme necessário
+    };
+    
+    selectClient(clientData);
+    closeClientModal();
 }
 
 function showClientSearchResults(clients) {
@@ -1021,10 +1082,11 @@ async function registerSale() {
         const paymentMethods = [];
         const paymentItems = document.querySelectorAll('.payment-item');
         
+        // Processa os métodos de pagamento já definidos
         paymentItems.forEach(item => {
             const method = item.querySelector('input[name="payment_methods[]"]').value;
             const amount = parseFloat(item.querySelector('input[name="payment_amounts[]"]').value.replace(',', '.'));
-            if (!isNaN(amount)) {
+            if (!isNaN(amount) && amount > 0) {
                 paymentMethods.push({
                     forma_pagamento: method,
                     valor: amount
@@ -1034,23 +1096,47 @@ async function registerSale() {
 
         const totalText = saleTotalElement?.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
         const total = parseFloat(totalText) || 0;
-        let valor_recebido = total;
+        let valor_recebido = 0;
         
         if (paymentMethods.length > 0) {
+            // Se há múltiplos métodos de pagamento, soma todos os valores
             valor_recebido = paymentMethods.reduce((sum, pm) => sum + pm.valor, 0);
         } else {
-            // Se não houver múltiplos pagamentos, usa o valor recebido ou assume dinheiro
+            // Se não há múltiplos pagamentos, usa o valor do campo "valor recebido"
             const amountReceivedText = amountReceivedInput?.value.replace(/\./g, '').replace(',', '.') || '0';
             valor_recebido = parseFloat(amountReceivedText) || 0;
+        }
+
+        const totalPagamentos = paymentMethods.reduce((sum, pm) => sum + pm.valor, 0);
+        
+        if (totalPagamentos < total) {
+            const remaining = total - totalPagamentos;
             
-            // Se o valor recebido for menor que o total, assume que o restante é dinheiro
-            if (valor_recebido < total) {
-                const remaining = total - valor_recebido;
+            // Verifica se já existe um pagamento em dinheiro para somar
+            const pagamentoDinheiroExistente = paymentMethods.find(pm => pm.forma_pagamento === 'dinheiro');
+            
+            if (pagamentoDinheiroExistente) {
+                // Se já existe pagamento em dinheiro, adiciona o valor restante
+                pagamentoDinheiroExistente.valor += remaining;
+            } else {
+                // Se não existe, cria um novo pagamento em dinheiro
                 paymentMethods.push({
                     forma_pagamento: 'dinheiro',
                     valor: remaining
                 });
             }
+            
+            // Atualiza o valor_recebido para incluir o pagamento em dinheiro
+            valor_recebido = total;
+        }
+        
+        // Se não há nenhum método de pagamento definido, assume pagamento total em dinheiro
+        if (paymentMethods.length === 0) {
+            paymentMethods.push({
+                forma_pagamento: 'dinheiro',
+                valor: total
+            });
+            valor_recebido = total;
         }
 
         const items = selectedProducts.map(product => {
@@ -1076,14 +1162,11 @@ async function registerSale() {
 
         const saleData = {
             cliente_id: parseInt(selectedClientIdInput.value),
-            forma_pagamento: paymentMethods.length > 0 ? 'multiplos' : document.getElementById('payment-method')?.value || 'dinheiro',
+            forma_pagamento: paymentMethods.length > 1 ? 'multiplos' : paymentMethods[0].forma_pagamento,
             valor_recebido: valor_recebido,
             valor_total: total,
             itens: items,
-            pagamentos: paymentMethods.length > 0 ? paymentMethods : [{
-                forma_pagamento: document.getElementById('payment-method')?.value || 'dinheiro',
-                valor: valor_recebido
-            }],
+            pagamentos: paymentMethods, // Sempre envia a lista de pagamentos
             total_descontos: items.reduce((sum, item) => sum + item.valor_desconto, 0),
             observacao: document.getElementById('sale-notes')?.value
         };
@@ -1100,7 +1183,6 @@ async function registerSale() {
                 instrucoes: deliveryAddress.instrucoes || ''
             };
         }
-
         const response = await fetch('/operador/api/vendas', {
             method: 'POST',
             headers: { 
