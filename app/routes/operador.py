@@ -666,7 +666,7 @@ def obter_vendas_hoje():
                 ],
                 'pagamentos': agregar_pagamentos(venda.pagamentos) if venda.pagamentos else []
             })
-
+        print(f'Vendas do dia: \n{resultado}')
         return jsonify({
             'success': True,
             'data': resultado,

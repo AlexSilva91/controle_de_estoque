@@ -1,10 +1,26 @@
+/**
+ * SISTEMA DE CAIXA - OPERADOR
+ * Arquivo completo com todas as funcionalidades do sistema de caixa
+ * Documentado para fácil manutenção e atualização futura
+ */
+
 // ==================== VARIÁVEIS GLOBAIS ====================
+/**
+ * Variáveis de estado do sistema
+ * @type {boolean} balanceVisible - Controla a visibilidade do saldo
+ * @type {number} currentBalance - Armazena o saldo atual do caixa
+ * @type {Array} clients - Lista de clientes cadastrados
+ * @type {Array} products - Lista de produtos disponíveis
+ * @type {Object|null} currentEditingClient - Cliente em edição
+ * @type {Object|null} selectedClient - Cliente selecionado para venda
+ * @type {Array} selectedProducts - Produtos selecionados para venda
+ * @type {Object|null} deliveryAddress - Endereço de entrega
+ * @type {number|null} currentCaixaId - ID do caixa aberto
+ * @type {Object|null} currentUser - Dados do usuário logado
+ */
 let balanceVisible = true;
 let currentBalance = 0;
 let clients = [];
-let filteredClients = [];
-let currentSort = { field: 'nome', direction: 'asc' };
-let currentFilter = 'all';
 let products = [];
 let currentEditingClient = null;
 let selectedClient = null;
@@ -12,19 +28,25 @@ let selectedProducts = [];
 let deliveryAddress = null;
 let currentCaixaId = null;
 let currentUser = null;
-let activeSearchDropdown = null;
-let clientSearchTimeout;
-let productSearchTimeout;
-let currentOpenModal = null;
 
 // ==================== ELEMENTOS DOM ====================
+/**
+ * Seleção de todos os elementos DOM necessários
+ * Cada grupo está documentado conforme sua função no sistema
+ */
+
+// Elementos de saldo e data
 const openingBalanceLabel = document.getElementById('opening-balance')?.querySelector('.balance-value');
 const currentBalanceLabel = document.getElementById('current-balance')?.querySelector('.balance-value');
 const currentDateElement = document.getElementById('current-date');
 const toggleBalanceBtn = document.getElementById('toggle-balance');
+
+// Elementos de navegação por abas
 const tabBtns = document.querySelectorAll('.menu-item');
 const tabContents = document.querySelectorAll('.tab-content');
 const currentTabTitle = document.getElementById('current-tab-title');
+
+// Elementos de produtos e vendas
 const productsList = document.getElementById('products-list');
 const productSearchInput = document.getElementById('product-search-input');
 const addProductBtn = document.getElementById('add-product-btn');
@@ -33,12 +55,15 @@ const saleTotalElement = document.getElementById('sale-total');
 const subtotalValueElement = document.getElementById('subtotal-value');
 const changeValueElement = document.getElementById('change-value');
 const amountReceivedInput = document.getElementById('amount-received');
+
+// Elementos de clientes
 const clientSearchInput = document.getElementById('client-search-input');
 const selectedClientInput = document.getElementById('selected-client');
 const selectedClientIdInput = document.getElementById('selected-client-id');
-const daySalesContent = document.getElementById('day-sales');
 const clientSearch = document.getElementById('client-search');
 const searchClientBtn = document.getElementById('search-client-btn');
+
+// Elementos modais
 const clientModal = document.getElementById('client-modal');
 const clientModalTitle = document.getElementById('client-modal-title');
 const clientForm = document.getElementById('client-form');
@@ -46,22 +71,32 @@ const modalCloses = document.querySelectorAll('.modal-close, #cancel-client');
 const productSearchModal = document.getElementById('product-search-modal');
 const modalProductSearch = document.getElementById('modal-product-search');
 const productSearchResults = document.getElementById('product-search-results');
+
+// Elementos de entrega
 const deliveryBtn = document.getElementById('delivery-btn');
 const useClientAddressBtn = document.getElementById('use-client-address-btn');
 const deliveryModal = document.getElementById('delivery-modal');
 const saveDeliveryBtn = document.getElementById('save-delivery');
 const cancelDeliveryBtn = document.getElementById('cancel-delivery');
+
+// Elementos de despesas
 const openExpenseModalBtn = document.getElementById('open-expense-modal-btn');
 const expenseModal = document.getElementById('expense-modal');
 const expenseForm = document.getElementById('expense-form');
 const cancelExpenseBtn = document.getElementById('cancel-expense');
 const saveExpenseBtn = document.getElementById('save-expense');
+
+// Outros elementos
 const closeRegisterBtn = document.getElementById('close-register-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const notification = document.getElementById('notification');
 const notificationMessage = document.getElementById('notification-message');
 
 // ==================== CONFIGURAÇÕES ====================
+/**
+ * Configuração para prevenir cache nas requisições
+ * @type {Object}
+ */
 const preventCacheConfig = {
     headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -70,105 +105,24 @@ const preventCacheConfig = {
     }
 };
 
-// ==================== ATALHOS DE TECLADO ====================
-const keyMap = {
-    'F1': showHelpMenu,
-    'F2': () => switchTab('sales'),
-    'F3': () => switchTab('day-sales'),
-    'F4': () => switchTab('clients'),
-    'F5': loadClients,
-    'F6': openClientModal,
-    'F7': openProductSearchModal,
-    'F8': openExpenseModal,
-    'F9': registerSale,
-    'F10': () => document.getElementById('amount-received')?.focus(),
-    'Escape': closeModal,
-    'Ctrl+1': () => document.getElementById('client-search-input')?.focus(),
-    'Ctrl+2': () => document.getElementById('product-search-input')?.focus(),
-    'Ctrl+D': applyManualDiscount,
-    'Ctrl+L': resetSaleForm,
-    'Ctrl+Q': () => logoutBtn?.click()
-};
-
-// ==================== MENU DE AJUDA ====================
-function showHelpMenu() {
-    const helpContent = `
-        <div class="help-menu">
-            <h2>Atalhos do Teclado</h2>
-            <table>
-                <tr><td><kbd>F1</kbd></td><td>Abrir este menu de ajuda</td></tr>
-                <tr><td><kbd>F2</kbd></td><td>Aba de Vendas</td></tr>
-                <tr><td><kbd>F3</kbd></td><td>Aba de Vendas do Dia</td></tr>
-                <tr><td><kbd>F4</kbd></td><td>Aba de Clientes</td></tr>
-                <tr><td><kbd>F5</kbd></td><td>Atualizar lista de clientes</td></tr>
-                <tr><td><kbd>F6</kbd></td><td>Cadastrar novo cliente</td></tr>
-                <tr><td><kbd>F8</kbd></td><td>Cadastrar despesa</td></tr>
-                <tr><td><kbd>F9</kbd></td><td>Registrar venda</td></tr>
-                <tr><td><kbd>F10</kbd></td><td>Focar no campo "Valor Recebido"</td></tr>
-                <tr><td><kbd>ESC</kbd></td><td>Fechar modal/limpar busca</td></tr>
-                <tr><td><kbd>Ctrl+1</kbd></td><td>Focar na busca de clientes</td></tr>
-                <tr><td><kbd>Ctrl+2</kbd></td><td>Focar na busca de produtos</td></tr>
-                <tr><td><kbd>Ctrl+D</kbd></td><td>Aplicar desconto manual</td></tr>
-                <tr><td><kbd>Ctrl+L</kbd></td><td>Limpar venda atual</td></tr>
-                <tr><td><kbd>Ctrl+Q</kbd></td><td>Sair do sistema</td></tr>
-            </table>
-            <button class="btn-primary" onclick="closeHelpMenu()">Fechar</button>
-        </div>
-    `;
-    
-    const helpMenu = document.createElement('div');
-    helpMenu.id = 'help-menu-overlay';
-    helpMenu.innerHTML = helpContent;
-    document.body.appendChild(helpMenu);
-    
-    helpMenu.style.display = 'flex';
-    helpMenu.addEventListener('click', (e) => {
-        if (e.target === helpMenu) closeHelpMenu();
-    });
-}
-
-function closeHelpMenu() {
-    const helpMenu = document.getElementById('help-menu-overlay');
-    if (helpMenu) helpMenu.remove();
-}
-
-// ==================== MANIPULAÇÃO DE TECLADO ====================
-function handleKeyDown(e) {
-    const key = e.key;
-    const ctrlKey = e.ctrlKey || e.metaKey;
-    
-    // Verifica combinações de teclas
-    if (ctrlKey) {
-        const combo = `Ctrl+${key.toUpperCase()}`;
-        if (keyMap[combo]) {
-            e.preventDefault();
-            keyMap[combo]();
-        }
-    } else {
-        // Verifica teclas individuais
-        if (key === 'Escape' && activeSearchDropdown) {
-            closeAllDropdowns();
-            return;
-        }
-        
-        if (keyMap[key]) {
-            e.preventDefault();
-            keyMap[key]();
-        }
-    }
-}
-
 // ==================== INICIALIZAÇÃO ====================
+/**
+ * Inicializa o sistema quando o DOM estiver completamente carregado
+ * Carrega dados iniciais e configura event listeners
+ */
 document.addEventListener('DOMContentLoaded', async () => {
     try {
+        // Aguarda breve momento para garantir que todos os elementos estejam disponíveis
         await new Promise(resolve => setTimeout(resolve, 100));
+        
         updateCurrentDate();
         await loadCurrentUser();
         await loadClients();
         await loadProducts();
         await checkCaixaStatus();
         setupEventListeners();
-        document.addEventListener('keydown', handleKeyDown);
+
+        // Atualizações periódicas
         setInterval(() => loadProducts(true), 10000);
         setInterval(() => updateBalance(true), 10000);
     } catch (error) {
@@ -178,6 +132,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ==================== FUNÇÕES DE USUÁRIO ====================
+/**
+ * Carrega os dados do usuário logado
+ * @async
+ */
 async function loadCurrentUser() {
     try {
         const response = await fetch('/operador/api/usuario', {
@@ -185,6 +143,7 @@ async function loadCurrentUser() {
             method: 'GET'
         });
         if (!response.ok) throw new Error('Erro ao carregar dados do usuário');
+        
         currentUser = await response.json();
     } catch (error) {
         showMessage(error.message, 'error');
@@ -192,266 +151,30 @@ async function loadCurrentUser() {
 }
 
 // ==================== FUNÇÕES DE CLIENTES ====================
+/**
+ * Carrega a lista de clientes do servidor
+ * @async
+ */
 async function loadClients() {
     try {
-        showClientsLoading(true);
         const response = await fetch('/operador/api/clientes', {
             ...preventCacheConfig,
             method: 'GET'
         });
         if (!response.ok) throw new Error('Erro ao carregar clientes');
+        
         clients = await response.json();
-        filteredClients = [...clients];
-        renderClientsTable();
-        updateClientsCount();
+        renderClientCards();
     } catch (error) {
         showMessage(error.message, 'error');
-        showClientsEmptyState(true);
-    } finally {
-        showClientsLoading(false);
     }
 }
 
-function renderClientsTable() {
-    const tbody = document.getElementById('clients-tbody');
-    if (!tbody) return;
-    
-    if (filteredClients.length === 0) {
-        showClientsEmptyState(true);
-        return;
-    }
-    
-    showClientsEmptyState(false);
-    tbody.innerHTML = filteredClients.map(client => `
-        <tr class="client-row" data-client-id="${client.id}">
-            <td class="client-id">#${client.id}</td>
-            <td class="client-name">
-                <div class="client-name-container">
-                    <strong>${client.nome || 'Não informado'}</strong>
-                    ${client.apelido ? `<small class="client-nickname">(${client.apelido})</small>` : ''}
-                </div>
-            </td>
-            <td class="client-document">
-                <span class="document-value">${formatDocument(client.documento) || 'Não informado'}</span>
-            </td>
-            <td class="client-phone">
-                ${client.telefone ? `
-                    <a href="tel:${client.telefone}" class="phone-link">
-                        <i class="fas fa-phone"></i>
-                        ${formatPhone(client.telefone)}
-                    </a>
-                ` : '<span class="text-muted">Não informado</span>'}
-            </td>
-            <td class="client-email">
-                ${client.email ? `
-                    <a href="mailto:${client.email}" class="email-link">
-                        <i class="fas fa-envelope"></i>
-                        ${client.email}
-                    </a>
-                ` : '<span class="text-muted">Não informado</span>'}
-            </td>
-            <td class="client-address">
-                <div class="address-container">
-                    ${client.endereco ? `
-                        <span class="address-text" title="${client.endereco}">
-                            ${truncateText(client.endereco, 30)}
-                        </span>
-                    ` : '<span class="text-muted">Não informado</span>'}
-                </div>
-            </td>
-            <td class="client-date">
-                <span class="date-value" title="${formatDateTime(client.data_cadastro)}">
-                    ${formatDate(client.data_cadastro)}
-                </span>
-            </td>
-            <td class="client-actions">
-                <div class="action-buttons">
-                    <button class="btn-action btn-edit" onclick="editClient(${client.id})" title="Editar cliente">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn-action btn-view" onclick="viewClientDetails(${client.id})" title="Ver detalhes">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                    <button class="btn-action btn-select" onclick="selectClientForSale(${client.id})" title="Selecionar para venda">
-                        <i class="fas fa-shopping-cart"></i>
-                    </button>
-                    <button class="btn-action btn-delete" onclick="confirmDeleteClient(${client.id})" title="Excluir cliente">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
-}
-
-function searchClients(searchTerm) {
-    const term = searchTerm.toLowerCase().trim();
-    if (!term) {
-        filteredClients = [...clients];
-    } else {
-        filteredClients = clients.filter(client => 
-            (client.nome && client.nome.toLowerCase().includes(term)) ||
-            (client.documento && client.documento.includes(term)) ||
-            (client.telefone && client.telefone.includes(term)) ||
-            (client.email && client.email.toLowerCase().includes(term)) ||
-            (client.endereco && client.endereco.toLowerCase().includes(term))
-        );
-    }
-    applySortAndFilter();
-    renderClientsTable();
-    updateClientsCount();
-}
-
-function filterClients(filterType) {
-    currentFilter = filterType;
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    
-    switch (filterType) {
-        case 'recent':
-            filteredClients = clients.filter(client => 
-                new Date(client.data_cadastro) >= thirtyDaysAgo
-            );
-            break;
-        case 'frequent':
-            filteredClients = clients.filter(client => 
-                client.total_vendas && client.total_vendas > 5
-            );
-            break;
-        default:
-            filteredClients = [...clients];
-    }
-    
-    applySortAndFilter();
-    renderClientsTable();
-    updateClientsCount();
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.filter === filterType);
-    });
-}
-
-function sortClients(field) {
-    if (currentSort.field === field) {
-        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-    } else {
-        currentSort.field = field;
-        currentSort.direction = 'asc';
-    }
-    
-    filteredClients.sort((a, b) => {
-        let valueA = a[field] || '';
-        let valueB = b[field] || '';
-        
-        if (field === 'id') {
-            valueA = parseInt(valueA) || 0;
-            valueB = parseInt(valueB) || 0;
-        } else if (field === 'data_cadastro') {
-            valueA = new Date(valueA);
-            valueB = new Date(valueB);
-        } else {
-            valueA = valueA.toString().toLowerCase();
-            valueB = valueB.toString().toLowerCase();
-        }
-        
-        let comparison = 0;
-        if (valueA > valueB) comparison = 1;
-        if (valueA < valueB) comparison = -1;
-        
-        return currentSort.direction === 'desc' ? -comparison : comparison;
-    });
-    
-    renderClientsTable();
-    updateSortIcons();
-}
-
-function applySortAndFilter() {
-    if (currentSort.field) {
-        sortClients(currentSort.field);
-    }
-}
-
-function updateSortIcons() {
-    document.querySelectorAll('.sortable i').forEach(icon => {
-        icon.className = 'fas fa-sort';
-    });
-    
-    const activeHeader = document.querySelector(`[data-sort="${currentSort.field}"] i`);
-    if (activeHeader) {
-        activeHeader.className = currentSort.direction === 'asc' 
-            ? 'fas fa-sort-up' 
-            : 'fas fa-sort-down';
-    }
-}
-
-function updateClientsCount() {
-    const countElement = document.getElementById('clients-count');
-    if (countElement) {
-        const total = clients.length;
-        const filtered = filteredClients.length;
-        
-        if (total === filtered) {
-            countElement.textContent = `${total} cliente${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`;
-        } else {
-            countElement.textContent = `${filtered} de ${total} clientes`;
-        }
-    }
-}
-
-function showClientsLoading(show) {
-    const loading = document.getElementById('clients-loading');
-    const table = document.querySelector('.clients-table-container');
-    if (loading) loading.style.display = show ? 'block' : 'none';
-    if (table) table.style.display = show ? 'none' : 'block';
-}
-
-function showClientsEmptyState(show) {
-    const emptyState = document.getElementById('clients-empty-state');
-    const table = document.querySelector('.clients-table-container');
-    const tableFooter = document.querySelector('.table-footer');
-    if (emptyState) emptyState.style.display = show ? 'block' : 'none';
-    if (table) table.style.display = show ? 'none' : 'block';
-    if (tableFooter) tableFooter.style.display = show ? 'none' : 'flex';
-}
-
-function formatDocument(doc) {
-    if (!doc) return '';
-    const numbers = doc.replace(/\D/g, '');
-    if (numbers.length === 11) {
-        return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-    } else if (numbers.length === 14) {
-        return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-    }
-    return doc;
-}
-
-function formatPhone(phone) {
-    if (!phone) return '';
-    const numbers = phone.replace(/\D/g, '');
-    if (numbers.length === 11) {
-        return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
-    } else if (numbers.length === 10) {
-        return numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
-    }
-    return phone;
-}
-
-function formatDate(dateString) {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR');
-}
-
-function formatDateTime(dateString) {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleString('pt-BR');
-}
-
-function truncateText(text, maxLength) {
-    if (!text) return '';
-    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
-}
-
+/**
+ * Busca clientes com base em um termo de pesquisa
+ * @async
+ * @param {string} searchTerm - Termo para busca
+ */
 async function searchClient() {
     const searchTerm = clientSearchInput?.value.trim();
     if (!searchTerm) {
@@ -465,6 +188,7 @@ async function searchClient() {
             method: 'GET'
         });
         if (!response.ok) throw new Error('Erro ao buscar clientes');
+        
         const results = await response.json();
         
         if (results.length === 0) {
@@ -482,8 +206,13 @@ async function searchClient() {
     }
 }
 
+/**
+ * Seleciona um cliente para a venda atual
+ * @param {Object} client - Cliente selecionado
+ */
 function selectClient(client) {
     if (!client || !selectedClientInput || !selectedClientIdInput) return;
+    
     selectedClient = client;
     selectedClientInput.value = client.nome;
     selectedClientIdInput.value = client.id;
@@ -491,40 +220,24 @@ function selectClient(client) {
     updateCaixaStatus();
 }
 
+/**
+ * Exibe resultados da busca de clientes
+ * @param {Array} clients - Lista de clientes encontrados
+ */
 function showClientSearchResults(clients) {
-    const resultsContainer = document.getElementById('client-search-results');
-    if (!resultsContainer) return;
-    resultsContainer.innerHTML = '';
-    
-    if (clients.length === 0) {
-        resultsContainer.innerHTML = '<div class="no-results">Nenhum cliente encontrado</div>';
-        resultsContainer.style.display = 'block';
-        return;
+    if (clients.length > 0) {
+        selectClient(clients[0]);
     }
-    
-    clients.forEach(client => {
-        const resultItem = document.createElement('div');
-        resultItem.className = 'search-result-item';
-        resultItem.innerHTML = `
-            <h4>${client.nome}</h4>
-            <p>Documento: ${client.documento || 'Não informado'}</p>
-            <p>Telefone: ${client.telefone || 'Não informado'}</p>
-        `;
-        resultItem.addEventListener('click', () => {
-            selectClient(client);
-            resultsContainer.style.display = 'none';
-            if (clientSearchInput) clientSearchInput.value = '';
-        });
-        resultsContainer.appendChild(resultItem);
-    });
-    
-    resultsContainer.style.display = 'block';
-    activeSearchDropdown = resultsContainer;
 }
 
+/**
+ * Renderiza os cards de clientes na interface
+ * @param {Array|null} [filteredClients=null] - Lista filtrada de clientes (opcional)
+ */
 function renderClientCards(filteredClients = null) {
     const container = document.getElementById('clients-container');
     if (!container) return;
+    
     container.innerHTML = '';
     const clientsToRender = filteredClients || clients;
     
@@ -557,28 +270,42 @@ function renderClientCards(filteredClients = null) {
     });
 }
 
+/**
+ * Abre o modal para cadastro de novo cliente
+ */
 function openClientModal() {
     if (!clientModalTitle || !clientForm) return;
+    
     currentEditingClient = null;
     clientModalTitle.textContent = 'Cadastrar Cliente';
     clientForm.reset();
     openModal('client');
 }
 
+/**
+ * Preenche o modal com dados do cliente para edição
+ * @param {string} clientId - ID do cliente a ser editado
+ */
 function editClient(clientId) {
     const client = clients.find(c => c.id == clientId);
     if (!client || !clientModalTitle) return;
     
     currentEditingClient = client;
     clientModalTitle.textContent = 'Editar Cliente';
+    
     document.getElementById('client-name').value = client.nome;
     document.getElementById('client-document').value = client.documento || '';
     document.getElementById('client-phone').value = client.telefone || '';
     document.getElementById('client-email').value = client.email || '';
     document.getElementById('client-address').value = client.endereco || '';
+    
     openModal('client');
 }
 
+/**
+ * Salva os dados do cliente (novo ou edição)
+ * @async
+ */
 async function saveClient() {
     if (!clientForm) return;
     
@@ -622,6 +349,11 @@ async function saveClient() {
 }
 
 // ==================== FUNÇÕES DE PRODUTOS ====================
+/**
+ * Carrega a lista de produtos do servidor
+ * @async
+ * @param {boolean} [forceUpdate=false] - Força atualização sem cache
+ */
 async function loadProducts(forceUpdate = false) {
     try {
         const url = forceUpdate 
@@ -633,12 +365,16 @@ async function loadProducts(forceUpdate = false) {
             method: 'GET'
         });
         if (!response.ok) throw new Error('Erro ao carregar produtos');
+        
         products = await response.json();
     } catch (error) {
         showMessage(error.message, 'error');
     }
 }
 
+/**
+ * Abre o modal de busca de produtos
+ */
 function openProductSearchModal() {
     const searchTerm = productSearchInput?.value.trim();
     if (searchTerm && modalProductSearch) {
@@ -648,8 +384,12 @@ function openProductSearchModal() {
     searchProductsInModal();
 }
 
+/**
+ * Busca produtos dentro do modal de busca
+ */
 function searchProductsInModal() {
     if (!modalProductSearch || !productSearchResults) return;
+    
     const searchTerm = modalProductSearch.value.trim().toLowerCase();
     if (!searchTerm) {
         productSearchResults.innerHTML = '<p>Digite um termo para busca</p>';
@@ -665,8 +405,13 @@ function searchProductsInModal() {
     displayProductSearchResults(filteredProducts);
 }
 
+/**
+ * Exibe os resultados da busca de produtos no modal
+ * @param {Array} products - Lista de produtos encontrados
+ */
 function displayProductSearchResults(products) {
     if (!productSearchResults) return;
+    
     productSearchResults.innerHTML = '';
     
     if (products.length === 0) {
@@ -690,16 +435,27 @@ function displayProductSearchResults(products) {
     });
 }
 
+/**
+ * Adiciona um produto à lista de venda
+ * @param {Object} product - Produto a ser adicionado
+ */
 async function addProductToSale(product, initialQuantity = 1) {
     if (!product) return;
+    
+    // Busca descontos para o produto
     const discounts = await fetchProductDiscounts(product.id);
+    
+    // Calcula o preço com desconto baseado na quantidade inicial
     const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(product.valor_unitario, initialQuantity, discounts);
+    
     const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
     
     if (existingProductIndex >= 0) {
         selectedProducts[existingProductIndex].quantity += 1;
+        // Recalcula desconto quando a quantidade muda
         const newQuantity = selectedProducts[existingProductIndex].quantity;
         const newPriceInfo = calculateDiscountedPrice(product.valor_unitario, newQuantity, discounts);
+        
         selectedProducts[existingProductIndex].price = newPriceInfo.finalPrice;
         selectedProducts[existingProductIndex].hasDiscount = newPriceInfo.discountApplied;
         selectedProducts[existingProductIndex].discountInfo = newPriceInfo.discountInfo;
@@ -717,14 +473,13 @@ async function addProductToSale(product, initialQuantity = 1) {
             allowsFraction: product.unidade.toLowerCase() === 'kg',
             hasDiscount: discountApplied,
             discountInfo: discountInfo,
-            availableDiscounts: discounts
+            availableDiscounts: discounts // Armazena os descontos disponíveis para recálculo
         });
     }
     
     renderProductsList();
     calculateSaleTotal();
 }
-
 async function fetchProductDiscounts(productId) {
     try {
         const response = await fetch(`/operador/api/produtos/${productId}/descontos?timestamp=${new Date().getTime()}`);
@@ -736,6 +491,14 @@ async function fetchProductDiscounts(productId) {
     }
 }
 
+
+/**
+ * Calcula o preço com desconto baseado nos descontos disponíveis
+ * @param {number} basePrice - Preço base do produto
+ * @param {number} quantity - Quantidade do produto
+ * @param {Array} discounts - Lista de descontos disponíveis
+ * @returns {Object} Objeto com preço final, flag de desconto aplicado e info do desconto
+ */
 function calculateDiscountedPrice(basePrice, quantity, discounts) {
     if (!discounts || discounts.length === 0) {
         return {
@@ -747,6 +510,8 @@ function calculateDiscountedPrice(basePrice, quantity, discounts) {
 
     let bestDiscount = null;
     let bestPrice = basePrice;
+    
+    // Ordena descontos por prioridade (percentual primeiro, depois fixo)
     const sortedDiscounts = [...discounts].sort((a, b) => {
         if (a.tipo === 'percentual' && b.tipo !== 'percentual') return -1;
         if (a.tipo !== 'percentual' && b.tipo === 'percentual') return 1;
@@ -754,22 +519,32 @@ function calculateDiscountedPrice(basePrice, quantity, discounts) {
     });
 
     for (const discount of sortedDiscounts) {
+        // Verifica se o desconto está ativo
         if (!discount.ativo) continue;
+        
+        // Verifica validade do desconto
         if (discount.valido_ate) {
             const validUntil = new Date(discount.valido_ate);
             const today = new Date();
             if (today > validUntil) continue;
         }
+        
+        // Verifica quantidade mínima
         if (quantity < discount.quantidade_minima) continue;
+        
+        // Verifica quantidade máxima (se aplicável)
         if (discount.quantidade_maxima && quantity > discount.quantidade_maxima) continue;
         
+        // Calcula preço com desconto
         let discountedPrice = basePrice;
+        
         if (discount.tipo === 'percentual') {
             discountedPrice = basePrice * (1 - (discount.valor / 100));
         } else if (discount.tipo === 'fixo') {
             discountedPrice = Math.max(0, basePrice - discount.valor);
         }
         
+        // Mantém o melhor desconto (maior redução)
         if (discountedPrice < bestPrice) {
             bestPrice = discountedPrice;
             bestDiscount = {
@@ -788,14 +563,22 @@ function calculateDiscountedPrice(basePrice, quantity, discounts) {
     };
 }
 
+/**
+ * Atualiza os descontos de todos os produtos na venda
+ */
 function updateAllProductDiscounts() {
     selectedProducts.forEach(async (product, index) => {
+        // Busca descontos atualizados para o produto
         const discounts = await fetchProductDiscounts(product.id);
+        
+        // Recalcula desconto com a quantidade atual
         const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(
             product.originalPrice, 
             product.quantity, 
             discounts
         );
+        
+        // Atualiza o produto no array
         selectedProducts[index] = {
             ...product,
             price: finalPrice,
@@ -804,24 +587,31 @@ function updateAllProductDiscounts() {
             availableDiscounts: discounts
         };
     });
+    
     renderProductsList();
     calculateSaleTotal();
 }
 
+/**
+ * Aplica desconto manual a todos os produtos
+ */
 function applyManualDiscount() {
     try {
         const discountType = document.getElementById('discount-type').value;
         const discountValueInput = document.getElementById('discount-value').value.trim();
         
+        // Validação inicial
         if (!discountValueInput) {
             throw new Error('Digite um valor para o desconto');
         }
 
+        // Conversão segura para número
         const discountValue = parseFloat(discountValueInput.replace(',', '.'));
         if (isNaN(discountValue)) {
             throw new Error('Valor de desconto inválido. Use apenas números.');
         }
 
+        // Validações específicas
         if (discountType === 'percentual') {
             if (discountValue <= 0 || discountValue > 100) {
                 throw new Error('Percentual deve ser entre 0.01% e 100%');
@@ -830,6 +620,7 @@ function applyManualDiscount() {
             if (discountValue <= 0) {
                 throw new Error('Valor fixo deve ser maior que zero');
             }
+            
             const minProductPrice = Math.min(...selectedProducts.map(p => p.originalPrice));
             if (discountValue >= minProductPrice) {
                 throw new Error(`Desconto não pode ser maior que ${formatCurrency(minProductPrice)}`);
@@ -840,6 +631,7 @@ function applyManualDiscount() {
             throw new Error('Adicione produtos antes de aplicar desconto');
         }
 
+        // Aplica o desconto (só executa se passar por todas as validações)
         selectedProducts = selectedProducts.map(product => {
             let newPrice = product.originalPrice;
             let discountAmount = 0;
@@ -872,15 +664,88 @@ function applyManualDiscount() {
         calculateSaleTotal();
         showMessage('Desconto aplicado com sucesso!');
         document.getElementById('discount-value').value = '';
+        
     } catch (error) {
         showMessage(error.message, 'error');
-        return false;
+        return false; // Impede a continuação do processo
     }
     return true;
 }
 
+// Adiciona event listener para o botão de aplicar desconto manual
+document.getElementById('apply-discount-btn')?.addEventListener('click', applyManualDiscount);
+
+/**
+ * Verifica e aplica descontos ao produto selecionado
+ * @param {Object} product - Produto selecionado
+ * @param {number} quantity - Quantidade do produto
+ * @returns {Object} Objeto com valor unitário após desconto e flag indicando se desconto foi aplicado
+ */
+async function checkAndApplyDiscounts(product, quantity) {
+    try {
+        // Busca descontos ativos para o produto
+        const response = await fetch(`/operador/api/produtos/${product.id}/descontos?timestamp=${new Date().getTime()}`, {
+            ...preventCacheConfig,
+            method: 'GET'
+        });
+        
+        if (!response.ok) return { 
+            finalPrice: product.price, 
+            discountApplied: false 
+        };
+
+        const discounts = await response.json();
+        
+        // Verifica cada desconto disponível
+        for (const discount of discounts) {
+            // Verifica se o desconto está ativo
+            if (!discount.ativo) continue;
+            
+            // Verifica a data limite (se existir)
+            if (discount.valido_ate) {
+                const validUntil = new Date(discount.valido_ate);
+                const today = new Date();
+                if (today > validUntil) continue;
+            }
+            
+            // Verifica a quantidade mínima e máxima
+            if (quantity < discount.quantidade_minima) continue;
+            if (discount.quantidade_maxima && quantity > discount.quantidade_maxima) continue;
+            
+            // Aplica o desconto conforme o tipo
+            if (discount.tipo === 'fixo') {
+                return {
+                    finalPrice: product.price - discount.valor,
+                    discountApplied: true,
+                    discountInfo: discount
+                };
+            } else if (discount.tipo === 'percentual') {
+                return {
+                    finalPrice: product.price * (1 - (discount.valor / 100)),
+                    discountApplied: true,
+                    discountInfo: discount
+                };
+            }
+        }
+        
+        return { 
+            finalPrice: product.price, 
+            discountApplied: false 
+        };
+    } catch (error) {
+        console.error('Erro ao verificar descontos:', error);
+        return { 
+            finalPrice: product.price, 
+            discountApplied: false 
+        };
+    }
+}
+/**
+ * Renderiza la lista de productos seleccionados para la venta
+ */
 function renderProductsList() {
     if (!productsList) return;
+    
     productsList.innerHTML = '';
     
     selectedProducts.forEach((product, index) => {
@@ -935,10 +800,12 @@ function renderProductsList() {
         productsList.appendChild(row);
     });
     
+    // Adiciona event listeners para os inputs de quantidade
     document.querySelectorAll('.quantity-input').forEach(input => {
         input.addEventListener('change', async function(e) {
             await updateProductQuantity(e.target);
         });
+        
         input.addEventListener('input', function(e) {
             if (e.target.type === 'text') {
                 const value = e.target.value;
@@ -950,6 +817,10 @@ function renderProductsList() {
     });
 }
 
+/**
+ * Atualiza a quantidade de um produto na lista de venda
+ * @param {HTMLInputElement} input - Campo de quantidade
+ */
 async function updateProductQuantity(input) {
     const index = parseInt(input.dataset.index);
     if (isNaN(index)) return;
@@ -957,6 +828,7 @@ async function updateProductQuantity(input) {
     let newQuantity;
     const product = selectedProducts[index];
     
+    // Converte o valor do input para número
     if (product.allowsFraction) {
         const value = input.value.trim().replace(',', '.');
         newQuantity = parseFloat(value);
@@ -972,12 +844,14 @@ async function updateProductQuantity(input) {
         }
     }
     
+    // Recalcula o preço com desconto baseado na nova quantidade
     const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(
         product.originalPrice, 
         newQuantity, 
         product.availableDiscounts || []
     );
     
+    // Atualiza o produto no array
     selectedProducts[index] = {
         ...product,
         quantity: newQuantity > 0 ? newQuantity : product.quantity,
@@ -986,6 +860,7 @@ async function updateProductQuantity(input) {
         discountInfo: discountInfo || product.discountInfo
     };
     
+    // Atualiza o valor no input
     input.value = product.allowsFraction ? 
         selectedProducts[index].quantity.toFixed(3).replace('.', ',') : 
         selectedProducts[index].quantity;
@@ -993,6 +868,10 @@ async function updateProductQuantity(input) {
     calculateSaleTotal();
 }
 
+/**
+ * Remove um produto da lista de venda
+ * @param {HTMLButtonElement} button - Botão de remoção
+ */
 function removeProductRow(button) {
     const index = parseInt(button.dataset.index);
     if (index >= 0 && index < selectedProducts.length) {
@@ -1001,13 +880,21 @@ function removeProductRow(button) {
     }
 }
 
+/**
+ * Adiciona uma linha vazia para seleção de produto
+ */
 function addEmptyProductRow() {
     openProductSearchModal();
 }
 
 // ==================== FUNÇÕES DE VENDA ====================
+/**
+ * Registra uma nova venda no sistema
+ * @async
+ */
 async function registerSale() {
     try {
+        // Validações iniciais
         if (!selectedClientIdInput?.value) {
             showMessage('Selecione um cliente', 'error');
             throw new Error('Cliente não selecionado');
@@ -1018,6 +905,7 @@ async function registerSale() {
             throw new Error('Nenhum produto selecionado');
         }
 
+        // Coleta os métodos de pagamento
         const paymentMethods = [];
         const paymentItems = document.querySelectorAll('.payment-item');
         
@@ -1032,27 +920,20 @@ async function registerSale() {
             }
         });
 
+        // Pega o valor total da venda
         const totalText = saleTotalElement?.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
         const total = parseFloat(totalText) || 0;
+
+        // Define o valor recebido
         let valor_recebido = total;
-        
         if (paymentMethods.length > 0) {
             valor_recebido = paymentMethods.reduce((sum, pm) => sum + pm.valor, 0);
         } else {
-            // Se não houver múltiplos pagamentos, usa o valor recebido ou assume dinheiro
             const amountReceivedText = amountReceivedInput?.value.replace(/\./g, '').replace(',', '.') || '0';
             valor_recebido = parseFloat(amountReceivedText) || 0;
-            
-            // Se o valor recebido for menor que o total, assume que o restante é dinheiro
-            if (valor_recebido < total) {
-                const remaining = total - valor_recebido;
-                paymentMethods.push({
-                    forma_pagamento: 'dinheiro',
-                    valor: remaining
-                });
-            }
         }
 
+        // Prepara os itens da venda
         const items = selectedProducts.map(product => {
             const originalTotal = product.originalPrice * product.quantity;
             const discountedTotal = product.price * product.quantity;
@@ -1074,6 +955,7 @@ async function registerSale() {
             };
         });
 
+        // Prepara os dados da venda
         const saleData = {
             cliente_id: parseInt(selectedClientIdInput.value),
             forma_pagamento: paymentMethods.length > 0 ? 'multiplos' : document.getElementById('payment-method')?.value || 'dinheiro',
@@ -1088,6 +970,7 @@ async function registerSale() {
             observacao: document.getElementById('sale-notes')?.value
         };
 
+        // Adiciona endereço de entrega se existir
         if (deliveryAddress) {
             saleData.endereco_entrega = {
                 logradouro: deliveryAddress.logradouro || '',
@@ -1101,6 +984,7 @@ async function registerSale() {
             };
         }
 
+        // Envia a venda para o servidor
         const response = await fetch('/operador/api/vendas', {
             method: 'POST',
             headers: { 
@@ -1120,18 +1004,38 @@ async function registerSale() {
             throw new Error(result.message || 'Erro ao registrar venda');
         }
 
+        // Limpa o formulário após sucesso
         resetSaleForm();
+        
+        // Atualiza os dados
         await updateBalance(true);
         await loadProducts(true);
+        
+        // Exibe mensagem de sucesso
         showMessage(`Venda registrada com sucesso!`);
+        
+        // Abre o comprovante em nova aba
         const paymentIdsStr = result.pagamentos_ids.join(',');
+
+        // Abrir o PDF com os IDs formatados
         window.open(`/operador/pdf/nota/${paymentIdsStr}?timestamp=${new Date().getTime()}`, '_blank');
+        
     } catch (error) {
         console.error('Erro ao registrar venda:', error);
         showMessage(error.message, 'error');
+        
+        // Log adicional para depuração
+        if (error.response) {
+            error.response.json().then(data => {
+                console.error("Detalhes do erro:", data);
+            });
+        }
     }
 }
-
+/**
+ * Calcula o total da venda com base nos produtos selecionados
+ * Modificado para aceitar valores com ponto ou vírgula
+ */
 function calculateSaleTotal() {
     let subtotal = 0;
     
@@ -1150,9 +1054,11 @@ function calculateSaleTotal() {
     
     let total = subtotal;
     
+    // Atualiza os elementos da UI
     if (subtotalValueElement) subtotalValueElement.textContent = formatCurrency(subtotal);
     if (saleTotalElement) saleTotalElement.textContent = formatCurrency(total);
     
+    // Calcula o troco apenas se houver valor recebido
     if (amountReceivedInput && amountReceivedInput.value) {
         const amountReceivedText = amountReceivedInput.value.replace(/\./g, '').replace(',', '.');
         const amountReceived = parseFloat(amountReceivedText) || 0;
@@ -1163,67 +1069,103 @@ function calculateSaleTotal() {
     }
 }
 
+/**
+ * Formata um número para exibição com casas decimais
+ * @param {number} num - Número a ser formatado
+ * @param {number} [decimals=3] - Número de casas decimais
+ * @returns {string} Número formatado com vírgula como separador decimal
+ */
 function formatDecimal(num, decimals = 3) {
     return num.toFixed(decimals).replace('.', ',');
 }
 
+// Adicione esta função ao seu código
 function formatCurrencyInput(input) {
+    // Remove tudo que não é número, ponto ou vírgula
     let value = input.value.replace(/[^\d,.]/g, '');
+    
+    // Substitui vírgula por ponto se houver mais de um separador
     const separators = value.match(/[,.]/g);
     if (separators && separators.length > 1) {
         value = value.replace(/[,.]/g, (m, i) => (i === value.lastIndexOf('.') || i === value.lastIndexOf(',')) ? m : '');
     }
+    
+    // Garante que há apenas um separador decimal
     value = value.replace(/([,.])(?=.*\1)/g, '');
+    
+    // Substitui vírgula por ponto para cálculo
     const numericValue = value.replace(',', '.');
+    
+    // Atualiza o valor formatado no input
     input.value = value;
+    
     return numericValue;
 }
 
+// Adicione este event listener no setupEventListeners()
+if (amountReceivedInput) {
+    amountReceivedInput.addEventListener('input', function(e) {
+        // Formata o valor enquanto digita
+        const numericValue = formatCurrencyInput(e.target);
+        
+        // Força o cálculo do total
+        if (!isNaN(parseFloat(numericValue))) {
+            calculateSaleTotal();
+        }
+    });
+    
+    // Mantenha o listener original para o cálculo do total
+    amountReceivedInput.addEventListener('change', calculateSaleTotal);
+}
+
+/**
+ * Reseta completamente o formulário de venda
+ */
 function resetSaleForm() {
     try {
+        // Limpa cliente
+        const selectedClientInput = document.getElementById('selected-client');
+        const selectedClientIdInput = document.getElementById('selected-client-id');
+        
         if (selectedClientInput) selectedClientInput.value = '';
         if (selectedClientIdInput) selectedClientIdInput.value = '';
+
+        // Limpa produtos
         if (productsList) productsList.innerHTML = '';
         selectedProducts = [];
-        const selectedPaymentsList = document.querySelector('.selected-payments-list');
-        if (selectedPaymentsList) selectedPaymentsList.innerHTML = '';
-        const paymentMethodSelect = document.querySelector('.payment-method-select');
-        const paymentAmountInput = document.querySelector('.payment-amount');
-        if (paymentMethodSelect) paymentMethodSelect.value = '';
-        if (paymentAmountInput) paymentAmountInput.value = '';
+
+        // Limpa pagamento
+        const paymentMethod = document.getElementById('payment-method');
+        if (paymentMethod) paymentMethod.value = '';
+        
         const saleNotes = document.getElementById('sale-notes');
         if (saleNotes) saleNotes.value = '';
+        
         if (amountReceivedInput) amountReceivedInput.value = '';
-        const discountValue = document.getElementById('discount-value');
-        const discountType = document.getElementById('discount-type');
-        const discountDisplay = document.getElementById('discount-value-display');
-        if (discountValue) discountValue.value = '';
-        if (discountType) discountType.value = 'percentual';
-        if (discountDisplay) discountDisplay.textContent = 'R$ 0.00';
+
+        // Limpa entrega
         deliveryAddress = null;
         const deliveryBtn = document.getElementById('delivery-btn');
         if (deliveryBtn) {
             deliveryBtn.classList.remove('has-delivery');
             deliveryBtn.innerHTML = '<i class="fas fa-truck"></i> Adicionar Entrega';
         }
-        const deliveryInfoDisplay = document.getElementById('delivery-info-display');
-        if (deliveryInfoDisplay) {
-            deliveryInfoDisplay.style.display = 'none';
-            const deliveryAddressText = document.getElementById('delivery-address-text');
-            if (deliveryAddressText) deliveryAddressText.textContent = '';
-        }
+        
         const deliveryInfo = document.querySelector('.delivery-info');
         if (deliveryInfo) deliveryInfo.remove();
+
+        // Limpa totais
         if (subtotalValueElement) subtotalValueElement.textContent = 'R$ 0.00';
         if (saleTotalElement) saleTotalElement.textContent = 'R$ 0.00';
         if (changeValueElement) changeValueElement.textContent = 'R$ 0.00';
+        if (amountReceivedInput) amountReceivedInput.value = '';
+        // Atualiza status
         updateCaixaStatus();
+
+        // Dispara evento se necessário
         if (selectedClientInput) {
             const event = new Event('input', { bubbles: true, cancelable: true });
             selectedClientInput.dispatchEvent(event);
-        }
-        if (typeof calculateSaleTotal === 'function') {
-            calculateSaleTotal();
         }
     } catch (error) {
         console.error("Erro ao resetar formulário de venda:", error);
@@ -1231,6 +1173,9 @@ function resetSaleForm() {
 }
 
 // ==================== FUNÇÕES DE ENTREGA ====================
+/**
+ * Abre o modal de cadastro de endereço de entrega
+ */
 function openDeliveryModal() {
     if (!deliveryModal) return;
     
@@ -1248,7 +1193,11 @@ function openDeliveryModal() {
     openModal('delivery');
 }
 
+/**
+ * Salva o endereço de entrega
+ */
 function saveDeliveryAddress() {
+    // Remova as validações obrigatórias
     deliveryAddress = {
         logradouro: document.getElementById('delivery-address')?.value || '',
         numero: document.getElementById('delivery-number')?.value || '',
@@ -1266,6 +1215,9 @@ function saveDeliveryAddress() {
     showMessage('Endereço de entrega salvo com sucesso!');
 }
 
+/**
+ * Função para capturar e processar o endereço do cliente selecionado
+ */
 function useClientAddress() {
     if (!selectedClientIdInput || !selectedClientIdInput.value) {
         showMessage('Nenhum cliente selecionado', 'error');
@@ -1280,6 +1232,7 @@ function useClientAddress() {
         return;
     }
 
+    // Verifica se já existe um endereço estruturado no cliente
     if (client.logradouro && client.numero && client.bairro && client.cidade && client.estado) {
         deliveryAddress = {
             logradouro: client.logradouro,
@@ -1293,6 +1246,7 @@ function useClientAddress() {
             endereco_completo: `${client.logradouro}, ${client.numero}, ${client.bairro}, ${client.cidade}-${client.estado}`
         };
     } else {
+        // Caso o endereço esteja em uma string única
         const addressString = client.endereco || client.endereco_completo;
         const addressRegex = /^(.*?)(?:,\s*(?:nº|no|numero|número)\s*(\d+))?(?:,\s*(.*?))?(?:,\s*(.*?)\s*-\s*([A-Z]{2}))?$/i;
         const matches = addressString.match(addressRegex);
@@ -1309,6 +1263,7 @@ function useClientAddress() {
             instrucoes: ''
         };
 
+        // Fallback para extrair cidade/estado
         if (!deliveryAddress.cidade && !deliveryAddress.estado && matches[3]) {
             const cityStateMatch = matches[3].match(/(.*?)\s*-\s*([A-Z]{2})$/i);
             if (cityStateMatch) {
@@ -1323,22 +1278,33 @@ function useClientAddress() {
     showMessage('Endereço do cliente definido para entrega!');
 }
 
+/**
+ * Atualiza a interface com as informações de entrega
+ */
 function updateDeliveryUI() {
     if (!deliveryAddress) return;
     
+    // Atualiza o botão de entrega
     if (deliveryBtn) {
         deliveryBtn.classList.add('has-delivery');
         deliveryBtn.innerHTML = '<i class="fas fa-check-circle"></i> Endereço de Entrega Cadastrado';
     }
+    
+    // Exibe as informações de entrega
     showDeliveryInfo();
 }
 
+/**
+ * Exibe as informações de entrega na interface
+ */
 function showDeliveryInfo() {
     if (!deliveryBtn || !deliveryAddress) return;
     
+    // Remove qualquer informação de entrega existente
     const existingInfo = document.querySelector('.delivery-info');
     if (existingInfo) existingInfo.remove();
     
+    // Cria o elemento com as informações de entrega
     const deliveryInfo = document.createElement('div');
     deliveryInfo.className = 'delivery-info';
     deliveryInfo.innerHTML = `
@@ -1357,19 +1323,27 @@ function showDeliveryInfo() {
         </div>
     `;
     
+    // Insere após o botão de entrega
     deliveryBtn.insertAdjacentElement('afterend', deliveryInfo);
+    
+    // Adiciona os event listeners aos botões
     document.getElementById('edit-delivery-btn')?.addEventListener('click', openDeliveryModal);
     document.getElementById('remove-delivery-btn')?.addEventListener('click', removeDeliveryAddress);
 }
 
+/**
+ * Remove o endereço de entrega
+ */
 function removeDeliveryAddress() {
     deliveryAddress = null;
     
+    // Remove a classe e restaura o ícone do botão
     if (deliveryBtn) {
         deliveryBtn.classList.remove('has-delivery');
         deliveryBtn.innerHTML = '<i class="fas fa-truck"></i> Adicionar Entrega';
     }
     
+    // Remove o bloco de informações de entrega
     const deliveryInfo = document.querySelector('.delivery-info');
     if (deliveryInfo) {
         deliveryInfo.remove();
@@ -1379,6 +1353,9 @@ function removeDeliveryAddress() {
 }
 
 // ==================== FUNÇÕES DE DESPESAS ====================
+/**
+ * Abre o modal de cadastro de despesas
+ */
 function openExpenseModal() {
     if (!expenseModal || !currentCaixaId) {
         showMessage('Nenhum caixa aberto encontrado', 'error');
@@ -1389,12 +1366,20 @@ function openExpenseModal() {
     document.getElementById('expense-description')?.focus();
 }
 
+/**
+ * Fecha o modal de despesas
+ */
 function closeExpenseModal() {
     if (!expenseModal || !expenseForm) return;
+    
     expenseModal.style.display = 'none';
     expenseForm.reset();
 }
 
+/**
+ * Registra uma nova despesa no sistema
+ * @async
+ */
 async function saveExpense() {
     const description = document.getElementById('expense-description')?.value.trim();
     const amount = document.getElementById('expense-amount')?.value;
@@ -1427,7 +1412,7 @@ async function saveExpense() {
         
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error || 'Erro ao registrar despesa');
+            throw new Error(errorData.erro || 'Erro ao registrar despesa');
         }
         
         showMessage('Despesa registrada com sucesso!');
@@ -1439,73 +1424,180 @@ async function saveExpense() {
     }
 }
 
-// ==================== FUNÇÕES DE VENDAS DO DIA ====================
+//=====================TABS E RELATÓRIOS ====================
+// Variáveis globais
+let currentOpenModal = null;
+
+// Comportamento das abas
+document.addEventListener('DOMContentLoaded', function() {
+    // Elementos das abas
+    const salesTab = document.getElementById('sales-tab');
+    const daySalesTab = document.getElementById('day-sales-tab');
+    const clientsTab = document.getElementById('clients-tab');
+    const salesContent = document.getElementById('sales');
+    const daySalesContent = document.getElementById('day-sales');
+    const clientsContent = document.getElementById('clients');
+    const currentTabTitle = document.getElementById('current-tab-title');
+    
+    // Função para alternar entre abas
+    function switchTab(activeTab, inactiveTabs, activeContent, inactiveContents, title) {
+        activeTab.classList.add('active');
+        inactiveTabs.forEach(tab => tab.classList.remove('active'));
+        activeContent.classList.add('active');
+        inactiveContents.forEach(content => content.classList.remove('active'));
+        currentTabTitle.textContent = title;
+    }
+    
+    // Event listeners para as abas
+    salesTab.addEventListener('click', function() {
+        switchTab(salesTab, [daySalesTab, clientsTab], salesContent, [daySalesContent, clientsContent], 'Vendas');
+    });
+    
+    daySalesTab.addEventListener('click', function() {
+        switchTab(daySalesTab, [salesTab, clientsTab], daySalesContent, [salesContent, clientsContent], 'Vendas do Dia');
+        loadDaySales();
+    });
+    
+    clientsTab.addEventListener('click', function() {
+        switchTab(clientsTab, [salesTab, daySalesTab], clientsContent, [salesContent, daySalesContent], 'Clientes');
+        if (typeof loadClients === 'function') {
+            loadClients();
+        }
+    });
+    
+    // Configura mensagens flash para desaparecer após 5 segundos
+    const flashMessages = document.querySelectorAll('.flash-message');
+    flashMessages.forEach(message => {
+        setTimeout(() => {
+            message.style.opacity = '0';
+            setTimeout(() => message.remove(), 1000);
+        }, 5000);
+    });
+    
+    // Monitora mudanças no cliente selecionado para atualizar o status do caixa
+    const selectedClientInput = document.getElementById('selected-client');
+    const caixaStatusDisplay = document.getElementById('caixa-status-display');
+    
+    // Função global para atualizar o status do caixa
+    window.updateCaixaStatus = function() {
+        if (selectedClientInput && selectedClientInput.value.trim() !== '') {
+            caixaStatusDisplay.className = 'caixa-status caixa-operacao';
+            caixaStatusDisplay.innerHTML = '<i class="fas fa-user-check"></i><span>CAIXA EM OPERAÇÃO</span>';
+        } else {
+            caixaStatusDisplay.className = 'caixa-status caixa-livre';
+            caixaStatusDisplay.innerHTML = '<i class="fas fa-check-circle"></i><span>CAIXA LIVRE</span>';
+        }
+    };
+    
+    // Observa mudanças no campo do cliente selecionado
+    if (selectedClientInput) {
+        selectedClientInput.addEventListener('input', updateCaixaStatus);
+        
+        // Configura o MutationObserver para detectar alterações programáticas no campo do cliente
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
+                    updateCaixaStatus();
+                }
+            });
+        });
+        
+        observer.observe(selectedClientInput, {
+            attributes: true,
+            attributeFilter: ['value']
+        });
+    }
+    
+    // Atualiza o status inicial
+    updateCaixaStatus();
+    
+    // Botão para limpar venda
+    const clearSaleBtn = document.getElementById('clear-sale-btn');
+    if (clearSaleBtn) {
+        clearSaleBtn.addEventListener('click', resetSaleForm);
+    }
+    
+    // Botão para atualizar lista de vendas do dia
+    const refreshSalesBtn = document.getElementById('refresh-sales-btn');
+    if (refreshSalesBtn) {
+        refreshSalesBtn.addEventListener('click', loadDaySales);
+    }
+    
+    // Botão para aplicar desconto manual
+    const applyDiscountBtn = document.getElementById('apply-discount-btn');
+    if (applyDiscountBtn) {
+        applyDiscountBtn.addEventListener('click', applyManualDiscount);
+    }
+});
+
+// Função para selecionar cliente
+function selectClient(client) {
+    const selectedClientInput = document.getElementById('selected-client');
+    const selectedClientIdInput = document.getElementById('selected-client-id');
+    
+    if (selectedClientInput && selectedClientIdInput) {
+        selectedClientInput.value = client.nome;
+        selectedClientIdInput.value = client.id;
+        
+        // Dispara evento de input para garantir a atualização
+        const event = new Event('input', {
+            bubbles: true,
+            cancelable: true,
+        });
+        selectedClientInput.dispatchEvent(event);
+        
+        showMessage(`Cliente selecionado: ${client.nome}`);
+    }
+}
+
+// Função para carregar as vendas do dia
 async function loadDaySales() {
     const tableBody = document.querySelector('#day-sales-table tbody');
     if (!tableBody) return;
     
+    tableBody.innerHTML = '<tr><td colspan="6"><div class="loading-spinner"></div></td></tr>';
+
     try {
-        tableBody.innerHTML = '<tr><td colspan="6"><div class="loading-spinner"></div></td></tr>';
-        
         const response = await fetch('/operador/api/vendas/hoje', {
-            ...preventCacheConfig,
-            method: 'GET'
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
         });
+
+        const contentType = response.headers.get("content-type");
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(errorText || 'Erro ao carregar vendas do dia');
+            console.error("Erro HTTP:", response.status, errorText);
+            throw new Error('Erro ao carregar vendas do dia. Código: ' + response.status);
+        }
+
+        if (!contentType || !contentType.includes("application/json")) {
+            const html = await response.text();
+            console.error("Resposta inesperada do servidor (não JSON):", html);
+            throw new Error("Resposta inesperada do servidor. Verifique se você está logado.");
         }
 
         const result = await response.json();
-        
+
         if (!result.success) {
             throw new Error(result.message || 'Erro ao carregar vendas');
         }
 
-        const vendas = result.data || [];
-        // Remover vendas duplicadas antes de renderizar
-        const vendasUnicas = removerVendasDuplicadas(vendas);
-        renderDaySales(vendasUnicas);
-    } catch (error) {
-        console.error("Erro ao carregar vendas:", error);
-        tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: red;">${error.message}</td></tr>`;
-        showMessage(error.message, 'error');
-    }
-}
+        const vendas = result.data;
 
-function removerVendasDuplicadas(vendas) {
-    const vendasUnicas = [];
-    const idsVistos = new Set();
+        tableBody.innerHTML = ''; // Limpa o spinner
 
-    for (const venda of vendas) {
-        if (!idsVistos.has(venda.id)) {
-            idsVistos.add(venda.id);
-            vendasUnicas.push(venda);
+        if (!Array.isArray(vendas) || vendas.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td colspan="6" style="text-align: center; padding: 1rem; color: #666;">Nenhuma venda registrada para o dia.</td>`;
+            tableBody.appendChild(row);
+            return;
         }
-    }
 
-    return vendasUnicas;
-}
-
-function renderDaySales(vendas) {
-    const tableBody = document.querySelector('#day-sales-table tbody');
-    if (!tableBody) return;
-    
-    tableBody.innerHTML = '';
-
-    if (!Array.isArray(vendas) || vendas.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 1rem; color: #666;">Nenhuma venda registrada para o dia.</td></tr>`;
-        return;
-    }
-
-    // Ordenar vendas por data (mais recente primeiro)
-    vendas.sort((a, b) => new Date(b.data_emissao) - new Date(a.data_emissao));
-
-    // Criar linhas da tabela
-    vendas.forEach(sale => {
-        // Verificar se a venda tem itens antes de renderizar
-        if (sale.itens && sale.itens.length > 0) {
+        vendas.forEach(sale => {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${sale.id}</td>
@@ -1523,40 +1615,50 @@ function renderDaySales(vendas) {
                 </td>
             `;
             tableBody.appendChild(row);
-        }
-    });
+        });
 
-    // Configurar event listeners para os botões
-    tableBody.addEventListener('click', function(e) {
-        const viewBtn = e.target.closest('.btn-view');
-        if (viewBtn) {
-            openSaleDetailsModal(viewBtn.dataset.id);
-            return;
-        }
-        
-        const voidBtn = e.target.closest('.btn-void');
-        if (voidBtn) {
-            openVoidSaleModal(voidBtn.dataset.id);
-            return;
-        }
-    });
+        // Adiciona os event listeners
+        tableBody.addEventListener('click', function(e) {
+            const viewBtn = e.target.closest('.btn-view');
+            if (viewBtn) {
+                openSaleDetailsModal(viewBtn.dataset.id);
+                return;
+            }
+            
+            const voidBtn = e.target.closest('.btn-void');
+            if (voidBtn) {
+                openVoidSaleModal(voidBtn.dataset.id);
+                return;
+            }
+        });
+
+    } catch (error) {
+        console.error("Erro ao carregar vendas:", error);
+        showMessage(error.message || "Erro inesperado ao carregar vendas.", 'error');
+        tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: red;">${error.message}</td></tr>`;
+    }
 }
 
+// Função para abrir modal de estorno de venda
 function openVoidSaleModal(saleId) {
     closeModal();
+    
     const modal = document.getElementById('void-sale-modal');
     if (!modal) {
         console.error('Modal de estorno não encontrado');
         return;
     }
     
+    // Preenche os campos do modal
     document.getElementById('void-sale-id').value = saleId;
     document.getElementById('void-sale-id-display').textContent = saleId;
     document.getElementById('void-sale-reason').value = '';
+    
     modal.style.display = 'flex';
     currentOpenModal = modal;
 }
 
+// Função para estornar venda (já corrigida anteriormente)
 async function voidSale() {
     const saleId = document.getElementById('void-sale-id').value;
     const reason = document.getElementById('void-sale-reason').value || "Sem motivo informado";
@@ -1591,6 +1693,7 @@ async function voidSale() {
         showMessage(`Venda #${saleId} estornada com sucesso!`, 'success');
         closeModal('void-sale-modal');
         loadDaySales();
+        
     } catch (error) {
         console.error('Erro ao estornar venda:', error);
         showMessage(error.message, 'error');
@@ -1603,20 +1706,30 @@ async function voidSale() {
     }
 }
 
+// Adicionar este evento no DOMContentLoaded
+document.getElementById('generate-pdf-btn')?.addEventListener('click', generateDaySalesPDF);
+
+// Função para gerar PDF das vendas do dia
 function generateDaySalesPDF() {
     try {
+        // Mostrar loading
         const button = document.getElementById('generate-pdf-btn');
         const originalText = button.innerHTML;
         button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
         button.disabled = true;
         
+        // Obter a data atual no formato YYYY-MM-DD
         const today = new Date();
         const dateStr = today.toISOString().split('T')[0];
+        
+        // Chamar a função que gera o PDF
         gerarRelatorioDiario(dateStr);
+        
     } catch (error) {
         console.error("Erro ao gerar PDF:", error);
         showMessage("Erro ao gerar relatório em PDF", "error");
     } finally {
+        // Restaurar o botão após 2 segundos (tempo estimado para geração)
         setTimeout(() => {
             const button = document.getElementById('generate-pdf-btn');
             if (button) {
@@ -1627,17 +1740,25 @@ function generateDaySalesPDF() {
     }
 }
 
+// Função existente atualizada para incluir mais parâmetros
 function gerarRelatorioDiario(data = null, caixaId = null, operadorId = null) {
     let url = '/operador/api/vendas/relatorio-diario-pdf';
     const params = new URLSearchParams();
+    
+    // Se nenhuma data for fornecida, usa a data atual
     const reportDate = data || new Date().toISOString().split('T')[0];
     params.append('data', reportDate);
+    
     if (caixaId) params.append('caixa_id', caixaId);
     if (operadorId) params.append('operador_id', operadorId);
+    
     url += '?' + params.toString();
+    
+    // Abre em nova aba (o servidor deve retornar o PDF)
     window.open(url, '_blank');
 }
 
+// Função para fechar modal
 function closeModal(modalId = null) {
     if (modalId) {
         const modal = document.getElementById(modalId);
@@ -1650,9 +1771,11 @@ function closeModal(modalId = null) {
     currentOpenModal = null;
 }
 
+// Função para abrir modal de detalhes da venda
 async function openSaleDetailsModal(saleId) {
     try {
         closeModal();
+        
         const modal = document.getElementById('sale-details-modal');
         if (!modal) {
             console.error('Modal de detalhes da venda não encontrado');
@@ -1662,7 +1785,7 @@ async function openSaleDetailsModal(saleId) {
         modal.style.display = 'flex';
         currentOpenModal = modal;
         
-        // Reset elementos do modal
+        // Reset dos elementos
         const elementsToReset = [
             'sale-details-id',
             'sale-details-date',
@@ -1688,16 +1811,22 @@ async function openSaleDetailsModal(saleId) {
             }
         });
 
-        // Buscar dados da API
         const response = await fetch(`/operador/api/vendas/${saleId}/detalhes`);
-        if (!response.ok) throw new Error('Erro ao buscar detalhes da venda');
+        
+        if (!response.ok) {
+            throw new Error('Erro ao buscar detalhes da venda');
+        }
         
         const result = await response.json();
-        if (!result.success) throw new Error(result.message || 'Erro ao carregar detalhes');
+        
+        if (!result.success) {
+            throw new Error(result.message || 'Erro ao carregar detalhes');
+        }
         
         const venda = result.data;
+        console.log('Dados da venda:', venda); // Para debug
         
-        // Preencher informações básicas
+        // Preenche informações básicas
         safeSetText('sale-details-id', saleId);
         safeSetText('sale-details-date', new Date(venda.data_emissao).toLocaleString('pt-BR'));
         safeSetText('sale-details-client', `${venda.cliente?.nome || 'Consumidor Final'}${venda.cliente?.documento ? ' (' + formatDocument(venda.cliente.documento) + ')' : ''}`);
@@ -1706,16 +1835,94 @@ async function openSaleDetailsModal(saleId) {
         safeSetText('sale-details-discount', formatCurrency(venda.valor_desconto || 0));
         safeSetText('sale-details-notes', venda.observacao || 'Nenhuma observação');
         
-        // Tratar informações de entrega
-        handleDeliveryInfo(venda);
+        // Preenche endereço de entrega
+        const deliveryContainer = document.getElementById('sale-details-delivery-container');
+        const deliveryInstructions = document.getElementById('sale-details-delivery-instructions');
         
-        // Tratar produtos com remoção de duplicatas
-        handleProductsTable(venda.itens);
+        if (deliveryContainer) {
+            if (venda.entrega) {
+                const endereco = [
+                    venda.entrega.endereco || venda.entrega.logradouro,
+                    venda.entrega.numero,
+                    venda.entrega.complemento,
+                    venda.entrega.bairro,
+                    `${venda.entrega.cidade}/${venda.entrega.estado}`.toUpperCase(),
+                    venda.entrega.cep ? formatCEP(venda.entrega.cep) : ''
+                ].filter(Boolean).join(', ');
+                
+                safeSetText('sale-details-delivery', endereco);
+                deliveryContainer.style.display = 'flex';
+                
+                if (deliveryInstructions) {
+                    if (venda.entrega.instrucoes) {
+                        deliveryInstructions.textContent = `Instruções: ${venda.entrega.instrucoes}`;
+                        deliveryInstructions.style.display = 'block';
+                    } else {
+                        deliveryInstructions.style.display = 'none';
+                    }
+                }
+            } else {
+                deliveryContainer.style.display = 'none';
+                if (deliveryInstructions) {
+                    deliveryInstructions.style.display = 'none';
+                }
+            }
+        }
         
-        // Tratar pagamentos com remoção de duplicatas
-        handlePaymentsTable(venda);
+        // Preenche produtos
+        const productsTable = document.getElementById('sale-details-products');
+        if (productsTable && venda.itens) {
+            venda.itens.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.produto_nome || 'Produto não encontrado'}</td>
+                    <td class="text-right">${item.quantidade.toLocaleString('pt-BR')}</td>
+                    <td class="text-right">${formatCurrency(item.valor_unitario)}</td>
+                    <td class="text-right">${item.desconto_aplicado ? formatCurrency(item.desconto_aplicado) : '-'}</td>
+                    <td class="text-right">${formatCurrency(item.valor_total)}</td>
+                `;
+                productsTable.appendChild(row);
+            });
+        }
         
-        // Event listener para fechar modal
+        // Preenche pagamentos
+        const paymentsTable = document.getElementById('sale-details-payments');
+        if (paymentsTable) {
+            if (venda.pagamentos && venda.pagamentos.length > 0) {
+                venda.pagamentos.forEach(pagamento => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${formatPaymentMethod(pagamento.forma_pagamento)}</td>
+                        <td class="text-right">${formatCurrency(pagamento.valor)}</td>
+                        <td>${new Date(pagamento.data).toLocaleString('pt-BR')}</td>
+                    `;
+                    paymentsTable.appendChild(row);
+                });
+                
+                // Adiciona total se houver mais de um pagamento
+                if (venda.pagamentos.length > 1) {
+                    const totalPagamentos = venda.pagamentos.reduce((sum, pag) => sum + pag.valor, 0);
+                    const row = document.createElement('tr');
+                    row.className = 'total-row';
+                    row.innerHTML = `
+                        <td><strong>Total</strong></td>
+                        <td class="text-right"><strong>${formatCurrency(totalPagamentos)}</strong></td>
+                        <td></td>
+                    `;
+                    paymentsTable.appendChild(row);
+                }
+            } else {
+                // Caso não tenha pagamentos específicos, usa o método de pagamento principal
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${formatPaymentMethod(venda.forma_pagamento)}</td>
+                    <td class="text-right">${formatCurrency(venda.valor_total)}</td>
+                    <td>${new Date(venda.data_emissao).toLocaleString('pt-BR')}</td>
+                `;
+                paymentsTable.appendChild(row);
+            }
+        }
+        
         modal.addEventListener('click', function(e) {
             if (e.target === modal) {
                 closeModal('sale-details-modal');
@@ -1729,168 +1936,40 @@ async function openSaleDetailsModal(saleId) {
     }
 }
 
-// Função para tratar informações de entrega
-function handleDeliveryInfo(venda) {
-    const deliveryContainer = document.getElementById('sale-details-delivery-container');
-    const deliveryInstructions = document.getElementById('sale-details-delivery-instructions');
-    
-    if (deliveryContainer) {
-        if (venda.entrega) {
-            const endereco = [
-                venda.entrega.endereco || venda.entrega.logradouro,
-                venda.entrega.numero,
-                venda.entrega.complemento,
-                venda.entrega.bairro,
-                `${venda.entrega.cidade}/${venda.entrega.estado}`.toUpperCase(),
-                venda.entrega.cep ? formatCEP(venda.entrega.cep) : ''
-            ].filter(Boolean).join(', ');
-            
-            safeSetText('sale-details-delivery', endereco);
-            deliveryContainer.style.display = 'flex';
-            
-            if (deliveryInstructions) {
-                if (venda.entrega.instrucoes) {
-                    deliveryInstructions.textContent = `Instruções: ${venda.entrega.instrucoes}`;
-                    deliveryInstructions.style.display = 'block';
-                } else {
-                    deliveryInstructions.style.display = 'none';
-                }
-            }
-        } else {
-            deliveryContainer.style.display = 'none';
-            if (deliveryInstructions) {
-                deliveryInstructions.style.display = 'none';
-            }
-        }
-    }
-}
-
-// Função para tratar tabela de produtos com remoção de duplicatas
-function handleProductsTable(itens) {
-    const productsTable = document.getElementById('sale-details-products');
-    if (!productsTable || !itens) return;
-    
-    // Limpar tabela antes de popular
-    productsTable.innerHTML = '';
-    
-    // Remover duplicatas baseado no produto_id ou produto_nome
-    const itensUnicos = [];
-    const idsVistos = new Set();
-    
-    itens.forEach(item => {
-        // Usar uma chave única baseada no produto e valor unitário para evitar duplicatas
-        const chaveUnica = `${item.produto_id || item.produto_nome}-${item.valor_unitario}-${item.quantidade}`;
-        
-        if (!idsVistos.has(chaveUnica)) {
-            idsVistos.add(chaveUnica);
-            itensUnicos.push(item);
-        }
-    });
-    
-    // Adicionar produtos únicos na tabela
-    itensUnicos.forEach(item => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${item.produto_nome || item.nome || 'Produto não encontrado'}</td>
-            <td class="text-right">${parseFloat(item.quantidade || 0).toLocaleString('pt-BR')}</td>
-            <td class="text-right">${formatCurrency(item.valor_unitario || 0)}</td>
-            <td class="text-right">${item.desconto_aplicado ? formatCurrency(item.desconto_aplicado) : '-'}</td>
-            <td class="text-right">${formatCurrency(item.valor_total || item.total || 0)}</td>
-        `;
-        productsTable.appendChild(row);
-    });
-}
-
-// Função para tratar tabela de pagamentos com remoção de duplicatas
-function handlePaymentsTable(venda) {
-    const paymentsTable = document.getElementById('sale-details-payments');
-    if (!paymentsTable) return;
-    
-    // Limpar tabela antes de popular
-    paymentsTable.innerHTML = '';
-    
-    if (venda.pagamentos && venda.pagamentos.length > 0) {
-        // Agregar pagamentos para evitar duplicatas
-        const pagamentosAgregados = agregarPagamentos(venda.pagamentos);
-        
-        pagamentosAgregados.forEach(pagamento => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${formatPaymentMethod(pagamento.forma_pagamento)}</td>
-                <td class="text-right">${formatCurrency(pagamento.valor)}</td>
-                <td>${new Date(pagamento.data).toLocaleString('pt-BR')}</td>
-            `;
-            paymentsTable.appendChild(row);
-        });
-        
-        // Adicionar linha de total se houver múltiplos pagamentos
-        if (pagamentosAgregados.length > 1) {
-            const totalPagamentos = pagamentosAgregados.reduce((sum, pag) => sum + parseFloat(pag.valor), 0);
-            const row = document.createElement('tr');
-            row.className = 'total-row';
-            row.innerHTML = `
-                <td><strong>Total</strong></td>
-                <td class="text-right"><strong>${formatCurrency(totalPagamentos)}</strong></td>
-                <td></td>
-            `;
-            paymentsTable.appendChild(row);
-        }
-    } else {
-        // Pagamento único (fallback para formato antigo)
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${formatPaymentMethod(venda.forma_pagamento)}</td>
-            <td class="text-right">${formatCurrency(venda.valor_total)}</td>
-            <td>${new Date(venda.data_emissao).toLocaleString('pt-BR')}</td>
-        `;
-        paymentsTable.appendChild(row);
-    }
-}
-
-// Função para agregar pagamentos e remover duplicatas
-function agregarPagamentos(pagamentos) {
-    if (!pagamentos || !Array.isArray(pagamentos)) return [];
-    
-    const agregados = new Map();
-    
-    pagamentos.forEach(pag => {
-        // Criar chave única baseada na forma de pagamento e data
-        const data = new Date(pag.data);
-        const dataFormatada = data.toISOString().split('T')[0]; // YYYY-MM-DD
-        const chave = `${pag.forma_pagamento}-${dataFormatada}`;
-        
-        if (agregados.has(chave)) {
-            // Somar valores de pagamentos duplicados
-            const existing = agregados.get(chave);
-            existing.valor = parseFloat(existing.valor) + parseFloat(pag.valor);
-        } else {
-            // Adicionar novo pagamento
-            agregados.set(chave, {
-                forma_pagamento: pag.forma_pagamento,
-                valor: parseFloat(pag.valor),
-                data: pag.data
-            });
-        }
-    });
-    
-    return Array.from(agregados.values());
-}
-
-// Função auxiliar para definir texto de forma segura
-function safeSetText(elementId, text) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.textContent = text || '';
-    }
-}
+// Funções auxiliares
 function safeSetText(elementId, text) {
     const el = document.getElementById(elementId);
-    if (el) el.textContent = text;
+    if (el) {
+        el.textContent = text;
+    } else {
+        console.warn(`Elemento com ID ${elementId} não encontrado`);
+    }
+}
+
+function formatDocument(doc) {
+    if (!doc) return '';
+    if (doc.length === 11) { // CPF
+        return doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    } else if (doc.length === 14) { // CNPJ
+        return doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+    }
+    return doc;
 }
 
 function formatCEP(cep) {
     if (!cep) return '';
     return cep.replace(/(\d{5})(\d{3})/, '$1-$2');
+}
+
+function formatCurrency(value) {
+    if (value === null || value === undefined) return 'R$ 0,00';
+    const parsed = Number(value);
+    if (isNaN(parsed)) return 'R$ 0,00';
+    
+    return parsed.toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    });
 }
 
 function formatPaymentMethod(method) {
@@ -1907,7 +1986,37 @@ function formatPaymentMethod(method) {
     return methods[method] || method;
 }
 
+function getCurrentUserId() {
+    return localStorage.getItem('userId') || 1;
+}
+
+function logActivity(action, type) {
+    console.log(`Atividade: ${action} (${type})`);
+}
+
+function showMessage(message, type = 'success') {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `flash-message ${type}`;
+    messageDiv.textContent = message;
+    document.body.appendChild(messageDiv);
+    
+    setTimeout(() => {
+        messageDiv.style.opacity = '0';
+        setTimeout(() => messageDiv.remove(), 1000);
+    }, 5000);
+}
+
+// Configurar eventos para o modal de estorno
+document.getElementById('confirm-void-sale')?.addEventListener('click', voidSale);
+document.getElementById('cancel-void-sale')?.addEventListener('click', () => {
+    closeModal('void-sale-modal');
+});
+
 // ==================== FUNÇÕES DE CAIXA ====================
+/**
+ * Verifica o status atual do caixa (aberto/fechado)
+ * @async
+ */
 async function checkCaixaStatus() {
     try {
         const response = await fetch('/operador/api/saldo', {
@@ -1915,6 +2024,7 @@ async function checkCaixaStatus() {
             method: 'GET'
         });
         if (!response.ok) throw new Error('Erro ao verificar status do caixa');
+        
         const data = await response.json();
         
         if (data.message === 'Nenhum caixa aberto encontrado') {
@@ -1930,6 +2040,11 @@ async function checkCaixaStatus() {
     }
 }
 
+/**
+ * Atualiza o saldo do caixa na interface
+ * @async
+ * @param {boolean} [forceUpdate=false] - Força atualização sem cache
+ */
 async function updateBalance(forceUpdate = false) {
     try {
         const url = forceUpdate 
@@ -1941,6 +2056,7 @@ async function updateBalance(forceUpdate = false) {
             method: 'GET'
         });
         if (!response.ok) throw new Error('Erro ao carregar saldo');
+        
         const data = await response.json();
         
         if (data.message === 'Nenhum caixa aberto encontrado') {
@@ -1962,16 +2078,76 @@ async function updateBalance(forceUpdate = false) {
         if (currentBalanceLabel) currentBalanceLabel.textContent = '';
     }
 }
-
-async function closeRegister() {
-    const valorFechamento = prompt('Informe o valor de fechamento do caixa:');
-    if (!valorFechamento) {
-        return showMessage('Operação cancelada', 'warning');
+// Adiciona um novo método de pagamento
+document.querySelector('.add-payment-method').addEventListener('click', function() {
+    const methodSelect = document.querySelector('.payment-method-select');
+    const amountInput = document.querySelector('.payment-amount');
+    const paymentsList = document.querySelector('.selected-payments-list');
+    
+    if (!methodSelect.value || !amountInput.value) {
+        showMessage('Selecione um método e informe o valor', 'error');
+        return;
     }
     
-    // Formata o valor para o padrão brasileiro
-    const valorNumerico = parseFloat(valorFechamento.replace('.', '').replace(',', '.'));
-    if (isNaN(valorNumerico)) {
+    const methodText = methodSelect.options[methodSelect.selectedIndex].text;
+    const amount = parseFloat(amountInput.value.replace(',', '.'));
+    
+    if (isNaN(amount)) {
+        showMessage('Valor inválido', 'error');
+        return;
+    }
+    
+    const paymentItem = document.createElement('div');
+    paymentItem.className = 'payment-item';
+    paymentItem.innerHTML = `
+        <span>${methodText}: R$ ${amount.toFixed(2).replace('.', ',')}</span>
+        <input type="hidden" name="payment_methods[]" value="${methodSelect.value}">
+        <input type="hidden" name="payment_amounts[]" value="${amount}">
+        <span class="remove-payment"><i class="fas fa-times"></i></span>
+    `;
+    
+    paymentsList.appendChild(paymentItem);
+    
+    // Limpa os campos
+    methodSelect.value = '';
+    amountInput.value = '';
+    
+    // Adiciona evento para remover o pagamento
+    paymentItem.querySelector('.remove-payment').addEventListener('click', function() {
+        paymentItem.remove();
+        calculatePaymentTotals();
+    });
+    
+    calculatePaymentTotals();
+});
+
+// Calcula totais e verifica se o valor recebido cobre o total
+function calculatePaymentTotals() {
+    const paymentAmounts = document.querySelectorAll('input[name="payment_amounts[]"]');
+    let totalPaid = 0;
+    
+    paymentAmounts.forEach(input => {
+        totalPaid += parseFloat(input.value) || 0;
+    });
+    
+    const totalText = saleTotalElement?.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
+    const total = parseFloat(totalText) || 0;
+    
+    if (totalPaid > 0) {
+        const change = Math.max(0, totalPaid - total);
+        if (changeValueElement) {
+            changeValueElement.textContent = formatCurrency(change);
+            changeValueElement.style.color = totalPaid < total ? 'var(--danger)' : '';
+        }
+    }
+}
+/**
+ * Fecha o caixa atual
+ * @async
+ */
+async function closeRegister() {
+    const valorFechamento = prompt('Informe o valor de fechamento do caixa:');
+    if (!valorFechamento || isNaN(valorFechamento)) {
         return showMessage('Valor de fechamento inválido', 'error');
     }
 
@@ -1981,14 +2157,19 @@ async function closeRegister() {
 
     try {
         const dataParam = new Date().toISOString().slice(0, 10);
+
+        // PEGAR OPERADOR ID DE VARIÁVEL GLOBAL OU CAMPO HIDDEN
         let operadorId = '';
         if (typeof currentOperadorId !== 'undefined') {
             operadorId = currentOperadorId;
         } else {
             const inputHidden = document.getElementById('operador-id');
-            if (inputHidden) operadorId = inputHidden.value;
+            if (inputHidden) {
+                operadorId = inputHidden.value;
+            }
         }
 
+        // Abrir o relatório antes de fechar o caixa
         const urlRelatorio = `/operador/api/vendas/relatorio-diario-pdf?data=${dataParam}&operador_id=${operadorId}`;
         const novaAba = window.open(urlRelatorio, '_blank');
 
@@ -1996,13 +2177,15 @@ async function closeRegister() {
             return showMessage('Não foi possível abrir o relatório. Verifique o bloqueador de pop-ups.', 'error');
         }
 
+        // Aguarda 1 segundo para garantir que o relatório foi requisitado
         await new Promise(resolve => setTimeout(resolve, 1000));
 
+        // Agora sim, fecha o caixa
         const response = await fetch('/operador/api/fechar-caixa', {
             ...preventCacheConfig,
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ valor_fechamento: valorNumerico })
+            body: JSON.stringify({ valor_fechamento: parseFloat(valorFechamento) })
         });
 
         if (!response.ok) {
@@ -2013,11 +2196,15 @@ async function closeRegister() {
         const now = new Date();
         showMessage(`Caixa fechado às ${now.toLocaleTimeString('pt-BR')}`);
         await checkCaixaStatus();
+
     } catch (error) {
         showMessage(error.message, 'error');
     }
 }
 
+/**
+ * Atualiza o status visual do caixa (livre/em operação)
+ */
 window.updateCaixaStatus = function() {
     const caixaStatusDisplay = document.querySelector('.caixa-status');
     if (!caixaStatusDisplay || !selectedClientInput) return;
@@ -2032,9 +2219,23 @@ window.updateCaixaStatus = function() {
 };
 
 // ==================== FUNÇÕES DE BUSCA DINÂMICA ====================
+/**
+ * Variáveis para controle dos timeouts de busca
+ */
+let clientSearchTimeout;
+let productSearchTimeout;
+let activeSearchDropdown = null;
+
+/**
+ * Exibe resultados de busca em um dropdown
+ * @param {Array} results - Resultados da busca
+ * @param {string} containerId - ID do container de resultados
+ * @param {string} type - Tipo de busca ('client' ou 'product')
+ */
 function showSearchResults(results, containerId, type) {
     const resultsContainer = document.getElementById(containerId);
     if (!resultsContainer) return;
+    
     resultsContainer.innerHTML = '';
 
     if (results.length === 0) {
@@ -2054,6 +2255,7 @@ function showSearchResults(results, containerId, type) {
                 <p>Documento: ${item.documento || 'Não informado'}</p>
                 <p>Telefone: ${item.telefone || 'Não informado'}</p>
             `;
+            
             resultItem.addEventListener('click', () => {
                 selectClient(item);
                 resultsContainer.style.display = 'none';
@@ -2065,12 +2267,14 @@ function showSearchResults(results, containerId, type) {
                 <p>Código: ${item.codigo || 'Não informado'} | Marca: ${item.marca || 'Não informada'}</p>
                 <p>Preço: ${formatCurrency(item.valor_unitario)} | Estoque loja: ${item.estoque_loja} ${item.unidade || 'un'} | Estoque depósito: ${item.estoque_deposito || 0} ${item.unidade || 'un'}</p>
             `;
+            
             resultItem.addEventListener('click', () => {
                 addProductToSale(item);
                 resultsContainer.style.display = 'none';
                 if (productSearchInput) productSearchInput.value = '';
             });
         }
+        
         resultsContainer.appendChild(resultItem);
     });
 
@@ -2078,6 +2282,11 @@ function showSearchResults(results, containerId, type) {
     activeSearchDropdown = resultsContainer;
 }
 
+/**
+ * Busca clientes dinamicamente
+ * @async
+ * @param {string} searchTerm - Termo para busca
+ */
 async function searchClients(searchTerm) {
     try {
         const response = await fetch(`/operador/api/clientes/buscar?q=${encodeURIComponent(searchTerm)}&timestamp=${new Date().getTime()}`, {
@@ -2085,40 +2294,20 @@ async function searchClients(searchTerm) {
             method: 'GET'
         });
         if (!response.ok) throw new Error('Erro ao buscar clientes');
+
         const results = await response.json();
-        showClientSearchResults(results);
+        showSearchResults(results, 'client-search-results', 'client');
     } catch (error) {
+        console.error('Erro na busca de clientes:', error);
         showMessage(error.message, 'error');
     }
 }
 
-function showClientResultsDropdown(clients) {
-    const dropdown = document.getElementById('client-search-results');
-    if (!dropdown) return;
-    dropdown.innerHTML = '';
-    
-    clients.forEach(client => {
-        const item = document.createElement('div');
-        item.className = 'client-result-item';
-        item.innerHTML = `
-            <div class="client-info">
-                <strong>${client.nome}</strong>
-                <div class="client-details">
-                    <span>${client.documento ? 'CPF: ' + formatDocument(client.documento) : ''}</span>
-                    <span>${client.telefone ? 'Tel: ' + formatPhone(client.telefone) : ''}</span>
-                </div>
-            </div>
-        `;
-        item.addEventListener('click', () => {
-            selectClient(client);
-            dropdown.innerHTML = '';
-            clientSearchInput.value = '';
-        });
-        dropdown.appendChild(item);
-    });
-    dropdown.style.display = 'block';
-}
-
+/**
+ * Busca produtos dinamicamente
+ * @async
+ * @param {string} searchTerm - Termo para busca
+ */
 async function searchProducts(searchTerm) {
     try {
         const response = await fetch(`/operador/api/produtos/buscar?q=${encodeURIComponent(searchTerm)}&timestamp=${new Date().getTime()}`, {
@@ -2126,6 +2315,7 @@ async function searchProducts(searchTerm) {
             method: 'GET'
         });
         if (!response.ok) throw new Error('Erro ao buscar produtos');
+        
         const results = await response.json();
         showSearchResults(results, 'product-search-results', 'product');
     } catch (error) {
@@ -2134,6 +2324,9 @@ async function searchProducts(searchTerm) {
     }
 }
 
+/**
+ * Fecha todos os dropdowns de busca
+ */
 function closeAllDropdowns() {
     document.querySelectorAll('.search-results-dropdown').forEach(dropdown => {
         dropdown.style.display = 'none';
@@ -2141,7 +2334,11 @@ function closeAllDropdowns() {
     activeSearchDropdown = null;
 }
 
+
 // ==================== FUNÇÕES UTILITÁRIAS ====================
+/**
+ * Atualiza a data e hora atual na interface
+ */
 function updateCurrentDate() {
     const now = new Date();
     if (currentDateElement) {
@@ -2155,6 +2352,9 @@ function updateCurrentDate() {
     }
 }
 
+/**
+ * Alterna a visibilidade do saldo
+ */
 function toggleBalance() {
     balanceVisible = !balanceVisible;
     updateBalance();
@@ -2163,51 +2363,88 @@ function toggleBalance() {
     }
 }
 
+/**
+ * Formata um valor numérico como moeda (R$)
+ * @param {number|string} value - Valor a ser formatado
+ * @returns {string} Valor formatado como moeda
+ */
 function formatCurrency(value) {
     const parsed = Number(
         typeof value === 'string'
             ? value.replace(',', '.')
             : value
     );
+    
     if (isNaN(parsed)) return 'R$ 0,00';
+
     return 'R$ ' + parsed.toFixed(2)
         .replace('.', ',')
         .replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
+/**
+ * Alterna entre as abas da interface
+ * @param {string} tabId - ID da aba a ser ativada
+ */
 function switchTab(tabId) {
     tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
     tabContents.forEach(content => content.classList.toggle('active', content.id === tabId));
+    
     const activeTabBtn = document.querySelector(`.menu-item[data-tab="${tabId}"]`);
     if (activeTabBtn && currentTabTitle) {
         const span = activeTabBtn.querySelector('span');
         if (span) currentTabTitle.textContent = span.textContent;
     }
-    if (tabId === 'day-sales') {
-        loadDaySales();
-    }
 }
 
+/**
+ * Abre um modal específico
+ * @param {string} type - Tipo do modal ('client', 'product-search', 'delivery', etc.)
+ */
 function openModal(type) {
     const modal = document.getElementById(`${type}-modal`);
     if (modal) modal.style.display = 'flex';
 }
 
+/**
+ * Fecha todos os modais abertos
+ */
+function closeModal() {
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.style.display = 'none';
+    });
+}
+
+/**
+ * Exibe uma mensagem de notificação na interface
+ * @param {string} message - Mensagem a ser exibida
+ * @param {string} [type='success'] - Tipo da mensagem ('success' ou 'error')
+ */
 function showMessage(message, type = 'success') {
     if (!notification || !notificationMessage) return;
+    
     notification.className = `notification ${type} show`;
     notificationMessage.textContent = message;
+    
     const icon = notification.querySelector('.notification-icon i');
     if (icon) {
         icon.className = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
     }
+    
     setTimeout(() => notification.classList.remove('show'), 5000);
 }
 
+/**
+ * Força requisições sem cache
+ * @param {string} url - URL da requisição
+ * @param {Object} [options={}] - Opções adicionais para fetch
+ * @returns {Promise} Promise da requisição fetch
+ */
 function forceNoCacheFetch(url, options = {}) {
     const timestamp = new Date().getTime();
     const separator = url.includes('?') ? '&' : '?';
     const noCacheUrl = `${url}${separator}_=${timestamp}`;
+    
     return fetch(noCacheUrl, {
         ...options,
         headers: {
@@ -2220,61 +2457,64 @@ function forceNoCacheFetch(url, options = {}) {
 }
 
 // ==================== CONFIGURAÇÃO DE EVENT LISTENERS ====================
+/**
+ * Configura todos os event listeners da aplicação
+ */
 function setupEventListeners() {
+    // Event listeners básicos
     if (toggleBalanceBtn) toggleBalanceBtn.addEventListener('click', toggleBalance);
+    
     if (tabBtns) {
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => switchTab(btn.dataset.tab));
         });
     }
+    
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
             window.location.href = '/logout?' + new Date().getTime();
         });
     }
+    
+    // Event listeners de clientes
     const searchClientBtn = document.getElementById('search-client-btn');
     if (searchClientBtn) searchClientBtn.addEventListener('click', searchClient);
+    
     if (clientSearchInput) {
-        clientSearchInput.addEventListener('focus', function() {
-            showClientSearchResults(clients);
-        });
-        clientSearchInput.addEventListener('input', function(e) {
-            clearTimeout(clientSearchTimeout);
-            const searchTerm = e.target.value.trim();
-            if (searchTerm.length >= 2) {
-                clientSearchTimeout = setTimeout(() => {
-                    searchClients(searchTerm);
-                }, 300);
-            } else if (searchTerm.length === 0) {
-                showClientSearchResults(clients);
-            }
-        });
         clientSearchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const searchTerm = clientSearchInput.value.trim();
-                if (searchTerm) searchClients(searchTerm);
-            }
+            if (e.key === 'Enter') searchClient();
         });
     }
+    
     const addClientBtn = document.getElementById('add-client-btn');
     if (addClientBtn) addClientBtn.addEventListener('click', openClientModal);
+    
+    // Event listeners de produtos
     const searchProductBtn = document.getElementById('search-product-btn');
     if (searchProductBtn) searchProductBtn.addEventListener('click', openProductSearchModal);
+    
     if (productSearchInput) {
         productSearchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') openProductSearchModal();
         });
     }
+    
     if (addProductBtn) addProductBtn.addEventListener('click', addEmptyProductRow);
+    
+    // Event listeners modais
     if (modalCloses) {
         modalCloses.forEach(btn => {
             btn.addEventListener('click', closeModal);
         });
     }
+    
     const saveClientBtn = document.getElementById('save-client');
     if (saveClientBtn) saveClientBtn.addEventListener('click', saveClient);
+    
+    // Event listeners de venda
     if (registerSaleBtn) registerSaleBtn.addEventListener('click', registerSale);
     if (closeRegisterBtn) closeRegisterBtn.addEventListener('click', closeRegister);
+    
     if (productsList) {
         productsList.addEventListener('input', (e) => {
             if (e.target.classList.contains('quantity-input')) {
@@ -2282,6 +2522,7 @@ function setupEventListeners() {
                 calculateSaleTotal();
             }
         });
+        
         productsList.addEventListener('click', (e) => {
             if (e.target.closest('.btn-remove')) {
                 const button = e.target.closest('.btn-remove');
@@ -2290,26 +2531,34 @@ function setupEventListeners() {
             }
         });
     }
-    document.getElementById('day-sales-tab')?.addEventListener('click', loadDaySales);
+    
     if (amountReceivedInput) {
         amountReceivedInput.addEventListener('input', calculateSaleTotal);
     }
+    
+    // Event listeners de entrega
     if (useClientAddressBtn) {
         useClientAddressBtn.addEventListener('click', useClientAddress);
     }
+    
     if (deliveryBtn) {
         deliveryBtn.addEventListener('click', openDeliveryModal);
     }
+    
     if (saveDeliveryBtn) {
         saveDeliveryBtn.addEventListener('click', saveDeliveryAddress);
     }
+    
     if (cancelDeliveryBtn) {
         cancelDeliveryBtn.addEventListener('click', closeModal);
     }
+    
+    // Event listeners de busca dinâmica
     if (clientSearchInput) {
         clientSearchInput.addEventListener('input', function(e) {
             clearTimeout(clientSearchTimeout);
             const searchTerm = e.target.value.trim();
+            
             if (searchTerm.length >= 2) {
                 clientSearchTimeout = setTimeout(() => {
                     searchClients(searchTerm);
@@ -2320,14 +2569,17 @@ function setupEventListeners() {
                 closeAllDropdowns();
             }
         });
+        
         clientSearchInput.addEventListener('focus', async function() {
             await searchClients('');
         });
     }
+    
     if (productSearchInput) {
         productSearchInput.addEventListener('input', function(e) {
             clearTimeout(productSearchTimeout);
             const searchTerm = e.target.value.trim();
+            
             if (searchTerm.length >= 2) {
                 productSearchTimeout = setTimeout(() => {
                     searchProducts(searchTerm);
@@ -2338,6 +2590,7 @@ function setupEventListeners() {
                 closeAllDropdowns();
             }
         });
+        
         productSearchInput.addEventListener('focus', function() {
             if (productSearchInput.value.trim().length >= 2) {
                 searchProducts(productSearchInput.value.trim());
@@ -2346,16 +2599,21 @@ function setupEventListeners() {
             }
         });
     }
+    
+    // Event listeners globais
     document.addEventListener('click', function(e) {
         if (!e.target.closest('.search-container') && activeSearchDropdown) {
             closeAllDropdowns();
         }
     });
+    
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && activeSearchDropdown) {
             closeAllDropdowns();
         }
     });
+    
+    // Event listener para remover cliente selecionado
     const removeClientBtn = document.getElementById("remove-selected-client-btn");
     if (removeClientBtn) {
         removeClientBtn.addEventListener("click", function() {
@@ -2364,7 +2622,8 @@ function setupEventListeners() {
             updateCaixaStatus();
         });
     }
-    
+
+    // Adiciona listener para preencher automaticamente o valor recebido
     const paymentMethodSelect = document.getElementById('payment-method');
     if (paymentMethodSelect) {
         paymentMethodSelect.addEventListener('change', function() {
@@ -2381,77 +2640,25 @@ function setupEventListeners() {
             }
         });
     }
-    
-    // Adiciona listeners para múltiplas formas de pagamento
-    document.querySelector('.add-payment-method')?.addEventListener('click', addPaymentMethod);
-    document.querySelector('.payment-amount')?.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            addPaymentMethod();
-        }
-    });
-}
-
-// ==================== FUNÇÕES PARA MÚLTIPLAS FORMAS DE PAGAMENTO ====================
-function addPaymentMethod() {
-    const paymentMethodSelect = document.querySelector('.payment-method-select');
-    const paymentAmountInput = document.querySelector('.payment-amount');
-    const selectedPaymentsList = document.querySelector('.selected-payments-list');
-    
-    if (!paymentMethodSelect || !paymentAmountInput || !selectedPaymentsList) return;
-    
-    const method = paymentMethodSelect.value;
-    const amountText = paymentAmountInput.value.replace(/\./g, '').replace(',', '.');
-    const amount = parseFloat(amountText);
-    
-    if (!method) {
-        showMessage('Selecione uma forma de pagamento', 'error');
-        return;
-    }
-    
-    if (isNaN(amount) || amount <= 0) {
-        showMessage('Digite um valor válido para o pagamento', 'error');
-        return;
-    }
-    
-    const paymentItem = document.createElement('div');
-    paymentItem.className = 'payment-item';
-    paymentItem.innerHTML = `
-        <input type="hidden" name="payment_methods[]" value="${method}">
-        <input type="hidden" name="payment_amounts[]" value="${amount.toFixed(2).replace('.', ',')}">
-        <span class="payment-method">${formatPaymentMethod(method)}</span>
-        <span class="payment-amount">${formatCurrency(amount)}</span>
-        <button class="btn-remove-payment" title="Remover pagamento">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    selectedPaymentsList.appendChild(paymentItem);
-    
-    // Adiciona listener para o botão de remover
-    paymentItem.querySelector('.btn-remove-payment').addEventListener('click', function() {
-        paymentItem.remove();
-        calculateSaleTotal();
-    });
-    
-    // Limpa os campos
-    paymentMethodSelect.value = '';
-    paymentAmountInput.value = '';
-    
-    // Calcula o total novamente
-    calculateSaleTotal();
 }
 
 // ==================== INICIALIZAÇÃO ADICIONAL ====================
+/**
+ * Configura listeners adicionais após o carregamento do DOM
+ */
 document.addEventListener('DOMContentLoaded', function() {
+    // Configuração adicional para busca dinâmica
     const modalSearchProductBtn = document.getElementById('modal-search-product-btn');
     if (modalSearchProductBtn) {
         modalSearchProductBtn.addEventListener('click', searchProductsInModal);
     }
+    
     if (modalProductSearch) {
         modalProductSearch.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') searchProductsInModal();
         });
     }
+    
     const cancelProductSearchBtn = document.getElementById('cancel-product-search');
     if (cancelProductSearchBtn) {
         cancelProductSearchBtn.addEventListener('click', () => {
@@ -2459,12 +2666,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (productSearchInput) productSearchInput.value = '';
         });
     }
+    
+    // Configuração de despesas
     if (openExpenseModalBtn) openExpenseModalBtn.addEventListener('click', openExpenseModal);
     if (cancelExpenseBtn) cancelExpenseBtn.addEventListener('click', closeExpenseModal);
     if (saveExpenseBtn) saveExpenseBtn.addEventListener('click', saveExpense);
-    document.getElementById('generate-pdf-btn')?.addEventListener('click', generateDaySalesPDF);
-    document.getElementById('confirm-void-sale')?.addEventListener('click', voidSale);
-    document.getElementById('cancel-void-sale')?.addEventListener('click', () => {
-        closeModal('void-sale-modal');
-    });
 });
