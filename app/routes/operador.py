@@ -548,7 +548,7 @@ def obter_vendas_hoje():
         if not caixa:
             return jsonify({
                 'success': False,
-                'message': 'Nenhum caixa aberto encontrado para o operador'
+                'message': 'Nenhuma venda a exibir! Caixa Fechado!'
             }), 400
 
         # Tratamento de data com fuso horário
@@ -1073,6 +1073,7 @@ def api_get_saldo():
 
         if not caixa:
             return jsonify({
+                'sucess': False,
                 'saldo': 0.00,
                 'saldo_formatado': 'R$ 0,00',
                 'valor_abertura': 0.00,

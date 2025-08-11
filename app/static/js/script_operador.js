@@ -1527,22 +1527,31 @@ async function saveExpense() {
 async function loadDaySales() {
     const tableBody = document.querySelector('#day-sales-table tbody');
     if (!tableBody) return;
-    
+
     try {
         tableBody.innerHTML = '<tr><td colspan="6"><div class="loading-spinner"></div></td></tr>';
-        
+
         const response = await fetch('/operador/api/vendas/hoje', {
             ...preventCacheConfig,
             method: 'GET'
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(errorText || 'Erro ao carregar vendas do dia');
+            let errorMessage = 'Erro ao carregar vendas do dia';
+            try {
+                // tenta ler como JSON
+                const errorData = await response.json();
+                errorMessage = errorData.message || errorMessage;
+            } catch {
+                // se não for JSON, tenta como texto
+                const errorText = await response.text();
+                if (errorText) errorMessage = errorText;
+            }
+            throw new Error(errorMessage);
         }
 
         const result = await response.json();
-        
+
         if (!result.success) {
             throw new Error(result.message || 'Erro ao carregar vendas');
         }
@@ -1551,6 +1560,7 @@ async function loadDaySales() {
         // Remover vendas duplicadas antes de renderizar
         const vendasUnicas = removerVendasDuplicadas(vendas);
         renderDaySales(vendasUnicas);
+
     } catch (error) {
         console.error("Erro ao carregar vendas:", error);
         tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: red;">${error.message}</td></tr>`;
