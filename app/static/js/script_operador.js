@@ -2219,15 +2219,38 @@ async function closeRegister() {
             }
             
             try {
-                const response = await fetch('/operador/api/fechar-caixa', {
+                // Primeiro gerar o relatório PDF
+                const pdfResponse = await fetch('/operador/api/vendas/relatorio-diario-pdf', {
+                    ...preventCacheConfig,
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (!pdfResponse.ok) {
+                    throw new Error('Erro ao gerar relatório PDF');
+                }
+
+                // Criar um link para download do PDF
+                const pdfBlob = await pdfResponse.blob();
+                const pdfUrl = URL.createObjectURL(pdfBlob);
+                const a = document.createElement('a');
+                a.href = pdfUrl;
+                a.download = `relatorio_caixa_${new Date().toISOString().split('T')[0]}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(pdfUrl);
+
+                // Depois realizar o fechamento do caixa
+                const fechamentoResponse = await fetch('/operador/api/fechar-caixa', {
                     ...preventCacheConfig,
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ valor_fechamento: valorNumerico })
                 });
 
-                if (!response.ok) {
-                    const errorData = await response.json();
+                if (!fechamentoResponse.ok) {
+                    const errorData = await fechamentoResponse.json();
                     throw new Error(errorData.error || 'Erro ao fechar caixa');
                 }
 
