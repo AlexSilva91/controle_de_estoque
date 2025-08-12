@@ -902,12 +902,17 @@ def gerar_pdf_vendas_dia():
         FONTE_NORMAL = 'Courier'
         FONTE_NEGRITO = 'Courier-Bold'
 
-    data_str = request.args.get('data')
+    # Obter caixa aberto do operador atual
     caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
+    if not caixa:
+        return jsonify({'success': False, 'message': 'Nenhum caixa aberto encontrado para o operador'}), 400
+    
     caixa_id = caixa.id
     operador_id = current_user.id
-    data = None
 
+    # Tratar parâmetros de data (se existirem)
+    data_str = request.args.get('data')
+    data = None
     if data_str:
         try:
             data = datetime.strptime(data_str, '%Y-%m-%d').date()
@@ -916,35 +921,45 @@ def gerar_pdf_vendas_dia():
 
     data_relatorio = data if data else datetime.now().date()
 
+    # Obter dados das vendas - agora com fallback padrão se não houver vendas
     resultado = obter_detalhes_vendas_dia(data, caixa_id, operador_id)
     if not resultado['success']:
-        return jsonify(resultado), 400
-    dados = resultado['data']
+        # Se não houver vendas, criar estrutura vazia mas ainda gerar o PDF
+        dados = {
+            'vendas': [],
+            'total_descontos': 0,
+            'total_saidas': 0
+        }
+    else:
+        dados = resultado['data']
 
-    # Criar métricas de pagamento a partir da tabela PagamentoNotaFiscal
+    # Inicializar métricas de pagamento mesmo sem vendas
     metricas_pagamento = {}
-    for venda in dados['vendas']:
-        # Verificar se há pagamentos registrados na tabela PagamentoNotaFiscal
-        if 'pagamentos' in venda and venda['pagamentos']:
-            for pagamento in venda['pagamentos']:
-                forma = pagamento['forma_pagamento']
-                valor = pagamento['valor']
+
+    # Processar métricas de pagamento apenas se houver vendas
+    if 'vendas' in dados and dados['vendas']:
+        for venda in dados['vendas']:
+            # Verificar se há pagamentos registrados na tabela PagamentoNotaFiscal
+            if 'pagamentos' in venda and venda['pagamentos']:
+                for pagamento in venda['pagamentos']:
+                    forma = pagamento['forma_pagamento']
+                    valor = pagamento['valor']
+
+                    if forma not in metricas_pagamento:
+                        metricas_pagamento[forma] = {'transacoes': 0, 'total': 0}
+
+                    metricas_pagamento[forma]['transacoes'] += 1
+                    metricas_pagamento[forma]['total'] += valor
+            else:
+                # Caso não haja pagamentos registrados, usar a forma de pagamento da venda
+                forma = venda['forma_pagamento']
+                total = venda['valor_total']
 
                 if forma not in metricas_pagamento:
                     metricas_pagamento[forma] = {'transacoes': 0, 'total': 0}
 
                 metricas_pagamento[forma]['transacoes'] += 1
-                metricas_pagamento[forma]['total'] += valor
-        else:
-            # Caso não haja pagamentos registrados, usar a forma de pagamento da venda
-            forma = venda['forma_pagamento']
-            total = venda['valor_total']
-
-            if forma not in metricas_pagamento:
-                metricas_pagamento[forma] = {'transacoes': 0, 'total': 0}
-
-            metricas_pagamento[forma]['transacoes'] += 1
-            metricas_pagamento[forma]['total'] += total
+                metricas_pagamento[forma]['total'] += total
 
     buffer = BytesIO()
 
@@ -1084,16 +1099,18 @@ def gerar_pdf_vendas_dia():
     elements.append(Spacer(1, 10))
 
     # Resumo Financeiro
-    total_vendas_positivas = sum(v['valor_total'] for v in dados['vendas'] if v['valor_total'] > 0)
-    total_estornos = sum(abs(v['valor_total']) for v in dados['vendas'] if v['valor_total'] < 0)
-    total_liquido = total_vendas_positivas - total_estornos - dados['total_saidas']
+    total_vendas_positivas = sum(v['valor_total'] for v in dados['vendas'] if 'valor_total' in v and v['valor_total'] > 0) if 'vendas' in dados else 0
+    total_estornos = sum(abs(v['valor_total']) for v in dados['vendas'] if 'valor_total' in v and v['valor_total'] < 0) if 'vendas' in dados else 0
+    total_liquido = total_vendas_positivas - total_estornos - dados.get('total_saidas', 0)
     
     # Calcular total a prazo pendente
-    total_a_prazo_pendente = sum(
-        v['valor_total'] - sum(p['valor'] for p in v['pagamentos']) 
-        for v in dados['vendas'] 
-        if v['a_prazo']
-    )
+    total_a_prazo_pendente = 0
+    if 'vendas' in dados:
+        total_a_prazo_pendente = sum(
+            v['valor_total'] - sum(p['valor'] for p in v['pagamentos']) 
+            for v in dados['vendas'] 
+            if 'a_prazo' in v and v['a_prazo'] and 'pagamentos' in v
+        )
 
     elements.append(Paragraph("RESUMO FINANCEIRO", estilos['subtitulo']))
     elements.append(Spacer(1, 5))
@@ -1101,9 +1118,9 @@ def gerar_pdf_vendas_dia():
         ["Descrição", "Valor (R$)"],
         ["Total Vendas", total_vendas_positivas],
         ["Total Estornos", total_estornos],
-        ["Total Descontos", dados['total_descontos']],
+        ["Total Descontos", dados.get('total_descontos', 0)],
         ["Total Entradas", total_vendas_positivas],
-        ["Total Saídas", dados['total_saidas']],
+        ["Total Saídas", dados.get('total_saidas', 0)],
         ["Total a Prazo Pendente", total_a_prazo_pendente],
         ["Saldo Líquido", total_liquido]
     ]
@@ -1123,17 +1140,23 @@ def gerar_pdf_vendas_dia():
     dados_pagamentos = [["Forma de Pagamento", "Qtd", "Total"]]
     total_geral_pagamentos = 0
     total_geral_transacoes = 0
-    formas_ordenadas = sorted(metricas_pagamento.items(), key=lambda x: x[1]['total'], reverse=True)
-    for forma, dados_forma in formas_ordenadas:
-        forma_nome = forma.value if hasattr(forma, 'value') else str(forma)
-        forma_nome = forma_nome.replace('_', ' ').title()
-        dados_pagamentos.append([
-            forma_nome,
-            dados_forma['transacoes'],
-            dados_forma['total']
-        ])
-        total_geral_pagamentos += dados_forma['total']
-        total_geral_transacoes += dados_forma['transacoes']
+    
+    if metricas_pagamento:
+        formas_ordenadas = sorted(metricas_pagamento.items(), key=lambda x: x[1]['total'], reverse=True)
+        for forma, dados_forma in formas_ordenadas:
+            forma_nome = forma.value if hasattr(forma, 'value') else str(forma)
+            forma_nome = forma_nome.replace('_', ' ').title()
+            dados_pagamentos.append([
+                forma_nome,
+                dados_forma['transacoes'],
+                dados_forma['total']
+            ])
+            total_geral_pagamentos += dados_forma['total']
+            total_geral_transacoes += dados_forma['transacoes']
+    else:
+        # Adiciona linha vazia se não houver pagamentos
+        dados_pagamentos.append(["Nenhum pagamento registrado", 0, 0])
+    
     dados_pagamentos.append(["TOTAL GERAL", total_geral_transacoes, total_geral_pagamentos])
     elements.append(criar_tabela_adaptavel(
         dados_pagamentos,
@@ -1146,78 +1169,90 @@ def gerar_pdf_vendas_dia():
     ))
     elements.append(Spacer(1, 15))
 
-    # Detalhes das Vendas
-    elements.append(Paragraph("DETALHES DAS VENDAS", estilos['subtitulo']))
-    elements.append(Spacer(1, 5))
-    for i, venda in enumerate(dados['vendas']):
-        is_estorno = venda['valor_total'] < 0
-        valor_exibicao = abs(venda['valor_total'])
-        titulo_venda = f"ESTORNO - VENDA #{venda['id']}" if is_estorno else f"VENDA #{venda['id']}"
-        elements.append(Paragraph(titulo_venda, estilos['estorno'] if is_estorno else estilos['negrito']))
-        elements.append(Spacer(1, 3))
-        
-        # Calcular valor pendente para vendas a prazo
-        valor_pendente = None
-        if venda['a_prazo']:
-            total_pago = sum(p['valor'] for p in venda['pagamentos'])
-            valor_pendente = venda['valor_total'] - total_pago
-        
-        info_venda_data = [
-            ["Data|Hora", datetime.fromisoformat(venda['data']).strftime('%d/%m/%Y %H:%M')],
-            ["Cliente", venda['cliente'] or "Não informado"],
-            ["Operador", venda['operador']],
-            ["Pagamento", venda['forma_pagamento']],
-            ["A Prazo", "Sim" if venda['a_prazo'] else "Não"],
-            ["Total", valor_exibicao],
-            ["Desconto", venda['valor_desconto']],
-        ]
-        
-        # Adicionar valor pendente se for venda a prazo
-        if venda['a_prazo']:
-            info_venda_data.append(["Pendente", valor_pendente])
-        
-        elements.append(criar_tabela_adaptavel(
-            info_venda_data,
-            colWidths=['30%', '70%'],
-            estilo=[('FONTNAME', (0, 0), (0, -1), FONTE_NEGRITO)],
-            quebrar_linhas=True
-        ))
+    # Detalhes das Vendas - apenas se houver vendas
+    if 'vendas' in dados and dados['vendas']:
+        elements.append(Paragraph("DETALHES DAS VENDAS", estilos['subtitulo']))
         elements.append(Spacer(1, 5))
-        
-        # Detalhes dos pagamentos se for venda a prazo
-        if venda['a_prazo'] and venda['pagamentos']:
-            elements.append(Paragraph("PAGAMENTOS REALIZADOS:", estilos['negrito']))
-            dados_pagamentos = [["Data", "Forma", "Valor"]]
-            for pagamento in venda['pagamentos']:
-                dados_pagamentos.append([
-                    datetime.fromisoformat(pagamento['data']).strftime('%d/%m/%Y %H:%M'),
-                    pagamento['forma_pagamento'],
-                    pagamento['valor']
-                ])
+        for i, venda in enumerate(dados['vendas']):
+            is_estorno = venda.get('valor_total', 0) < 0
+            valor_exibicao = abs(venda.get('valor_total', 0))
+            titulo_venda = f"ESTORNO - VENDA #{venda.get('id', '')}" if is_estorno else f"VENDA #{venda.get('id', '')}"
+            elements.append(Paragraph(titulo_venda, estilos['estorno'] if is_estorno else estilos['negrito']))
+            elements.append(Spacer(1, 3))
+            
+            # Calcular valor pendente para vendas a prazo
+            valor_pendente = None
+            if venda.get('a_prazo', False):
+                total_pago = sum(p['valor'] for p in venda['pagamentos']) if 'pagamentos' in venda else 0
+                valor_pendente = venda.get('valor_total', 0) - total_pago
+            
+            info_venda_data = [
+                ["Data|Hora", datetime.fromisoformat(venda['data']).strftime('%d/%m/%Y %H:%M') if 'data' in venda else "N/D"],
+                ["Cliente", venda.get('cliente', "Não informado")],
+                ["Operador", venda.get('operador', "N/D")],
+                ["Pagamento", venda.get('forma_pagamento', "N/D")],
+                ["A Prazo", "Sim" if venda.get('a_prazo', False) else "Não"],
+                ["Total", valor_exibicao],
+                ["Desconto", venda.get('valor_desconto', 0)],
+            ]
+            
+            # Adicionar valor pendente se for venda a prazo
+            if venda.get('a_prazo', False) and valor_pendente is not None:
+                info_venda_data.append(["Pendente", valor_pendente])
+            
             elements.append(criar_tabela_adaptavel(
-                dados_pagamentos,
-                colWidths=['40%', '30%', '30%'],
-                estilo=[('ALIGN', (2, 1), (2, -1), 'RIGHT')]
+                info_venda_data,
+                colWidths=['30%', '70%'],
+                estilo=[('FONTNAME', (0, 0), (0, -1), FONTE_NEGRITO)],
+                quebrar_linhas=True
             ))
             elements.append(Spacer(1, 5))
-        
-        dados_itens = [["Produto", "Qtd", "Unit.", "Total"]]
-        for item in venda['itens']:
-            quantidade = -item['quantidade'] if is_estorno else item['quantidade']
-            valor_total_item = -item['valor_total'] if is_estorno else item['valor_total']
-            dados_itens.append([
-                item['produto'],
-                quantidade,
-                item['valor_unitario'],
-                valor_total_item
-            ])
-        elements.append(criar_tabela_adaptavel(
-            dados_itens,
-            colWidths=['40%', '15%', '20%', '25%'],
-            estilo=[('ALIGN', (1, 1), (-1, -1), 'RIGHT')]
-        ))
-        if i < len(dados['vendas']) - 1:
-            elements.append(Spacer(1, 10))
+            
+            # Detalhes dos pagamentos se for venda a prazo
+            if venda.get('a_prazo', False) and 'pagamentos' in venda and venda['pagamentos']:
+                elements.append(Paragraph("PAGAMENTOS REALIZADOS:", estilos['negrito']))
+                dados_pagamentos = [["Data", "Forma", "Valor"]]
+                for pagamento in venda['pagamentos']:
+                    dados_pagamentos.append([
+                        datetime.fromisoformat(pagamento['data']).strftime('%d/%m/%Y %H:%M') if 'data' in pagamento else "N/D",
+                        pagamento.get('forma_pagamento', "N/D"),
+                        pagamento.get('valor', 0)
+                    ])
+                elements.append(criar_tabela_adaptavel(
+                    dados_pagamentos,
+                    colWidths=['40%', '30%', '30%'],
+                    estilo=[('ALIGN', (2, 1), (2, -1), 'RIGHT')]
+                ))
+                elements.append(Spacer(1, 5))
+            
+            # Itens da venda
+            if 'itens' in venda and venda['itens']:
+                dados_itens = [["Produto", "Qtd", "Unit.", "Total"]]
+                for item in venda['itens']:
+                    quantidade = -item['quantidade'] if is_estorno else item['quantidade']
+                    valor_total_item = -item['valor_total'] if is_estorno else item['valor_total']
+                    dados_itens.append([
+                        item.get('produto', "N/D"),
+                        quantidade,
+                        item.get('valor_unitario', 0),
+                        valor_total_item
+                    ])
+                elements.append(criar_tabela_adaptavel(
+                    dados_itens,
+                    colWidths=['40%', '15%', '20%', '25%'],
+                    estilo=[('ALIGN', (1, 1), (-1, -1), 'RIGHT')]
+                ))
+            else:
+                elements.append(Paragraph("Nenhum item registrado nesta venda", estilos['normal']))
+            
+            if i < len(dados['vendas']) - 1:
+                elements.append(Spacer(1, 10))
+    else:
+        # Mensagem quando não há vendas
+        elements.append(Paragraph("DETALHES DAS VENDAS", estilos['subtitulo']))
+        elements.append(Spacer(1, 5))
+        elements.append(Paragraph("Nenhuma venda registrada no período", estilos['normal']))
+        elements.append(Spacer(1, 10))
 
     # Rodapé
     elements.append(Spacer(1, 15))

@@ -1753,10 +1753,8 @@ function generateDaySalesPDF() {
         const originalText = button.innerHTML;
         button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
         button.disabled = true;
-        
-        const today = new Date();
-        const dateStr = today.toISOString().split('T')[0];
-        gerarRelatorioDiario(dateStr);
+
+        gerarRelatorioDiario();
     } catch (error) {
         console.error("Erro ao gerar PDF:", error);
         showMessage("Erro ao gerar relatório em PDF", "error");
@@ -1771,16 +1769,17 @@ function generateDaySalesPDF() {
     }
 }
 
-function gerarRelatorioDiario(data = null, caixaId = null, operadorId = null) {
+function gerarRelatorioDiario(caixaId = null, operadorId = null) {
     let url = '/operador/api/vendas/relatorio-diario-pdf';
     const params = new URLSearchParams();
-    const reportDate = data || new Date().toISOString().split('T')[0];
-    params.append('data', reportDate);
     if (caixaId) params.append('caixa_id', caixaId);
     if (operadorId) params.append('operador_id', operadorId);
-    url += '?' + params.toString();
+    if ([...params].length > 0) {
+        url += '?' + params.toString();
+    }
     window.open(url, '_blank');
 }
+
 
 function closeModal(modalId = null) {
     if (modalId) {
