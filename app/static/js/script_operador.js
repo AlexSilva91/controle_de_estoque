@@ -526,32 +526,33 @@ async function searchClient() {
 
 // Função para selecionar cliente para venda (chamada pelo botão)
 function selectClientForSale(clientId) {
-    // Buscar o cliente pelo ID
     const client = findClientById(clientId);
     
     if (client) {
-        // Chamar a função selectClient existente
         selectClient(client);
-        
-        // Opcional: Fechar modal de seleção de cliente se existir
-        closeClientModal();
+        showMessage(`Cliente ${client.nome} selecionado para venda`);
     } else {
         showMessage('Cliente não encontrado', 'error');
     }
 }
 
 function findClientById(clientId) {
-    
-    if (typeof clients !== 'undefined' && Array.isArray(clients)) {
-        return clients.find(client => client.id == clientId);
+    // Primeiro tenta encontrar na lista de clientes carregada
+    if (clients && Array.isArray(clients)) {
+        const client = clients.find(c => c.id == clientId);
+        if (client) return client;
     }
     
+    // Se não encontrou, tenta extrair da tabela HTML (fallback)
     const clientRow = document.querySelector(`[data-client-id="${clientId}"]`);
     if (clientRow) {
         return {
             id: clientId,
-            nome: clientRow.getAttribute('data-client-name') || clientRow.querySelector('.client-name')?.textContent,
-            // Adicione outros campos necessários
+            nome: clientRow.querySelector('.client-name strong')?.textContent || `Cliente ${clientId}`,
+            documento: clientRow.querySelector('.document-value')?.textContent || '',
+            telefone: clientRow.querySelector('.phone-link')?.textContent.replace(/\D/g, '') || '',
+            email: clientRow.querySelector('.email-link')?.textContent || '',
+            endereco: clientRow.querySelector('.address-text')?.textContent || ''
         };
     }
     
@@ -569,14 +570,26 @@ function closeClientModal() {
 
 // Sua função selectClient existente (mantendo como está)
 function selectClient(client) {
-    if (!client || !selectedClientInput || !selectedClientIdInput) return;
-    selectedClient = client;
-    selectedClientInput.value = client.nome;
-    selectedClientIdInput.value = client.id;
-    showMessage(`Cliente selecionado: ${client.nome}`);
+    if (!client) {
+        // Define o cliente padrão quando nenhum cliente é selecionado
+        selectedClient = {
+            id: 1,
+            nome: "PADRÃO",
+            documento: "",
+            telefone: "",
+            email: "",
+            endereco: ""
+        };
+        selectedClientInput.value = "PADRÃO"; // Mostra que está usando o padrão
+        selectedClientIdInput.value = "1"; // ID 1 para o cliente padrão
+    } else {
+        // Atribui o cliente selecionado
+        selectedClient = client;
+        selectedClientInput.value = client.nome; // Exibe o nome do cliente
+        selectedClientIdInput.value = client.id.toString();
+    }
     updateCaixaStatus();
 }
-
 // Versão alternativa se você quiser passar o objeto cliente diretamente no botão
 // Neste caso, o botão seria: onclick="selectClientForSaleByObject(this)" 
 // E você adicionaria data-attributes no botão com as informações do cliente
@@ -1109,10 +1122,7 @@ function addEmptyProductRow() {
 // ==================== FUNÇÕES DE VENDA ====================
 async function registerSale() {
     try {
-        if (!selectedClientIdInput?.value) {
-            showMessage('Selecione um cliente', 'error');
-            throw new Error('Cliente não selecionado');
-        }
+        const clienteId = selectedClientIdInput?.value ? parseInt(selectedClientIdInput.value) : 1;
         
         if (selectedProducts.length === 0) {
             showMessage('Adicione pelo menos um produto', 'error');
@@ -1201,7 +1211,7 @@ async function registerSale() {
         });
 
         const saleData = {
-            cliente_id: parseInt(selectedClientIdInput.value),
+            cliente_id: clienteId,
             forma_pagamento: paymentMethods.length > 1 ? 'multiplos' : paymentMethods[0].forma_pagamento,
             valor_recebido: valor_recebido,
             valor_total: total,
@@ -1303,6 +1313,7 @@ function formatCurrencyInput(input) {
 
 function resetSaleForm() {
     try {
+        selectClient(null);
         if (selectedClientInput) selectedClientInput.value = '';
         if (selectedClientIdInput) selectedClientIdInput.value = '';
         if (productsList) productsList.innerHTML = '';
