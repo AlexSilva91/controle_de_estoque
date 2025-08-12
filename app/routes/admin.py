@@ -27,14 +27,15 @@ from app.models.entities import (
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber)
 from app.crud import (
-    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_todos_os_descontos, criar_desconto, deletar_desconto, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, get_transferencias,
-    get_user_by_cpf, get_user_by_id, get_usuarios, create_user, obter_caixas_completo, registrar_transferencia, update_user,
-    get_produto, get_produtos, create_produto, update_produto, delete_produto,
+    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_todos_os_descontos,
+    criar_desconto, deletar_desconto, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
+    get_transferencias,get_user_by_cpf, get_user_by_id, get_usuarios, create_user, obter_caixas_completo,
+    registrar_transferencia, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
     registrar_movimentacao, get_cliente, get_clientes, create_cliente, 
     update_cliente, delete_cliente, create_nota_fiscal, get_nota_fiscal, 
     get_notas_fiscais, create_lancamento_financeiro, get_lancamento_financeiro,
     get_lancamentos_financeiros, update_lancamento_financeiro, 
-    delete_lancamento_financeiro, get_clientes_all
+    delete_lancamento_financeiro, get_clientes_all, get_caixas_abertos
 )
 from app.schemas import (
     UsuarioCreate, UsuarioUpdate, ProdutoCreate, ProdutoUpdate, MovimentacaoEstoqueCreate,
@@ -398,7 +399,7 @@ def fechar_caixa_route():
 @admin_required
 def get_caixa_status():
     try:
-        caixa = get_caixa_aberto(db.session)
+        caixa = get_caixas_abertos(db.session)
         if caixa:
             return jsonify({
                 'success': True,
@@ -2217,14 +2218,30 @@ def gerar_pdf_caixa_financeiro(caixa_id):
     try:
         session = Session(db.engine)
 
+        # --- Busca informações do caixa e operador ---
+        caixa = session.query(Caixa).filter_by(id=caixa_id).first()
+        if not caixa:
+            raise Exception("Caixa não encontrado")
+            
+        operador_nome = caixa.operador.nome if caixa.operador else "Operador não identificado"
+
         # --- Busca movimentações ---
         movimentacoes = session.query(Financeiro)\
             .filter_by(caixa_id=caixa_id)\
             .order_by(Financeiro.data.desc())\
             .all()
 
-        total_entradas = sum(mov.valor for mov in movimentacoes if mov.tipo == TipoMovimentacao.entrada and mov.categoria != CategoriaFinanceira.abertura_caixa and mov.categoria != CategoriaFinanceira.estorno)
-        total_saidas = sum(mov.valor for mov in movimentacoes if mov.tipo == TipoMovimentacao.saida and mov.categoria != CategoriaFinanceira.abertura_caixa and mov.categoria != CategoriaFinanceira.estorno)
+        # Calcula totais excluindo abertura e fechamento de caixa
+        total_entradas = sum(mov.valor for mov in movimentacoes 
+                             if mov.tipo == TipoMovimentacao.entrada and mov.categoria 
+                             != CategoriaFinanceira.abertura_caixa and mov.categoria 
+                             != CategoriaFinanceira.estorno)
+        
+        total_saidas = sum(mov.valor for mov in movimentacoes 
+                           if mov.tipo == TipoMovimentacao.saida and mov.categoria 
+                           != CategoriaFinanceira.abertura_caixa 
+                           and mov.categoria != CategoriaFinanceira.estorno 
+                           and mov.categoria != CategoriaFinanceira.fechamento_caixa)
 
         # --- Vendas por forma de pagamento ---
         vendas_por_forma_pagamento = session.query(
@@ -2235,10 +2252,35 @@ def gerar_pdf_caixa_financeiro(caixa_id):
             NotaFiscal.status == StatusNota.emitida
         ).group_by(PagamentoNotaFiscal.forma_pagamento).all()
 
-        totais_vendas = {
-            forma.value: float(total)
-            for forma, total in vendas_por_forma_pagamento
-        }
+        totais_vendas = {}
+        for forma, total in vendas_por_forma_pagamento:
+            if forma == 'a_prazo':
+                total_entradas += total
+            totais_vendas[forma.value] = float(total)
+
+        # --- Calcula os novos campos ---
+        # Valor Físico: dinheiro menos diferença de abertura/fechamento (se fechamento > abertura)
+        valor_dinheiro = totais_vendas.get('dinheiro', 0.0)
+        valor_fisico = valor_dinheiro
+        
+        if caixa.valor_fechamento and caixa.valor_abertura and caixa.valor_fechamento > caixa.valor_abertura:
+            diferenca = float(caixa.valor_fechamento) - float(caixa.valor_abertura)
+            valor_fisico = valor_dinheiro - diferenca
+            if valor_fisico < 0:
+                valor_fisico = 0.0
+
+        # Valor Digital: soma de todos os pagamentos digitais
+        valor_digital = sum([
+            totais_vendas.get('pix_loja', 0.0),
+            totais_vendas.get('pix_fabiano', 0.0),
+            totais_vendas.get('pix_edfrance', 0.0),
+            totais_vendas.get('pix_maquineta', 0.0),
+            totais_vendas.get('cartao_debito', 0.0),
+            totais_vendas.get('cartao_credito', 0.0)
+        ])
+
+        # A Prazo: valor total de vendas a prazo
+        a_prazo = totais_vendas.get('a_prazo', 0.0)
 
         # --- Geração do PDF ---
         buffer = BytesIO()
@@ -2263,14 +2305,26 @@ def gerar_pdf_caixa_financeiro(caixa_id):
 
         def moeda_br(valor): return format_currency(valor)
 
-        # --- Título ---
+        # --- Cabeçalho com informações do caixa ---
         elements.append(Paragraph(f"RELATÓRIO FINANCEIRO - CAIXA #{caixa_id}", bold_center))
         elements.append(Spacer(1, 8))
+        
+        # Adiciona data do relatório e nome do operador
+        data_relatorio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        elements.append(Paragraph(f"Data do relatório: {data_relatorio}", left_style))
+        elements.append(Paragraph(f"Operador responsável: {operador_nome}", left_style))
+        elements.append(Spacer(1, 12))
 
         # --- Totais (esquerda) ---
         elements.append(Paragraph(f"Total de Entradas: {moeda_br(total_entradas)}", left_style))
         elements.append(Paragraph(f"Total de Saídas: {moeda_br(total_saidas)}", left_style))
         elements.append(Paragraph(f"Saldo: {moeda_br(total_entradas - total_saidas)}", left_style))
+        elements.append(Spacer(1, 8))
+        
+        # --- Novos campos ---
+        elements.append(Paragraph(f"Valor Físico (Dinheiro): {moeda_br(valor_fisico)}", left_style))
+        elements.append(Paragraph(f"Valor Digital: {moeda_br(valor_digital)}", left_style))
+        elements.append(Paragraph(f"A Prazo: {moeda_br(a_prazo)}", left_style))
         elements.append(Spacer(1, 12))
 
         # --- Tabela: Vendas por Forma de Pagamento ---

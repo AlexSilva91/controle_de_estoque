@@ -175,7 +175,21 @@ def get_caixa_aberto(db: Session, operador_id: int):
         Caixa.status == StatusCaixa.aberto,
         Caixa.operador_id == operador_id
     ).first()
-
+    
+def get_caixas_abertos(db: Session):
+    """
+    Retorna todos os caixas com status 'aberto'.
+    
+    Args:
+        db (Session): Sessão do banco de dados
+    
+    Returns:
+        List[Caixa]: Lista de caixas abertos ou lista vazia se nenhum encontrado
+    """
+    return db.query(Caixa).filter(
+        Caixa.status == StatusCaixa.aberto
+    ).all()
+    
 def get_caixa_by_id(db: Session, caixa_id: int) -> Optional[entities.Caixa]:
     """Retorna um caixa pelo ID"""
     return db.query(entities.Caixa).filter(entities.Caixa.id == caixa_id).first()

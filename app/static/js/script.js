@@ -2771,19 +2771,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // ===== OUTRAS FUNÇÕES =====
-  async function checkCaixaStatus() {
-    try {
-      const response = await fetchWithErrorHandling('/admin/caixa/status');
-      
-      if (response.success && response.aberto) {
-        showFlashMessage('info', `Caixa aberto por ${response.caixa.operador} com valor de R$ ${response.caixa.valor_abertura}`);
-      }
-    } catch (error) {
-      console.error('Erro ao verificar status do caixa:', error);
-    }
-  }
-
   // ===== INICIALIZAÇÃO =====
   updateDateTime();
   setInterval(updateDateTime, 60000);
@@ -2838,8 +2825,7 @@ document.addEventListener('DOMContentLoaded', function() {
   async function loadInitialData() {
     try {
       await Promise.all([
-        loadDashboardData(),
-        checkCaixaStatus()
+        loadDashboardData()
       ]);
       
       const activeTab = document.querySelector('.sidebar-nav li.active');
