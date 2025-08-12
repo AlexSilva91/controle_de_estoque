@@ -2139,7 +2139,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  async function loadCaixaFinanceiro(caixaId) {
+async function loadCaixaFinanceiro(caixaId) {
     try {
       const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
       caixaIdAtual = caixaId;
@@ -2149,37 +2149,50 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tableBody) {
           tableBody.innerHTML = '';
 
-          let totalEntradas = 0;
-          let totalSaidas = 0;
-
+          // REMOVA O CÁLCULO MANUAL DE ENTRADAS/SAÍDAS
+          // Use os totais calculados pelo backend (response.totais)
+          
           response.data.forEach(item => {
             const row = document.createElement('tr');
             const valor = parseFloat(item.valor);
 
-            if (item.tipo === 'entrada') {
-              totalEntradas += valor;
-            } else {
-              totalSaidas += valor;
-            }
+            // Format payment methods as tags
+            const paymentTags = item.formas_pagamento && item.formas_pagamento.length > 0 
+              ? item.formas_pagamento.map(p => `<span class="badge badge-info">${p}</span>`).join(' ') 
+              : '-';
 
             row.innerHTML = `
               <td>${formatDateTime(item.data)}</td>
               <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
               <td>${item.categoria || '-'}</td>
               <td>${formatarMoeda(valor)}</td>
-              <td>${item.descricao || '-'}</td>
+              <td>
+                ${item.descricao || '-'}
+                ${item.cliente_nome ? `<br><small>Cliente: ${item.cliente_nome}</small>` : ''}
+                ${paymentTags !== '-' ? `<br><small>Pagamento: ${paymentTags}</small>` : ''}
+              </td>
             `;
             tableBody.appendChild(row);
           });
 
+          // USE OS TOTAIS DO BACKEND (response.totais) EM VEZ DE CALCULAR NOVAMENTE
           if (document.getElementById('caixaTotalEntradas')) {
-            document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(totalEntradas);
+            document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(response.totais.entradas);
           }
           if (document.getElementById('caixaTotalSaidas')) {
-            document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(totalSaidas);
+            document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(response.totais.saidas);
           }
           if (document.getElementById('caixaSaldo')) {
-            document.getElementById('caixaSaldo').textContent = formatarMoeda(totalEntradas - totalSaidas);
+            document.getElementById('caixaSaldo').textContent = formatarMoeda(response.totais.saldo);
+          }
+          if (document.getElementById('caixaValorFisico')) {
+            document.getElementById('caixaValorFisico').textContent = formatarMoeda(response.totais.valor_fisico || 0);
+          }
+          if (document.getElementById('caixaValorDigital')) {
+            document.getElementById('caixaValorDigital').textContent = formatarMoeda(response.totais.valor_digital || 0);
+          }
+          if (document.getElementById('caixaAPrazo')) {
+            document.getElementById('caixaAPrazo').textContent = formatarMoeda(response.totais.a_prazo || 0);
           }
 
           const formasPagamento = response.vendas_por_forma_pagamento || {};
@@ -2199,7 +2212,6 @@ document.addEventListener('DOMContentLoaded', function() {
       showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
     }
   }
-
   document.getElementById('abrirPdfCaixa').addEventListener('click', () => {
     if (caixaIdAtual) {
       const url = `/admin/caixas/${caixaIdAtual}/financeiro/pdf`;
