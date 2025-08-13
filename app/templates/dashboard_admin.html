@@ -99,6 +99,12 @@
                             <span class="nav-text">Financeiro</span>
                         </a>
                     </li>
+                    <li data-tab="contas-receber">
+                        <a href="#contas-receber" class="nav-link">
+                            <i class="fas fa-chart-line"></i>
+                            <span class="nav-text">Contas a Receber</span>
+                        </a>
+                    </li>
                     <li data-tab="caixas">
                         <a href="#caixas" class="nav-link">
                             <i class="fas fa-cash-register"></i>
@@ -553,7 +559,192 @@
                         </div>
                     </div>
                 </div>
-                
+                <!-- Contas a Receber -->
+                <div id="contas-receber" class="tab-content">
+                    <div class="action-bar">
+                        <div class="filter-container">
+                            <div class="filter-group">
+                                <label for="contasReceberDataInicio">De:</label>
+                                <input type="date" id="contasReceberDataInicio" class="form-control">
+                            </div>
+                            <div class="filter-group">
+                                <label for="contasReceberDataFim">Até:</label>
+                                <input type="date" id="contasReceberDataFim" class="form-control">
+                            </div>
+                            <div class="filter-group">
+                                <label for="contasReceberStatus">Status:</label>
+                                <select id="contasReceberStatus" class="form-control">
+                                    <option value="">Todos</option>
+                                    <option value="pendente">Pendentes</option>
+                                    <option value="atrasado">Atrasados</option>
+                                    <option value="quitado">Quitados</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" id="filtrarContasReceber">
+                                <i class="fas fa-filter"></i>
+                                <span>Filtrar</span>
+                            </button>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn btn-secondary" id="exportarContasReceber" aria-label="Exportar">
+                                <i class="fas fa-file-export"></i>
+                                <span>Exportar</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-file-invoice-dollar"></i> Contas a Receber</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table id="tabelaContasReceber">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Cliente</th>
+                                            <th>Documento</th>
+                                            <th>Descrição</th>
+                                            <th>Valor Total</th>
+                                            <th>Valor Pendente</th>
+                                            <th>Emissão</th>
+                                            <th>Vencimento</th>
+                                            <th>Status</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Dados serão preenchidos via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Detalhes Conta -->
+                <div id="detalhesContaModal" class="modal">
+                    <div class="modal-overlay"></div>
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3 class="modal-title">
+                                    <i class="fas fa-info-circle"></i>
+                                    <span>Detalhes da Conta</span>
+                                </h3>
+                                <button class="close-modal" aria-label="Fechar">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <div class="detail-item">
+                                            <label>Cliente:</label>
+                                            <div class="value" id="detalheClienteNome"></div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <label>Documento:</label>
+                                            <div class="value" id="detalheClienteDocumento"></div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <label>Descrição:</label>
+                                            <div class="value" id="detalheDescricao"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="detail-item">
+                                            <label>Valor Total:</label>
+                                            <div class="value" id="detalheValorTotal"></div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <label>Valor Pendente:</label>
+                                            <div class="value" id="detalheValorPendente"></div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <label>Status:</label>
+                                            <div class="value" id="detalheStatus"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <h4 class="mb-3">Pagamentos Realizados</h4>
+                                <div class="table-responsive mb-4">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Data</th>
+                                                <th>Valor</th>
+                                                <th>Forma Pagamento</th>
+                                                <th>Observações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="detalhePagamentos">
+                                            <!-- Preenchido via JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <h4 class="mb-3">Registrar Pagamento</h4>
+                                <form id="formPagamentoConta">
+                                    <input type="hidden" id="contaIdPagamento">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label for="valorPagamento">Valor*</label>
+                                                <input type="number" id="valorPagamento" class="form-control" step="0.01" min="0.01" required>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label for="dataPagamento">Data*</label>
+                                                <input type="date" id="dataPagamento" class="form-control" required>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label for="formaPagamento">Forma de Pagamento*</label>
+                                                <select id="formaPagamento" class="form-control" required>
+                                                    <option value="">Selecione</option>
+                                                    <option value="dinheiro">Dinheiro</option>
+                                                    <option value="pix_loja">PIX Loja</option>
+                                                    <option value="pix_fabiano">PIX Fabiano</option>
+                                                    <option value="pix_maquineta">PIX Maquineta</option>
+                                                    <option value="pix_edfrance">PIX EDFrance</option>
+                                                    <option value="cartao_credito">Cartão Crédito</option>
+                                                    <option value="cartao_debito">Cartão Débito</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label for="caixaPagamento">Caixa</label>
+                                                <select id="caixaPagamento" class="form-control">
+                                                    <option value="">Selecione</option>
+                                                    <!-- Preenchido via JS -->
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="observacaoPagamento">Observações</label>
+                                        <textarea id="observacaoPagamento" class="form-control" rows="2"></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-check"></i> Registrar Pagamento
+                                        </button>
+                                        <button type="button" id="btnPagarTotal" class="btn btn-success ml-2">
+                                            <i class="fas fa-check-double"></i> Pagar Valor Total
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <!-- Estoque -->
                 <div id="estoque" class="tab-content">
                     <div class="action-bar">

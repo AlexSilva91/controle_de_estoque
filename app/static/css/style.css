@@ -2503,3 +2503,54 @@ canvas {
 .mt-4 {
     margin-top: 1.5rem;
 }
+/* Estilos para Contas a Receber */
+.detail-item {
+    margin-bottom: 1rem;
+}
+
+.detail-item label {
+    font-weight: 600;
+    color: #6c757d;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.detail-item .value {
+    padding: 0.5rem;
+    background-color: #0F3460;
+    border-radius: 4px;
+    border-left: 3px solid #007bff;
+}
+
+/* Tabela de contas */
+#tabelaContasReceber tbody tr {
+    cursor: pointer;
+}
+
+#tabelaContasReceber tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+/* Modal de detalhes */
+#detalhesContaModal .modal-dialog {
+    max-width: 900px;
+}
+
+/* Badges de status */
+.badge-quitado {
+    background-color: #28a745;
+}
+
+.badge-pendente {
+    background-color: #ff6a07;
+    color: #212529;
+}
+
+.badge-atrasado {
+    background-color: #f50018;
+}
+
+/* Formulário de pagamento */
+#formPagamentoConta .form-group {
+    margin-bottom: 1rem;
+}

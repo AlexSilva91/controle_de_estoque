@@ -255,7 +255,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       });
     });
-
+    document.querySelector('.sidebar-nav li[data-tab="contas-receber"]').addEventListener('click', function(e) {
+        e.preventDefault();
+        openModal('contasReceberModal');
+        carregarContasReceber();
+    });
     const navItems = document.querySelectorAll('.sidebar-nav li');
     const tabContents = document.querySelectorAll('.tab-content');
     const pageTitle = document.getElementById('page-title');
@@ -292,6 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tabId === 'descontos') loadDescontosData();
         if (tabId === 'caixas') loadCaixasData();
         if (tabId === 'relatorio-saidas') loadRelatorioSaidasData();
+        if (tabId === 'contas-receber') carregarContasReceber();
       });
     });
 
@@ -2462,7 +2467,365 @@ async function loadCaixaFinanceiro(caixaId) {
 
   // Event Listeners para Caixas
   document.getElementById('refreshData')?.addEventListener('click', loadDashboardData);
+  // Variáveis globais
+  let contasReceberData = [];
+  let caixasAbertos = [];
 
+  // Função para abrir o modal de contas a receber
+  function openContasReceberModal() {
+      carregarContasReceber();
+      carregarCaixasAbertos();
+      openModal('contasReceberModal');
+  }
+
+  // Função para carregar as contas a receber
+  async function carregarContasReceber() {
+      try {
+          const nome = document.getElementById('filtroClienteNome')?.value || '';
+          const documento = document.getElementById('filtroClienteDocumento')?.value || '';
+          const dataInicio = document.getElementById('filtroDataInicio')?.value || '';
+          const dataFim = document.getElementById('filtroDataFim')?.value || '';
+          
+          const params = new URLSearchParams();
+          if (nome) params.append('cliente_nome', nome);
+          if (documento) params.append('cliente_documento', documento);
+          if (dataInicio) params.append('data_inicio', dataInicio);
+          if (dataFim) params.append('data_fim', dataFim);
+          
+          const response = await fetchWithErrorHandling(`/admin/contas-receber?${params.toString()}`);
+          
+          if (response && response.contas) { // Alterado para verificar response.contas
+              contasReceberData = response.contas;
+              atualizarTabelaContasReceber();
+          } else {
+              showFlashMessage('warning', 'Nenhuma conta encontrada');
+          }
+      } catch (error) {
+          console.error('Erro ao carregar contas a receber:', error);
+          showFlashMessage('error', 'Erro ao carregar contas a receber');
+      }
+  }
+
+  // Função para atualizar a tabela de contas a receber
+  function atualizarTabelaContasReceber() {
+      const tbody = document.querySelector('#tabelaContasReceber tbody');
+      if (!tbody) return;
+      
+      tbody.innerHTML = '';
+      
+      if (contasReceberData.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="10" class="text-center">Nenhuma conta encontrada</td></tr>';
+          return;
+      }
+      
+      contasReceberData.forEach(conta => {
+          const tr = document.createElement('tr');
+          
+          // Determinar status e classe CSS
+          let statusClass, statusText;
+          const hoje = new Date();
+          const vencimento = new Date(conta.data_vencimento);
+          
+          if (conta.status === 'quitado') {
+              statusClass = 'badge-success';
+              statusText = 'Quitado';
+          } else if (vencimento < hoje) {
+              statusClass = 'badge-danger';
+              statusText = 'Atrasado';
+          } else {
+              statusClass = 'badge-warning';
+              statusText = 'Pendente';
+          }
+          
+          tr.innerHTML = `
+              <td>${conta.id}</td>
+              <td>${conta.cliente.nome}</td>
+              <td>${conta.cliente.documento || ''}</td>
+              <td>${conta.descricao || '-'}</td>
+              <td>${formatarMoeda(conta.valor_original)}</td>
+              <td>${formatarMoeda(conta.valor_aberto)}</td>
+              <td>${formatarData(conta.data_emissao)}</td>
+              <td>${formatarData(conta.data_vencimento)}</td>
+              <td><span class="badge ${statusClass}">${statusText}</span></td>
+              <td>
+                  <button class="btn btn-sm btn-info btn-detalhes-conta" data-id="${conta.id}" title="Detalhes">
+                      <i class="fas fa-eye"></i>
+                  </button>
+              </td>
+          `;
+          
+          tbody.appendChild(tr);
+      });
+      
+      // Adicionar eventos aos botões de detalhes
+      document.querySelectorAll('.btn-detalhes-conta').forEach(btn => {
+          btn.addEventListener('click', function() {
+              const contaId = this.getAttribute('data-id');
+              abrirModalDetalhesConta(contaId);
+          });
+      });
+  }
+  // Função para formatar data (dd/mm/aaaa)
+  function formatarData(dataString) {
+      if (!dataString) return '-';
+      const date = new Date(dataString);
+      return date.toLocaleDateString('pt-BR');
+  }
+
+  async function abrirModalDetalhesConta(contaId) {
+      try {
+          const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
+          
+          if (response) {
+              const conta = response;
+              
+              // Preencher detalhes básicos
+              document.getElementById('contaIdPagamento').value = conta.id;
+              document.getElementById('detalheClienteNome').textContent = conta.cliente;
+              document.getElementById('detalheClienteDocumento').textContent = conta.cliente_documento || 'Não informado';
+              document.getElementById('detalheDescricao').textContent = conta.descricao || 'Sem descrição';
+              document.getElementById('detalheValorTotal').textContent = formatarMoeda(conta.valor_original);
+              document.getElementById('detalheValorPendente').textContent = formatarMoeda(conta.valor_aberto);
+              
+              // Status
+              const statusElement = document.getElementById('detalheStatus');
+              if (statusElement) {
+                  if (conta.status === 'quitado') {
+                      statusElement.textContent = 'Quitado';
+                      statusElement.className = 'value badge badge-success';
+                  } else {
+                      const hoje = new Date();
+                      const vencimento = new Date(conta.data_vencimento);
+                      
+                      if (vencimento < hoje) {
+                          statusElement.textContent = 'Atrasado';
+                          statusElement.className = 'value badge badge-danger';
+                      } else {
+                          statusElement.textContent = 'Pendente';
+                          statusElement.className = 'value badge badge-warning';
+                      }
+                  }
+              }
+              
+              // Preencher pagamentos
+              const pagamentosTbody = document.getElementById('detalhePagamentos');
+              if (pagamentosTbody) {
+                  pagamentosTbody.innerHTML = '';
+                  
+                  if (conta.pagamentos && conta.pagamentos.length > 0) {
+                      conta.pagamentos.forEach(pag => {
+                          const tr = document.createElement('tr');
+                          tr.innerHTML = `
+                              <td>${formatarData(pag.data_pagamento)}</td>
+                              <td>${formatarMoeda(pag.valor_pago)}</td>
+                              <td>${formatarFormaPagamento(pag.forma_pagamento)}</td>
+                              <td>${pag.observacoes || '-'}</td>
+                          `;
+                          pagamentosTbody.appendChild(tr);
+                      });
+                  } else {
+                      pagamentosTbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
+                  }
+              } else {
+                  console.error('Elemento detalhePagamentos não encontrado');
+              }
+
+              // Preencher select de caixas
+              const selectCaixa = document.getElementById('caixaPagamento'); // <-- ID correto do HTML
+              if (selectCaixa) {
+                  selectCaixa.innerHTML = '<option value="">Selecione</option>'; // limpa opções antigas
+
+                  if (conta.caixas && conta.caixas.length > 0) {
+                      conta.caixas.forEach(caixa => {
+                          const option = document.createElement('option');
+                          option.value = caixa.id;
+                          option.textContent = `Caixa ${caixa.id} - ${caixa.operador} - ${formatarData(caixa.data_abertura)} (${caixa.status})`;
+                          selectCaixa.appendChild(option);
+                      });
+                  } else {
+                      const option = document.createElement('option');
+                      option.value = '';
+                      option.textContent = 'Nenhum caixa disponível';
+                      selectCaixa.appendChild(option);
+                  }
+              }
+              
+              // Definir data atual como padrão
+              const hoje = new Date();
+              const dataPagamentoInput = document.getElementById('dataPagamento');
+              if (dataPagamentoInput) {
+                  dataPagamentoInput.value = hoje.toISOString().split('T')[0];
+              }
+              
+              // Definir valor pendente como valor padrão
+              const valorPagamentoInput = document.getElementById('valorPagamento');
+              if (valorPagamentoInput) {
+                  valorPagamentoInput.value = conta.valor_aberto;
+              }
+              
+              openModal('detalhesContaModal');
+          }
+      } catch (error) {
+          console.error('Erro ao carregar detalhes da conta:', error);
+          showFlashMessage('error', 'Erro ao carregar detalhes da conta');
+      }
+  }
+
+  // Função para formatar forma de pagamento
+  function formatarFormaPagamento(forma) {
+      const formas = {
+          'dinheiro': 'Dinheiro',
+          'pix_loja': 'PIX Loja',
+          'pix_fabiano': 'PIX Fabiano',
+          'pix_maquineta': 'PIX Maquineta',
+          'pix_edfrance': 'PIX EDFrance',
+          'cartao_credito': 'Cartão Crédito',
+          'cartao_debito': 'Cartão Débito',
+          'a_prazo': 'A Prazo'
+      };
+      
+      return formas[forma] || forma;
+  }
+
+  // Função para carregar caixas abertos no select
+  async function carregarCaixasAbertos() {
+      try {
+          const response = await fetchWithErrorHandling('/admin/api/caixas/abertos');
+          
+          if (response && response.caixas) {
+              caixasAbertos = response.caixas;
+              const select = document.getElementById('caixaPagamento');
+              
+              if (select) {
+                  select.innerHTML = '<option value="">Selecione</option>';
+                  
+                  caixasAbertos.forEach(caixa => {
+                      const option = document.createElement('option');
+                      option.value = caixa.id;
+                      option.textContent = `Caixa #${caixa.id} - ${caixa.operador} (${formatarData(caixa.data_abertura)})`;
+                      select.appendChild(option);
+                  });
+              }
+          }
+      } catch (error) {
+          console.error('Erro ao carregar caixas abertos:', error);
+      }
+  }
+
+  // Função para registrar pagamento
+  async function registrarPagamento(contaId, valor, pagarTotal = false) {
+      try {
+          const dataPagamento = document.getElementById('dataPagamento').value;
+          const formaPagamento = document.getElementById('formaPagamento').value;
+          const caixaId = document.getElementById('caixaPagamento').value;
+          const observacoes = document.getElementById('observacaoPagamento').value;
+          
+          // Validações
+          if (!dataPagamento) {
+              showFlashMessage('error', 'Informe a data do pagamento');
+              return;
+          }
+          
+          if (!formaPagamento) {
+              showFlashMessage('error', 'Selecione a forma de pagamento');
+              return;
+          }
+          
+          if (valor <= 0 || isNaN(valor)) {
+              showFlashMessage('error', 'Informe um valor válido');
+              return;
+          }
+          
+          const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/pagar`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                  valor_pago: valor,
+                  forma_pagamento: formaPagamento,
+                  caixa_id: caixaId || null,
+                  observacoes: observacoes || ''
+              })
+          });
+          
+          if (response && response.success) {
+              showFlashMessage('success', 'Pagamento registrado com sucesso');
+              
+              // Recarregar os dados
+              carregarContasReceber();
+              
+              // Se foi pagamento total, fechar o modal
+              if (pagarTotal) {
+                  closeModal('detalhesContaModal');
+              } else {
+                  // Recarregar os detalhes da conta
+                  abrirModalDetalhesConta(contaId);
+              }
+          }
+      } catch (error) {
+          console.error('Erro ao registrar pagamento:', error);
+          showFlashMessage('error', error.message || 'Erro ao registrar pagamento');
+      }
+  }
+
+  // Event Listeners
+  document.addEventListener('DOMContentLoaded', function() {
+      // Adicionar item ao menu sidebar
+      const financeiroNavItem = document.querySelector('.sidebar-nav li[data-tab="financeiro"]');
+      if (financeiroNavItem) {
+          const contasReceberItem = document.createElement('li');
+          contasReceberItem.innerHTML = `
+              <a href="#contas-receber" class="nav-link">
+                  <i class="fas fa-hand-holding-usd"></i>
+                  <span class="nav-text">Contas a Receber</span>
+              </a>
+          `;
+          financeiroNavItem.parentNode.insertBefore(contasReceberItem, financeiroNavItem.nextSibling);
+          
+          // Adicionar evento de clique
+          contasReceberItem.addEventListener('click', function(e) {
+              e.preventDefault();
+              openContasReceberModal();
+          });
+      }
+      
+      // Filtro
+      document.getElementById('btnFiltrarContas')?.addEventListener('click', carregarContasReceber);
+      
+      // Formulário de pagamento
+      document.getElementById('formPagamentoConta')?.addEventListener('submit', function(e) {
+          e.preventDefault();
+          const contaId = document.getElementById('contaIdPagamento').value;
+          const valor = parseFloat(document.getElementById('valorPagamento').value);
+          registrarPagamento(contaId, valor);
+      });
+      
+      // Botão pagar total
+      document.getElementById('btnPagarTotal')?.addEventListener('click', function() {
+          const contaId = document.getElementById('contaIdPagamento').value;
+          const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
+          const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+          
+          if (confirm(`Confirmar pagamento total de ${valorPendenteText}?`)) {
+              document.getElementById('valorPagamento').value = valorPendente;
+              registrarPagamento(contaId, valorPendente, true);
+          }
+      });
+      
+      // Permitir filtrar com Enter nos campos de texto
+      document.getElementById('filtroClienteNome')?.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+              carregarContasReceber();
+          }
+      });
+      
+      document.getElementById('filtroClienteDocumento')?.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+              carregarContasReceber();
+          }
+      });
+  });
   // ===== MOVIMENTAÇÕES =====
   async function loadMovimentacoesData() {
     try {
@@ -3093,6 +3456,7 @@ async function loadCaixaFinanceiro(caixaId) {
           loadRelatorioSaidasData();
           loadCategoriasProdutos();
         }
+        if (tabId === 'contas-receber') carregarContasReceber();
       }
     } catch (error) {
       console.error('Erro ao carregar dados iniciais:', error);

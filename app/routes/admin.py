@@ -3125,3 +3125,137 @@ def relatorio_vendas_produtos_detalhes():
         
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+    
+# ================= CONTAS A RECEBER =====================
+@admin_bp.route('/contas-receber', methods=['GET'])
+@login_required
+@admin_required
+def contas_receber():
+    cliente_nome = request.args.get('cliente_nome', '')
+    cliente_documento = request.args.get('cliente_documento', '')
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    status = request.args.get('status', 'pendente')
+
+    query = ContaReceber.query.join(Cliente)
+    
+    if cliente_nome:
+        query = query.filter(Cliente.nome.ilike(f'%{cliente_nome}%'))
+    if cliente_documento:
+        query = query.filter(Cliente.documento.ilike(f'%{cliente_documento}%'))
+    if data_inicio:
+        query = query.filter(ContaReceber.data_vencimento >= datetime.strptime(data_inicio, '%Y-%m-%d'))
+    if data_fim:
+        query = query.filter(ContaReceber.data_vencimento <= datetime.strptime(data_fim, '%Y-%m-%d'))
+    if status == 'pendente':
+        query = query.filter(ContaReceber.status != StatusPagamento.quitado)
+    elif status == 'quitado':
+        query = query.filter(ContaReceber.status == StatusPagamento.quitado)
+    
+    contas = query.order_by(ContaReceber.data_vencimento.asc()).all()
+
+    # Monta JSON compatível com seu JS
+    contas_json = []
+    for conta in contas:
+        contas_json.append({
+            'id': conta.id,
+            'cliente': {
+                'nome': conta.cliente.nome,
+                'documento': conta.cliente.documento
+            },
+            'descricao': conta.descricao,
+            'valor_original': float(conta.valor_original),
+            'valor_aberto': float(conta.valor_aberto),
+            'data_emissao': conta.data_emissao.strftime('%Y-%m-%d'),
+            'data_vencimento': conta.data_vencimento.strftime('%Y-%m-%d'),
+            'status': conta.status.value
+        })
+    print(contas_json)
+    return jsonify({
+        'success': True,
+        'contas': contas_json
+    })
+
+@admin_bp.route('/contas-receber/<int:id>/detalhes', methods=['GET'])
+@login_required
+@admin_required
+def conta_receber_detalhes(id):
+    conta = ContaReceber.query.get_or_404(id)
+    caixas = Caixa.query.order_by(Caixa.data_abertura.desc()).all()
+    caixas_json = [{
+        'id': c.id,
+        'operador': c.operador.nome if c.operador else 'Sem operador',
+        'data_abertura': c.data_abertura.strftime('%Y-%m-%d'),
+        'status': c.status.value
+    } for c in caixas]
+    print(f'{caixas_json}')
+    return jsonify({
+        'id': conta.id,
+        'cliente': conta.cliente.nome,
+        'cliente_documento': conta.cliente.documento if conta.cliente and conta.cliente.documento else '',
+        'descricao': conta.descricao,
+        'valor_original': float(conta.valor_original),
+        'valor_aberto': float(conta.valor_aberto),
+        'data_emissao': conta.data_emissao.strftime('%d/%m/%Y'),
+        'data_vencimento': conta.data_vencimento.strftime('%d/%m/%Y'),
+        'status': conta.status.value,
+        'nota_fiscal': {
+            'id': conta.nota_fiscal_id,
+            'valor_total': float(conta.nota_fiscal.valor_total) if conta.nota_fiscal else None
+        } if conta.nota_fiscal else None,
+        'pagamentos': [{
+            'id': p.id,
+            'valor_pago': float(p.valor_pago),
+            'data_pagamento': p.data_pagamento.strftime('%d/%m/%Y'),
+            'forma_pagamento': p.forma_pagamento.value,
+            'observacoes': p.observacoes or ''
+        } for p in conta.pagamentos],
+        'caixas': caixas_json  
+    })
+
+
+@admin_bp.route('/contas-receber/<int:id>/pagar', methods=['POST'])
+@login_required
+@admin_required
+def pagar_conta_receber(id):
+    conta = ContaReceber.query.get_or_404(id)
+    data = request.get_json()
+    
+    try:
+        valor_pago = Decimal(data['valor_pago'])
+        forma_pagamento = FormaPagamento[data['forma_pagamento']]
+        caixa_id = data.get('caixa_id')
+        observacoes = data.get('observacoes', '')
+        
+        if valor_pago <= 0:
+            return jsonify({'error': 'Valor deve ser positivo'}), 400
+        if valor_pago > conta.valor_aberto:
+            return jsonify({'error': 'Valor excede o valor em aberto'}), 400
+        
+        # Get current open caixa if not provided
+        if not caixa_id:
+            caixa = Caixa.query.filter_by(
+                operador_id=current_user.id,
+                status=StatusCaixa.aberto
+            ).order_by(Caixa.data_abertura.desc()).first()
+            if caixa:
+                caixa_id = caixa.id
+        
+        pagamento = conta.registrar_pagamento(
+            valor_pago=valor_pago,
+            forma_pagamento=forma_pagamento,
+            caixa_id=caixa_id,
+            observacoes=observacoes
+        )
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'valor_aberto': float(conta.valor_aberto),
+            'status': conta.status.value
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
