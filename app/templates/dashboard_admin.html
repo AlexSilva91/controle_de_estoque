@@ -84,7 +84,7 @@
                     <li data-tab="estoque">
                         <a href="#estoque" class="nav-link">
                             <i class="fas fa-exchange-alt"></i>
-                            <span class="nav-text">Movimentações</span>
+                            <span class="nav-text">Movimentações do Estoque</span>
                         </a>
                     </li>
                     <li data-tab="relatorio-saidas">
@@ -392,6 +392,40 @@
                             </div>
                         </div>
                         <div class="card-body">
+                            <!-- Adicionando os filtros aqui -->
+                            <div class="filtros-relatorio">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="relatorioDataInicio">Data Início</label>
+                                        <input type="date" id="relatorioDataInicio" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="relatorioDataFim">Data Fim</label>
+                                        <input type="date" id="relatorioDataFim" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="relatorioProdutoNome">Nome do Produto</label>
+                                        <input type="text" id="relatorioProdutoNome" class="form-control" placeholder="Filtrar por nome">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="relatorioProdutoCodigo">Código do Produto</label>
+                                        <input type="text" id="relatorioProdutoCodigo" class="form-control" placeholder="Filtrar por código">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="relatorioCategoria">Categoria</label>
+                                        <select id="relatorioCategoria" class="form-control">
+                                            <option value="">Todas</option>
+                                            <!-- Opções serão preenchidas via JavaScript -->
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <button class="btn btn-primary" id="filtrarRelatorio">
+                                            <i class="fas fa-filter"></i> Filtrar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <div class="relatorio-meta">
                                 <div class="meta-item">
                                     <span class="meta-label">Período:</span>

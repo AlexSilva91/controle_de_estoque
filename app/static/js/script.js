@@ -1854,12 +1854,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
           const dataInicio = document.getElementById('relatorioDataInicio')?.value;
           const dataFim = document.getElementById('relatorioDataFim')?.value;
+          const produtoNome = document.getElementById('relatorioProdutoNome')?.value;
+          const produtoCodigo = document.getElementById('relatorioProdutoCodigo')?.value;
           const categoria = document.getElementById('relatorioCategoria')?.value;
           const limite = document.getElementById('relatorioLimite')?.value;
           
           const params = new URLSearchParams();
           if (dataInicio) params.append('data_inicio', dataInicio);
           if (dataFim) params.append('data_fim', dataFim);
+          if (produtoNome) params.append('produto_nome', produtoNome);
+          if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
           if (categoria) params.append('categoria', categoria);
           if (limite) params.append('limite', limite);
           
@@ -1922,8 +1926,6 @@ document.addEventListener('DOMContentLoaded', function() {
           showFlashMessage('error', 'Erro ao carregar relatório de saídas');
       }
   }
-
-  // Adicione esta função para carregar as categorias de produtos
   async function loadCategoriasProdutos() {
       try {
           const response = await fetchWithErrorHandling('/admin/api/produtos/categorias');
@@ -1999,6 +2001,18 @@ document.addEventListener('DOMContentLoaded', function() {
           console.error('Erro ao exportar relatório:', error);
           showFlashMessage('error', 'Erro ao exportar relatório');
       }
+  document.getElementById('filtrarRelatorio')?.addEventListener('click', loadRelatorioSaidasData);
+  document.getElementById('atualizarRelatorio')?.addEventListener('click', loadRelatorioSaidasData);
+  document.getElementById('relatorioProdutoNome')?.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+          loadRelatorioSaidasData();
+      }
+  });
+  document.getElementById('relatorioProdutoCodigo')?.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+          loadRelatorioSaidasData();
+      }
+  });
   });
   // Adicione este código na seção de Event Listeners para o relatório
   document.addEventListener('click', function(e) {

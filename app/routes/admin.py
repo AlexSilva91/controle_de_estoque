@@ -2720,7 +2720,8 @@ def relatorio_vendas_produtos():
         # Obter parâmetros de filtro da requisição
         data_inicio = request.args.get('data_inicio')
         data_fim = request.args.get('data_fim')
-        produto_id = request.args.get('produto_id')
+        produto_nome = request.args.get('produto_nome')
+        produto_codigo = request.args.get('produto_codigo')
         categoria = request.args.get('categoria')
         limite = request.args.get('limite', default=50, type=int)
         
@@ -2742,14 +2743,12 @@ def relatorio_vendas_produtos():
         query = db.session.query(
             Produto.id.label('produto_id'),
             Produto.nome.label('produto_nome'),
+            Produto.codigo.label('produto_codigo'),
             Produto.unidade.label('unidade'),
             func.sum(NotaFiscalItem.quantidade).label('quantidade_vendida'),
             func.sum(NotaFiscalItem.valor_total).label('valor_total_vendido'),
             Produto.estoque_loja.label('estoque_atual_loja'),
-            Produto.estoque_deposito.label('estoque_atual_deposito'),
-            Produto.estoque_fabrica.label('estoque_atual_fabrica'),
-            Produto.estoque_minimo.label('estoque_minimo'),
-            Produto.estoque_maximo.label('estoque_maximo')
+            Produto.estoque_minimo.label('estoque_minimo')
         ).join(
             NotaFiscalItem,
             NotaFiscalItem.produto_id == Produto.id
@@ -2767,8 +2766,11 @@ def relatorio_vendas_produtos():
         )
         
         # Aplicar filtros adicionais
-        if produto_id:
-            query = query.filter(Produto.id == produto_id)
+        if produto_nome:
+            query = query.filter(Produto.nome.ilike(f'%{produto_nome}%'))
+        
+        if produto_codigo:
+            query = query.filter(Produto.codigo.ilike(f'%{produto_codigo}%'))
         
         if categoria:
             query = query.filter(Produto.tipo == categoria)
@@ -2791,20 +2793,18 @@ def relatorio_vendas_produtos():
             relatorio.append({
                 'produto_id': r.produto_id,
                 'produto_nome': r.produto_nome,
+                'produto_codigo': r.produto_codigo,
                 'unidade': r.unidade.value,
                 'quantidade_vendida': float(r.quantidade_vendida),
                 'valor_total_vendido': float(r.valor_total_vendido),
                 'estoque_atual_loja': float(r.estoque_atual_loja),
-                'estoque_atual_deposito': float(r.estoque_atual_deposito),
-                'estoque_atual_fabrica': float(r.estoque_atual_fabrica),
                 'estoque_minimo': float(r.estoque_minimo),
-                'estoque_maximo': float(r.estoque_maximo) if r.estoque_maximo else None,
                 'percentual_estoque': round(percentual_estoque, 2),
                 'status_estoque': 'CRÍTICO' if r.estoque_atual_loja < r.estoque_minimo else 'OK',
                 'dias_restantes': (
                     round(r.estoque_atual_loja / (r.quantidade_vendida / 30), 2)
                     if r.quantidade_vendida > 0 else None
-                )  # Estimativa de dias até acabar o estoque
+                )
             })
         
         # Adicionar totais ao relatório
@@ -2819,7 +2819,7 @@ def relatorio_vendas_produtos():
             'total_valor_vendido': total_vendido,
             'produtos_estoque_critico': sum(1 for item in relatorio if item['status_estoque'] == 'CRÍTICO')
         }
-        print(f'\n{relatorio}\n{meta_relatorio}')
+        
         return jsonify({
             'meta': meta_relatorio,
             'dados': relatorio
@@ -3013,7 +3013,7 @@ def relatorio_vendas_produtos_detalhes():
         if not produto_id:
             return jsonify({'success': False, 'message': 'ID do produto não fornecido'}), 400
         
-        # Converter strings para objetos date (only if provided)
+        # Converter strings para objetos date
         data_inicio_obj = None
         data_fim_obj = None
         try:
@@ -3023,6 +3023,10 @@ def relatorio_vendas_produtos_detalhes():
                 data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
         except ValueError:
             return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
+        
+        # Converter para datetime para filtros
+        data_inicio_dt = datetime.combine(data_inicio_obj, datetime.min.time()) if data_inicio_obj else None
+        data_fim_dt = datetime.combine(data_fim_obj, datetime.max.time()) if data_fim_obj else None
         
         # Obter informações resumidas do produto
         produto_info = db.session.query(
@@ -3046,10 +3050,10 @@ def relatorio_vendas_produtos_detalhes():
             NotaFiscal.status == StatusNota.emitida
         )
         
-        if data_inicio:
-            produto_info = produto_info.filter(NotaFiscal.data_emissao >= data_inicio)
-        if data_fim:
-            produto_info = produto_info.filter(NotaFiscal.data_emissao <= data_fim + timedelta(days=1))
+        if data_inicio_dt:
+            produto_info = produto_info.filter(NotaFiscal.data_emissao >= data_inicio_dt)
+        if data_fim_dt:
+            produto_info = produto_info.filter(NotaFiscal.data_emissao <= data_fim_dt)
         
         produto_info = produto_info.group_by(Produto.id).first()
         
@@ -3060,11 +3064,11 @@ def relatorio_vendas_produtos_detalhes():
         status_estoque = 'CRÍTICO' if produto_info.estoque_atual_loja < produto_info.estoque_minimo else 'OK'
         
         dias_restantes = None
-        if produto_info.quantidade_vendida > 0:
+        if produto_info.quantidade_vendida and produto_info.quantidade_vendida > 0:
             media_diaria = produto_info.quantidade_vendida / 30  # Considerando os últimos 30 dias
             dias_restantes = round(produto_info.estoque_atual_loja / media_diaria, 2)
         
-        # Obter histórico detalhado de vendas
+        # Obter histórico detalhado de vendas (filtros antes do limit)
         historico_query = db.session.query(
             NotaFiscal.data_emissao,
             NotaFiscalItem.quantidade,
@@ -3080,15 +3084,14 @@ def relatorio_vendas_produtos_detalhes():
         ).filter(
             NotaFiscalItem.produto_id == produto_id,
             NotaFiscal.status == StatusNota.emitida
-        ).order_by(
-            NotaFiscal.data_emissao.desc()
-        ).limit(50)
+        )
         
-        if data_inicio:
-            historico_query = historico_query.filter(NotaFiscal.data_emissao >= data_inicio)
-        if data_fim:
-            historico_query = historico_query.filter(NotaFiscal.data_emissao <= data_fim + timedelta(days=1))
+        if data_inicio_dt:
+            historico_query = historico_query.filter(NotaFiscal.data_emissao >= data_inicio_dt)
+        if data_fim_dt:
+            historico_query = historico_query.filter(NotaFiscal.data_emissao <= data_fim_dt)
         
+        historico_query = historico_query.order_by(NotaFiscal.data_emissao.desc()).limit(50)
         historico = historico_query.all()
         
         # Formatar os dados para retorno
