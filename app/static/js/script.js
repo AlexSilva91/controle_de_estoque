@@ -2000,7 +2000,74 @@ document.addEventListener('DOMContentLoaded', function() {
           showFlashMessage('error', 'Erro ao exportar relatório');
       }
   });
+  // Adicione este código na seção de Event Listeners para o relatório
+  document.addEventListener('click', function(e) {
+      if (e.target.closest('.btn-info') && e.target.closest('.btn-info').getAttribute('title') === 'Ver detalhes') {
+          const produtoId = e.target.closest('.btn-info').getAttribute('data-id');
+          abrirModalDetalhesSaida(produtoId);
+      }
+  });
 
+  async function abrirModalDetalhesSaida(produtoId) {
+      try {
+        // Obter os filtros atuais do relatório
+        const dataInicio = document.getElementById('relatorioDataInicio')?.value;
+        const dataFim = document.getElementById('relatorioDataFim')?.value;
+        
+        // Verificar se as datas são válidas antes de enviar
+        const params = new URLSearchParams();
+        params.append('produto_id', produtoId);
+        if (dataInicio) params.append('data_inicio', dataInicio);
+        if (dataFim) params.append('data_fim', dataFim);
+        
+        // Buscar os detalhes do produto e histórico de vendas
+        const response = await fetchWithErrorHandling(`/admin/relatorios/vendas-produtos/detalhes?${params.toString()}`);
+          if (response.success) {
+              const produto = response.produto;
+              const historico = response.historico;
+              
+              // Preencher os detalhes do produto
+              document.getElementById('detalhesProdutoNome').textContent = produto.produto_nome;
+              document.getElementById('detalhesProdutoCodigo').textContent = produto.produto_codigo || '-';
+              document.getElementById('detalhesProdutoTipo').textContent = produto.produto_tipo || '-';
+              document.getElementById('detalhesProdutoUnidade').textContent = produto.unidade;
+              document.getElementById('detalhesQuantidadeVendida').textContent = produto.quantidade_vendida.toFixed(3) + ' ' + produto.unidade;
+              document.getElementById('detalhesValorTotal').textContent = formatarMoeda(produto.valor_total_vendido);
+              document.getElementById('detalhesEstoqueAtual').textContent = produto.estoque_atual_loja.toFixed(3) + ' ' + produto.unidade;
+              document.getElementById('detalhesEstoqueMinimo').textContent = produto.estoque_minimo.toFixed(3) + ' ' + produto.unidade;
+              
+              // Status do estoque
+              const statusElement = document.getElementById('detalhesStatusEstoque');
+              statusElement.textContent = produto.status_estoque;
+              statusElement.className = 'value badge ' + (produto.status_estoque === 'CRÍTICO' ? 'badge-danger' : 'badge-success');
+              
+              document.getElementById('detalhesDiasRestantes').textContent = produto.dias_restantes || '-';
+              
+              // Preencher o histórico de vendas
+              const tbody = document.querySelector('#historicoVendasTable tbody');
+              tbody.innerHTML = '';
+              
+              historico.forEach(item => {
+                  const tr = document.createElement('tr');
+                  tr.innerHTML = `
+                      <td>${formatDateTime(item.data_emissao)}</td>
+                      <td>${item.quantidade.toFixed(3)} ${produto.unidade}</td>
+                      <td>${formatarMoeda(item.valor_unitario)}</td>
+                      <td>${formatarMoeda(item.valor_total)}</td>
+                      <td>${item.cliente_nome || 'Consumidor'}</td>
+                  `;
+                  tbody.appendChild(tr);
+              });
+              
+              openModal('detalhesSaidaModal');
+          } else {
+              showFlashMessage('error', response.message || 'Erro ao carregar detalhes do produto');
+          }
+      } catch (error) {
+          console.error('Erro ao abrir modal de detalhes:', error);
+          showFlashMessage('error', 'Erro ao carregar detalhes do produto');
+      }
+  }
 
   // ===== CAIXAS =====
   async function loadCaixasData() {

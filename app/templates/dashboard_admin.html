@@ -1214,6 +1214,86 @@
             </div>
         </div>
     </div>
+        <!-- Modal Detalhes Saída de Estoque -->
+    <div id="detalhesSaidaModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Detalhes da Saída de Estoque</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <label>Produto:</label>
+                            <div class="value" id="detalhesProdutoNome"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Código:</label>
+                            <div class="value" id="detalhesProdutoCodigo"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Tipo:</label>
+                            <div class="value" id="detalhesProdutoTipo"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Unidade:</label>
+                            <div class="value" id="detalhesProdutoUnidade"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Quantidade Vendida:</label>
+                            <div class="value" id="detalhesQuantidadeVendida"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Valor Total:</label>
+                            <div class="value" id="detalhesValorTotal"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Estoque Atual (Loja):</label>
+                            <div class="value" id="detalhesEstoqueAtual"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Estoque Mínimo:</label>
+                            <div class="value" id="detalhesEstoqueMinimo"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Status Estoque:</label>
+                            <div class="value" id="detalhesStatusEstoque"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Dias Restantes:</label>
+                            <div class="value" id="detalhesDiasRestantes"></div>
+                        </div>
+                    </div>
+                    
+                    <h4 class="mt-4">Histórico de Vendas</h4>
+                    <div class="table-responsive">
+                        <table class="table compact-table" id="historicoVendasTable">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Quantidade</th>
+                                    <th>Valor Unitário</th>
+                                    <th>Valor Total</th>
+                                    <th>Cliente</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Dados serão preenchidos via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <!-- Modal Visualizar Usuário -->
     <div id="visualizarUsuarioModal" class="modal">
         <div class="modal-overlay"></div>

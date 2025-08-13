@@ -3000,3 +3000,125 @@ def get_produto_categorias():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+@admin_bp.route('/relatorios/vendas-produtos/detalhes', methods=['GET'])
+@login_required
+@admin_required
+def relatorio_vendas_produtos_detalhes():
+    try:
+        produto_id = request.args.get('produto_id')
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        
+        if not produto_id:
+            return jsonify({'success': False, 'message': 'ID do produto não fornecido'}), 400
+        
+        # Converter strings para objetos date (only if provided)
+        data_inicio_obj = None
+        data_fim_obj = None
+        try:
+            if data_inicio and data_inicio.lower() != 'undefined':
+                data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            if data_fim and data_fim.lower() != 'undefined':
+                data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
+        
+        # Obter informações resumidas do produto
+        produto_info = db.session.query(
+            Produto.id.label('produto_id'),
+            Produto.nome.label('produto_nome'),
+            Produto.codigo.label('produto_codigo'),
+            Produto.tipo.label('produto_tipo'),
+            Produto.unidade.label('unidade'),
+            func.sum(NotaFiscalItem.quantidade).label('quantidade_vendida'),
+            func.sum(NotaFiscalItem.valor_total).label('valor_total_vendido'),
+            Produto.estoque_loja.label('estoque_atual_loja'),
+            Produto.estoque_minimo.label('estoque_minimo')
+        ).join(
+            NotaFiscalItem,
+            NotaFiscalItem.produto_id == Produto.id
+        ).join(
+            NotaFiscal,
+            NotaFiscal.id == NotaFiscalItem.nota_id
+        ).filter(
+            Produto.id == produto_id,
+            NotaFiscal.status == StatusNota.emitida
+        )
+        
+        if data_inicio:
+            produto_info = produto_info.filter(NotaFiscal.data_emissao >= data_inicio)
+        if data_fim:
+            produto_info = produto_info.filter(NotaFiscal.data_emissao <= data_fim + timedelta(days=1))
+        
+        produto_info = produto_info.group_by(Produto.id).first()
+        
+        if not produto_info:
+            return jsonify({'success': False, 'message': 'Produto não encontrado'}), 404
+        
+        # Calcular status do estoque e dias restantes
+        status_estoque = 'CRÍTICO' if produto_info.estoque_atual_loja < produto_info.estoque_minimo else 'OK'
+        
+        dias_restantes = None
+        if produto_info.quantidade_vendida > 0:
+            media_diaria = produto_info.quantidade_vendida / 30  # Considerando os últimos 30 dias
+            dias_restantes = round(produto_info.estoque_atual_loja / media_diaria, 2)
+        
+        # Obter histórico detalhado de vendas
+        historico_query = db.session.query(
+            NotaFiscal.data_emissao,
+            NotaFiscalItem.quantidade,
+            NotaFiscalItem.valor_unitario,
+            NotaFiscalItem.valor_total,
+            Cliente.nome.label('cliente_nome')
+        ).join(
+            NotaFiscal,
+            NotaFiscal.id == NotaFiscalItem.nota_id
+        ).outerjoin(
+            Cliente,
+            Cliente.id == NotaFiscal.cliente_id
+        ).filter(
+            NotaFiscalItem.produto_id == produto_id,
+            NotaFiscal.status == StatusNota.emitida
+        ).order_by(
+            NotaFiscal.data_emissao.desc()
+        ).limit(50)
+        
+        if data_inicio:
+            historico_query = historico_query.filter(NotaFiscal.data_emissao >= data_inicio)
+        if data_fim:
+            historico_query = historico_query.filter(NotaFiscal.data_emissao <= data_fim + timedelta(days=1))
+        
+        historico = historico_query.all()
+        
+        # Formatar os dados para retorno
+        produto_data = {
+            'produto_id': produto_info.produto_id,
+            'produto_nome': produto_info.produto_nome,
+            'produto_codigo': produto_info.produto_codigo,
+            'produto_tipo': produto_info.produto_tipo,
+            'unidade': produto_info.unidade.value,
+            'quantidade_vendida': float(produto_info.quantidade_vendida),
+            'valor_total_vendido': float(produto_info.valor_total_vendido),
+            'estoque_atual_loja': float(produto_info.estoque_atual_loja),
+            'estoque_minimo': float(produto_info.estoque_minimo),
+            'status_estoque': status_estoque,
+            'dias_restantes': dias_restantes
+        }
+        
+        historico_data = [{
+            'data_emissao': item.data_emissao.isoformat(),
+            'quantidade': float(item.quantidade),
+            'valor_unitario': float(item.valor_unitario),
+            'valor_total': float(item.valor_total),
+            'cliente_nome': item.cliente_nome
+        } for item in historico]
+        
+        return jsonify({
+            'success': True,
+            'produto': produto_data,
+            'historico': historico_data
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
