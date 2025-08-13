@@ -2450,6 +2450,7 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         elements.append(Paragraph("RELATÓRIO FINANCEIRO", header_style))
         elements.append(Paragraph(f"CAIXA #{caixa_id}", subtitle_style))
         elements.append(linha_separadora())
+        elements.append(Spacer(1, 6))
         data_relatorio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
         elements.append(Paragraph(f"-> Data: {data_relatorio}", normal_style))
         elements.append(Paragraph(f"-> Operador: {operador_nome}", normal_style))
@@ -2458,6 +2459,7 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         # --- Resumo Financeiro ---
         elements.append(linha_separadora())
         elements.append(Paragraph("RESUMO FINANCEIRO", subtitle_style))
+        elements.append(Spacer(1, 4))
         elements.append(linha_separadora())
         elements.append(linha_dupla("Total Entradas:", moeda_br(total_entradas)))
         elements.append(linha_dupla("Total Saídas:", moeda_br(total_saidas)))
@@ -2470,7 +2472,9 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         # --- Vendas por Forma de Pagamento ---
         elements.append(Spacer(1, 4))
         elements.append(linha_separadora())
+        elements.append(Spacer(1, 1))
         elements.append(Paragraph("FORMAS DE PAGAMENTO", subtitle_style))
+        elements.append(Spacer(1, 6))
         elements.append(linha_separadora())
         nomes_formas = {
             'dinheiro': 'Dinheiro',
@@ -2491,6 +2495,7 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         elements.append(Spacer(1, 8))
         elements.append(linha_separadora())
         elements.append(Paragraph("MOVIMENTAÇÕES", subtitle_style))
+        elements.append(Spacer(1, 6))
         elements.append(linha_separadora())
         for mov in movimentacoes:
             tipo_cat = f"{mov.tipo.value}"
@@ -2521,6 +2526,7 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         elements.append(Spacer(1, 15))
         elements.append(linha_separadora())
         elements.append(Paragraph("ASSINATURAS", subtitle_style))
+        elements.append(Spacer(1, 6))
         elements.append(linha_separadora())
         elements.append(Spacer(1, 20))
         elements.append(Paragraph("Operador:", normal_style))
