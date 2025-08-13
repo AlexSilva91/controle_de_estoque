@@ -2283,7 +2283,6 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         caixa = session.query(Caixa).filter_by(id=caixa_id).first()
         if not caixa:
             raise Exception("Caixa não encontrado")
-            
         operador_nome = caixa.operador.nome if caixa.operador else "Operador não identificado"
 
         # --- Busca movimentações ---
@@ -2293,12 +2292,12 @@ def gerar_pdf_caixa_financeiro(caixa_id):
             .all()
 
         # Calcula totais excluindo abertura e fechamento de caixa
-        total_entradas = sum(mov.valor for mov in movimentacoes 
+        total_entradas = sum(float(mov.valor) for mov in movimentacoes 
                              if mov.tipo == TipoMovimentacao.entrada and mov.categoria 
                              != CategoriaFinanceira.abertura_caixa and mov.categoria 
                              != CategoriaFinanceira.estorno)
         
-        total_saidas = sum(mov.valor for mov in movimentacoes 
+        total_saidas = sum(float(mov.valor) for mov in movimentacoes 
                            if mov.tipo == TipoMovimentacao.saida and mov.categoria 
                            != CategoriaFinanceira.abertura_caixa 
                            and mov.categoria != CategoriaFinanceira.estorno 
@@ -2315,22 +2314,24 @@ def gerar_pdf_caixa_financeiro(caixa_id):
 
         totais_vendas = {}
         for forma, total in vendas_por_forma_pagamento:
+            total = float(total) if total is not None else 0.0
             if forma == 'a_prazo':
                 total_entradas += total
-            totais_vendas[forma.value] = float(total)
+            totais_vendas[forma.value] = total
 
         # --- Calcula os novos campos ---
-        # Valor Físico: dinheiro menos diferença de abertura/fechamento (se fechamento > abertura)
         valor_dinheiro = totais_vendas.get('dinheiro', 0.0)
         valor_fisico = valor_dinheiro
-        
-        if caixa.valor_fechamento and caixa.valor_abertura and caixa.valor_fechamento > caixa.valor_abertura:
-            diferenca = float(caixa.valor_fechamento) - float(caixa.valor_abertura)
-            valor_fisico = valor_dinheiro - diferenca
-            if valor_fisico < 0:
-                valor_fisico = 0.0
+        if caixa.valor_fechamento and caixa.valor_abertura:
+            try:
+                valor_fechamento = float(caixa.valor_fechamento)
+                valor_abertura = float(caixa.valor_abertura)
+                if valor_fechamento > valor_abertura:
+                    diferenca = valor_fechamento - valor_abertura
+                    valor_fisico = max(valor_dinheiro - diferenca, 0.0)
+            except (TypeError, ValueError):
+                pass
 
-        # Valor Digital: soma de todos os pagamentos digitais
         valor_digital = sum([
             totais_vendas.get('pix_loja', 0.0),
             totais_vendas.get('pix_fabiano', 0.0),
@@ -2339,111 +2340,194 @@ def gerar_pdf_caixa_financeiro(caixa_id):
             totais_vendas.get('cartao_debito', 0.0),
             totais_vendas.get('cartao_credito', 0.0)
         ])
-
-        # A Prazo: valor total de vendas a prazo
         a_prazo = totais_vendas.get('a_prazo', 0.0)
 
-        # --- Geração do PDF ---
+        # --- Configuração para bobina 80mm ---
+        bobina_width = 226
+        bobina_height = 3000
+        
         buffer = BytesIO()
         doc = SimpleDocTemplate(
             buffer,
-            pagesize=A4,
-            leftMargin=30,
-            rightMargin=30,
-            topMargin=30,
-            bottomMargin=40
+            pagesize=(bobina_width, bobina_height),
+            leftMargin=5,
+            rightMargin=5,
+            topMargin=-6,
+            bottomMargin=5
         )
         elements = []
 
+        # --- Estilos ---
         styles = getSampleStyleSheet()
-        normal = styles['Normal']
-
-        left_style = ParagraphStyle(name='Left', parent=normal, alignment=0, fontSize=11)
-        center_style = ParagraphStyle(name='Center', parent=normal, alignment=1, fontSize=11)
-        bold_center = ParagraphStyle(name='BoldCenter', parent=center_style, fontSize=13, leading=14, spaceAfter=10)
-        descricao_style = ParagraphStyle(name='DescricaoPequena', fontSize=8, leading=14, wordWrap='CJK')
-        wrap_style = ParagraphStyle(name='WrapCell', fontSize=9, leading=11, wordWrap='CJK', alignment=0)
-
-        def moeda_br(valor): return format_currency(valor)
-
-        # --- Cabeçalho com informações do caixa ---
-        elements.append(Paragraph(f"RELATÓRIO FINANCEIRO - CAIXA #{caixa_id}", bold_center))
-        elements.append(Spacer(1, 8))
-        
-        # Adiciona data do relatório e nome do operador
-        data_relatorio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-        elements.append(Paragraph(f"Data do relatório: {data_relatorio}", left_style))
-        elements.append(Paragraph(f"Operador responsável: {operador_nome}", left_style))
-        elements.append(Spacer(1, 12))
-
-        # --- Totais (esquerda) ---
-        elements.append(Paragraph(f"Total de Entradas: {moeda_br(total_entradas)}", left_style))
-        elements.append(Paragraph(f"Total de Saídas: {moeda_br(total_saidas)}", left_style))
-        elements.append(Paragraph(f"Saldo: {moeda_br(total_entradas - total_saidas)}", left_style))
-        elements.append(Spacer(1, 8))
-        
-        # --- Novos campos ---
-        elements.append(Paragraph(f"Valor Físico (Dinheiro): {moeda_br(valor_fisico)}", left_style))
-        elements.append(Paragraph(f"Valor Digital: {moeda_br(valor_digital)}", left_style))
-        elements.append(Paragraph(f"A Prazo: {moeda_br(a_prazo)}", left_style))
-        elements.append(Spacer(1, 12))
-
-        # --- Tabela: Vendas por Forma de Pagamento ---
-        elements.append(Paragraph("Vendas por Forma de Pagamento", bold_center))
-        data_vendas = [["Forma de Pagamento", "Total (R$)"]]
-        for forma, valor in totais_vendas.items():
-            data_vendas.append([forma, moeda_br(valor)])
-
-        tabela_vendas = Table(data_vendas, colWidths=[220, 140], hAlign='CENTER')
-        tabela_vendas.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
-        ]))
-        elements.append(tabela_vendas)
-        elements.append(Spacer(1, 12))
-
-        # --- Tabela: Movimentações ---
-        elements.append(Paragraph("Movimentações Financeiras", bold_center))
-
-        data_movs = [["ID", "Data", "Tipo", "Categoria", "Valor", "Descrição"]]
-        for mov in movimentacoes:
-            descricao = Paragraph(mov.descricao or "-", descricao_style)
-            data_movs.append([
-                str(mov.id),
-                mov.data.strftime('%d/%m/%Y'),
-                Paragraph(mov.tipo.value, wrap_style),      
-                Paragraph(mov.categoria.value if mov.categoria else "-", wrap_style),
-                moeda_br(mov.valor),
-                descricao
-            ])
-
-        table_movs = Table(
-            data_movs,
-            colWidths=[30, 60, 55, 80, 70, 200],
-            hAlign='CENTER'
+        header_style = ParagraphStyle(
+            name='Header',
+            parent=styles['Heading1'],
+            fontSize=14,
+            leading=14,
+            alignment=1,
+            fontName='Helvetica-Bold',
+            spaceAfter=6
         )
-        table_movs.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-            ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP')
-        ]))
-        elements.append(table_movs)
-        elements.append(Spacer(1, 40))
+        subtitle_style = ParagraphStyle(
+            name='Subtitle',
+            parent=styles['Heading2'],
+            fontSize=12,
+            leading=12,
+            alignment=1,
+            fontName='Helvetica-Bold',
+            spaceAfter=4
+        )
+        normal_style = ParagraphStyle(
+            name='Normal',
+            parent=styles['Normal'],
+            fontSize=10,
+            leading=10,
+            alignment=0,
+            fontName='Helvetica'
+        )
+        valor_style = ParagraphStyle(
+            name='Valor',
+            parent=normal_style,
+            alignment=2,
+            fontName='Helvetica-Bold'
+        )
+        linha_style = ParagraphStyle(
+            name='Linha',
+            parent=normal_style,
+            alignment=1,
+            textColor=colors.black
+        )
 
-        # --- Área para assinaturas lado a lado ---
-        assinaturas = [
-            SignatureLine(width=240, height=50, label="Assinatura do Operador"),
-            SignatureLine(width=240, height=50, label="Assinatura do Administrador")
-        ]
+        def moeda_br(valor):
+            return f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
-        assinatura_table = Table([assinaturas], colWidths=[270, 270], hAlign='CENTER')
-        assinatura_table.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
-        ]))
-        elements.append(assinatura_table)
+        def linha_separadora():
+            return Paragraph("=" * 34, linha_style)
+
+        def linha_tracejada():
+            return Paragraph("-" * 60, linha_style)
+
+        # Função para criar linha alinhada com tabela invisível
+        from reportlab.platypus import Table, TableStyle
+        def linha_dupla(label, valor):
+            tabela = Table(
+                [[Paragraph(label, normal_style), Paragraph(valor, valor_style)]],
+                colWidths=[120, 80]
+            )
+            tabela.setStyle(TableStyle([
+                ('ALIGN', (0,0), (0,0), 'LEFT'),
+                ('ALIGN', (1,0), (1,0), 'RIGHT'),
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('FONTNAME', (0,0), (0,0), 'Helvetica'),
+                ('FONTNAME', (1,0), (1,0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,-1), 12),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+                ('TOPPADDING', (0,0), (-1,-1), 0),
+            ]))
+            return tabela
+
+        # --- Logo ---
+        from flask import current_app
+        import os
+        from PIL import Image as PILImage
+        from reportlab.platypus import Image, Spacer
+        logo_path = os.path.join(current_app.root_path, 'static', 'assets', 'logo.jpeg')
+        if os.path.exists(logo_path):
+            try:
+                with PILImage.open(logo_path) as img:
+                    img_width, img_height = img.size
+                    aspect_ratio = img_width / img_height
+                logo_width = 250
+                logo_height = logo_width / aspect_ratio
+                logo = Image(logo_path, width=logo_width, height=logo_height)
+                logo.hAlign = 'CENTER'
+                elements.append(logo)
+                elements.append(Spacer(0, 6))
+            except Exception as e:
+                print(f"Erro ao carregar a logo: {e}")
+
+        # --- Cabeçalho ---
+        elements.append(Paragraph("RELATÓRIO FINANCEIRO", header_style))
+        elements.append(Paragraph(f"CAIXA #{caixa_id}", subtitle_style))
+        elements.append(linha_separadora())
+        data_relatorio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        elements.append(Paragraph(f"-> Data: {data_relatorio}", normal_style))
+        elements.append(Paragraph(f"-> Operador: {operador_nome}", normal_style))
+        elements.append(Spacer(1, 6))
+
+        # --- Resumo Financeiro ---
+        elements.append(linha_separadora())
+        elements.append(Paragraph("RESUMO FINANCEIRO", subtitle_style))
+        elements.append(linha_separadora())
+        elements.append(linha_dupla("Total Entradas:", moeda_br(total_entradas)))
+        elements.append(linha_dupla("Total Saídas:", moeda_br(total_saidas)))
+        elements.append(linha_dupla("Saldo:", moeda_br(total_entradas - total_saidas)))
+        elements.append(Spacer(1, 6))
+        elements.append(linha_dupla("Valor Físico:", moeda_br(valor_fisico)))
+        elements.append(linha_dupla("Valor Digital:", moeda_br(valor_digital)))
+        elements.append(linha_dupla("A Prazo:", moeda_br(a_prazo)))
+
+        # --- Vendas por Forma de Pagamento ---
+        elements.append(Spacer(1, 4))
+        elements.append(linha_separadora())
+        elements.append(Paragraph("FORMAS DE PAGAMENTO", subtitle_style))
+        elements.append(linha_separadora())
+        nomes_formas = {
+            'dinheiro': 'Dinheiro',
+            'pix_loja': 'PIX Loja',
+            'pix_fabiano': 'PIX Fabiano',
+            'pix_edfrance': 'PIX Edfranci',
+            'pix_maquineta': 'PIX Maquineta',
+            'cartao_debito': 'Cartão Débito',
+            'cartao_credito': 'Cartão Crédito',
+            'a_prazo': 'A Prazo'
+        }
+        for forma, valor in totais_vendas.items():
+            if valor > 0:
+                nome_forma = nomes_formas.get(forma, forma)
+                elements.append(linha_dupla(f"{nome_forma}:", moeda_br(valor)))
+
+        # --- Movimentações Financeiras ---
+        elements.append(Spacer(1, 8))
+        elements.append(linha_separadora())
+        elements.append(Paragraph("MOVIMENTAÇÕES", subtitle_style))
+        elements.append(linha_separadora())
+        for mov in movimentacoes:
+            tipo_cat = f"{mov.tipo.value}"
+            if mov.categoria:
+                tipo_cat += f" - {mov.categoria.value}"
+            elements.append(linha_dupla(tipo_cat, moeda_br(float(mov.valor))))
+            if mov.descricao:
+                descricao = mov.descricao
+                if len(descricao) > 25:
+                    words = descricao.split()
+                    lines = []
+                    current_line = ""
+                    for word in words:
+                        if len(current_line + word) > 25:
+                            lines.append(current_line.strip())
+                            current_line = word + ""
+                        else:
+                            current_line += word + ""
+                    if current_line:
+                        lines.append(current_line.strip())
+                    for line in lines:
+                        elements.append(Paragraph(line, normal_style))
+                else:
+                    elements.append(Paragraph(descricao, normal_style))
+            elements.append(linha_tracejada())
+
+        # --- Assinaturas ---
+        elements.append(Spacer(1, 15))
+        elements.append(linha_separadora())
+        elements.append(Paragraph("ASSINATURAS", subtitle_style))
+        elements.append(linha_separadora())
+        elements.append(Spacer(1, 20))
+        elements.append(Paragraph("Operador:", normal_style))
+        elements.append(Paragraph("____________________________________", normal_style))
+        elements.append(Spacer(1, 15))
+        elements.append(Paragraph("Administrador:", normal_style))
+        elements.append(Paragraph("____________________________________", normal_style))
 
         doc.build(elements)
         buffer.seek(0)
@@ -2452,13 +2536,15 @@ def gerar_pdf_caixa_financeiro(caixa_id):
             buffer,
             mimetype='application/pdf',
             as_attachment=False,
-            download_name=f"caixa_{caixa_id}_financeiro.pdf"
+            download_name=f"caixa_{caixa_id}_bobina.pdf"
         ))
-        response.headers['Content-Disposition'] = f'inline; filename=caixa_{caixa_id}_financeiro.pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=caixa_{caixa_id}_bobina.pdf'
         return response
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        session.close()
 
 @admin_bp.route('/caixas/<int:caixa_id>/aprovar', methods=['POST'])
 @login_required
