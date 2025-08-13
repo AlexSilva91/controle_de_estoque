@@ -291,6 +291,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tabId === 'estoque') loadMovimentacoesData();
         if (tabId === 'descontos') loadDescontosData();
         if (tabId === 'caixas') loadCaixasData();
+        if (tabId === 'relatorio-saidas') loadRelatorioSaidasData();
       });
     });
 
@@ -1844,6 +1845,163 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  async function loadRelatorioSaidasData() {
+      try {
+          // Verifique se estamos na aba correta
+          if (!document.getElementById('relatorio-saidas').classList.contains('active')) {
+              return;
+          }
+
+          const dataInicio = document.getElementById('relatorioDataInicio')?.value;
+          const dataFim = document.getElementById('relatorioDataFim')?.value;
+          const categoria = document.getElementById('relatorioCategoria')?.value;
+          const limite = document.getElementById('relatorioLimite')?.value;
+          
+          const params = new URLSearchParams();
+          if (dataInicio) params.append('data_inicio', dataInicio);
+          if (dataFim) params.append('data_fim', dataFim);
+          if (categoria) params.append('categoria', categoria);
+          if (limite) params.append('limite', limite);
+          
+          const url = `/admin/relatorios/vendas-produtos?${params.toString()}`;
+          const response = await fetchWithErrorHandling(url);
+          
+          if (response) {
+              // Atualizar metadados do relatório
+              if (response.meta) {
+                  document.getElementById('relatorioPeriodoTexto').textContent = 
+                      `${response.meta.data_inicio} a ${response.meta.data_fim}`;
+                  document.getElementById('relatorioTotalProdutos').textContent = 
+                      response.meta.total_produtos;
+                  document.getElementById('relatorioTotalQuantidade').textContent = 
+                      response.meta.total_quantidade_vendida;
+                  document.getElementById('relatorioTotalValor').textContent = 
+                      formatarMoeda(response.meta.total_valor_vendido);
+                  document.getElementById('relatorioEstoqueCritico').textContent = 
+                      response.meta.produtos_estoque_critico;
+              }
+              
+              // Preencher tabela
+              const tbody = document.querySelector('#tabelaRelatorio tbody');
+              if (tbody) {
+                  tbody.innerHTML = '';
+                  
+                  if (response.dados && response.dados.length > 0) {
+                      response.dados.forEach(item => {
+                          const tr = document.createElement('tr');
+                          tr.innerHTML = `
+                              <td>${item.produto_id}</td>
+                              <td>${item.produto_nome}</td>
+                              <td>${item.unidade}</td>
+                              <td>${item.quantidade_vendida.toFixed(3)}</td>
+                              <td>${formatarMoeda(item.valor_total_vendido)}</td>
+                              <td>${item.estoque_atual_loja.toFixed(3)}</td>
+                              <td>${item.estoque_minimo.toFixed(3)}</td>
+                              <td>
+                                  <span class="badge ${item.status_estoque === 'CRÍTICO' ? 'badge-danger' : 'badge-success'}">
+                                      ${item.status_estoque}
+                                  </span>
+                                  ${item.percentual_estoque ? `(${item.percentual_estoque}%)` : ''}
+                              </td>
+                              <td>${item.dias_restantes || '-'}</td>
+                              <td>
+                                  <button class="btn-icon btn-info" data-id="${item.produto_id}" title="Ver detalhes">
+                                      <i class="fas fa-info-circle"></i>
+                                  </button>
+                              </td>
+                          `;
+                          tbody.appendChild(tr);
+                      });
+                  } else {
+                      tbody.innerHTML = '<tr><td colspan="10" class="text-center">Nenhum dado encontrado para o período selecionado</td></tr>';
+                  }
+              }
+          }
+      } catch (error) {
+          console.error('Erro ao carregar relatório de saídas:', error);
+          showFlashMessage('error', 'Erro ao carregar relatório de saídas');
+      }
+  }
+
+  // Adicione esta função para carregar as categorias de produtos
+  async function loadCategoriasProdutos() {
+      try {
+          const response = await fetchWithErrorHandling('/admin/api/produtos/categorias');
+          if (response && response.categorias) {
+              const select = document.getElementById('relatorioCategoria');
+              if (select) {
+                  // Manter o valor selecionado atual
+                  const selectedValue = select.value;
+                  
+                  // Limpar e adicionar novas opções
+                  select.innerHTML = '<option value="">Todas</option>';
+                  response.categorias.forEach(categoria => {
+                      const option = document.createElement('option');
+                      option.value = categoria;
+                      option.textContent = categoria;
+                      select.appendChild(option);
+                  });
+                  
+                  // Restaurar o valor selecionado se ainda existir
+                  if (selectedValue && response.categorias.includes(selectedValue)) {
+                      select.value = selectedValue;
+                  }
+              }
+          }
+      } catch (error) {
+          console.error('Erro ao carregar categorias:', error);
+      }
+  }
+
+  // Adicione este código para configurar as datas padrão
+  function setupDefaultDates() {
+      const hoje = new Date();
+      const trintaDiasAtras = new Date();
+      trintaDiasAtras.setDate(hoje.getDate() - 30);
+      
+      const formatDate = (date) => {
+          return date.toISOString().split('T')[0];
+      };
+      
+      document.getElementById('relatorioDataFim').value = formatDate(hoje);
+      document.getElementById('relatorioDataInicio').value = formatDate(trintaDiasAtras);
+  }
+
+  // Adicione estes event listeners
+  document.addEventListener('DOMContentLoaded', function() {
+      // Adicione esta linha no final da função setupNavigation()
+      if (document.getElementById('relatorio-saidas')) {
+          setupDefaultDates();
+          loadCategoriasProdutos();
+          loadRelatorioSaidasData();
+      }
+  });
+
+  // Event listeners específicos para o relatório
+  document.getElementById('filtrarRelatorio')?.addEventListener('click', loadRelatorioSaidasData);
+  document.getElementById('atualizarRelatorio')?.addEventListener('click', loadRelatorioSaidasData);
+  document.getElementById('exportarRelatorio')?.addEventListener('click', async function() {
+      try {
+          const dataInicio = document.getElementById('relatorioDataInicio')?.value;
+          const dataFim = document.getElementById('relatorioDataFim')?.value;
+          const categoria = document.getElementById('relatorioCategoria')?.value;
+          const limite = document.getElementById('relatorioLimite')?.value;
+          
+          const params = new URLSearchParams();
+          if (dataInicio) params.append('data_inicio', dataInicio);
+          if (dataFim) params.append('data_fim', dataFim);
+          if (categoria) params.append('categoria', categoria);
+          if (limite) params.append('limite', limite);
+          
+          // const url = `/admin/relatorios/vendas-produtos/exportar?${params.toString()}`;
+          // window.open(url, '_blank');
+      } catch (error) {
+          console.error('Erro ao exportar relatório:', error);
+          showFlashMessage('error', 'Erro ao exportar relatório');
+      }
+  });
+
+
   // ===== CAIXAS =====
   async function loadCaixasData() {
     try {
@@ -2850,6 +3008,10 @@ async function loadCaixaFinanceiro(caixaId) {
         if (tabId === 'estoque') loadMovimentacoesData();
         if (tabId === 'descontos') loadDescontosData();
         if (tabId === 'caixas') loadCaixasData();
+        if (tabId === 'relatorio-saidas') {
+          loadRelatorioSaidasData();
+          loadCategoriasProdutos();
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados iniciais:', error);

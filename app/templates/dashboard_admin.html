@@ -87,6 +87,12 @@
                             <span class="nav-text">Movimentações</span>
                         </a>
                     </li>
+                    <li data-tab="relatorio-saidas">
+                        <a href="#relatorio-saidas" class="nav-link">
+                            <i class="fas fa-chart-bar"></i>
+                            <span class="nav-text">Relatório de Saídas</span>
+                        </a>
+                    </li>
                     <li data-tab="financeiro">
                         <a href="#financeiro" class="nav-link">
                             <i class="fas fa-chart-line"></i>
@@ -374,7 +380,65 @@
                         </div>
                     </div>
                 </div>
-
+                
+                <div id="relatorio-saidas" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-boxes"></i> Relatório de Saída de Produtos</h3>
+                            <div class="card-actions">
+                                <button class="btn-icon" title="Atualizar" aria-label="Atualizar" id="atualizarRelatorio">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="relatorio-meta">
+                                <div class="meta-item">
+                                    <span class="meta-label">Período:</span>
+                                    <span id="relatorioPeriodoTexto">Últimos 30 dias</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Total Produtos:</span>
+                                    <span id="relatorioTotalProdutos">0</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Total Quantidade:</span>
+                                    <span id="relatorioTotalQuantidade">0</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Total Valor:</span>
+                                    <span id="relatorioTotalValor">R$ 0,00</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Produtos com Estoque Crítico:</span>
+                                    <span id="relatorioEstoqueCritico">0</span>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table id="tabelaRelatorio">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Produto</th>
+                                            <th>Unidade</th>
+                                            <th>Quantidade Vendida</th>
+                                            <th>Valor Total</th>
+                                            <th>Estoque Atual (Loja)</th>
+                                            <th>Estoque Mínimo</th>
+                                            <th>Status Estoque</th>
+                                            <th>Dias Restantes</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Dados serão preenchidos via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <!-- Financeiro -->
                 <div id="financeiro" class="tab-content">
                     <div class="action-bar">

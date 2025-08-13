@@ -1,6 +1,8 @@
+import csv
 from functools import wraps
+import io
 from zoneinfo import ZoneInfo
-from flask import Blueprint, app, render_template, request, jsonify
+from flask import Blueprint, Response, app, render_template, request, jsonify
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -2703,3 +2705,298 @@ def reabrir_caixa(caixa_id):
         print(e)
         db.session.rollback()
         return jsonify({'success': False, 'error': f'Erro ao reabrir caixa: {str(e)}'}), 500
+    
+# =============== RELATÓRIO DE SAIDA DE PRODUTOS ======================
+from flask import jsonify, request
+from datetime import datetime, timedelta
+from sqlalchemy import func, and_, or_
+from zoneinfo import ZoneInfo
+
+@admin_bp.route('/relatorios/vendas-produtos', methods=['GET'])
+@login_required
+@admin_required
+def relatorio_vendas_produtos():
+    try:
+        # Obter parâmetros de filtro da requisição
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        produto_id = request.args.get('produto_id')
+        categoria = request.args.get('categoria')
+        limite = request.args.get('limite', default=50, type=int)
+        
+        # Definir datas padrão (últimos 30 dias) se não fornecidas
+        hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
+        if not data_inicio:
+            data_inicio = (hoje - timedelta(days=30)).strftime('%Y-%m-%d')
+        if not data_fim:
+            data_fim = hoje.strftime('%Y-%m-%d')
+        
+        # Converter strings para objetos date
+        try:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
+        
+        # Construir a query base
+        query = db.session.query(
+            Produto.id.label('produto_id'),
+            Produto.nome.label('produto_nome'),
+            Produto.unidade.label('unidade'),
+            func.sum(NotaFiscalItem.quantidade).label('quantidade_vendida'),
+            func.sum(NotaFiscalItem.valor_total).label('valor_total_vendido'),
+            Produto.estoque_loja.label('estoque_atual_loja'),
+            Produto.estoque_deposito.label('estoque_atual_deposito'),
+            Produto.estoque_fabrica.label('estoque_atual_fabrica'),
+            Produto.estoque_minimo.label('estoque_minimo'),
+            Produto.estoque_maximo.label('estoque_maximo')
+        ).join(
+            NotaFiscalItem,
+            NotaFiscalItem.produto_id == Produto.id
+        ).join(
+            NotaFiscal,
+            NotaFiscal.id == NotaFiscalItem.nota_id
+        ).filter(
+            NotaFiscal.status == StatusNota.emitida,
+            NotaFiscal.data_emissao >= data_inicio,
+            NotaFiscal.data_emissao <= data_fim + timedelta(days=1)  # Inclui todo o dia final
+        ).group_by(
+            Produto.id
+        ).order_by(
+            func.sum(NotaFiscalItem.quantidade).desc()
+        )
+        
+        # Aplicar filtros adicionais
+        if produto_id:
+            query = query.filter(Produto.id == produto_id)
+        
+        if categoria:
+            query = query.filter(Produto.tipo == categoria)
+        
+        # Limitar resultados se necessário
+        if limite:
+            query = query.limit(limite)
+        
+        # Executar a query
+        resultados = query.all()
+        
+        # Processar os resultados para o relatório
+        relatorio = []
+        for r in resultados:
+            # Calcular percentual de estoque atual em relação ao mínimo
+            percentual_estoque = 0
+            if r.estoque_minimo > 0:
+                percentual_estoque = (r.estoque_atual_loja / r.estoque_minimo) * 100
+            
+            relatorio.append({
+                'produto_id': r.produto_id,
+                'produto_nome': r.produto_nome,
+                'unidade': r.unidade.value,
+                'quantidade_vendida': float(r.quantidade_vendida),
+                'valor_total_vendido': float(r.valor_total_vendido),
+                'estoque_atual_loja': float(r.estoque_atual_loja),
+                'estoque_atual_deposito': float(r.estoque_atual_deposito),
+                'estoque_atual_fabrica': float(r.estoque_atual_fabrica),
+                'estoque_minimo': float(r.estoque_minimo),
+                'estoque_maximo': float(r.estoque_maximo) if r.estoque_maximo else None,
+                'percentual_estoque': round(percentual_estoque, 2),
+                'status_estoque': 'CRÍTICO' if r.estoque_atual_loja < r.estoque_minimo else 'OK',
+                'dias_restantes': (
+                    round(r.estoque_atual_loja / (r.quantidade_vendida / 30), 2)
+                    if r.quantidade_vendida > 0 else None
+                )  # Estimativa de dias até acabar o estoque
+            })
+        
+        # Adicionar totais ao relatório
+        total_vendido = sum(item['valor_total_vendido'] for item in relatorio)
+        total_quantidade = sum(item['quantidade_vendida'] for item in relatorio)
+        
+        meta_relatorio = {
+            'data_inicio': data_inicio.strftime('%Y-%m-%d'),
+            'data_fim': data_fim.strftime('%Y-%m-%d'),
+            'total_produtos': len(relatorio),
+            'total_quantidade_vendida': total_quantidade,
+            'total_valor_vendido': total_vendido,
+            'produtos_estoque_critico': sum(1 for item in relatorio if item['status_estoque'] == 'CRÍTICO')
+        }
+        print(f'\n{relatorio}\n{meta_relatorio}')
+        return jsonify({
+            'meta': meta_relatorio,
+            'dados': relatorio
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@admin_bp.route('/relatorios/vendas-diarias', methods=['GET'])
+@login_required
+@admin_required
+def relatorio_vendas_diarias():
+    try:
+        # Obter parâmetros de filtro
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        agrupar_por = request.args.get('agrupar_por', default='dia')  # 'dia', 'semana', 'mes'
+        
+        # Definir datas padrão (últimos 30 dias)
+        hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
+        if not data_inicio:
+            data_inicio = (hoje - timedelta(days=30)).strftime('%Y-%m-%d')
+        if not data_fim:
+            data_fim = hoje.strftime('%Y-%m-%d')
+        
+        # Converter strings para objetos date
+        try:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
+        
+        # Definir a expressão de agrupamento baseada no parâmetro
+        if agrupar_por == 'dia':
+            group_expr = func.date(NotaFiscal.data_emissao)
+            label_format = '%Y-%m-%d'
+        elif agrupar_por == 'semana':
+            group_expr = func.date_trunc('week', NotaFiscal.data_emissao)
+            label_format = 'Semana %Y-%m-%d'
+        elif agrupar_por == 'mes':
+            group_expr = func.date_trunc('month', NotaFiscal.data_emissao)
+            label_format = '%Y-%m'
+        else:
+            return jsonify({'error': 'Agrupamento inválido. Use dia, semana ou mes'}), 400
+        
+        # Query para obter vendas agrupadas por período
+        vendas_por_periodo = db.session.query(
+            group_expr.label('periodo'),
+            func.count(NotaFiscal.id).label('quantidade_vendas'),
+            func.sum(NotaFiscal.valor_total).label('valor_total'),
+            func.sum(NotaFiscal.valor_desconto).label('valor_desconto_total')
+        ).filter(
+            NotaFiscal.status == StatusNota.emitida,
+            NotaFiscal.data_emissao >= data_inicio,
+            NotaFiscal.data_emissao <= data_fim + timedelta(days=1)
+        ).group_by(
+            group_expr
+        ).order_by(
+            group_expr
+        ).all()
+        
+        # Query para obter produtos mais vendidos no período
+        produtos_mais_vendidos = db.session.query(
+            Produto.id,
+            Produto.nome,
+            func.sum(NotaFiscalItem.quantidade).label('quantidade_total'),
+            func.sum(NotaFiscalItem.valor_total).label('valor_total')
+        ).join(
+            NotaFiscalItem,
+            NotaFiscalItem.produto_id == Produto.id
+        ).join(
+            NotaFiscal,
+            NotaFiscal.id == NotaFiscalItem.nota_id
+        ).filter(
+            NotaFiscal.status == StatusNota.emitida,
+            NotaFiscal.data_emissao >= data_inicio,
+            NotaFiscal.data_emissao <= data_fim + timedelta(days=1)
+        ).group_by(
+            Produto.id
+        ).order_by(
+            func.sum(NotaFiscalItem.quantidade).desc()
+        ).limit(5).all()
+        
+        # Processar resultados
+        relatorio_periodo = [{
+            'periodo': r.periodo.strftime(label_format),
+            'quantidade_vendas': r.quantidade_vendas,
+            'valor_total': float(r.valor_total),
+            'valor_desconto_total': float(r.valor_desconto_total),
+            'valor_liquido': float(r.valor_total - r.valor_desconto_total)
+        } for r in vendas_por_periodo]
+        
+        relatorio_produtos = [{
+            'produto_id': r.id,
+            'produto_nome': r.nome,
+            'quantidade_total': float(r.quantidade_total),
+            'valor_total': float(r.valor_total)
+        } for r in produtos_mais_vendidos]
+        
+        return jsonify({
+            'meta': {
+                'data_inicio': data_inicio.strftime('%Y-%m-%d'),
+                'data_fim': data_fim.strftime('%Y-%m-%d'),
+                'agrupar_por': agrupar_por
+            },
+            'vendas_por_periodo': relatorio_periodo,
+            'produtos_mais_vendidos': relatorio_produtos
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@admin_bp.route('/relatorios/vendas-produtos/exportar', methods=['GET'])
+@login_required
+@admin_required
+def exportar_relatorio_vendas_produtos():
+    try:
+        # Os mesmos parâmetros da rota /relatorios/vendas-produtos
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        produto_id = request.args.get('produto_id')
+        categoria = request.args.get('categoria')
+        limite = request.args.get('limite', default=50, type=int)
+        
+        # Chame a função existente para obter os dados
+        relatorio = relatorio_vendas_produtos().get_json()
+        
+        # Crie um arquivo CSV ou Excel (exemplo simplificado)
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Escreva o cabeçalho
+        writer.writerow([
+            'ID Produto', 'Nome Produto', 'Unidade', 
+            'Quantidade Vendida', 'Valor Total Vendido',
+            'Estoque Atual Loja', 'Estoque Mínimo', 
+            'Status Estoque', 'Dias Restantes'
+        ])
+        
+        # Escreva os dados
+        for item in relatorio['dados']:
+            writer.writerow([
+                item['produto_id'],
+                item['produto_nome'],
+                item['unidade'],
+                item['quantidade_vendida'],
+                item['valor_total_vendido'],
+                item['estoque_atual_loja'],
+                item['estoque_minimo'],
+                item['status_estoque'],
+                item['dias_restantes'] or ''
+            ])
+        
+        # Retorne o arquivo para download
+        output.seek(0)
+        return Response(
+            output,
+            mimetype="text/csv",
+            headers={"Content-disposition": "attachment; filename=relatorio_saidas_produtos.csv"}
+        )
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@admin_bp.route('/api/produtos/categorias', methods=['GET'])
+@login_required
+@admin_required
+def get_produto_categorias():
+    try:
+        # Query distinct product categories from the database
+        categorias = db.session.query(Produto.tipo).distinct().all()
+        
+        # Extract just the category names from the query results
+        categorias_list = [categoria[0] for categoria in categorias if categoria[0]]
+        
+        return jsonify({
+            'categorias': sorted(categorias_list)  # Return sorted list of categories
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

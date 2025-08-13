@@ -2430,3 +2430,34 @@ canvas {
     outline: 2px solid #ff0000;
     outline-offset: 2px;
   }
+/* Adicione ao seu arquivo style.css */
+.relatorio-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+}
+
+.meta-item {
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
+}
+
+.meta-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+}
+
+#tabelaRelatorio th {
+    white-space: nowrap;
+}
+
+#tabelaRelatorio td {
+    vertical-align: middle;
+}
