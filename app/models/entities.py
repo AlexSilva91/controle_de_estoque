@@ -574,18 +574,25 @@ class ContaReceber(Base):
             if isinstance(data_pagamento, str):
                 data_pagamento = datetime.strptime(data_pagamento, '%Y-%m-%d')
         
+        # Atualiza as observações da conta se fornecidas
+        if observacoes is not None and observacoes.strip() != '':
+            if self.observacoes:
+                self.observacoes += f"\n{data_pagamento.strftime('%d/%m/%Y')}: {observacoes}"
+            else:
+                self.observacoes = f"{data_pagamento.strftime('%d/%m/%Y')}: {observacoes}"
+        
         pagamento = PagamentoContaReceber(
             conta_id=self.id,
             caixa_id=caixa_id,
             valor_pago=valor_pago,
             forma_pagamento=forma_pagamento,
-            observacoes=observacoes,
-            data_pagamento=data_pagamento  # Usa a data fornecida
+            observacoes=observacoes,  # Observações específicas deste pagamento
+            data_pagamento=data_pagamento
         )
         db.session.add(pagamento)
         
         self.valor_aberto -= valor_pago
-        self.data_pagamento = data_pagamento  # Atualiza também na conta
+        self.data_pagamento = data_pagamento
         self.status = StatusPagamento.quitado if self.valor_aberto == 0 else StatusPagamento.parcial
         
         financeiro = Financeiro(
@@ -595,8 +602,8 @@ class ContaReceber(Base):
             conta_receber_id=self.id,
             cliente_id=self.cliente_id,
             caixa_id=caixa_id,
-            descricao=f"Pagamento conta #{self.id}",
-            data=data_pagamento  # Usa a mesma data
+            descricao=f"Pagamento conta #{self.id} - {observacoes if observacoes else ''}".strip(),
+            data=data_pagamento
         )
 
         db.session.add(financeiro)

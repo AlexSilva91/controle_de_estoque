@@ -3221,18 +3221,14 @@ def pagar_conta_receber(id):
     print(f'Dados recebidos para pagamento: {data}')  # Log completo dos dados
 
     try:
-        # ----------------------
         # Validação do valor pago
-        # ----------------------
         valor_pago = Decimal(str(data.get('valor_pago', 0)))
         if valor_pago <= 0:
             return jsonify({'error': 'Valor deve ser positivo'}), 400
         if valor_pago > conta.valor_aberto:
             return jsonify({'error': 'Valor excede o valor em aberto'}), 400
 
-        # ----------------------
         # Forma de pagamento
-        # ----------------------
         forma_pagamento_str = data.get('forma_pagamento')
         if not forma_pagamento_str:
             return jsonify({'error': 'Forma de pagamento não informada'}), 400
@@ -3241,20 +3237,16 @@ def pagar_conta_receber(id):
         except KeyError:
             return jsonify({'error': f'Forma de pagamento inválida: {forma_pagamento_str}'}), 400
 
-        # ----------------------
         # Caixa
-        # ----------------------
         caixa_id = data.get('caixa_id')
         if caixa_id is not None:
             try:
                 caixa_id = int(caixa_id)
-                # Verifica se o caixa existe
                 if not Caixa.query.get(caixa_id):
                     return jsonify({'error': 'Caixa não encontrado'}), 400
             except ValueError:
                 return jsonify({'error': 'ID do caixa inválido'}), 400
         else:
-            # Busca caixa aberto do usuário atual
             caixa = Caixa.query.filter_by(
                 operador_id=current_user.id,
                 status=StatusCaixa.aberto
@@ -3264,77 +3256,37 @@ def pagar_conta_receber(id):
             else:
                 return jsonify({'error': 'Nenhum caixa aberto encontrado para o usuário'}), 400
 
-        # ----------------------
         # Observações
-        # ----------------------
         observacoes = data.get('observacoes', '')
 
-        # ----------------------
-        # Data do pagamento (TRATAMENTO ESPECIAL)
-        # ----------------------
+        # Data do pagamento
         data_pagamento_str = data.get('data_pagamento')
         if data_pagamento_str:
             try:
-                # Converter string para objeto datetime
                 data_pagamento = datetime.strptime(data_pagamento_str, '%Y-%m-%d').date()
-                # Converter date para datetime (meia-noite)
                 data_pagamento = datetime.combine(data_pagamento, datetime.min.time())
-                print(f'Data de pagamento convertida: {data_pagamento}')
             except ValueError as e:
                 print(f'Erro ao converter data: {e}')
                 return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
         else:
             data_pagamento = datetime.now()
-            print(f'Usando data atual: {data_pagamento}')
 
-        # ----------------------
-        # Registrar pagamento na conta
-        # ----------------------
+        # REGISTRAR PAGAMENTO (única chamada que já cria tudo necessário)
         pagamento = conta.registrar_pagamento(
             valor_pago=valor_pago,
             forma_pagamento=forma_pagamento,
             caixa_id=caixa_id,
             observacoes=observacoes,
-            data_pagamento=data_pagamento  # Passando a data tratada
+            data_pagamento=data_pagamento
         )
-
-        # ----------------------
-        # Registrar no financeiro
-        # ----------------------
-        financeiro = Financeiro(
-            tipo=TipoMovimentacao.entrada,
-            categoria=CategoriaFinanceira.venda,
-            valor=valor_pago,
-            conta_receber_id=conta.id,
-            cliente_id=conta.cliente_id,
-            caixa_id=caixa_id,
-            descricao=f"Pagamento conta #{conta.id} - {conta.descricao}",
-            data=data_pagamento  # Mesma data do pagamento
-        )
-        db.session.add(financeiro)
-
-        # ----------------------
-        # Atualizar status da conta
-        # ----------------------
-        if conta.valor_aberto == 0:
-            conta.status = StatusPagamento.quitado
-            conta.data_pagamento = data_pagamento  # Atualiza data na conta também
-        elif conta.valor_aberto < conta.valor_original:
-            conta.status = StatusPagamento.parcial
-        else:
-            conta.status = StatusPagamento.pendente
 
         db.session.commit()
-
-        # Log do pagamento registrado
-        pagamento_registrado = PagamentoContaReceber.query.get(pagamento.id)
-        print(f'Pagamento registrado no banco: ID {pagamento_registrado.id}, Data: {pagamento_registrado.data_pagamento}')
 
         return jsonify({
             'success': True,
             'valor_aberto': float(conta.valor_aberto),
             'status': conta.status.value,
-            'data_pagamento': data_pagamento.strftime('%Y-%m-%d')  # Retorna a data formatada
+            'data_pagamento': data_pagamento.strftime('%Y-%m-%d')
         })
 
     except Exception as e:
@@ -3343,4 +3295,3 @@ def pagar_conta_receber(id):
         print(f'Erro ao processar pagamento: {e}')
         print(traceback.format_exc())
         return jsonify({'error': f'Erro interno ao processar pagamento: {str(e)}'}), 500
-    
