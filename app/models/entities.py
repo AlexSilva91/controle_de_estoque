@@ -3,7 +3,7 @@ import enum
 from flask_login import UserMixin
 from sqlalchemy import (
     Column, Integer, Numeric, String, DateTime, Enum, ForeignKey, Text, DECIMAL,
-    UniqueConstraint, Boolean, Table
+    UniqueConstraint, Boolean, Table, func
 )
 from sqlalchemy.orm import relationship
 from . import db
@@ -551,7 +551,7 @@ class ContaReceber(Base):
     valor_aberto = Column(DECIMAL(12, 2), nullable=False)
     data_vencimento = Column(DateTime, nullable=False)
     data_emissao = Column(DateTime, default=datetime.now, nullable=False)
-    data_pagamento = Column(DateTime, default=datetime.now, nullable=False)
+    data_pagamento = Column(DateTime, server_default=func.now(), nullable=False)
     status = Column(Enum(StatusPagamento), default=StatusPagamento.pendente, nullable=False)
     observacoes = Column(Text, nullable=True)
     sincronizado = Column(Boolean, default=False, nullable=False)
