@@ -2161,10 +2161,10 @@ def get_caixa_financeiro(caixa_id):
             
             if mov.conta_receber_id:
                 pagamentos = session.query(PagamentoContaReceber)\
-                    .filter_by(conta_receber_id=mov.conta_receber_id)\
+                    .filter_by(conta_id=mov.conta_receber_id)\
                     .all()
                 formas_pagamento = [p.forma_pagamento.value for p in pagamentos]
-            
+                        
             # Adiciona ao array de dados
             dados.append({
                 'id': mov.id,

@@ -2135,7 +2135,310 @@ document.addEventListener('DOMContentLoaded', function() {
           console.error('Erro ao atualizar lista de pagamentos:', error);
       }
   }
-  
+  async function loadRelatorioSaidasData() {
+      try {
+          // Mostrar loading
+          const tbody = document.querySelector('#tabelaRelatorio tbody');
+          tbody.innerHTML = '<tr><td colspan="10" class="text-center"><div class="spinner-border" role="status"><span class="sr-only">Carregando...</span></div></td></tr>';
+          
+          // Obter valores dos filtros
+          const dataInicio = document.getElementById('relatorioDataInicio').value;
+          const dataFim = document.getElementById('relatorioDataFim').value;
+          const produtoNome = document.getElementById('relatorioProdutoNome').value;
+          const produtoCodigo = document.getElementById('relatorioProdutoCodigo').value;
+          const categoria = document.getElementById('relatorioCategoria').value;
+          
+          // Construir parâmetros da URL
+          const params = new URLSearchParams();
+          if (dataInicio) params.append('data_inicio', dataInicio);
+          if (dataFim) params.append('data_fim', dataFim);
+          if (produtoNome) params.append('produto_nome', produtoNome);
+          if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
+          if (categoria) params.append('categoria', categoria);
+          
+          // Limite padrão de 50 itens
+          params.append('limite', 50);
+          
+          // Fazer a requisição
+          const response = await fetchWithErrorHandling(`/admin/relatorios/vendas-produtos?${params.toString()}`);
+          
+          if (response) {
+              // Atualizar metadados
+              atualizarMetadadosRelatorio(response.meta);
+              
+              // Preencher tabela
+              preencherTabelaRelatorio(response.dados);
+          }
+      } catch (error) {
+          console.error('Erro ao carregar relatório:', error);
+          const tbody = document.querySelector('#tabelaRelatorio tbody');
+          tbody.innerHTML = '<tr><td colspan="10" class="text-center text-danger">Erro ao carregar dados do relatório</td></tr>';
+          showFlashMessage('error', 'Erro ao carregar relatório de saídas');
+      }
+  }
+
+  function atualizarMetadadosRelatorio(meta) {
+      if (!meta) return;
+      
+      // Formatar período
+      const inicio = new Date(meta.data_inicio);
+      const fim = new Date(meta.data_fim);
+      document.getElementById('relatorioPeriodoTexto').textContent = `${inicio.toLocaleDateString()} a ${fim.toLocaleDateString()}`;
+      
+      // Atualizar totais
+      document.getElementById('relatorioTotalProdutos').textContent = meta.total_produtos;
+      document.getElementById('relatorioTotalQuantidade').textContent = meta.total_quantidade_vendida;
+      document.getElementById('relatorioTotalValor').textContent = formatarMoeda(meta.total_valor_vendido);
+      document.getElementById('relatorioEstoqueCritico').textContent = meta.produtos_estoque_critico;
+  }
+
+  function preencherTabelaRelatorio(dados) {
+      const tbody = document.querySelector('#tabelaRelatorio tbody');
+      
+      if (!dados || dados.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="10" class="text-center">Nenhum dado encontrado para os filtros selecionados</td></tr>';
+          return;
+      }
+      
+      tbody.innerHTML = '';
+      
+      dados.forEach(item => {
+          const tr = document.createElement('tr');
+          
+          if (item.status_estoque === 'CRÍTICO') {
+              tr.classList.add('table-warning');
+          }
+          
+          tr.innerHTML = `
+              <td>${item.produto_id}</td>
+              <td>
+                  <strong>${item.produto_nome}</strong><br>
+                  <small class="text-muted">${item.produto_codigo || 'Sem código'}</small>
+              </td>
+              <td>${item.unidade}</td>
+              <td>${item.quantidade_vendida.toFixed(2)}</td>
+              <td>${formatarMoeda(item.valor_total_vendido)}</td>
+              <td>
+                  ${item.estoque_atual_loja.toFixed(2)}
+                  <div class="progress mt-1" style="height: 5px;">
+                      <div class="progress-bar ${item.percentual_estoque < 100 ? 'bg-danger' : 'bg-success'}" 
+                          role="progressbar" 
+                          style="width: ${Math.min(item.percentual_estoque, 100)}%" 
+                          aria-valuenow="${item.percentual_estoque}" 
+                          aria-valuemin="0" 
+                          aria-valuemax="100">
+                      </div>
+                  </div>
+              </td>
+              <td>${item.estoque_minimo.toFixed(2)}</td>
+              <td>
+                  <span class="badge ${item.status_estoque === 'CRÍTICO' ? 'badge-danger' : 'badge-success'}">
+                      ${item.status_estoque}
+                  </span>
+              </td>
+              <td>${item.dias_restantes ? `${item.dias_restantes} dias` : 'N/A'}</td>
+              <td class="text-center">
+                  <button class="btn btn-sm btn-outline-primary btn-detalhes" 
+                          data-produto-id="${item.produto_id}"
+                          title="Ver detalhes">
+                      <i class="fas fa-eye"></i>
+                  </button>
+              </td>
+          `;
+          
+          tbody.appendChild(tr);
+      });
+      
+      // Evento do botão de detalhes
+      document.querySelectorAll('.btn-detalhes').forEach(btn => {
+          btn.addEventListener('click', function() {
+              const produtoId = this.getAttribute('data-produto-id');
+              abrirModalDetalhesProduto(produtoId); // Chama a rota /detalhes
+          });
+      });
+  }
+
+  async function abrirModalDetalhesProduto(produtoId) {
+      try {
+          // Obter valores dos filtros atuais
+          const dataInicio = document.getElementById('relatorioDataInicio').value;
+          const dataFim = document.getElementById('relatorioDataFim').value;
+          
+          // Construir parâmetros
+          const params = new URLSearchParams();
+          params.append('produto_id', produtoId);
+          if (dataInicio) params.append('data_inicio', dataInicio);
+          if (dataFim) params.append('data_fim', dataFim);
+          
+          // Mostrar modal de loading
+          const modal = document.getElementById('detalhesSaidaModal');
+          const modalBody = modal.querySelector('.modal-body');
+          modalBody.innerHTML = '<div class="text-center p-4"><div class="spinner-border" role="status"><span class="sr-only">Carregando...</span></div></div>';
+          openModal('detalhesSaidaModal');
+          
+          // Fazer requisição
+          const response = await fetchWithErrorHandling(`/admin/relatorios/vendas-produtos/detalhes?${params.toString()}`);
+          
+          if (response && response.success) {
+              const produto = response.produto;
+              const historico = response.historico;
+              
+              // Preencher modal
+              modalBody.innerHTML = `
+                  <div class="detalhes-produto-header">
+                      <h4>${produto.produto_nome}</h4>
+                      <p class="text-muted">Código: ${produto.produto_codigo || 'N/A'} | Categoria: ${produto.produto_tipo || 'N/A'}</p>
+                      <div class="row mb-3">
+                          <div class="col-md-4">
+                              <div class="card card-sm">
+                                  <div class="card-body">
+                                      <h6>Estoque Atual</h6>
+                                      <h3 class="text-primary">${produto.estoque_atual_loja} ${produto.unidade}</h3>
+                                  </div>
+                              </div>
+                          </div>
+                          <div class="col-md-4">
+                              <div class="card card-sm">
+                                  <div class="card-body">
+                                      <h6>Estoque Mínimo</h6>
+                                      <h3 class="${produto.status_estoque === 'CRÍTICO' ? 'text-danger' : 'text-success'}">${produto.estoque_minimo} ${produto.unidade}</h3>
+                                  </div>
+                              </div>
+                          </div>
+                          <div class="col-md-4">
+                              <div class="card card-sm">
+                                  <div class="card-body">
+                                      <h6>Dias Restantes</h6>
+                                      <h3>${produto.dias_restantes || 'N/A'}</h3>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <div class="historico-vendas">
+                      <h5>Histórico de Vendas</h5>
+                      <div class="table-responsive">
+                          <table class="table table-sm table-hover">
+                              <thead>
+                                  <tr>
+                                      <th>Data</th>
+                                      <th>Cliente</th>
+                                      <th>Quantidade</th>
+                                      <th>Valor Unitário</th>
+                                      <th>Valor Total</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  ${historico.map(item => `
+                                      <tr>
+                                          <td>${formatarData(item.data_emissao)}</td>
+                                          <td>${item.cliente_nome || 'Consumidor'}</td>
+                                          <td>${item.quantidade}</td>
+                                          <td>${formatarMoeda(item.valor_unitario)}</td>
+                                          <td>${formatarMoeda(item.valor_total)}</td>
+                                      </tr>
+                                  `).join('')}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              `;
+          } else {
+              modalBody.innerHTML = `<div class="alert alert-danger">${response.message || 'Erro ao carregar detalhes'}</div>`;
+          }
+      } catch (error) {
+          console.error('Erro ao carregar detalhes:', error);
+          const modalBody = document.querySelector('#modalDetalhesProduto .modal-body');
+          modalBody.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+      }
+  }
+
+  function exportarRelatorioProduto(produtoId = null) {
+      // Obter valores dos filtros
+      const dataInicio = document.getElementById('relatorioDataInicio').value;
+      const dataFim = document.getElementById('relatorioDataFim').value;
+      const produtoNome = document.getElementById('relatorioProdutoNome').value;
+      const produtoCodigo = document.getElementById('relatorioProdutoCodigo').value;
+      const categoria = document.getElementById('relatorioCategoria').value;
+      
+      // Construir parâmetros
+      const params = new URLSearchParams();
+      if (produtoId) params.append('produto_id', produtoId);
+      if (dataInicio) params.append('data_inicio', dataInicio);
+      if (dataFim) params.append('data_fim', dataFim);
+      if (produtoNome) params.append('produto_nome', produtoNome);
+      if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
+      if (categoria) params.append('categoria', categoria);
+      
+      // Abrir link de download
+      window.open(`/relatorios/vendas-produtos/exportar?${params.toString()}`, '_blank');
+  }
+
+  async function loadCategoriasProdutos() {
+      try {
+          const response = await fetchWithErrorHandling('/admin/api/produtos/categorias');
+          
+          if (response && response.categorias) {
+              const select = document.getElementById('relatorioCategoria');
+              select.innerHTML = '<option value="">Todas</option>';
+              
+              response.categorias.forEach(categoria => {
+                  const option = document.createElement('option');
+                  option.value = categoria;
+                  option.textContent = categoria;
+                  select.appendChild(option);
+              });
+          }
+      } catch (error) {
+          console.error('Erro ao carregar categorias:', error);
+      }
+  }
+
+  // Funções auxiliares
+  function formatarMoeda(valor) {
+      return new Intl.NumberFormat('pt-BR', { 
+          style: 'currency', 
+          currency: 'BRL' 
+      }).format(valor || 0);
+  }
+
+  function formatarData(dataString) {
+      if (!dataString) return '-';
+      const date = new Date(dataString);
+      return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Event Listeners
+  document.addEventListener('DOMContentLoaded', function() {
+      // Definir datas padrão (últimos 30 dias)
+      const hoje = new Date();
+      const trintaDiasAtras = new Date();
+      trintaDiasAtras.setDate(hoje.getDate() - 30);
+      
+      document.getElementById('relatorioDataFim').valueAsDate = hoje;
+      document.getElementById('relatorioDataInicio').valueAsDate = trintaDiasAtras;
+      
+      // Carregar categorias
+      loadCategoriasProdutos();
+      
+      // Carregar dados iniciais
+      loadRelatorioSaidasData();
+  });
+
+  document.getElementById('filtrarRelatorio').addEventListener('click', loadRelatorioSaidasData);
+  document.getElementById('atualizarRelatorio').addEventListener('click', loadRelatorioSaidasData);
+
+  // Permitir filtrar com Enter nos campos de texto
+  [document.getElementById('relatorioProdutoNome'), document.getElementById('relatorioProdutoCodigo')].forEach(input => {
+      if (input) {
+          input.addEventListener('keypress', function(e) {
+              if (e.key === 'Enter') {
+                  loadRelatorioSaidasData();
+              }
+          });
+      }
+  });
   // ===== CAIXAS =====
   async function loadCaixasData() {
     try {
