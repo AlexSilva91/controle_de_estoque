@@ -1850,304 +1850,292 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  async function loadRelatorioSaidasData() {
+  async function loadContasReceber() {
       try {
-          // Verifique se estamos na aba correta
-          if (!document.getElementById('relatorio-saidas').classList.contains('active')) {
-              return;
-          }
-
-          const dataInicio = document.getElementById('relatorioDataInicio')?.value;
-          const dataFim = document.getElementById('relatorioDataFim')?.value;
-          const produtoNome = document.getElementById('relatorioProdutoNome')?.value;
-          const produtoCodigo = document.getElementById('relatorioProdutoCodigo')?.value;
-          const categoria = document.getElementById('relatorioCategoria')?.value;
-          const limite = document.getElementById('relatorioLimite')?.value;
+          // Obter valores dos filtros
+          const dataInicio = document.getElementById('contasReceberDataInicio').value;
+          const dataFim = document.getElementById('contasReceberDataFim').value;
+          const status = document.getElementById('contasReceberStatus').value;
           
+          // Construir parâmetros da URL
           const params = new URLSearchParams();
           if (dataInicio) params.append('data_inicio', dataInicio);
           if (dataFim) params.append('data_fim', dataFim);
-          if (produtoNome) params.append('produto_nome', produtoNome);
-          if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
-          if (categoria) params.append('categoria', categoria);
-          if (limite) params.append('limite', limite);
+          if (status) params.append('status', status);
           
-          const url = `/admin/relatorios/vendas-produtos?${params.toString()}`;
-          const response = await fetchWithErrorHandling(url);
+          // Fazer a requisição
+          const response = await fetchWithErrorHandling(`/admin/contas-receber?${params.toString()}`);
           
-          if (response) {
-              // Atualizar metadados do relatório
-              if (response.meta) {
-                  document.getElementById('relatorioPeriodoTexto').textContent = 
-                      `${response.meta.data_inicio} a ${response.meta.data_fim}`;
-                  document.getElementById('relatorioTotalProdutos').textContent = 
-                      response.meta.total_produtos;
-                  document.getElementById('relatorioTotalQuantidade').textContent = 
-                      response.meta.total_quantidade_vendida;
-                  document.getElementById('relatorioTotalValor').textContent = 
-                      formatarMoeda(response.meta.total_valor_vendido);
-                  document.getElementById('relatorioEstoqueCritico').textContent = 
-                      response.meta.produtos_estoque_critico;
-              }
+          if (response && response.success) {
+              const tbody = document.querySelector('#tabelaContasReceber tbody');
+              tbody.innerHTML = '';
               
-              // Preencher tabela
-              const tbody = document.querySelector('#tabelaRelatorio tbody');
-              if (tbody) {
-                  tbody.innerHTML = '';
+              if (response.contas && response.contas.length > 0) {
+                  const hoje = new Date();
                   
-                  if (response.dados && response.dados.length > 0) {
-                      response.dados.forEach(item => {
-                          const tr = document.createElement('tr');
-                          tr.innerHTML = `
-                              <td>${item.produto_id}</td>
-                              <td>${item.produto_nome}</td>
-                              <td>${item.unidade}</td>
-                              <td>${item.quantidade_vendida.toFixed(3)}</td>
-                              <td>${formatarMoeda(item.valor_total_vendido)}</td>
-                              <td>${item.estoque_atual_loja.toFixed(3)}</td>
-                              <td>${item.estoque_minimo.toFixed(3)}</td>
-                              <td>
-                                  <span class="badge ${item.status_estoque === 'CRÍTICO' ? 'badge-danger' : 'badge-success'}">
-                                      ${item.status_estoque}
-                                  </span>
-                                  ${item.percentual_estoque ? `(${item.percentual_estoque}%)` : ''}
-                              </td>
-                              <td>${item.dias_restantes || '-'}</td>
-                              <td>
-                                  <button class="btn-icon btn-info" data-id="${item.produto_id}" title="Ver detalhes">
-                                      <i class="fas fa-info-circle"></i>
-                                  </button>
-                              </td>
-                          `;
-                          tbody.appendChild(tr);
-                      });
-                  } else {
-                      tbody.innerHTML = '<tr><td colspan="10" class="text-center">Nenhum dado encontrado para o período selecionado</td></tr>';
-                  }
-              }
-          }
-      } catch (error) {
-          console.error('Erro ao carregar relatório de saídas:', error);
-          showFlashMessage('error', 'Erro ao carregar relatório de saídas');
-      }
-  }
-  async function loadCategoriasProdutos() {
-      try {
-          const response = await fetchWithErrorHandling('/admin/api/produtos/categorias');
-          if (response && response.categorias) {
-              const select = document.getElementById('relatorioCategoria');
-              if (select) {
-                  // Manter o valor selecionado atual
-                  const selectedValue = select.value;
-                  
-                  // Limpar e adicionar novas opções
-                  select.innerHTML = '<option value="">Todas</option>';
-                  response.categorias.forEach(categoria => {
-                      const option = document.createElement('option');
-                      option.value = categoria;
-                      option.textContent = categoria;
-                      select.appendChild(option);
+                  response.contas.forEach(conta => {
+                      // Determinar o status correto para exibição
+                      let statusExibicao = conta.status;
+                      let badgeClass = '';
+                      
+                      // Se não for quitado, verificar se está atrasado
+                      if (statusExibicao !== 'quitado') {
+                          const dataVencimento = new Date(conta.data_vencimento);
+                          statusExibicao = dataVencimento >= hoje ? 'pendente' : 'atrasado';
+                      }
+                      
+                      // Formatar o status para exibição
+                      const statusFormatado = formatarStatus(statusExibicao);
+                      badgeClass = getStatusBadgeClass(statusExibicao);
+                      
+                      const tr = document.createElement('tr');
+                      tr.innerHTML = `
+                          <td>${conta.id}</td>
+                          <td>${conta.cliente.nome}</td>
+                          <td>${conta.cliente.documento || '-'}</td>
+                          <td>${conta.descricao || '-'}</td>
+                          <td>${formatarMoeda(conta.valor_original)}</td>
+                          <td>${formatarMoeda(conta.valor_aberto)}</td>
+                          <td>${formatarData(conta.data_emissao)}</td>
+                          <td>${formatarData(conta.data_vencimento)}</td>
+                          <td>
+                              <span class="badge ${badgeClass}">
+                                  ${statusFormatado}
+                              </span>
+                          </td>
+                          <td>
+                              <button class="btn-icon btn-info btn-detalhes-conta" data-id="${conta.id}" title="Ver detalhes">
+                                  <i class="fas fa-info-circle"></i>
+                              </button>
+                          </td>
+                      `;
+                      tbody.appendChild(tr);
                   });
-                  
-                  // Restaurar o valor selecionado se ainda existir
-                  if (selectedValue && response.categorias.includes(selectedValue)) {
-                      select.value = selectedValue;
-                  }
+              } else {
+                  tbody.innerHTML = '<tr><td colspan="10" class="text-center">Nenhuma conta encontrada</td></tr>';
               }
           }
       } catch (error) {
-          console.error('Erro ao carregar categorias:', error);
+          console.error('Erro ao carregar contas a receber:', error);
+          showFlashMessage('error', 'Erro ao carregar contas a receber');
       }
   }
 
-  // Adicione este código para configurar as datas padrão
-  function setupDefaultDates() {
+  // Funções auxiliares para formatação
+  function formatarData(dataString) {
+      if (!dataString) return '-';
+      const date = new Date(dataString);
+      return date.toLocaleDateString('pt-BR');
+  }
+
+  // Funções auxiliares para formatação
+  function formatarStatus(status) {
+      const statusMap = {
+          'pendente': 'Pendente',
+          'atrasado': 'Atrasado',
+          'quitado': 'Quitado',
+          'paid': 'Quitado',       // Para compatibilidade
+          'pending': 'Pendente',   // Para compatibilidade
+          'overdue': 'Atrasado'    // Para compatibilidade
+      };
+      return statusMap[status.toLowerCase()] || status;
+  }
+
+  function getStatusBadgeClass(status) {
+      const normalizedStatus = status.toLowerCase();
+      const classMap = {
+          'pendente': 'badge-warning',
+          'pending': 'badge-warning',
+          'atrasado': 'badge-danger',
+          'overdue': 'badge-danger',
+          'quitado': 'badge-success',
+          'paid': 'badge-success'
+      };
+      return classMap[normalizedStatus] || 'badge-secondary';
+  }
+
+  // Configurar datas padrão (30 dias atrás até hoje)
+  function setupContasReceberDates() {
       const hoje = new Date();
       const trintaDiasAtras = new Date();
       trintaDiasAtras.setDate(hoje.getDate() - 30);
       
-      const formatDate = (date) => {
-          return date.toISOString().split('T')[0];
-      };
-      
-      document.getElementById('relatorioDataFim').value = formatDate(hoje);
-      document.getElementById('relatorioDataInicio').value = formatDate(trintaDiasAtras);
+      document.getElementById('contasReceberDataFim').valueAsDate = hoje;
+      document.getElementById('contasReceberDataInicio').valueAsDate = trintaDiasAtras;
   }
 
-  // Adicione estes event listeners
+  // Event Listeners
   document.addEventListener('DOMContentLoaded', function() {
-      // Adicione esta linha no final da função setupNavigation()
-      if (document.getElementById('relatorio-saidas')) {
-          setupDefaultDates();
-          loadCategoriasProdutos();
-          loadRelatorioSaidasData();
+      if (document.getElementById('contas-receber')) {
+          setupContasReceberDates();
+          loadContasReceber();
       }
   });
 
-  // Event listeners específicos para o relatório
-  document.getElementById('filtrarRelatorio')?.addEventListener('click', loadRelatorioSaidasData);
-  document.getElementById('atualizarRelatorio')?.addEventListener('click', loadRelatorioSaidasData);
-  document.getElementById('exportarRelatorio')?.addEventListener('click', async function() {
-      try {
-          const dataInicio = document.getElementById('relatorioDataInicio')?.value;
-          const dataFim = document.getElementById('relatorioDataFim')?.value;
-          const categoria = document.getElementById('relatorioCategoria')?.value;
-          const limite = document.getElementById('relatorioLimite')?.value;
-          
-          const params = new URLSearchParams();
-          if (dataInicio) params.append('data_inicio', dataInicio);
-          if (dataFim) params.append('data_fim', dataFim);
-          if (categoria) params.append('categoria', categoria);
-          if (limite) params.append('limite', limite);
-          
-          // const url = `/admin/relatorios/vendas-produtos/exportar?${params.toString()}`;
-          // window.open(url, '_blank');
-      } catch (error) {
-          console.error('Erro ao exportar relatório:', error);
-          showFlashMessage('error', 'Erro ao exportar relatório');
-      }
-  document.getElementById('filtrarRelatorio')?.addEventListener('click', loadRelatorioSaidasData);
-  document.getElementById('atualizarRelatorio')?.addEventListener('click', loadRelatorioSaidasData);
-  document.getElementById('relatorioProdutoNome')?.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-          loadRelatorioSaidasData();
-      }
-  });
-  document.getElementById('relatorioProdutoCodigo')?.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-          loadRelatorioSaidasData();
-      }
-  });
-  });
-  // Adicione este código na seção de Event Listeners para o relatório
+  document.getElementById('filtrarContasReceber')?.addEventListener('click', loadContasReceber);
+
+  // Event listener para abrir modal de detalhes
   document.addEventListener('click', function(e) {
-      if (e.target.closest('.btn-info') && e.target.closest('.btn-info').getAttribute('title') === 'Ver detalhes') {
-          const produtoId = e.target.closest('.btn-info').getAttribute('data-id');
-          abrirModalDetalhesSaida(produtoId);
+      if (e.target.closest('.btn-detalhes-conta')) {
+          const contaId = e.target.closest('.btn-detalhes-conta').getAttribute('data-id');
+          abrirModalDetalhesConta(contaId);
       }
   });
 
-  async function abrirModalDetalhesSaida(produtoId) {
+  // Função para abrir modal de detalhes da conta
+  async function abrirModalDetalhesConta(contaId) {
       try {
-        // Obter os filtros atuais do relatório
-        const dataInicio = document.getElementById('relatorioDataInicio')?.value;
-        const dataFim = document.getElementById('relatorioDataFim')?.value;
-        
-        // Verificar se as datas são válidas antes de enviar
-        const params = new URLSearchParams();
-        params.append('produto_id', produtoId);
-        if (dataInicio) params.append('data_inicio', dataInicio);
-        if (dataFim) params.append('data_fim', dataFim);
-        
-        // Buscar os detalhes do produto e histórico de vendas
-        const response = await fetchWithErrorHandling(`/admin/relatorios/vendas-produtos/detalhes?${params.toString()}`);
-          if (response.success) {
-              const produto = response.produto;
-              const historico = response.historico;
-              
-              // Preencher os detalhes do produto
-              document.getElementById('detalhesProdutoNome').textContent = produto.produto_nome;
-              document.getElementById('detalhesProdutoCodigo').textContent = produto.produto_codigo || '-';
-              document.getElementById('detalhesProdutoTipo').textContent = produto.produto_tipo || '-';
-              document.getElementById('detalhesProdutoUnidade').textContent = produto.unidade;
-              document.getElementById('detalhesQuantidadeVendida').textContent = produto.quantidade_vendida.toFixed(3) + ' ' + produto.unidade;
-              document.getElementById('detalhesValorTotal').textContent = formatarMoeda(produto.valor_total_vendido);
-              document.getElementById('detalhesEstoqueAtual').textContent = produto.estoque_atual_loja.toFixed(3) + ' ' + produto.unidade;
-              document.getElementById('detalhesEstoqueMinimo').textContent = produto.estoque_minimo.toFixed(3) + ' ' + produto.unidade;
-              
-              // Status do estoque
-              const statusElement = document.getElementById('detalhesStatusEstoque');
-              statusElement.textContent = produto.status_estoque;
-              statusElement.className = 'value badge ' + (produto.status_estoque === 'CRÍTICO' ? 'badge-danger' : 'badge-success');
-              
-              document.getElementById('detalhesDiasRestantes').textContent = produto.dias_restantes || '-';
-              
-              // Preencher o histórico de vendas
-              const tbody = document.querySelector('#historicoVendasTable tbody');
-              tbody.innerHTML = '';
-              
-              historico.forEach(item => {
-                  const tr = document.createElement('tr');
-                  tr.innerHTML = `
-                      <td>${formatDateTime(item.data_emissao)}</td>
-                      <td>${item.quantidade.toFixed(3)} ${produto.unidade}</td>
-                      <td>${formatarMoeda(item.valor_unitario)}</td>
-                      <td>${formatarMoeda(item.valor_total)}</td>
-                      <td>${item.cliente_nome || 'Consumidor'}</td>
-                  `;
-                  tbody.appendChild(tr);
-              });
-              
-              openModal('detalhesSaidaModal');
-          } else {
-              showFlashMessage('error', response.message || 'Erro ao carregar detalhes do produto');
-          }
-      } catch (error) {
-          console.error('Erro ao abrir modal de detalhes:', error);
-          showFlashMessage('error', 'Erro ao carregar detalhes do produto');
-      }
-  }
-  async function registrarPagamento(contaId, valor, pagarTotal = false) {
-      try {
-          const dataPagamento = document.getElementById('dataPagamento').value;
-          const formaPagamento = document.getElementById('formaPagamento').value;
-          const caixaId = document.getElementById('caixaPagamento').value;
-          const observacoes = document.getElementById('observacaoPagamento').value;
+          // Fazer a requisição para obter os detalhes da conta
+          const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
           
-          if (!dataPagamento) {
-              showFlashMessage('error', 'Informe a data do pagamento');
-              return;
-          }
-          
-          if (!formaPagamento) {
-              showFlashMessage('error', 'Selecione a forma de pagamento');
-              return;
-          }
-          
-          if (valor <= 0 || isNaN(valor)) {
-              showFlashMessage('error', 'Informe um valor válido');
-              return;
-          }
-          
-          const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/pagar`, {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                  valor_pago: valor,
-                  forma_pagamento: formaPagamento,
-                  caixa_id: caixaId,
-                  observacoes: observacoes || ''
-              })
-          });
-          
-          if (response && response.success) {
-              showFlashMessage('success', 'Pagamento registrado com sucesso');
-              
-              // Atualizar os valores na interface
+          if (response) {
+              // 1. Preencher informações básicas da conta
+              document.getElementById('detalheClienteNome').textContent = response.cliente || '-';
+              document.getElementById('detalheClienteDocumento').textContent = response.cliente_documento || '-';
+              document.getElementById('detalheDescricao').textContent = response.descricao || '-';
+              document.getElementById('detalheValorTotal').textContent = formatarMoeda(response.valor_original);
               document.getElementById('detalheValorPendente').textContent = formatarMoeda(response.valor_aberto);
               
-              // Atualizar status
-              const statusElement = document.getElementById('detalheStatus');
-              if (statusElement) {
-                  statusElement.textContent = response.status === 'quitado' ? 'Quitado' : 'Pendente';
-                  statusElement.className = 'value badge ' + (response.status === 'quitado' ? 'badge-success' : 'badge-warning');
+              // 2. Determinar o status para exibição
+              const hoje = new Date();
+              const dataVencimento = new Date(response.data_vencimento.split('/').reverse().join('-'));
+              let statusExibicao = response.status.toLowerCase();
+              
+              // Se não estiver quitado, verificar se está atrasado
+              if (statusExibicao !== 'quitado') {
+                  statusExibicao = dataVencimento >= hoje ? 'pendente' : 'atrasado';
               }
               
-              // Recarregar a lista de pagamentos
-              await atualizarListaPagamentos(contaId);
+              // Atualizar o elemento de status no modal
+              const statusElement = document.getElementById('detalheStatus');
+              statusElement.textContent = formatarStatus(statusExibicao);
+              statusElement.className = 'value badge ' + getStatusBadgeClass(statusExibicao);
               
-              // Se foi pagamento total, fechar o modal
-              if (pagarTotal) {
-                  closeModal('detalhesContaModal');
+              // 3. Preencher a lista de pagamentos realizados
+              const pagamentosTbody = document.getElementById('detalhePagamentos');
+              pagamentosTbody.innerHTML = '';
+              
+              if (response.pagamentos && response.pagamentos.length > 0) {
+                  response.pagamentos.forEach(pagamento => {
+                      const tr = document.createElement('tr');
+                      tr.innerHTML = `
+                          <td>${pagamento.data_pagamento}</td>
+                          <td>${formatarMoeda(pagamento.valor_pago)}</td>
+                          <td>${formatarFormaPagamento(pagamento.forma_pagamento)}</td>
+                          <td>${pagamento.observacoes || '-'}</td>
+                      `;
+                      pagamentosTbody.appendChild(tr);
+                  });
+              } else {
+                  pagamentosTbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
+              }
+              
+              // 4. Preencher o select de caixas disponíveis
+              const caixaSelect = document.getElementById('caixaPagamento');
+              caixaSelect.innerHTML = '<option value="">Selecione</option>';
+              
+              if (response.caixas && response.caixas.length > 0) {
+                  response.caixas.forEach(caixa => {
+                      const option = document.createElement('option');
+                      option.value = caixa.id;
+                      
+                      // Formatando a data de abertura para exibição
+                      const dataAbertura = caixa.data_abertura.split('-').reverse().join('/');
+                      option.textContent = `${dataAbertura} - ${caixa.operador} (${caixa.status})`;
+                      
+                      // Selecionar automaticamente o caixa aberto do usuário atual, se existir
+                      if (caixa.status.toLowerCase() === 'aberto') {
+                          option.selected = true;
+                      }
+                      
+                      caixaSelect.appendChild(option);
+                  });
+              }
+              
+              // 5. Configurar o formulário de pagamento
+              document.getElementById('contaIdPagamento').value = contaId;
+              
+              // Definir data atual como padrão para pagamento
+              const hojeISO = new Date().toISOString().split('T')[0];
+              document.getElementById('dataPagamento').value = hojeISO;
+              
+              // Limpar campos do formulário
+              document.getElementById('valorPagamento').value = '';
+              document.getElementById('observacaoPagamento').value = '';
+              
+              // 6. Habilitar/desabilitar botões conforme o status
+              const btnPagarTotal = document.getElementById('btnPagarTotal');
+              if (response.valor_aberto <= 0 || statusExibicao === 'quitado') {
+                  btnPagarTotal.disabled = true;
+                  btnPagarTotal.classList.add('disabled');
+              } else {
+                  btnPagarTotal.disabled = false;
+                  btnPagarTotal.classList.remove('disabled');
+              }
+              
+              // 7. Abrir o modal
+              openModal('detalhesContaModal');
+          }
+      } catch (error) {
+          console.error('Erro ao abrir detalhes da conta:', error);
+          showFlashMessage('error', 'Erro ao carregar detalhes da conta');
+      }
+  }
+
+  // Event listeners para os botões de pagamento
+  document.getElementById('formPagamentoConta')?.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const contaId = document.getElementById('contaIdPagamento').value;
+      const valor = parseFloat(document.getElementById('valorPagamento').value);
+      
+      if (contaId && valor) {
+          registrarPagamento(contaId, valor);
+      }
+  });
+
+  document.getElementById('btnPagarTotal')?.addEventListener('click', function() {
+      const contaId = document.getElementById('contaIdPagamento').value;
+      const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
+      const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+      
+      if (contaId && valorPendente > 0) {
+          // Preencher o valor total no campo
+          document.getElementById('valorPagamento').value = valorPendente.toFixed(2);
+          
+          // Registrar o pagamento
+          registrarPagamento(contaId, valorPendente, true);
+      }
+  });
+
+  // Função para atualizar a lista de pagamentos
+  async function atualizarListaPagamentos(contaId) {
+      try {
+          const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
+          
+          if (response && response.pagamentos) {
+              const pagamentosTbody = document.getElementById('detalhePagamentos');
+              pagamentosTbody.innerHTML = '';
+              
+              if (response.pagamentos.length > 0) {
+                  response.pagamentos.forEach(pagamento => {
+                      const tr = document.createElement('tr');
+                      tr.innerHTML = `
+                          <td>${pagamento.data_pagamento}</td>
+                          <td>${formatarMoeda(pagamento.valor_pago)}</td>
+                          <td>${pagamento.forma_pagamento}</td>
+                          <td>${pagamento.observacoes || '-'}</td>
+                      `;
+                      pagamentosTbody.appendChild(tr);
+                  });
+              } else {
+                  pagamentosTbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
               }
           }
       } catch (error) {
-          console.error('Erro ao registrar pagamento:', error);
-          showFlashMessage('error', error.message || 'Erro ao registrar pagamento');
+          console.error('Erro ao atualizar lista de pagamentos:', error);
       }
   }
+  
   // ===== CAIXAS =====
   async function loadCaixasData() {
     try {

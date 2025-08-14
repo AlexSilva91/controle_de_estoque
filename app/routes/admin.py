@@ -3144,37 +3144,70 @@ def contas_receber():
     if cliente_documento:
         query = query.filter(Cliente.documento.ilike(f'%{cliente_documento}%'))
     if data_inicio:
-        query = query.filter(ContaReceber.data_vencimento >= datetime.strptime(data_inicio, '%Y-%m-%d'))
+        query = query.filter(ContaReceber.data_vencimento >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
     if data_fim:
-        query = query.filter(ContaReceber.data_vencimento <= datetime.strptime(data_fim, '%Y-%m-%d'))
+        query = query.filter(ContaReceber.data_vencimento <= datetime.strptime(data_fim, '%Y-%m-%d').date())
 
-    # Só filtra status se foi informado
-    if status == 'pendente':
-        query = query.filter(ContaReceber.status != StatusPagamento.quitado)
-    elif status == 'quitado':
-        query = query.filter(ContaReceber.status == StatusPagamento.quitado)
+    # Filtro de status aprimorado
+    if status:
+        hoje = datetime.now().date()
+        if status == 'pendente':
+            query = query.filter(
+                ContaReceber.status != StatusPagamento.quitado,
+                ContaReceber.data_vencimento >= hoje
+            )
+        elif status == 'atrasado':
+            query = query.filter(
+                ContaReceber.status != StatusPagamento.quitado,
+                ContaReceber.data_vencimento < hoje
+            )
+        elif status == 'quitado':
+            query = query.filter(ContaReceber.status == StatusPagamento.quitado)
+        elif status == 'parcial':
+            query = query.filter(
+                ContaReceber.status != StatusPagamento.quitado,
+                ContaReceber.valor_aberto > 0,
+                ContaReceber.valor_aberto < ContaReceber.valor_original
+            )
     
     contas = query.order_by(ContaReceber.data_vencimento.asc()).all()
 
-    contas_json = [{
-        'id': conta.id,
-        'cliente': {
-            'nome': conta.cliente.nome,
-            'documento': conta.cliente.documento
-        },
-        'descricao': conta.descricao,
-        'valor_original': float(conta.valor_original),
-        'valor_aberto': float(conta.valor_aberto),
-        'data_emissao': conta.data_emissao.strftime('%Y-%m-%d'),
-        'data_vencimento': conta.data_vencimento.strftime('%Y-%m-%d'),
-        'status': conta.status.value
-    } for conta in contas]
+    hoje_date = datetime.now().date()
+    contas_json = []
+    for conta in contas:
+        # Determinar o status baseado no status do banco e data de vencimento
+        if conta.status == StatusPagamento.quitado:
+            status_conta = 'quitado'
+        else:
+            # Converter data_vencimento para date se for datetime
+            data_vencimento = conta.data_vencimento.date() if isinstance(conta.data_vencimento, datetime) else conta.data_vencimento
+            
+            # Verificar se é um pagamento parcial
+            if conta.valor_aberto > 0 and conta.valor_aberto < conta.valor_original:
+                status_conta = 'parcial'
+            else:
+                status_conta = 'pendente' if data_vencimento >= hoje_date else 'atrasado'
+        
+        contas_json.append({
+            'id': conta.id,
+            'cliente': {
+                'nome': conta.cliente.nome,
+                'documento': conta.cliente.documento
+            },
+            'descricao': conta.descricao,
+            'valor_original': float(conta.valor_original),
+            'valor_aberto': float(conta.valor_aberto),
+            'data_emissao': conta.data_emissao.strftime('%Y-%m-%d'),
+            'data_vencimento': conta.data_vencimento.strftime('%Y-%m-%d'),
+            'status': status_conta,
+            'status_original': conta.status.value  # Manter o status original do banco
+        })
 
     return jsonify({
         'success': True,
         'contas': contas_json
     })
-
+    
 @admin_bp.route('/contas-receber/<int:id>/detalhes', methods=['GET'])
 @login_required
 @admin_required
