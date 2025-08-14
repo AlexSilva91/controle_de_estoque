@@ -566,27 +566,22 @@ class ContaReceber(Base):
         if valor_pago > self.valor_aberto:
             raise ValueError("Valor do pagamento excede o valor em aberto")
         
-        # Se não for fornecida data, usa a atual
-        if data_pagamento is None:
-            data_pagamento = datetime.now()
-        else:
-            # Garante que é um objeto datetime
-            if isinstance(data_pagamento, str):
-                data_pagamento = datetime.strptime(data_pagamento, '%Y-%m-%d')
+        # SEMPRE usa a data e hora atuais, ignorando qualquer parâmetro recebido
+        data_pagamento = datetime.now()
         
         # Atualiza as observações da conta se fornecidas
         if observacoes is not None and observacoes.strip() != '':
             if self.observacoes:
-                self.observacoes += f"\n{data_pagamento.strftime('%d/%m/%Y')}: {observacoes}"
+                self.observacoes += f"\n{data_pagamento.strftime('%d/%m/%Y %H:%M')}: {observacoes}"
             else:
-                self.observacoes = f"{data_pagamento.strftime('%d/%m/%Y')}: {observacoes}"
+                self.observacoes = f"{data_pagamento.strftime('%d/%m/%Y %H:%M')}: {observacoes}"
         
         pagamento = PagamentoContaReceber(
             conta_id=self.id,
             caixa_id=caixa_id,
             valor_pago=valor_pago,
             forma_pagamento=forma_pagamento,
-            observacoes=observacoes,  # Observações específicas deste pagamento
+            observacoes=observacoes,
             data_pagamento=data_pagamento
         )
         db.session.add(pagamento)

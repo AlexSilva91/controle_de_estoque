@@ -3259,19 +3259,10 @@ def pagar_conta_receber(id):
         # Observações
         observacoes = data.get('observacoes', '')
 
-        # Data do pagamento
-        data_pagamento_str = data.get('data_pagamento')
-        if data_pagamento_str:
-            try:
-                data_pagamento = datetime.strptime(data_pagamento_str, '%Y-%m-%d').date()
-                data_pagamento = datetime.combine(data_pagamento, datetime.min.time())
-            except ValueError as e:
-                print(f'Erro ao converter data: {e}')
-                return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
-        else:
-            data_pagamento = datetime.now()
+        # SEMPRE usa a data e hora atuais, ignorando qualquer entrada do frontend
+        data_pagamento = datetime.now()
 
-        # REGISTRAR PAGAMENTO (única chamada que já cria tudo necessário)
+        # REGISTRAR PAGAMENTO
         pagamento = conta.registrar_pagamento(
             valor_pago=valor_pago,
             forma_pagamento=forma_pagamento,
@@ -3286,7 +3277,7 @@ def pagar_conta_receber(id):
             'success': True,
             'valor_aberto': float(conta.valor_aberto),
             'status': conta.status.value,
-            'data_pagamento': data_pagamento.strftime('%Y-%m-%d')
+            'data_pagamento': data_pagamento.strftime('%Y-%m-%d %H:%M:%S')  # Retorna data e hora completas
         })
 
     except Exception as e:
