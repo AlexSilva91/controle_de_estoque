@@ -2,7 +2,7 @@ from datetime import datetime
 import enum
 from flask_login import UserMixin
 from sqlalchemy import (
-    Column, Integer, Numeric, String, Float, DateTime, Enum, ForeignKey, Text, DECIMAL,
+    Column, Integer, Numeric, String, DateTime, Enum, ForeignKey, Text, DECIMAL,
     UniqueConstraint, Boolean, Table
 )
 from sqlalchemy.orm import relationship
@@ -560,22 +560,32 @@ class ContaReceber(Base):
     nota_fiscal = relationship("NotaFiscal", back_populates="contas_receber")
     pagamentos = relationship("PagamentoContaReceber", back_populates="conta", cascade="all, delete-orphan")
 
-    def registrar_pagamento(self, valor_pago, forma_pagamento, caixa_id=None, observacoes=None):
+    def registrar_pagamento(self, valor_pago, forma_pagamento, caixa_id=None, observacoes=None, data_pagamento=None):
         if valor_pago <= 0:
             raise ValueError("Valor do pagamento deve ser positivo")
         if valor_pago > self.valor_aberto:
             raise ValueError("Valor do pagamento excede o valor em aberto")
+        
+        # Se não for fornecida data, usa a atual
+        if data_pagamento is None:
+            data_pagamento = datetime.now()
+        else:
+            # Garante que é um objeto datetime
+            if isinstance(data_pagamento, str):
+                data_pagamento = datetime.strptime(data_pagamento, '%Y-%m-%d')
         
         pagamento = PagamentoContaReceber(
             conta_id=self.id,
             caixa_id=caixa_id,
             valor_pago=valor_pago,
             forma_pagamento=forma_pagamento,
-            observacoes=observacoes
+            observacoes=observacoes,
+            data_pagamento=data_pagamento  # Usa a data fornecida
         )
         db.session.add(pagamento)
         
         self.valor_aberto -= valor_pago
+        self.data_pagamento = data_pagamento  # Atualiza também na conta
         self.status = StatusPagamento.quitado if self.valor_aberto == 0 else StatusPagamento.parcial
         
         financeiro = Financeiro(
@@ -585,8 +595,10 @@ class ContaReceber(Base):
             conta_receber_id=self.id,
             cliente_id=self.cliente_id,
             caixa_id=caixa_id,
-            descricao=f"Pagamento conta #{self.id}"
+            descricao=f"Pagamento conta #{self.id}",
+            data=data_pagamento  # Usa a mesma data
         )
+
         db.session.add(financeiro)
         
         return pagamento

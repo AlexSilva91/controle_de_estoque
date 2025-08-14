@@ -1570,6 +1570,29 @@
             </div>
         </div>
     </div>
+    <!-- Modal para Pagamento Parcial -->
+    <div id="modalPagamentoParcial" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5>Pagamento Parcial</h5>
+                    <button class="close-modal" data-close="modalPagamentoParcial">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="valorParcialInput">Valor a pagar:</label>
+                        <input type="number" id="valorParcialInput" class="form-control" step="0.01" min="0.01">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btnConfirmarParcial" class="btn btn-primary">Confirmar</button>
+                    <button class="btn btn-secondary close-modal" data-close="modalPagamentoParcial">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Desconto Produto -->
     <div id="descontoModal" class="modal">
         <div class="modal-overlay"></div>
