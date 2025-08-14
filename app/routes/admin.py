@@ -3135,7 +3135,7 @@ def contas_receber():
     cliente_documento = request.args.get('cliente_documento', '')
     data_inicio = request.args.get('data_inicio')
     data_fim = request.args.get('data_fim')
-    status = request.args.get('status', 'pendente')
+    status = request.args.get('status') 
 
     query = ContaReceber.query.join(Cliente)
     
@@ -3147,6 +3147,8 @@ def contas_receber():
         query = query.filter(ContaReceber.data_vencimento >= datetime.strptime(data_inicio, '%Y-%m-%d'))
     if data_fim:
         query = query.filter(ContaReceber.data_vencimento <= datetime.strptime(data_fim, '%Y-%m-%d'))
+
+    # Só filtra status se foi informado
     if status == 'pendente':
         query = query.filter(ContaReceber.status != StatusPagamento.quitado)
     elif status == 'quitado':
@@ -3154,23 +3156,20 @@ def contas_receber():
     
     contas = query.order_by(ContaReceber.data_vencimento.asc()).all()
 
-    # Monta JSON compatível com seu JS
-    contas_json = []
-    for conta in contas:
-        contas_json.append({
-            'id': conta.id,
-            'cliente': {
-                'nome': conta.cliente.nome,
-                'documento': conta.cliente.documento
-            },
-            'descricao': conta.descricao,
-            'valor_original': float(conta.valor_original),
-            'valor_aberto': float(conta.valor_aberto),
-            'data_emissao': conta.data_emissao.strftime('%Y-%m-%d'),
-            'data_vencimento': conta.data_vencimento.strftime('%Y-%m-%d'),
-            'status': conta.status.value
-        })
-    print(contas_json)
+    contas_json = [{
+        'id': conta.id,
+        'cliente': {
+            'nome': conta.cliente.nome,
+            'documento': conta.cliente.documento
+        },
+        'descricao': conta.descricao,
+        'valor_original': float(conta.valor_original),
+        'valor_aberto': float(conta.valor_aberto),
+        'data_emissao': conta.data_emissao.strftime('%Y-%m-%d'),
+        'data_vencimento': conta.data_vencimento.strftime('%Y-%m-%d'),
+        'status': conta.status.value
+    } for conta in contas]
+
     return jsonify({
         'success': True,
         'contas': contas_json
@@ -3245,7 +3244,8 @@ def pagar_conta_receber(id):
             valor_pago=valor_pago,
             forma_pagamento=forma_pagamento,
             caixa_id=caixa_id,
-            observacoes=observacoes
+            observacoes=observacoes,
+            data_pagamento=datetime.now()
         )
         
         db.session.commit()

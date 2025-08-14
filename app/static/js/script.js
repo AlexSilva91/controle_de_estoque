@@ -2087,7 +2087,67 @@ document.addEventListener('DOMContentLoaded', function() {
           showFlashMessage('error', 'Erro ao carregar detalhes do produto');
       }
   }
-
+  async function registrarPagamento(contaId, valor, pagarTotal = false) {
+      try {
+          const dataPagamento = document.getElementById('dataPagamento').value;
+          const formaPagamento = document.getElementById('formaPagamento').value;
+          const caixaId = document.getElementById('caixaPagamento').value;
+          const observacoes = document.getElementById('observacaoPagamento').value;
+          
+          if (!dataPagamento) {
+              showFlashMessage('error', 'Informe a data do pagamento');
+              return;
+          }
+          
+          if (!formaPagamento) {
+              showFlashMessage('error', 'Selecione a forma de pagamento');
+              return;
+          }
+          
+          if (valor <= 0 || isNaN(valor)) {
+              showFlashMessage('error', 'Informe um valor válido');
+              return;
+          }
+          
+          const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/pagar`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                  valor_pago: valor,
+                  forma_pagamento: formaPagamento,
+                  caixa_id: caixaId,
+                  observacoes: observacoes || ''
+              })
+          });
+          
+          if (response && response.success) {
+              showFlashMessage('success', 'Pagamento registrado com sucesso');
+              
+              // Atualizar os valores na interface
+              document.getElementById('detalheValorPendente').textContent = formatarMoeda(response.valor_aberto);
+              
+              // Atualizar status
+              const statusElement = document.getElementById('detalheStatus');
+              if (statusElement) {
+                  statusElement.textContent = response.status === 'quitado' ? 'Quitado' : 'Pendente';
+                  statusElement.className = 'value badge ' + (response.status === 'quitado' ? 'badge-success' : 'badge-warning');
+              }
+              
+              // Recarregar a lista de pagamentos
+              await atualizarListaPagamentos(contaId);
+              
+              // Se foi pagamento total, fechar o modal
+              if (pagarTotal) {
+                  closeModal('detalhesContaModal');
+              }
+          }
+      } catch (error) {
+          console.error('Erro ao registrar pagamento:', error);
+          showFlashMessage('error', error.message || 'Erro ao registrar pagamento');
+      }
+  }
   // ===== CAIXAS =====
   async function loadCaixasData() {
     try {
@@ -2529,6 +2589,9 @@ async function loadCaixaFinanceiro(caixaId) {
           if (conta.status === 'quitado') {
               statusClass = 'badge-success';
               statusText = 'Quitado';
+          } else if (conta.status === 'parcial') {
+              statusClass = 'badge-info';
+              statusText = 'Parcial';
           } else if (vencimento < hoje) {
               statusClass = 'badge-danger';
               statusText = 'Atrasado';
@@ -2593,6 +2656,19 @@ async function loadCaixaFinanceiro(caixaId) {
                   if (conta.status === 'quitado') {
                       statusElement.textContent = 'Quitado';
                       statusElement.className = 'value badge badge-success';
+
+                      // Ocultar área de pagamento
+                      const pagamentoSection = document.getElementById('areaPagamento');
+                      if (pagamentoSection) pagamentoSection.style.display = 'none';
+
+                  } else if (conta.status === 'parcial') {
+                      statusElement.textContent = 'Parcial';
+                      statusElement.className = 'value badge badge-info';
+
+                      // Mostrar área de pagamento
+                      const pagamentoSection = document.getElementById('areaPagamento');
+                      if (pagamentoSection) pagamentoSection.style.display = '';
+
                   } else {
                       const hoje = new Date();
                       const vencimento = new Date(conta.data_vencimento);
@@ -2604,6 +2680,10 @@ async function loadCaixaFinanceiro(caixaId) {
                           statusElement.textContent = 'Pendente';
                           statusElement.className = 'value badge badge-warning';
                       }
+
+                      // Mostrar área de pagamento
+                      const pagamentoSection = document.getElementById('areaPagamento');
+                      if (pagamentoSection) pagamentoSection.style.display = '';
                   }
               }
               
@@ -2616,7 +2696,7 @@ async function loadCaixaFinanceiro(caixaId) {
                       conta.pagamentos.forEach(pag => {
                           const tr = document.createElement('tr');
                           tr.innerHTML = `
-                              <td>${formatarData(pag.data_pagamento)}</td>
+                              <td>${pag.data_pagamento}</td>
                               <td>${formatarMoeda(pag.valor_pago)}</td>
                               <td>${formatarFormaPagamento(pag.forma_pagamento)}</td>
                               <td>${pag.observacoes || '-'}</td>
@@ -2631,9 +2711,9 @@ async function loadCaixaFinanceiro(caixaId) {
               }
 
               // Preencher select de caixas
-              const selectCaixa = document.getElementById('caixaPagamento'); // <-- ID correto do HTML
+              const selectCaixa = document.getElementById('caixaPagamento');
               if (selectCaixa) {
-                  selectCaixa.innerHTML = '<option value="">Selecione</option>'; // limpa opções antigas
+                  selectCaixa.innerHTML = '<option value="">Selecione</option>';
 
                   if (conta.caixas && conta.caixas.length > 0) {
                       conta.caixas.forEach(caixa => {
@@ -2662,7 +2742,7 @@ async function loadCaixaFinanceiro(caixaId) {
               if (valorPagamentoInput) {
                   valorPagamentoInput.value = conta.valor_aberto;
               }
-              
+              setupPagamentoButtons();
               openModal('detalhesContaModal');
           }
       } catch (error) {
@@ -2717,8 +2797,8 @@ async function loadCaixaFinanceiro(caixaId) {
       try {
           const dataPagamento = document.getElementById('dataPagamento').value;
           const formaPagamento = document.getElementById('formaPagamento').value;
-          const caixaId = document.getElementById('caixaPagamento').value;
-          const observacoes = document.getElementById('observacaoPagamento').value;
+          const caixaPagamento = document.getElementById('caixaPagamento').value;
+          const observacaoPagamento = document.getElementById('observacaoPagamento').value;
           
           // Validações
           if (!dataPagamento) {
@@ -2744,28 +2824,65 @@ async function loadCaixaFinanceiro(caixaId) {
               body: JSON.stringify({
                   valor_pago: valor,
                   forma_pagamento: formaPagamento,
-                  caixa_id: caixaId || null,
-                  observacoes: observacoes || ''
+                  caixa_id: caixaPagamento || null,
+                  observacoes: observacaoPagamento || '',
+                  data_pagamento: dataPagamento
               })
           });
           
           if (response && response.success) {
               showFlashMessage('success', 'Pagamento registrado com sucesso');
               
-              // Recarregar os dados
-              carregarContasReceber();
+              // Atualizar os valores na interface
+              document.getElementById('detalheValorPendente').textContent = formatarMoeda(response.valor_aberto);
+              
+              // Atualizar status
+              const statusElement = document.getElementById('detalheStatus');
+              if (statusElement) {
+                  statusElement.textContent = response.status === 'quitado' ? 'Quitado' : 'Pendente';
+                  statusElement.className = 'value badge ' + (response.status === 'quitado' ? 'badge-success' : 'badge-warning');
+              }
+              
+              // Recarregar a lista de pagamentos
+              await atualizarListaPagamentos(contaId);
               
               // Se foi pagamento total, fechar o modal
               if (pagarTotal) {
                   closeModal('detalhesContaModal');
-              } else {
-                  // Recarregar os detalhes da conta
-                  abrirModalDetalhesConta(contaId);
+                  // Recarregar a lista de contas
+                  carregarContasReceber();
               }
           }
       } catch (error) {
           console.error('Erro ao registrar pagamento:', error);
           showFlashMessage('error', error.message || 'Erro ao registrar pagamento');
+      }
+  }
+
+  // Função para atualizar a lista de pagamentos
+  async function atualizarListaPagamentos(contaId) {
+      try {
+          const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
+          
+          if (response && response.pagamentos) {
+              const tbody = document.getElementById('detalhePagamentos');
+              if (tbody) {
+                  tbody.innerHTML = '';
+                  
+                  response.pagamentos.forEach(pag => {
+                      const tr = document.createElement('tr');
+                      tr.innerHTML = `
+                          <td>${pag.data_pagamento}</td>
+                          <td>${formatarMoeda(pag.valor_pago)}</td>
+                          <td>${formatarFormaPagamento(pag.forma_pagamento)}</td>
+                          <td>${pag.observacoes || '-'}</td>
+                      `;
+                      tbody.appendChild(tr);
+                  });
+              }
+          }
+      } catch (error) {
+          console.error('Erro ao atualizar lista de pagamentos:', error);
       }
   }
 
@@ -2825,7 +2942,83 @@ async function loadCaixaFinanceiro(caixaId) {
               carregarContasReceber();
           }
       });
+      // Adicione isso no final do arquivo, dentro do DOMContentLoaded
+      document.addEventListener('DOMContentLoaded', function() {
+          // Formulário de pagamento
+          const formPagamento = document.getElementById('formPagamentoConta');
+          if (formPagamento) {
+              formPagamento.addEventListener('submit', function(e) {
+                  e.preventDefault();
+                  const contaId = document.getElementById('contaIdPagamento').value;
+                  const valor = parseFloat(document.getElementById('valorPagamento').value);
+                  
+                  if (isNaN(valor) || valor <= 0) {
+                      showFlashMessage('error', 'Informe um valor válido');
+                      return;
+                  }
+                  
+                  const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
+                  const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+                  
+                  if (valor > valorPendente) {
+                      showFlashMessage('error', 'Valor informado é maior que o valor pendente');
+                      return;
+                  }
+                  
+                  registrarPagamento(contaId, valor);
+              });
+          }
+          
+          // Botão de pagar total
+          const btnPagarTotal = document.getElementById('btnPagarTotal');
+          if (btnPagarTotal) {
+              btnPagarTotal.addEventListener('click', function() {
+                  const contaId = document.getElementById('contaIdPagamento').value;
+                  const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
+                  const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+                  
+                  if (confirm(`Confirmar pagamento total de ${valorPendenteText}?`)) {
+                      document.getElementById('valorPagamento').value = valorPendente;
+                      registrarPagamento(contaId, valorPendente, true);
+                  }
+              });
+          }
+      });
   });
+  // Adicione esta função para configurar os eventos dos botões de pagamento
+  function setupPagamentoButtons() {
+      // Botão Registrar Pagamento
+      const formPagamento = document.getElementById('formPagamentoConta');
+      if (formPagamento) {
+          formPagamento.addEventListener('submit', function(e) {
+              e.preventDefault();
+              const contaId = document.getElementById('contaIdPagamento').value;
+              const valor = parseFloat(document.getElementById('valorPagamento').value);
+              
+              if (isNaN(valor) || valor <= 0) {
+                  showFlashMessage('error', 'Informe um valor válido');
+                  return;
+              }
+              
+              registrarPagamento(contaId, valor);
+          });
+      }
+      
+      // Botão Pagar Total
+      const btnPagarTotal = document.getElementById('btnPagarTotal');
+      if (btnPagarTotal) {
+          btnPagarTotal.addEventListener('click', function() {
+              const contaId = document.getElementById('contaIdPagamento').value;
+              const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
+              const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+              
+              if (confirm(`Confirmar pagamento total de ${valorPendenteText}?`)) {
+                  document.getElementById('valorPagamento').value = valorPendente;
+                  registrarPagamento(contaId, valorPendente, true);
+              }
+          });
+      }
+  }
   // ===== MOVIMENTAÇÕES =====
   async function loadMovimentacoesData() {
     try {
