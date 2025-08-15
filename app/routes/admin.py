@@ -3147,26 +3147,58 @@ def relatorio_vendas_produtos_detalhes():
 @login_required
 @admin_required
 def contas_receber():
-    cliente_nome = request.args.get('cliente_nome', '')
-    cliente_documento = request.args.get('cliente_documento', '')
-    data_inicio = request.args.get('data_inicio')
-    data_fim = request.args.get('data_fim')
-    status = request.args.get('status') 
+    # Obter parâmetros de filtro
+    cliente_nome = request.args.get('cliente_nome', '').strip()
+    cliente_documento = request.args.get('cliente_documento', '').strip()
+    data_emissao_inicio = request.args.get('data_emissao_inicio')
+    data_emissao_fim = request.args.get('data_emissao_fim')
+    data_vencimento_inicio = request.args.get('data_vencimento_inicio')
+    data_vencimento_fim = request.args.get('data_vencimento_fim')
+    status = request.args.get('status')
 
+    # Query base
     query = ContaReceber.query.join(Cliente)
     
+    # Filtros
     if cliente_nome:
         query = query.filter(Cliente.nome.ilike(f'%{cliente_nome}%'))
+    
     if cliente_documento:
         query = query.filter(Cliente.documento.ilike(f'%{cliente_documento}%'))
-    if data_inicio:
-        query = query.filter(ContaReceber.data_vencimento >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
-    if data_fim:
-        query = query.filter(ContaReceber.data_vencimento <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+    
+    # Filtro por data de emissão
+    if data_emissao_inicio:
+        try:
+            data_emissao_inicio = datetime.strptime(data_emissao_inicio, '%Y-%m-%d').date()
+            query = query.filter(ContaReceber.data_emissao >= data_emissao_inicio)
+        except ValueError:
+            pass
+    
+    if data_emissao_fim:
+        try:
+            data_emissao_fim = datetime.strptime(data_emissao_fim, '%Y-%m-%d').date()
+            query = query.filter(ContaReceber.data_emissao <= data_emissao_fim)
+        except ValueError:
+            pass
+    
+    # Filtro por data de vencimento
+    if data_vencimento_inicio:
+        try:
+            data_vencimento_inicio = datetime.strptime(data_vencimento_inicio, '%Y-%m-%d').date()
+            query = query.filter(ContaReceber.data_vencimento >= data_vencimento_inicio)
+        except ValueError:
+            pass
+    
+    if data_vencimento_fim:
+        try:
+            data_vencimento_fim = datetime.strptime(data_vencimento_fim, '%Y-%m-%d').date()
+            query = query.filter(ContaReceber.data_vencimento <= data_vencimento_fim)
+        except ValueError:
+            pass
 
-    # Filtro de status aprimorado
+    # Filtro de status
+    hoje = datetime.now().date()
     if status:
-        hoje = datetime.now().date()
         if status == 'pendente':
             query = query.filter(
                 ContaReceber.status != StatusPagamento.quitado,
@@ -3186,24 +3218,12 @@ def contas_receber():
                 ContaReceber.valor_aberto < ContaReceber.valor_original
             )
     
+    # Executar query
     contas = query.order_by(ContaReceber.data_vencimento.asc()).all()
 
-    hoje_date = datetime.now().date()
+    # Serialização
     contas_json = []
     for conta in contas:
-        # Determinar o status baseado no status do banco e data de vencimento
-        if conta.status == StatusPagamento.quitado:
-            status_conta = 'quitado'
-        else:
-            # Converter data_vencimento para date se for datetime
-            data_vencimento = conta.data_vencimento.date() if isinstance(conta.data_vencimento, datetime) else conta.data_vencimento
-            
-            # Verificar se é um pagamento parcial
-            if conta.valor_aberto > 0 and conta.valor_aberto < conta.valor_original:
-                status_conta = 'parcial'
-            else:
-                status_conta = 'pendente' if data_vencimento >= hoje_date else 'atrasado'
-        
         contas_json.append({
             'id': conta.id,
             'cliente': {
@@ -3215,8 +3235,7 @@ def contas_receber():
             'valor_aberto': float(conta.valor_aberto),
             'data_emissao': conta.data_emissao.strftime('%Y-%m-%d'),
             'data_vencimento': conta.data_vencimento.strftime('%Y-%m-%d'),
-            'status': status_conta,
-            'status_original': conta.status.value  # Manter o status original do banco
+            'status': conta.status.value
         })
 
     return jsonify({

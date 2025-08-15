@@ -2811,24 +2811,36 @@ async function loadCaixaFinanceiro(caixaId) {
       try {
           const nome = document.getElementById('contasReceberClienteNome')?.value || '';
           const documento = document.getElementById('contasReceberClienteDocumento')?.value || '';
-          const dataInicio = document.getElementById('contasReceberDataInicio')?.value || '';
-          const dataFim = document.getElementById('contasReceberDataFim')?.value || '';
+          const dataEmissaoInicio = document.getElementById('contasReceberDataEmissaoInicio')?.value || '';
+          const dataEmissaoFim = document.getElementById('contasReceberDataEmissaoFim')?.value || '';
+          const dataVencimentoInicio = document.getElementById('contasReceberDataVencimentoInicio')?.value || '';
+          const dataVencimentoFim = document.getElementById('contasReceberDataVencimentoFim')?.value || '';
           const status = document.getElementById('contasReceberStatus')?.value || '';
           
           const params = new URLSearchParams();
           if (nome) params.append('cliente_nome', nome);
           if (documento) params.append('cliente_documento', documento);
-          if (dataInicio) params.append('data_inicio', dataInicio);
-          if (dataFim) params.append('data_fim', dataFim);
+          if (dataEmissaoInicio) params.append('data_emissao_inicio', dataEmissaoInicio);
+          if (dataEmissaoFim) params.append('data_emissao_fim', dataEmissaoFim);
+          if (dataVencimentoInicio) params.append('data_vencimento_inicio', dataVencimentoInicio);
+          if (dataVencimentoFim) params.append('data_vencimento_fim', dataVencimentoFim);
           if (status) params.append('status', status);
           
-          const response = await fetchWithErrorHandling(`/admin/contas-receber?${params.toString()}`);
+          const response = await fetch(`/admin/contas-receber?${params.toString()}`);
           
-          if (response && response.contas) {
-              contasReceberData = response.contas;
+          if (!response.ok) {
+              throw new Error('Erro na requisição');
+          }
+          
+          const data = await response.json();
+          
+          if (data && data.contas && data.contas.length > 0) {
+              contasReceberData = data.contas;
               atualizarTabelaContasReceber();
           } else {
-              showFlashMessage('warning', 'Nenhuma conta encontrada');
+              contasReceberData = [];
+              atualizarTabelaContasReceber();
+              showFlashMessage('warning', 'Nenhuma conta encontrada com os filtros aplicados');
           }
       } catch (error) {
           console.error('Erro ao carregar contas a receber:', error);
