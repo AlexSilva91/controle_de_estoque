@@ -2139,14 +2139,13 @@ document.addEventListener('DOMContentLoaded', function() {
       try {
           // Mostrar loading
           const tbody = document.querySelector('#tabelaRelatorio tbody');
-          tbody.innerHTML = '<tr><td colspan="10" class="text-center"><div class="spinner-border" role="status"><span class="sr-only">Carregando...</span></div></td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" class="text-center"><div class="spinner-border" role="status"><span class="sr-only">Carregando...</span></div></td></tr>';
           
           // Obter valores dos filtros
           const dataInicio = document.getElementById('relatorioDataInicio').value;
           const dataFim = document.getElementById('relatorioDataFim').value;
           const produtoNome = document.getElementById('relatorioProdutoNome').value;
           const produtoCodigo = document.getElementById('relatorioProdutoCodigo').value;
-          const categoria = document.getElementById('relatorioCategoria').value;
           
           // Construir parâmetros da URL
           const params = new URLSearchParams();
@@ -2154,7 +2153,6 @@ document.addEventListener('DOMContentLoaded', function() {
           if (dataFim) params.append('data_fim', dataFim);
           if (produtoNome) params.append('produto_nome', produtoNome);
           if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
-          if (categoria) params.append('categoria', categoria);
           
           // Limite padrão de 50 itens
           params.append('limite', 50);
@@ -2172,7 +2170,7 @@ document.addEventListener('DOMContentLoaded', function() {
       } catch (error) {
           console.error('Erro ao carregar relatório:', error);
           const tbody = document.querySelector('#tabelaRelatorio tbody');
-          tbody.innerHTML = '<tr><td colspan="10" class="text-center text-danger">Erro ao carregar dados do relatório</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">Erro ao carregar dados do relatório</td></tr>';
           showFlashMessage('error', 'Erro ao carregar relatório de saídas');
       }
   }
@@ -2374,27 +2372,6 @@ document.addEventListener('DOMContentLoaded', function() {
       // Abrir link de download
       window.open(`/relatorios/vendas-produtos/exportar?${params.toString()}`, '_blank');
   }
-
-  async function loadCategoriasProdutos() {
-      try {
-          const response = await fetchWithErrorHandling('/admin/api/produtos/categorias');
-          
-          if (response && response.categorias) {
-              const select = document.getElementById('relatorioCategoria');
-              select.innerHTML = '<option value="">Todas</option>';
-              
-              response.categorias.forEach(categoria => {
-                  const option = document.createElement('option');
-                  option.value = categoria;
-                  option.textContent = categoria;
-                  select.appendChild(option);
-              });
-          }
-      } catch (error) {
-          console.error('Erro ao carregar categorias:', error);
-      }
-  }
-
   // Funções auxiliares
   function formatarMoeda(valor) {
       return new Intl.NumberFormat('pt-BR', { 
