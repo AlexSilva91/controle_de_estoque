@@ -2286,7 +2286,7 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         if not caixa:
             raise Exception("Caixa não encontrado")
         operador_nome = caixa.operador.nome if caixa.operador else "Operador não identificado"
-
+        caixa_data = caixa.data_fechamento
         # --- Busca movimentações ---
         movimentacoes = session.query(Financeiro)\
             .filter_by(caixa_id=caixa_id)\
@@ -2450,10 +2450,9 @@ def gerar_pdf_caixa_financeiro(caixa_id):
 
         # --- Cabeçalho ---
         elements.append(Paragraph("RELATÓRIO FINANCEIRO", header_style))
-        elements.append(Paragraph(f"CAIXA #{caixa_id}", subtitle_style))
         elements.append(linha_separadora())
         elements.append(Spacer(1, 6))
-        data_relatorio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        data_relatorio = caixa_data
         elements.append(Paragraph(f"-> Data: {data_relatorio}", normal_style))
         elements.append(Paragraph(f"-> Operador: {operador_nome}", normal_style))
         elements.append(Spacer(1, 6))
