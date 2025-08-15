@@ -2809,20 +2809,22 @@ async function loadCaixaFinanceiro(caixaId) {
   // Função para carregar as contas a receber
   async function carregarContasReceber() {
       try {
-          const nome = document.getElementById('filtroClienteNome')?.value || '';
-          const documento = document.getElementById('filtroClienteDocumento')?.value || '';
-          const dataInicio = document.getElementById('filtroDataInicio')?.value || '';
-          const dataFim = document.getElementById('filtroDataFim')?.value || '';
+          const nome = document.getElementById('contasReceberClienteNome')?.value || '';
+          const documento = document.getElementById('contasReceberClienteDocumento')?.value || '';
+          const dataInicio = document.getElementById('contasReceberDataInicio')?.value || '';
+          const dataFim = document.getElementById('contasReceberDataFim')?.value || '';
+          const status = document.getElementById('contasReceberStatus')?.value || '';
           
           const params = new URLSearchParams();
           if (nome) params.append('cliente_nome', nome);
           if (documento) params.append('cliente_documento', documento);
           if (dataInicio) params.append('data_inicio', dataInicio);
           if (dataFim) params.append('data_fim', dataFim);
+          if (status) params.append('status', status);
           
           const response = await fetchWithErrorHandling(`/admin/contas-receber?${params.toString()}`);
           
-          if (response && response.contas) { // Alterado para verificar response.contas
+          if (response && response.contas) {
               contasReceberData = response.contas;
               atualizarTabelaContasReceber();
           } else {
@@ -2833,6 +2835,18 @@ async function loadCaixaFinanceiro(caixaId) {
           showFlashMessage('error', 'Erro ao carregar contas a receber');
       }
   }
+
+  // Adicionar este evento no DOMContentLoaded
+  document.getElementById('filtrarContasReceber')?.addEventListener('click', carregarContasReceber);
+
+  // Permitir filtrar com Enter nos campos de filtro
+  document.getElementById('contasReceberClienteNome')?.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') carregarContasReceber();
+  });
+
+  document.getElementById('contasReceberClienteDocumento')?.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') carregarContasReceber();
+  });
 
   // Função para atualizar a tabela de contas a receber
   function atualizarTabelaContasReceber() {

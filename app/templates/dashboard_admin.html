@@ -555,29 +555,38 @@
                 <!-- Contas a Receber -->
                 <div id="contas-receber" class="tab-content">
                     <div class="action-bar">
-                        <div class="filter-container">
-                            <div class="filter-group">
-                                <label for="contasReceberDataInicio">De:</label>
-                                <input type="date" id="contasReceberDataInicio" class="form-control">
-                            </div>
-                            <div class="filter-group">
-                                <label for="contasReceberDataFim">Até:</label>
-                                <input type="date" id="contasReceberDataFim" class="form-control">
-                            </div>
-                            <div class="filter-group">
-                                <label for="contasReceberStatus">Status:</label>
-                                <select id="contasReceberStatus" class="form-control">
-                                    <option value="">Todos</option>
-                                    <option value="pendente">Pendentes</option>
-                                    <option value="atrasado">Atrasados</option>
-                                    <option value="quitado">Quitados</option>
-                                </select>
-                            </div>
-                            <button class="btn btn-primary" id="filtrarContasReceber">
-                                <i class="fas fa-filter"></i>
-                                <span>Filtrar</span>
-                            </button>
+                      <div class="filter-container">
+                        <div class="filter-group">
+                            <label for="contasReceberClienteNome">Cliente:</label>
+                            <input type="text" id="contasReceberClienteNome" class="form-control" placeholder="Nome do cliente">
                         </div>
+                        <div class="filter-group">
+                            <label for="contasReceberClienteDocumento">Documento:</label>
+                            <input type="text" id="contasReceberClienteDocumento" class="form-control" placeholder="CPF/CNPJ">
+                        </div>
+                        <div class="filter-group">
+                            <label for="contasReceberDataInicio">De:</label>
+                            <input type="date" id="contasReceberDataInicio" class="form-control">
+                        </div>
+                        <div class="filter-group">
+                            <label for="contasReceberDataFim">Até:</label>
+                            <input type="date" id="contasReceberDataFim" class="form-control">
+                        </div>
+                        <div class="filter-group">
+                            <label for="contasReceberStatus">Status:</label>
+                            <select id="contasReceberStatus" class="form-control">
+                                <option value="">Todos</option>
+                                <option value="pendente">Pendentes</option>
+                                <option value="atrasado">Atrasados</option>
+                                <option value="quitado">Quitados</option>
+                                <option value="parcial">Parciais</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" id="filtrarContasReceber">
+                            <i class="fas fa-filter"></i>
+                            <span>Filtrar</span>
+                        </button>
+                    </div>
                         <div class="action-buttons">
                             <button class="btn btn-secondary" id="exportarContasReceber" aria-label="Exportar">
                                 <i class="fas fa-file-export"></i>
