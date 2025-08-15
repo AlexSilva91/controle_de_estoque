@@ -3061,34 +3061,38 @@ async function loadCaixaFinanceiro(caixaId) {
   }
 
   // Função para registrar pagamento
+  let pagamentoEmProcesso = false;
+
   async function registrarPagamento(contaId, valor, pagarTotal = false) {
+      if (pagamentoEmProcesso) return; // impede execução duplicada
+      pagamentoEmProcesso = true;
+
       try {
           const dataPagamento = document.getElementById('dataPagamento').value;
           const formaPagamento = document.getElementById('formaPagamento').value;
           const caixaPagamento = document.getElementById('caixaPagamento').value;
           const observacaoPagamento = document.getElementById('observacaoPagamento').value;
-          
+
           // Validações
           if (!dataPagamento) {
               showFlashMessage('error', 'Informe a data do pagamento');
+              pagamentoEmProcesso = false;
               return;
           }
-          
           if (!formaPagamento) {
               showFlashMessage('error', 'Selecione a forma de pagamento');
+              pagamentoEmProcesso = false;
               return;
           }
-          
           if (valor <= 0 || isNaN(valor)) {
               showFlashMessage('error', 'Informe um valor válido');
+              pagamentoEmProcesso = false;
               return;
           }
-          
+
           const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/pagar`, {
               method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json'
-              },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                   valor_pago: valor,
                   forma_pagamento: formaPagamento,
@@ -3097,35 +3101,56 @@ async function loadCaixaFinanceiro(caixaId) {
                   data_pagamento: dataPagamento
               })
           });
-          
+
           if (response && response.success) {
               showFlashMessage('success', 'Pagamento registrado com sucesso');
-              
-              // Atualizar os valores na interface
+
               document.getElementById('detalheValorPendente').textContent = formatarMoeda(response.valor_aberto);
-              
-              // Atualizar status
+
               const statusElement = document.getElementById('detalheStatus');
               if (statusElement) {
                   statusElement.textContent = response.status === 'quitado' ? 'Quitado' : 'Pendente';
                   statusElement.className = 'value badge ' + (response.status === 'quitado' ? 'badge-success' : 'badge-warning');
               }
-              
-              // Recarregar a lista de pagamentos
+
               await atualizarListaPagamentos(contaId);
-              
-              // Se foi pagamento total, fechar o modal
+
               if (pagarTotal) {
                   closeModal('detalhesContaModal');
-                  // Recarregar a lista de contas
                   carregarContasReceber();
               }
           }
       } catch (error) {
           console.error('Erro ao registrar pagamento:', error);
           showFlashMessage('error', error.message || 'Erro ao registrar pagamento');
+      } finally {
+          pagamentoEmProcesso = false;
       }
   }
+
+  // Evento submit do formulário de pagamento
+  document.getElementById('formPagamentoConta')?.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const contaId = document.getElementById('contaIdPagamento').value;
+      const valor = parseFloat(document.getElementById('valorPagamento').value);
+      if (contaId && valor) {
+          registrarPagamento(contaId, valor);
+      }
+  });
+
+  // Corrigido: prevenir submit duplo quando clicar em "Pagar Total"
+  document.getElementById('btnPagarTotal')?.addEventListener('click', function(e) {
+      e.preventDefault(); // impede que o botão envie o form automaticamente
+      const contaId = document.getElementById('contaIdPagamento').value;
+      const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
+      const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+      
+      if (contaId && valorPendente > 0) {
+          document.getElementById('valorPagamento').value = valorPendente.toFixed(2);
+          registrarPagamento(contaId, valorPendente, true);
+      }
+  });
+
 
   // Função para atualizar a lista de pagamentos
   async function atualizarListaPagamentos(contaId) {
