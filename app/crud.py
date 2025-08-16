@@ -32,7 +32,8 @@ from app.models.entities import (
     StatusNota,
     StatusPagamento,
     UnidadeMedida, 
-    FormaPagamento
+    FormaPagamento,
+    Produto
 )
 
 from app.utils.conversor_unidade import converter_quantidade
@@ -1575,7 +1576,7 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
 
 def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
     """
-    Estorna uma venda vinculando ao caixa original da nota fiscal
+    Estorna uma venda vinculando ao caixa original da nota fiscal e devolve os produtos ao estoque
     """
     try:
         # Busca a nota fiscal original
@@ -1622,6 +1623,19 @@ def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
                 sincronizado=False
             )
             db.session.add(item_estorno)
+            
+            # Atualiza o estoque do produto
+            produto = Produto.query.get(item.produto_id)
+            if produto:
+                # Devolve a quantidade ao estoque de origem
+                if item.estoque_origem == TipoEstoque.loja:
+                    produto.estoque_loja += item.quantidade
+                elif item.estoque_origem == TipoEstoque.deposito:
+                    produto.estoque_deposito += item.quantidade
+                elif item.estoque_origem == TipoEstoque.fabrica:
+                    produto.estoque_fabrica += item.quantidade
+                
+                produto.sincronizado = False
             
             # Cria movimentação de estoque reversa
             movimentacao = MovimentacaoEstoque(
