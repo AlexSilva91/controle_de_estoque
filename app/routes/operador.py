@@ -876,12 +876,12 @@ def gerar_pdf_vendas_dia():
     from reportlab.lib.pagesizes import portrait, mm
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageTemplate, Frame, NextPageTemplate, BaseDocTemplate, KeepTogether
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageTemplate, Frame, NextPageTemplate, BaseDocTemplate, KeepTogether, Image
     from reportlab.platypus.flowables import PageBreak
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
     from io import BytesIO
-    from flask import send_file, request, jsonify
+    from flask import send_file, request, jsonify, current_app
     from datetime import datetime
     from sqlalchemy import func
     import os
@@ -890,17 +890,17 @@ def gerar_pdf_vendas_dia():
     LARGURA_IMPRESSORA = 72 * mm
     ALTURA_IMPRESSORA = 1000 * mm
     MARGEM = 2 * mm
-    TAMANHO_FONTE = 6
+    TAMANHO_FONTE = 7
     ESPACAMENTO = 1.2
 
     try:
         pdfmetrics.registerFont(TTFont('RobotoCondensed', 'RobotoCondensed-Regular.ttf'))
         pdfmetrics.registerFont(TTFont('RobotoCondensed-Bold', 'RobotoCondensed-Bold.ttf'))
-        FONTE_NORMAL = 'RobotoCondensed'
-        FONTE_NEGRITO = 'RobotoCondensed-Bold'
+        FONTE_NORMAL = 'RobotoCondensed-Bold'  # Alterado para negrito como padrão
+        FONTE_NEGRITO = 'RobotoCondensed-Bold'  # Mantém o negrito
     except:
-        FONTE_NORMAL = 'Courier'
-        FONTE_NEGRITO = 'Courier-Bold'
+        FONTE_NORMAL = 'Courier-Bold'  # Alterado para negrito
+        FONTE_NEGRITO = 'Courier-Bold'  # Mantém o negrito
 
     # Obter caixa aberto do operador atual
     caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
@@ -963,13 +963,29 @@ def gerar_pdf_vendas_dia():
 
     buffer = BytesIO()
 
+    # Definir o caminho absoluto para a imagem
+    caminho_imagem = 'app/static/assets/logo.jpeg'
+    
+    # Verificar se a imagem existe
+    if not os.path.exists(caminho_imagem):
+        return jsonify({'success': False, 'message': 'Arquivo de logo não encontrado'}), 400
+
     class PDFComRodape(BaseDocTemplate):
         def __init__(self, filename, **kw):
             super().__init__(filename, **kw)
             template = PageTemplate('normal', [
                 Frame(MARGEM, MARGEM, LARGURA_IMPRESSORA - 2 * MARGEM,
-                      ALTURA_IMPRESSORA - 2 * MARGEM - 15 * mm, id='F1')])
+                      ALTURA_IMPRESSORA - 2 * MARGEM - 15 * mm - 22*mm, # Subtraindo altura da imagem + espaço
+                      id='F1')],
+                      onPage=self.draw_header)
             self.addPageTemplates(template)
+
+        def draw_header(self, canvas, doc):
+            """Desenha a imagem diretamente no topo de cada página"""
+            canvas.drawImage(caminho_imagem,
+                           0, ALTURA_IMPRESSORA - 20*mm,  # Posição Y no topo absoluto
+                           width=LARGURA_IMPRESSORA,
+                           height=20*mm)
 
         def afterFlowable(self, flowable):
             if hasattr(flowable, 'keepWithNext'):
@@ -981,7 +997,7 @@ def gerar_pdf_vendas_dia():
                 f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')} • Página {self.page}",
                 ParagraphStyle(
                     name='Rodape',
-                    fontName=FONTE_NORMAL,
+                    fontName=FONTE_NEGRITO,  # Alterado para negrito
                     fontSize=TAMANHO_FONTE - 1,
                     alignment=1,
                     spaceBefore=5
@@ -1004,7 +1020,7 @@ def gerar_pdf_vendas_dia():
 
     def criar_estilo(nome, **kwargs):
         defaults = {
-            'fontName': FONTE_NORMAL,
+            'fontName': FONTE_NEGRITO,
             'fontSize': TAMANHO_FONTE,
             'leading': TAMANHO_FONTE * ESPACAMENTO,
             'spaceAfter': 4,
@@ -1014,12 +1030,12 @@ def gerar_pdf_vendas_dia():
         return ParagraphStyle(nome, parent=styles['Normal'], **defaults)
 
     estilos = {
-        'titulo': criar_estilo('Titulo', fontName=FONTE_NEGRITO, fontSize=10, alignment=1, spaceAfter=8),
-        'subtitulo': criar_estilo('Subtitulo', fontName=FONTE_NEGRITO, alignment=1, spaceAfter=6),
+        'titulo': criar_estilo('Titulo', fontSize=10, alignment=1, spaceAfter=8),
+        'subtitulo': criar_estilo('Subtitulo', alignment=1, spaceAfter=6),
         'normal': criar_estilo('Normal'),
-        'negrito': criar_estilo('Negrito', fontName=FONTE_NEGRITO),
+        'negrito': criar_estilo('Negrito'),
         'valor': criar_estilo('Valor', alignment=2),
-        'valor_negrito': criar_estilo('ValorNegrito', fontName=FONTE_NEGRITO, alignment=2),
+        'valor_negrito': criar_estilo('ValorNegrito', alignment=2),
         'estorno': criar_estilo('Estorno', textColor=colors.black, backColor=colors.whitesmoke),
         'rodape': criar_estilo('Rodape', fontSize=TAMANHO_FONTE - 1, alignment=1)
     }
@@ -1042,7 +1058,7 @@ def gerar_pdf_vendas_dia():
                     texto = str(celula)
                     if quebrar_linhas and len(texto) > max_chars:
                         texto = '<br/>'.join([texto[j:j + max_chars] for j in range(0, len(texto), max_chars)])
-                    estilo_celula = estilos['negrito'] if i == 0 and linha == dados[0] else estilos['normal']
+                    estilo_celula = estilos['negrito']
                     linha_formatada.append(Paragraph(texto, estilo_celula))
             dados_formatados.append(linha_formatada)
 
@@ -1052,7 +1068,7 @@ def gerar_pdf_vendas_dia():
 
         tabela = Table(dados_formatados, colWidths=colWidths, hAlign='LEFT')
         estilo_base = [
-            ('FONTNAME', (0, 0), (-1, -1), FONTE_NORMAL),
+            ('FONTNAME', (0, 0), (-1, -1), FONTE_NEGRITO),
             ('FONTSIZE', (0, 0), (-1, -1), TAMANHO_FONTE),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('LEADING', (0, 0), (-1, -1), TAMANHO_FONTE * ESPACAMENTO),
@@ -1074,7 +1090,7 @@ def gerar_pdf_vendas_dia():
         tabela.setStyle(TableStyle(estilo_base))
         return KeepTogether(tabela)
 
-    # Cabeçalho
+    elements.append(Spacer(1, -45))
     elements.append(Paragraph("RELATÓRIO DIÁRIO DE VENDAS", estilos['titulo']))
     elements.append(Spacer(1, 10))
     info_cabecalho = [
