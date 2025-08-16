@@ -212,6 +212,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadProducts();
         await checkCaixaStatus();
         setupEventListeners();
+        setupDiscountControls();
         document.addEventListener('keydown', handleKeyDown);
         setInterval(() => loadProducts(true), 10000);
         setInterval(() => updateBalance(true), 10000);
@@ -924,51 +925,49 @@ function updateAllProductDiscounts() {
 
 function applyManualDiscount() {
     try {
+        // 1. Obtém os valores dos campos
         const discountType = document.getElementById('discount-type').value;
         const discountValueInput = document.getElementById('discount-value').value.trim();
         
-        if (!discountValueInput) {
-            throw new Error('Digite um valor para o desconto');
-        }
-
+        // 2. Validações básicas
+        if (!discountValueInput) throw new Error('Digite um valor para o desconto');
+        
         const discountValue = parseFloat(discountValueInput.replace(',', '.'));
-        if (isNaN(discountValue)) {
-            throw new Error('Valor de desconto inválido. Use apenas números.');
-        }
-
+        if (isNaN(discountValue)) throw new Error('Valor inválido. Use apenas números.');
+        
+        // 3. Calcula o total atual SEM descontos
+        const subtotal = selectedProducts.reduce((sum, product) => {
+            return sum + (product.originalPrice * product.quantity);
+        }, 0);
+        
+        // 4. Validações específicas
         if (discountType === 'percentual') {
             if (discountValue <= 0 || discountValue > 100) {
                 throw new Error('Percentual deve ser entre 0.01% e 100%');
             }
         } else {
-            if (discountValue <= 0) {
-                throw new Error('Valor fixo deve ser maior que zero');
-            }
-            const minProductPrice = Math.min(...selectedProducts.map(p => p.originalPrice));
-            if (discountValue >= minProductPrice) {
-                throw new Error(`Desconto não pode ser maior que ${formatCurrency(minProductPrice)}`);
-            }
+            if (discountValue <= 0) throw new Error('Valor fixo deve ser maior que zero');
+            if (discountValue >= subtotal) throw new Error(`Desconto não pode ser maior que ${formatCurrency(subtotal)}`);
         }
-
-        if (selectedProducts.length === 0) {
-            throw new Error('Adicione produtos antes de aplicar desconto');
+        
+        // 5. Calcula o valor total do desconto
+        let totalDiscount = 0;
+        if (discountType === 'percentual') {
+            totalDiscount = subtotal * (discountValue / 100);
+        } else {
+            totalDiscount = discountValue;
         }
-
+        
+        // 6. Distribui o desconto proporcionalmente entre os produtos
         selectedProducts = selectedProducts.map(product => {
-            let newPrice = product.originalPrice;
-            let discountAmount = 0;
-            
-            if (discountType === 'percentual') {
-                discountAmount = product.originalPrice * (discountValue / 100);
-                newPrice = product.originalPrice - discountAmount;
-            } else {
-                discountAmount = Math.min(discountValue, product.originalPrice);
-                newPrice = product.originalPrice - discountAmount;
-            }
+            const productTotal = product.originalPrice * product.quantity;
+            const discountRatio = productTotal / subtotal;
+            const productDiscount = totalDiscount * discountRatio;
+            const discountedPrice = product.originalPrice - (productDiscount / product.quantity);
             
             return {
                 ...product,
-                price: newPrice,
+                price: discountedPrice,
                 hasDiscount: true,
                 discountInfo: {
                     tipo: discountType,
@@ -981,16 +980,16 @@ function applyManualDiscount() {
                 }
             };
         });
-
+        
+        // 7. Atualiza a interface
         renderProductsList();
         calculateSaleTotal();
-        showMessage('Desconto aplicado com sucesso!');
+        showMessage(`Desconto de ${formatCurrency(totalDiscount)} aplicado ao total!`);
         document.getElementById('discount-value').value = '';
+        
     } catch (error) {
         showMessage(error.message, 'error');
-        return false;
     }
-    return true;
 }
 
 function renderProductsList() {
@@ -2685,7 +2684,109 @@ function setupEventListeners() {
         }
     });
 }
+// ==================== FUNÇÕES DE DESCONTO MANUAL ====================
+function setupDiscountControls() {
+    const applyDiscountBtn = document.getElementById('apply-discount-btn');
+    if (applyDiscountBtn) {
+        applyDiscountBtn.addEventListener('click', applyManualDiscount);
+    }
+    
+    // Adiciona listener para tecla Enter no campo de valor do desconto
+    const discountValueInput = document.getElementById('discount-value');
+    if (discountValueInput) {
+        discountValueInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                applyManualDiscount();
+            }
+        });
+    }
+}
 
+function applyManualDiscount() {
+    try {
+        // 1. Obtém os valores dos campos
+        const discountType = document.getElementById('discount-type').value;
+        const discountValueInput = document.getElementById('discount-value').value.trim();
+        
+        // 2. Validações básicas
+        if (!discountValueInput) {
+            throw new Error('Digite um valor para o desconto');
+        }
+
+        // Converte o valor para número
+        const discountValue = parseFloat(discountValueInput.replace(',', '.'));
+        if (isNaN(discountValue)) {
+            throw new Error('Valor de desconto inválido. Use apenas números.');
+        }
+
+        // 3. Calcula o subtotal atual (sem descontos)
+        const subtotal = selectedProducts.reduce((sum, product) => {
+            return sum + (product.originalPrice * product.quantity);
+        }, 0);
+
+        // 4. Validações específicas por tipo de desconto
+        if (discountType === 'percentual') {
+            if (discountValue <= 0 || discountValue > 100) {
+                throw new Error('Percentual deve ser entre 0.01% e 100%');
+            }
+        } else { // desconto fixo
+            if (discountValue <= 0) {
+                throw new Error('Valor fixo deve ser maior que zero');
+            }
+            
+            if (discountValue >= subtotal) {
+                throw new Error(`Desconto não pode ser maior que ${formatCurrency(subtotal)}`);
+            }
+        }
+
+        // 5. Verifica se há produtos na venda
+        if (selectedProducts.length === 0) {
+            throw new Error('Adicione produtos antes de aplicar desconto');
+        }
+
+        // 6. Calcula o valor total do desconto
+        let totalDiscount = 0;
+        if (discountType === 'percentual') {
+            totalDiscount = subtotal * (discountValue / 100);
+        } else {
+            totalDiscount = discountValue;
+        }
+
+        // 7. Calcula o fator de ajuste para manter a proporção dos produtos
+        const totalWithDiscount = subtotal - totalDiscount;
+        const adjustmentFactor = totalWithDiscount / subtotal;
+
+        // 8. Aplica o fator de ajuste para manter a proporção entre os produtos
+        selectedProducts = selectedProducts.map(product => {
+            const newPrice = product.originalPrice * adjustmentFactor;
+            
+            return {
+                ...product,
+                price: newPrice,
+                hasDiscount: true,
+                discountInfo: {
+                    tipo: discountType,
+                    valor: discountValue,
+                    valor_aplicado: discountType === 'percentual' 
+                        ? `${discountValue}%` 
+                        : formatCurrency(discountValue),
+                    identificador: 'MANUAL',
+                    descricao: 'Desconto manual aplicado'
+                }
+            };
+        });
+
+        // 9. Atualiza a interface
+        renderProductsList();
+        calculateSaleTotal();
+        
+        // 10. Mostra mensagem de sucesso e limpa o campo
+        showMessage(`Desconto de ${formatCurrency(totalDiscount)} aplicado com sucesso!`);
+        document.getElementById('discount-value').value = '';
+    } catch (error) {
+        showMessage(error.message, 'error');
+    }
+}
 // ==================== FUNÇÕES PARA MÚLTIPLAS FORMAS DE PAGAMENTO ====================
 function addPaymentMethod() {
     const paymentMethodSelect = document.querySelector('.payment-method-select');
