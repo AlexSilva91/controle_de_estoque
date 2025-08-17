@@ -1736,19 +1736,35 @@ def obter_detalhes_vendas_dia(data=None, caixa_id=None, operador_id=None):
             # Obtém os pagamentos da nota fiscal
             pagamentos = []
             total_pagamentos = 0.0
+            
+            # CORREÇÃO PRINCIPAL: Processa pagamentos registrados na tabela PagamentoNotaFiscal
             for pagamento in nota.pagamentos:
+                forma_pagamento_str = pagamento.forma_pagamento.value
+                valor_pagamento = float(pagamento.valor)
+                
                 pagamentos.append({
-                    'forma_pagamento': pagamento.forma_pagamento.value,
-                    'valor': float(pagamento.valor),
+                    'forma_pagamento': forma_pagamento_str,
+                    'valor': valor_pagamento,
                     'data': pagamento.data.isoformat()
                 })
-                total_pagamentos += float(pagamento.valor)
+                total_pagamentos += valor_pagamento
+                
+                # CORREÇÃO: Soma por forma de pagamento APENAS se não for estorno (valor positivo)
+                if valor_pagamento > 0:
+                    if forma_pagamento_str not in consolidado['por_forma_pagamento']:
+                        consolidado['por_forma_pagamento'][forma_pagamento_str] = 0.0
+                    consolidado['por_forma_pagamento'][forma_pagamento_str] += valor_pagamento
             
-            # Forma de pagamento (para compatibilidade com versões antigas)
-            forma_pagamento = nota.forma_pagamento.value if nota.forma_pagamento else 'nao_informado'
-            if forma_pagamento not in consolidado['por_forma_pagamento']:
-                consolidado['por_forma_pagamento'][forma_pagamento] = 0.0
-            consolidado['por_forma_pagamento'][forma_pagamento] += float(nota.valor_total)
+            # Se não houver pagamentos registrados, usa a forma de pagamento da nota (compatibilidade)
+            if not nota.pagamentos:
+                forma_pagamento = nota.forma_pagamento.value if nota.forma_pagamento else 'nao_informado'
+                valor_nota = float(nota.valor_total)
+                
+                # CORREÇÃO: Soma APENAS se não for estorno (valor positivo)
+                if valor_nota > 0:
+                    if forma_pagamento not in consolidado['por_forma_pagamento']:
+                        consolidado['por_forma_pagamento'][forma_pagamento] = 0.0
+                    consolidado['por_forma_pagamento'][forma_pagamento] += valor_nota
             
             # Adiciona detalhes da venda
             venda_info = {
@@ -1758,7 +1774,7 @@ def obter_detalhes_vendas_dia(data=None, caixa_id=None, operador_id=None):
                 'operador': nota.operador.nome,
                 'valor_total': float(nota.valor_total),
                 'valor_desconto': float(nota.valor_desconto) if nota.valor_desconto else 0.0,
-                'forma_pagamento': forma_pagamento,  # Mantido para compatibilidade
+                'forma_pagamento': nota.forma_pagamento.value if nota.forma_pagamento else 'nao_informado',  # Mantido para compatibilidade
                 'a_prazo': nota.a_prazo,
                 'pagamentos': pagamentos,  # Novo campo com detalhes dos pagamentos
                 'total_pagamentos': total_pagamentos,  # Soma dos valores pagos
@@ -1827,6 +1843,7 @@ def obter_detalhes_vendas_dia(data=None, caixa_id=None, operador_id=None):
                 'pagamento_id': mov.pagamento_id
             })
         
+        print(f'Dados corrigidos: {consolidado}')
         return {
             'success': True,
             'data': consolidado,

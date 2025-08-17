@@ -896,11 +896,11 @@ def gerar_pdf_vendas_dia():
     try:
         pdfmetrics.registerFont(TTFont('RobotoCondensed', 'RobotoCondensed-Regular.ttf'))
         pdfmetrics.registerFont(TTFont('RobotoCondensed-Bold', 'RobotoCondensed-Bold.ttf'))
-        FONTE_NORMAL = 'RobotoCondensed-Bold'  # Alterado para negrito como padrão
-        FONTE_NEGRITO = 'RobotoCondensed-Bold'  # Mantém o negrito
+        FONTE_NORMAL = 'RobotoCondensed-Bold'
+        FONTE_NEGRITO = 'RobotoCondensed-Bold'
     except:
-        FONTE_NORMAL = 'Courier-Bold'  # Alterado para negrito
-        FONTE_NEGRITO = 'Courier-Bold'  # Mantém o negrito
+        FONTE_NORMAL = 'Courier-Bold'
+        FONTE_NEGRITO = 'Courier-Bold'
 
     # Obter caixa aberto do operador atual
     caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
@@ -928,38 +928,11 @@ def gerar_pdf_vendas_dia():
         dados = {
             'vendas': [],
             'total_descontos': 0,
-            'total_saidas': 0
+            'total_saidas': 0,
+            'por_forma_pagamento': {}
         }
     else:
         dados = resultado['data']
-
-    # Inicializar métricas de pagamento mesmo sem vendas
-    metricas_pagamento = {}
-
-    # Processar métricas de pagamento apenas se houver vendas
-    if 'vendas' in dados and dados['vendas']:
-        for venda in dados['vendas']:
-            # Verificar se há pagamentos registrados na tabela PagamentoNotaFiscal
-            if 'pagamentos' in venda and venda['pagamentos']:
-                for pagamento in venda['pagamentos']:
-                    forma = pagamento['forma_pagamento']
-                    valor = pagamento['valor']
-
-                    if forma not in metricas_pagamento:
-                        metricas_pagamento[forma] = {'transacoes': 0, 'total': 0}
-
-                    metricas_pagamento[forma]['transacoes'] += 1
-                    metricas_pagamento[forma]['total'] += valor
-            else:
-                # Caso não haja pagamentos registrados, usar a forma de pagamento da venda
-                forma = venda['forma_pagamento']
-                total = venda['valor_total']
-
-                if forma not in metricas_pagamento:
-                    metricas_pagamento[forma] = {'transacoes': 0, 'total': 0}
-
-                metricas_pagamento[forma]['transacoes'] += 1
-                metricas_pagamento[forma]['total'] += total
 
     buffer = BytesIO()
 
@@ -975,7 +948,7 @@ def gerar_pdf_vendas_dia():
             super().__init__(filename, **kw)
             template = PageTemplate('normal', [
                 Frame(MARGEM, MARGEM, LARGURA_IMPRESSORA - 2 * MARGEM,
-                      ALTURA_IMPRESSORA - 2 * MARGEM - 15 * mm - 22*mm, # Subtraindo altura da imagem + espaço
+                      ALTURA_IMPRESSORA - 2 * MARGEM - 15 * mm - 22*mm,
                       id='F1')],
                       onPage=self.draw_header)
             self.addPageTemplates(template)
@@ -983,7 +956,7 @@ def gerar_pdf_vendas_dia():
         def draw_header(self, canvas, doc):
             """Desenha a imagem diretamente no topo de cada página"""
             canvas.drawImage(caminho_imagem,
-                           0, ALTURA_IMPRESSORA - 20*mm,  # Posição Y no topo absoluto
+                           0, ALTURA_IMPRESSORA - 20*mm,
                            width=LARGURA_IMPRESSORA,
                            height=20*mm)
 
@@ -997,7 +970,7 @@ def gerar_pdf_vendas_dia():
                 f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')} • Página {self.page}",
                 ParagraphStyle(
                     name='Rodape',
-                    fontName=FONTE_NEGRITO,  # Alterado para negrito
+                    fontName=FONTE_NEGRITO,
                     fontSize=TAMANHO_FONTE - 1,
                     alignment=1,
                     spaceBefore=5
@@ -1117,7 +1090,7 @@ def gerar_pdf_vendas_dia():
     # Resumo Financeiro
     total_vendas_positivas = sum(v['valor_total'] for v in dados['vendas'] if 'valor_total' in v and v['valor_total'] > 0) if 'vendas' in dados else 0
     total_estornos = sum(abs(v['valor_total']) for v in dados['vendas'] if 'valor_total' in v and v['valor_total'] < 0) if 'vendas' in dados else 0
-    total_liquido = total_vendas_positivas - total_estornos - dados.get('total_saidas', 0)
+    total_liquido = total_vendas_positivas - dados.get('total_saidas', 0)
     
     # Calcular total a prazo pendente
     total_a_prazo_pendente = 0
@@ -1136,7 +1109,7 @@ def gerar_pdf_vendas_dia():
         ["Total Estornos", total_estornos],
         ["Total Descontos", dados.get('total_descontos', 0)],
         ["Total Entradas", total_vendas_positivas],
-        ["Total Saídas", dados.get('total_saidas', 0)-total_estornos],
+        ["Total Saídas", dados.get('total_saidas', 0)],
         ["Total a Prazo Pendente", total_a_prazo_pendente],
         ["Saldo Líquido", total_liquido]
     ]
@@ -1150,25 +1123,55 @@ def gerar_pdf_vendas_dia():
     ))
     elements.append(Spacer(1, 10))
 
-    # Formas de Pagamento (agora usando dados da tabela PagamentoNotaFiscal)
+    # CORREÇÃO PRINCIPAL: Formas de Pagamento usando os dados corretos da função obter_detalhes_vendas_dia
     elements.append(Paragraph("FORMAS DE PAGAMENTO", estilos['subtitulo']))
     elements.append(Spacer(1, 5))
     dados_pagamentos = [["Forma de Pagamento", "Qtd", "Total"]]
     total_geral_pagamentos = 0
     total_geral_transacoes = 0
     
-    if metricas_pagamento:
-        formas_ordenadas = sorted(metricas_pagamento.items(), key=lambda x: x[1]['total'], reverse=True)
-        for forma, dados_forma in formas_ordenadas:
-            forma_nome = forma.value if hasattr(forma, 'value') else str(forma)
-            forma_nome = forma_nome.replace('_', ' ').title()
+    # USAR DIRETAMENTE OS DADOS DA FUNÇÃO obter_detalhes_vendas_dia
+    por_forma_pagamento = dados.get('por_forma_pagamento', {})
+    
+    if por_forma_pagamento:
+        # Contar transações por forma de pagamento (EXCLUINDO ESTORNOS)
+        contadores_transacoes = {}
+        
+        for venda in dados.get('vendas', []):
+            # PULAR ESTORNOS (vendas com valor negativo)
+            if venda.get('valor_total', 0) < 0:
+                continue
+                
+            # Se tem pagamentos registrados, usa eles
+            if 'pagamentos' in venda and venda['pagamentos']:
+                for pagamento in venda['pagamentos']:
+                    if pagamento.get('valor', 0) > 0:  # Só conta pagamentos positivos
+                        forma = pagamento['forma_pagamento']
+                        if forma not in contadores_transacoes:
+                            contadores_transacoes[forma] = 0
+                        contadores_transacoes[forma] += 1
+            else:
+                # Caso contrário, usa a forma de pagamento da venda (se não for estorno)
+                if venda.get('valor_total', 0) > 0:
+                    forma = venda.get('forma_pagamento', 'nao_informado')
+                    if forma not in contadores_transacoes:
+                        contadores_transacoes[forma] = 0
+                    contadores_transacoes[forma] += 1
+        
+        # Ordena por valor total (decrescente)
+        formas_ordenadas = sorted(por_forma_pagamento.items(), key=lambda x: x[1], reverse=True)
+        
+        for forma, total in formas_ordenadas:
+            forma_nome = str(forma).replace('_', ' ').title()
+            qtd_transacoes = contadores_transacoes.get(forma, 0)
+            
             dados_pagamentos.append([
                 forma_nome,
-                dados_forma['transacoes'],
-                dados_forma['total']
+                qtd_transacoes,
+                total
             ])
-            total_geral_pagamentos += dados_forma['total']
-            total_geral_transacoes += dados_forma['transacoes']
+            total_geral_pagamentos += total
+            total_geral_transacoes += qtd_transacoes
     else:
         # Adiciona linha vazia se não houver pagamentos
         dados_pagamentos.append(["Nenhum pagamento registrado", 0, 0])
@@ -1227,15 +1230,15 @@ def gerar_pdf_vendas_dia():
             # Detalhes dos pagamentos se for venda a prazo
             if venda.get('a_prazo', False) and 'pagamentos' in venda and venda['pagamentos']:
                 elements.append(Paragraph("PAGAMENTOS REALIZADOS:", estilos['negrito']))
-                dados_pagamentos = [["Data", "Forma", "Valor"]]
+                dados_pagamentos_venda = [["Data", "Forma", "Valor"]]
                 for pagamento in venda['pagamentos']:
-                    dados_pagamentos.append([
+                    dados_pagamentos_venda.append([
                         datetime.fromisoformat(pagamento['data']).strftime('%d/%m/%Y %H:%M') if 'data' in pagamento else "N/D",
                         pagamento.get('forma_pagamento', "N/D"),
                         pagamento.get('valor', 0)
                     ])
                 elements.append(criar_tabela_adaptavel(
-                    dados_pagamentos,
+                    dados_pagamentos_venda,
                     colWidths=['40%', '30%', '30%'],
                     estilo=[('ALIGN', (2, 1), (2, -1), 'RIGHT')]
                 ))
