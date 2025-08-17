@@ -1441,14 +1441,6 @@ body {
         align-items: center;
     }
     
-    .modal-content {
-        background-color: white;
-        padding: 20px;
-        border-radius: 5px;
-        max-width: 80%;
-        max-height: 80vh;
-        overflow-y: auto;
-    }
 /* Sale Details Modal Styles */
 .sale-details-container {
     display: flex;
