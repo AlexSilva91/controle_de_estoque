@@ -1163,7 +1163,7 @@ async function registerPayment(contaId, valorPago, formaPagamento, observacoes) 
                 observacoes: observacoes
             })
         });
-        
+        updateBalance(true);
         return await response.json();
     } catch (error) {
         console.error('Erro ao registrar pagamento:', error);
@@ -3472,7 +3472,7 @@ function addPaymentMethod() {
         <span class="payment-method">${formatPaymentMethod(method)}</span>
         <span class="payment-amount">${formatCurrency(amount)}</span>
         <button class="btn-remove-payment" title="Remover pagamento">
-            <i class="fas fa-times"></i>
+            <i class="fas fa-trash"></i>
         </button>
     `;
     

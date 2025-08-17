@@ -522,7 +522,7 @@ body {
 
 /* Botão de remover cliente */
 .remove-btn {
-    background-color: #f44336;
+    background-color: #ff0000;
     color: white;
     border: none;
     border-radius: 6px;
@@ -531,7 +531,19 @@ body {
     font-size: 16px;
     transition: background-color 0.3s ease;
 }
-
+.btn-remove-payment{
+    background-color: #ff1100;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+.btn-remove-payment:hover{
+    background-color: #d32f2f;
+}
 .remove-btn:hover {
     background-color: #d32f2f;
 }
