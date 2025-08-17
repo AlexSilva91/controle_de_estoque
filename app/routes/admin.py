@@ -3140,7 +3140,187 @@ def relatorio_vendas_produtos_detalhes():
     except Exception as e:
         print(f"Erro no relatório de vendas detalhado: {str(e)}")
         return jsonify({'success': False, 'message': 'Erro interno no servidor'}), 500
-    
+
+from flask import make_response
+from fpdf import FPDF
+from datetime import datetime
+
+class PDF(FPDF):
+    def header(self):
+        self.set_font('Arial', 'B', 16)
+        self.cell(0, 10, 'Relatório de Vendas de Produtos', 0, 1, 'C')
+        self.set_font('Arial', '', 12)
+        self.ln(5)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('Arial', 'I', 8)
+        self.cell(0, 10, f"Página {self.page_no()} - Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", 0, 0, 'C')
+
+@admin_bp.route('/relatorios/vendas-produtos/pdf', methods=['GET'])
+@login_required
+@admin_required
+def relatorio_vendas_produtos_pdf():
+    try:
+        # Obter os dados
+        relatorio_data = relatorio_vendas_produtos().get_json()
+        if 'error' in relatorio_data:
+            return jsonify(relatorio_data), 500
+        
+        data_inicio = datetime.strptime(relatorio_data['meta']['data_inicio'], "%Y-%m-%d")
+        data_fim = datetime.strptime(relatorio_data['meta']['data_fim'], "%Y-%m-%d")
+
+        # Formatar para DD/MM/YYYY
+        data_inicio_fmt = data_inicio.strftime("%d/%m/%Y")
+        data_fim_fmt = data_fim.strftime("%d/%m/%Y")
+
+        pdf = PDF(orientation='P', unit='mm', format='A4')
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        
+        # Informações do relatório
+        pdf.set_font('Arial', '', 12)
+        pdf.cell(0, 10, f"Período: {data_inicio_fmt} a {data_fim_fmt}", 0, 1, 'C')
+        pdf.cell(0, 10, f"Total de produtos: {relatorio_data['meta']['total_produtos']}", 0, 1, 'C')
+        pdf.cell(0, 10, f"Quantidade total vendida: {relatorio_data['meta']['total_quantidade_vendida']}", 0, 1, 'C')
+        pdf.cell(0, 10, f"Valor total vendido: {formatarMoeda(relatorio_data['meta']['total_valor_vendido'])}", 0, 1, 'C')
+        pdf.ln(10)
+
+        # Verificar se é detalhado ou geral
+        produto_id = request.args.get('produto_id')
+        if produto_id:
+            # MODO DETALHADO - Para um produto específico
+            detalhes_data = relatorio_vendas_produtos_detalhes().get_json()
+            if not detalhes_data.get('success'):
+                return jsonify(detalhes_data), 500
+
+            # Informações do produto
+            pdf.set_font('Arial', 'B', 14)
+            pdf.cell(0, 10, f"Detalhes do Produto: {detalhes_data['produto']['produto_nome']}", 0, 1, 'C')
+            
+            # Tabela de informações (2 colunas)
+            col_width = 85  # Largura de cada coluna
+            pdf.set_font('Arial', '', 12)
+            pdf.set_x((pdf.w - col_width*2)/2)  # Centralizar tabela
+            
+            with pdf.table(width=col_width*2, col_widths=(col_width, col_width), text_align=('L', 'L')) as table:
+                # Adicionar linhas da tabela...
+                pass
+            
+            pdf.ln(10)
+            
+            # Histórico de vendas
+            pdf.set_font('Arial', 'B', 12)
+            pdf.cell(0, 10, 'Histórico de Vendas:', 0, 1, 'C')
+            
+            # Definir larguras das colunas (total não deve ultrapassar 190mm para A4)
+            col_widths = [25, 20, 30, 30, 85]  # Total: 190mm
+            
+            # Centralizar tabela
+            table_width = sum(col_widths)
+            pdf.set_x((pdf.w - table_width)/2)
+            
+            # Cabeçalho
+            pdf.set_fill_color(70, 130, 180)
+            pdf.set_text_color(255, 255, 255)
+            pdf.set_font('Arial', 'B', 10)
+            
+            headers = ['Data', 'Qtd.', 'Valor Unit.', 'Valor Total', 'Cliente']
+            for i, header in enumerate(headers):
+                pdf.cell(col_widths[i], 10, header, 1, 0, 'C', 1)
+            pdf.ln()
+            
+            # Conteúdo
+            pdf.set_text_color(0, 0, 0)
+            pdf.set_font('Arial', '', 10)
+            
+            for venda in detalhes_data['historico']:
+                pdf.set_x((pdf.w - table_width)/2)  # Recentralizar a cada linha
+                data = datetime.fromisoformat(venda['data_emissao']).strftime('%d/%m/%Y')
+                
+                # Truncar o nome do cliente se for muito longo
+                cliente_nome = venda['cliente_nome'] or 'Consumidor'
+                if len(cliente_nome) > 30:
+                    cliente_nome = cliente_nome[:27] + '...'
+                
+                for i, item in enumerate([
+                    data,
+                    str(venda['quantidade']),
+                    formatarMoeda(venda['valor_unitario']),
+                    formatarMoeda(venda['valor_total']),
+                    cliente_nome
+                ]):
+                    pdf.cell(col_widths[i], 10, item, 1)
+                pdf.ln()
+        else:
+            # MODO GERAL - Lista de produtos
+            pdf.set_font('Arial', 'B', 12)
+            pdf.cell(0, 10, 'Lista de Produtos:', 0, 1, 'C')
+            
+            # Definir larguras das colunas (total não deve ultrapassar 190mm para A4)
+            col_widths = [15, 95, 15, 20, 25, 15, 15]  # Total: 200mm (ajustado para caber em A4)
+            
+            # Centralizar tabela
+            table_width = sum(col_widths)
+            pdf.set_x((pdf.w - table_width)/2)
+            
+            # Cabeçalho
+            pdf.set_fill_color(70, 130, 180)
+            pdf.set_text_color(255, 255, 255)
+            pdf.set_font('Arial', 'B', 10)
+            
+            headers = ['ID', 'Produto', 'Unid.', 'Qtd. Vend.', 'Valor Vend.', 'Estoque', 'Status']
+            for i, header in enumerate(headers):
+                pdf.cell(col_widths[i], 10, header, 1, 0, 'C', 1)
+            pdf.ln()
+            
+            # Conteúdo
+            pdf.set_text_color(0, 0, 0)
+            pdf.set_font('Arial', '', 10)
+            
+            for produto in relatorio_data['dados']:
+                pdf.set_x((pdf.w - table_width)/2)  # Recentralizar a cada linha
+                
+                # ID
+                pdf.cell(col_widths[0], 10, str(produto['produto_id']), 1, 0, 'C')
+                
+                # Produto - truncar se for muito longo (mantendo uma linha)
+                nome_produto = produto['produto_nome']
+                if len(nome_produto) > 35:  # Ajuste este valor conforme necessário
+                    nome_produto = nome_produto[:32] + '...'
+                pdf.cell(col_widths[1], 10, nome_produto, 1, 0, 'L')
+                
+                # Demais células...
+                pdf.cell(col_widths[2], 10, produto['unidade'], 1, 0, 'C')
+                pdf.cell(col_widths[3], 10, str(round(produto['quantidade_vendida'], 2)), 1, 0, 'R')
+                pdf.cell(col_widths[4], 10, formatarMoeda(produto['valor_total_vendido']), 1, 0, 'R')
+                pdf.cell(col_widths[5], 10, str(round(produto['estoque_atual_loja'], 2)), 1, 0, 'R')
+                
+                # Status com cor
+                if produto['status_estoque'] == 'CRÍTICO':
+                    pdf.set_text_color(255, 0, 0)
+                else:
+                    pdf.set_text_color(0, 128, 0)
+                
+                pdf.cell(col_widths[6], 10, produto['status_estoque'], 1, 1, 'C')
+                pdf.set_text_color(0, 0, 0)  # Resetar cor
+
+        # Gerar PDF
+        pdf_output = pdf.output(dest='S').encode('latin1')
+        
+        response = make_response(pdf_output)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'inline; filename=relatorio_vendas_produtos.pdf'
+        
+        return response
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def formatarMoeda(valor):
+    """Função auxiliar para formatar valores monetários"""
+    return f"R$ {float(valor):,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.')
+
 # ================= CONTAS A RECEBER =====================
 @admin_bp.route('/contas-receber', methods=['GET'])
 @login_required

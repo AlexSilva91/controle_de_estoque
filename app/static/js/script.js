@@ -2178,10 +2178,16 @@ document.addEventListener('DOMContentLoaded', function() {
   function atualizarMetadadosRelatorio(meta) {
       if (!meta) return;
       
-      // Formatar período
-      const inicio = new Date(meta.data_inicio);
-      const fim = new Date(meta.data_fim);
-      document.getElementById('relatorioPeriodoTexto').textContent = `${inicio.toLocaleDateString()} a ${fim.toLocaleDateString()}`;
+      // Formatar período - CORREÇÃO: Usar UTC para evitar problemas de fuso horário
+      const inicio = new Date(meta.data_inicio + 'T00:00:00Z'); // Adiciona horário e UTC
+      const fim = new Date(meta.data_fim + 'T23:59:59Z'); // Adiciona horário e UTC
+      
+      // Ajusta para o fuso horário local apenas para exibição
+      const inicioLocal = new Date(inicio.getTime() + inicio.getTimezoneOffset() * 60000);
+      const fimLocal = new Date(fim.getTime() + fim.getTimezoneOffset() * 60000);
+      
+      document.getElementById('relatorioPeriodoTexto').textContent = 
+          `${inicioLocal.toLocaleDateString('pt-BR')} a ${fimLocal.toLocaleDateString('pt-BR')}`;
       
       // Atualizar totais
       document.getElementById('relatorioTotalProdutos').textContent = meta.total_produtos;
@@ -2255,7 +2261,33 @@ document.addEventListener('DOMContentLoaded', function() {
           });
       });
   }
+  // Adicione esta função no seu arquivo JavaScript existente
+  async function exportarRelatorioPDF() {
+      try {
+          // Obter valores dos filtros atuais
+          const dataInicio = document.getElementById('relatorioDataInicio').value;
+          const dataFim = document.getElementById('relatorioDataFim').value;
+          const produtoNome = document.getElementById('relatorioProdutoNome').value;
+          const produtoCodigo = document.getElementById('relatorioProdutoCodigo').value;
+          
+          // Construir parâmetros
+          const params = new URLSearchParams();
+          if (dataInicio) params.append('data_inicio', dataInicio);
+          if (dataFim) params.append('data_fim', dataFim);
+          if (produtoNome) params.append('produto_nome', produtoNome);
+          if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
+          
+          // Gerar PDF em nova guia
+          window.open(`/admin/relatorios/vendas-produtos/pdf?${params.toString()}`, '_blank');
+          
+      } catch (error) {
+          console.error('Erro ao gerar PDF:', error);
+          showFlashMessage('error', 'Erro ao gerar relatório em PDF');
+      }
+  }
 
+  // Adicione este event listener no DOMContentLoaded ou onde você configura os eventos
+  document.getElementById('btnExportarPDF')?.addEventListener('click', exportarRelatorioPDF);
   async function abrirModalDetalhesProduto(produtoId) {
       try {
           // Obter valores dos filtros atuais
