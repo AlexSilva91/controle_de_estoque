@@ -735,7 +735,356 @@ async function saveClient() {
         showMessage(error.message, 'error');
     }
 }
+async function viewClientDetails(clientId) {
+    try {
+        const client = await findClientById(clientId);
+        
+        if (!client) {
+            showMessage('Cliente não encontrado', 'error');
+            return;
+        }
+        
+        // Busca as contas a receber e notas fiscais do cliente
+        const [contasReceber, notasFiscais] = await Promise.all([
+            findContasReceberByClienteId(clientId),
+            findNotasFiscaisByClienteId(clientId)
+        ]);
+        
+        // Create a modal to display client details
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'client-details-modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Detalhes do Cliente</h3>
+                    <span class="modal-close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="client-info-section">
+                        <h4>Informações Básicas</h4>
+                        <div class="client-detail">
+                            <label>Nome:</label>
+                            <p>${client.nome || 'Não informado'}</p>
+                        </div>
+                        <div class="client-detail">
+                            <label>Documento:</label>
+                            <p>${formatDocument(client.documento) || 'Não informado'}</p>
+                        </div>
+                        <div class="client-detail">
+                            <label>Telefone:</label>
+                            <p>${client.telefone ? formatPhone(client.telefone) : 'Não informado'}</p>
+                        </div>
+                        <div class="client-detail">
+                            <label>Email:</label>
+                            <p>${client.email || 'Não informado'}</p>
+                        </div>
+                        <div class="client-detail">
+                            <label>Endereço:</label>
+                            <p>${client.endereco || 'Não informado'}</p>
+                        </div>
+                        <div class="client-detail">
+                            <label>Limite de Crédito:</label>
+                            <p>${client.limite_credito ? formatCurrency(client.limite_credito) : 'Não informado'}</p>
+                        </div>
+                        <div class="client-detail">
+                            <label>Data de Cadastro:</label>
+                            <p>${formatDateTime(client.criado_em) || 'Não informado'}</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Seção de Contas a Receber -->
+                    <div class="client-section">
+                        <h4>Contas a Receber (${contasReceber.length})</h4>
+                        ${contasReceber.length > 0 ? 
+                            `<div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Descrição</th>
+                                            <th>Valor Total</th>
+                                            <th>Valor Aberto</th>
+                                            <th>Status</th>
+                                            <th>Vencimento</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${contasReceber.map(conta => `
+                                            <tr>
+                                                <td>${conta.descricao || 'Sem descrição'}</td>
+                                                <td>${formatCurrency(conta.valor_original)}</td>
+                                                <td>${formatCurrency(conta.valor_aberto)}</td>
+                                                <td><span class="status-badge ${conta.status}">${conta.status}</span></td>
+                                                <td>${formatDate(conta.data_vencimento)}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td><strong>Total:</strong></td>
+                                            <td><strong>${formatCurrency(contasReceber.reduce((sum, conta) => sum + conta.valor_original, 0))}</strong></td>
+                                            <td><strong>${formatCurrency(contasReceber.reduce((sum, conta) => sum + conta.valor_aberto, 0))}</strong></td>
+                                            <td colspan="2"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>` : 
+                            '<p>Nenhuma conta a receber encontrada</p>'}
+                    </div>
+                    
+                    <!-- Seção de Compras/Notas Fiscais -->
+                    <div class="client-section">
+                        <h4>Histórico de Compras (${notasFiscais.length})</h4>
+                        ${notasFiscais.length > 0 ? 
+                            `<div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Valor Total</th>
+                                            <th>Desconto</th>
+                                            <th>Status</th>
+                                            <th>Pagamento</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${notasFiscais.map(nota => `
+                                            <tr>
+                                                <td>${formatDateTime(nota.data_emissao)}</td>
+                                                <td>${formatCurrency(nota.valor_total)}</td>
+                                                <td>${formatCurrency(nota.valor_desconto)}</td>
+                                                <td><span class="status-badge ${nota.status}">${nota.status}</span></td>
+                                                <td>${nota.a_prazo ? 'A Prazo' : 'À Vista'} ${nota.forma_pagamento ? `(${nota.forma_pagamento})` : ''}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td><strong>Total:</strong></td>
+                                            <td><strong>${formatCurrency(notasFiscais.reduce((sum, nota) => sum + nota.valor_total, 0))}</strong></td>
+                                            <td><strong>${formatCurrency(notasFiscais.reduce((sum, nota) => sum + (nota.valor_desconto || 0), 0))}</strong></td>
+                                            <td colspan="2"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>` : 
+                            '<p>Nenhuma compra registrada</p>'}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary modal-close">Fechar</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Add event listeners for closing the modal
+        modal.querySelectorAll('.modal-close').forEach(closeBtn => {
+            closeBtn.addEventListener('click', () => {
+                modal.remove();
+            });
+        });
+        
+        // Show the modal
+        modal.style.display = 'flex';
+        
+        // Close modal when clicking outside
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+        
+    } catch (error) {
+        console.error('Erro ao carregar detalhes do cliente:', error);
+        showMessage('Erro ao carregar detalhes do cliente', 'error');
+    }
+}
+/**
+ * Busca contas a receber de um cliente
+ */
+async function findContasReceberByClienteId(clienteId) {
+    try {
+        const response = await fetch(`/operador/api/clientes/${clienteId}/contas_receber`);
+        
+        if (!response.ok) {
+            throw new Error('Erro ao buscar contas a receber');
+        }
+        
+        const contas = await response.json();
+        
+        // Processa os dados para o formato esperado
+        return contas.map(conta => ({
+            id: conta.id,
+            descricao: conta.descricao || 'Sem descrição',
+            valor_original: conta.valor_original,
+            valor_aberto: conta.valor_aberto,
+            status: conta.status,
+            data_vencimento: conta.data_vencimento,
+            data_emissao: conta.data_emissao,
+            data_pagamento: conta.data_pagamento,
+            nota_fiscal_id: conta.nota_fiscal_id,
+            observacoes: conta.observacoes
+        }));
+        
+    } catch (error) {
+        console.error('Erro ao buscar contas a receber:', error);
+        showMessage('Erro ao carregar contas a receber', 'error');
+        return [];
+    }
+}
 
+/**
+ * Busca notas fiscais de um cliente
+ */
+async function findNotasFiscaisByClienteId(clienteId) {
+    try {
+        const response = await fetch(`/operador/api/clientes/${clienteId}/notas_fiscais`);
+        
+        if (!response.ok) {
+            throw new Error('Erro ao buscar notas fiscais');
+        }
+        
+        const notas = await response.json();
+        
+        // Processa os dados para o formato esperado
+        return notas.map(nota => ({
+            id: nota.id,
+            data_emissao: nota.data_emissao,
+            valor_total: nota.valor_total,
+            valor_desconto: nota.valor_desconto || 0,
+            status: nota.status,
+            a_prazo: nota.a_prazo || false,
+            forma_pagamento: nota.forma_pagamento,
+            valor_recebido: nota.valor_recebido,
+            troco: nota.troco,
+            operador_id: nota.operador_id,
+            caixa_id: nota.caixa_id
+        }));
+        
+    } catch (error) {
+        console.error('Erro ao buscar notas fiscais:', error);
+        showMessage('Erro ao carregar histórico de compras', 'error');
+        return [];
+    }
+}
+
+/**
+ * Formata um valor monetário
+ */
+function formatCurrency(value) {
+    if (value === null || value === undefined) return 'R$ 0,00';
+    return new Intl.NumberFormat('pt-BR', { 
+        style: 'currency', 
+        currency: 'BRL',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(Number(value));
+}
+
+/**
+ * Formata uma data (sem hora)
+ */
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'N/A';
+        
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+        
+        return `${day}/${month}/${year}`;
+    } catch (e) {
+        console.error('Erro ao formatar data:', e);
+        return 'N/A';
+    }
+}
+
+/**
+ * Formata data e hora
+ */
+function formatDateTime(dateTimeString) {
+    if (!dateTimeString) return 'N/A';
+    try {
+        const date = new Date(dateTimeString);
+        if (isNaN(date.getTime())) return 'N/A';
+        
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        
+        return `${day}/${month}/${year} ${hours}:${minutes}`;
+    } catch (e) {
+        console.error('Erro ao formatar data/hora:', e);
+        return 'N/A';
+    }
+}
+
+/**
+ * Formata documento (CPF/CNPJ)
+ */
+function formatDocument(doc) {
+    if (!doc) return '';
+    
+    // Remove caracteres não numéricos
+    const cleanDoc = doc.replace(/\D/g, '');
+    
+    // Formata como CPF (11 dígitos)
+    if (cleanDoc.length === 11) {
+        return cleanDoc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    }
+    
+    // Formata como CNPJ (14 dígitos)
+    if (cleanDoc.length === 14) {
+        return cleanDoc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+    }
+    
+    // Retorna o original se não for CPF nem CNPJ
+    return doc;
+}
+
+/**
+ * Formata telefone
+ */
+function formatPhone(phone) {
+    if (!phone) return '';
+    
+    // Remove caracteres não numéricos
+    const cleanPhone = phone.replace(/\D/g, '');
+    
+    // Formata como celular com 9º dígito (11 dígitos)
+    if (cleanPhone.length === 11) {
+        return cleanPhone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    }
+    
+    // Formata como telefone fixo (10 dígitos)
+    if (cleanPhone.length === 10) {
+        return cleanPhone.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+    }
+    
+    // Retorna o original se não corresponder aos padrões
+    return phone;
+}
+
+/**
+ * Exibe uma mensagem para o usuário
+ */
+function showMessage(message, type = 'success') {
+    // Implementação básica - você pode usar sua própria função ou biblioteca
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 5000);
+}
 // ==================== FUNÇÕES DE PRODUTOS ====================
 async function loadProducts(forceUpdate = false) {
     try {

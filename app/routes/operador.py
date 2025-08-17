@@ -1726,3 +1726,71 @@ def api_get_produto_descontos(produto_id):
     except Exception as e:
         app.logger.error(f"Erro ao buscar descontos do produto {produto_id}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Erro interno ao buscar descontos'}), 500
+    
+@operador_bp.route('/api/clientes/<int:cliente_id>/contas_receber', methods=['GET'])
+@login_required
+@operador_required
+def get_contas_receber_cliente(cliente_id):
+    try:
+        # Verifica se o cliente existe
+        cliente = Cliente.query.get(cliente_id)
+        if not cliente:
+            return jsonify({'error': 'Cliente não encontrado'}), 404
+
+        # Busca as contas a receber do cliente
+        contas = ContaReceber.query.filter_by(cliente_id=cliente_id).all()
+        
+        contas_data = []
+        for conta in contas:
+            contas_data.append({
+                'id': conta.id,
+                'descricao': conta.descricao,
+                'valor_original': float(conta.valor_original),
+                'valor_aberto': float(conta.valor_aberto),
+                'data_vencimento': conta.data_vencimento.isoformat() if conta.data_vencimento else None,
+                'data_emissao': conta.data_emissao.isoformat() if conta.data_emissao else None,
+                'data_pagamento': conta.data_pagamento.isoformat() if conta.data_pagamento else None,
+                'status': conta.status.value,
+                'nota_fiscal_id': conta.nota_fiscal_id,
+                'observacoes': conta.observacoes
+            })
+        print(f'contas cliente: \n{contas_data}')
+        return jsonify(contas_data)
+
+    except Exception as e:
+        print(f'ERROR: \n {e}')
+        return jsonify({'error': str(e)}), 500
+
+@operador_bp.route('/api/clientes/<int:cliente_id>/notas_fiscais', methods=['GET'])
+@login_required
+@operador_required
+def get_notas_fiscais_cliente(cliente_id):
+    try:
+        # Verifica se o cliente existe
+        cliente = Cliente.query.get(cliente_id)
+        if not cliente:
+            return jsonify({'error': 'Cliente não encontrado'}), 404
+
+        # Busca as notas fiscais do cliente
+        notas = NotaFiscal.query.filter_by(cliente_id=cliente_id).order_by(NotaFiscal.data_emissao.desc()).all()
+        
+        notas_data = []
+        for nota in notas:
+            notas_data.append({
+                'id': nota.id,
+                'data_emissao': nota.data_emissao.isoformat() if nota.data_emissao else None,
+                'valor_total': float(nota.valor_total),
+                'valor_desconto': float(nota.valor_desconto),
+                'status': nota.status.value,
+                'a_prazo': nota.a_prazo,
+                'forma_pagamento': nota.forma_pagamento.value if nota.forma_pagamento else None,
+                'valor_recebido': float(nota.valor_recebido) if nota.valor_recebido else None,
+                'troco': float(nota.troco) if nota.troco else None,
+                'operador_id': nota.operador_id,
+                'caixa_id': nota.caixa_id
+            })
+        print(f'notas fiscal: \n{notas_data}')
+        return jsonify(notas_data)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
