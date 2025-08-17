@@ -1794,3 +1794,84 @@ def get_notas_fiscais_cliente(cliente_id):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+@operador_bp.route('/api/contas_receber/<int:conta_id>/pagamento', methods=['POST'])
+@login_required
+@operador_required
+def registrar_pagamento_conta(conta_id):
+    try:
+        data = request.get_json()
+        valor_pago = Decimal(data.get('valor_pago'))
+        forma_pagamento = data.get('forma_pagamento')
+        observacoes = data.get('observacoes', '').strip()
+        
+        # Verifica se a conta existe
+        conta = ContaReceber.query.get(conta_id)
+        if not conta:
+            return jsonify({'success': False, 'message': 'Conta não encontrada'}), 404
+        
+        # Validações
+        if valor_pago <= 0:
+            return jsonify({'success': False, 'message': 'Valor do pagamento deve ser positivo'}), 400
+            
+        if valor_pago > conta.valor_aberto:
+            return jsonify({'success': False, 'message': 'Valor do pagamento excede o valor em aberto'}), 400
+            
+        if not forma_pagamento:
+            return jsonify({'success': False, 'message': 'Forma de pagamento não informada'}), 400
+        
+        # Obtém o caixa aberto do operador atual
+        caixa_aberto = Caixa.query.filter_by(
+            operador_id=current_user.id,
+            status=StatusCaixa.aberto
+        ).order_by(Caixa.data_abertura.desc()).first()
+        
+        if not caixa_aberto:
+            return jsonify({'success': False, 'message': 'Nenhum caixa aberto encontrado para o operador'}), 400
+        
+        # Registra o pagamento
+        conta.registrar_pagamento(
+            valor_pago=valor_pago,
+            forma_pagamento=FormaPagamento(forma_pagamento),
+            caixa_id=caixa_aberto.id,
+            observacoes=observacoes
+        )
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Pagamento registrado com sucesso',
+            'novo_status': conta.status.value,
+            'valor_aberto': float(conta.valor_aberto)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f'Erro ao registrar pagamento: {str(e)}')
+        return jsonify({'success': False, 'message': f'Erro ao registrar pagamento: {str(e)}'}), 500
+
+@operador_bp.route('/api/clientes/<int:cliente_id>', methods=['GET'])
+@login_required
+@operador_required
+def get_cliente(cliente_id):
+    try:
+        cliente = Cliente.query.get(cliente_id)
+        if not cliente:
+            return jsonify({'error': 'Cliente não encontrado'}), 404
+            
+        return jsonify({
+            'id': cliente.id,
+            'nome': cliente.nome,
+            'documento': cliente.documento,
+            'telefone': cliente.telefone,
+            'email': cliente.email,
+            'endereco': cliente.endereco,
+            'limite_credito': float(cliente.limite_credito) if cliente.limite_credito else None,
+            'ativo': cliente.ativo,
+            'criado_em': cliente.criado_em.isoformat() if cliente.criado_em else None
+        })
+        
+    except Exception as e:
+        print(f'Erro ao buscar cliente: {str(e)}')
+        return jsonify({'error': str(e)}), 500

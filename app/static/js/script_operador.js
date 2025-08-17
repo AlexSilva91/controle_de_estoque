@@ -806,16 +806,29 @@ async function viewClientDetails(clientId) {
                                             <th>Valor Aberto</th>
                                             <th>Status</th>
                                             <th>Vencimento</th>
+                                            <th>Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         ${contasReceber.map(conta => `
-                                            <tr>
+                                            <tr data-conta-id="${conta.id}">
                                                 <td>${conta.descricao || 'Sem descrição'}</td>
                                                 <td>${formatCurrency(conta.valor_original)}</td>
                                                 <td>${formatCurrency(conta.valor_aberto)}</td>
                                                 <td><span class="status-badge ${conta.status}">${conta.status}</span></td>
                                                 <td>${formatDate(conta.data_vencimento)}</td>
+                                                <td class="actions-cell">
+                                                    ${conta.status === 'pendente' || conta.status === 'parcial' ? `
+                                                        <button class="btn-pay-partial btn-small" data-conta-id="${conta.id}" 
+                                                            data-valor-aberto="${conta.valor_aberto}">
+                                                            Pagar Parcial
+                                                        </button>
+                                                        <button class="btn-pay-full btn-small" data-conta-id="${conta.id}" 
+                                                            data-valor-aberto="${conta.valor_aberto}">
+                                                            Pagar Total
+                                                        </button>
+                                                    ` : ''}
+                                                </td>
                                             </tr>
                                         `).join('')}
                                     </tbody>
@@ -824,7 +837,7 @@ async function viewClientDetails(clientId) {
                                             <td><strong>Total:</strong></td>
                                             <td><strong>${formatCurrency(contasReceber.reduce((sum, conta) => sum + conta.valor_original, 0))}</strong></td>
                                             <td><strong>${formatCurrency(contasReceber.reduce((sum, conta) => sum + conta.valor_aberto, 0))}</strong></td>
-                                            <td colspan="2"></td>
+                                            <td colspan="3"></td>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -896,77 +909,284 @@ async function viewClientDetails(clientId) {
             }
         });
         
+        // Add event listeners for payment buttons
+        modal.querySelectorAll('.btn-pay-partial').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const contaId = e.target.getAttribute('data-conta-id');
+                const valorAberto = parseFloat(e.target.getAttribute('data-valor-aberto'));
+                showPartialPaymentModal(contaId, valorAberto);
+            });
+        });
+        
+        modal.querySelectorAll('.btn-pay-full').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const contaId = e.target.getAttribute('data-conta-id');
+                const valorAberto = parseFloat(e.target.getAttribute('data-valor-aberto'));
+                confirmFullPayment(contaId, valorAberto);
+            });
+        });
+        
     } catch (error) {
         console.error('Erro ao carregar detalhes do cliente:', error);
         showMessage('Erro ao carregar detalhes do cliente', 'error');
     }
 }
+
 /**
- * Busca contas a receber de um cliente
+ * Mostra o modal para pagamento parcial
  */
-async function findContasReceberByClienteId(clienteId) {
-    try {
-        const response = await fetch(`/operador/api/clientes/${clienteId}/contas_receber`);
+function showPartialPaymentModal(contaId, valorAberto) {
+    const paymentModal = document.createElement('div');
+    paymentModal.className = 'modal';
+    paymentModal.id = 'partial-payment-modal';
+    paymentModal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Registrar Pagamento Parcial</h3>
+                <span class="modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="partial-payment-form">
+                    <div class="form-group">
+                        <label for="payment-amount">Valor do Pagamento:</label>
+                        <input type="number" id="payment-amount" name="payment-amount" 
+                               min="0.01" max="${valorAberto}" step="0.01" 
+                               placeholder="Digite o valor" required>
+                        <small>Valor disponível: ${formatCurrency(valorAberto)}</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="payment-method">Forma de Pagamento:</label>
+                        <select id="payment-method" name="payment-method" required>
+                            <option value="">Selecione...</option>
+                            <option value="pix_fabiano">PIX Fabiano</option>
+                            <option value="pix_maquineta">PIX Maquineta</option>
+                            <option value="pix_edfrance">PIX EDFrance</option>
+                            <option value="pix_loja">PIX Loja</option>
+                            <option value="dinheiro">Dinheiro</option>
+                            <option value="cartao_credito">Cartão de Crédito</option>
+                            <option value="cartao_debito">Cartão de Débito</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="payment-notes">Observações:</label>
+                        <textarea id="payment-notes" name="payment-notes" 
+                                  placeholder="Opcional"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary modal-close">Cancelar</button>
+                <button class="btn-primary" id="confirm-partial-payment">Confirmar Pagamento</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(paymentModal);
+    
+    // Add event listeners for closing the modal
+    paymentModal.querySelectorAll('.modal-close').forEach(closeBtn => {
+        closeBtn.addEventListener('click', () => {
+            paymentModal.remove();
+        });
+    });
+    
+    // Show the modal
+    paymentModal.style.display = 'flex';
+    
+    // Close modal when clicking outside
+    paymentModal.addEventListener('click', (e) => {
+        if (e.target === paymentModal) {
+            paymentModal.remove();
+        }
+    });
+    
+    // Handle partial payment confirmation
+    paymentModal.querySelector('#confirm-partial-payment').addEventListener('click', async () => {
+        const form = paymentModal.querySelector('#partial-payment-form');
+        const formData = new FormData(form);
         
-        if (!response.ok) {
-            throw new Error('Erro ao buscar contas a receber');
+        const valorPago = parseFloat(formData.get('payment-amount'));
+        const formaPagamento = formData.get('payment-method');
+        const observacoes = formData.get('payment-notes');
+        
+        if (!valorPago || valorPago <= 0) {
+            showMessage('Valor do pagamento inválido', 'error');
+            return;
         }
         
-        const contas = await response.json();
+        if (valorPago > valorAberto) {
+            showMessage('Valor do pagamento excede o valor em aberto', 'error');
+            return;
+        }
         
-        // Processa os dados para o formato esperado
-        return contas.map(conta => ({
-            id: conta.id,
-            descricao: conta.descricao || 'Sem descrição',
-            valor_original: conta.valor_original,
-            valor_aberto: conta.valor_aberto,
-            status: conta.status,
-            data_vencimento: conta.data_vencimento,
-            data_emissao: conta.data_emissao,
-            data_pagamento: conta.data_pagamento,
-            nota_fiscal_id: conta.nota_fiscal_id,
-            observacoes: conta.observacoes
-        }));
+        if (!formaPagamento) {
+            showMessage('Selecione uma forma de pagamento', 'error');
+            return;
+        }
         
+        try {
+            const response = await registerPayment(contaId, valorPago, formaPagamento, observacoes);
+            
+            if (response.success) {
+                showMessage('Pagamento registrado com sucesso', 'success');
+                paymentModal.remove();
+                
+                // Recarrega os dados do cliente para atualizar a tabela
+                const clientId = await getClientIdFromConta(contaId);
+                if (clientId) {
+                    // Fecha o modal atual e abre um novo com os dados atualizados
+                    document.querySelector('#client-details-modal')?.remove();
+                    viewClientDetails(clientId);
+                }
+            } else {
+                showMessage(response.message || 'Erro ao registrar pagamento', 'error');
+            }
+        } catch (error) {
+            console.error('Erro ao registrar pagamento:', error);
+            showMessage('Erro ao registrar pagamento', 'error');
+        }
+    });
+}
+
+/**
+ * Confirma o pagamento total
+ */
+async function confirmFullPayment(contaId, valorAberto) {
+    const confirmModal = document.createElement('div');
+    confirmModal.className = 'modal';
+    confirmModal.id = 'confirm-payment-modal';
+    confirmModal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Confirmar Pagamento Total</h3>
+                <span class="modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Deseja registrar o pagamento total de ${formatCurrency(valorAberto)}?</p>
+                <form id="full-payment-form">
+                    <div class="form-group">
+                        <label for="payment-method">Forma de Pagamento:</label>
+                        <select id="payment-method" name="payment-method" required>
+                            <option value="">Selecione...</option>
+                            <option value="pix_fabiano">PIX Fabiano</option>
+                            <option value="pix_maquineta">PIX Maquineta</option>
+                            <option value="pix_edfrance">PIX EDFrance</option>
+                            <option value="pix_loja">PIX Loja</option>
+                            <option value="dinheiro">Dinheiro</option>
+                            <option value="cartao_credito">Cartão de Crédito</option>
+                            <option value="cartao_debito">Cartão de Débito</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="payment-notes">Observações:</label>
+                        <textarea id="payment-notes" name="payment-notes" 
+                                  placeholder="Opcional"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary modal-close">Cancelar</button>
+                <button class="btn-primary" id="confirm-full-payment">Confirmar Pagamento</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(confirmModal);
+    
+    // Add event listeners for closing the modal
+    confirmModal.querySelectorAll('.modal-close').forEach(closeBtn => {
+        closeBtn.addEventListener('click', () => {
+            confirmModal.remove();
+        });
+    });
+    
+    // Show the modal
+    confirmModal.style.display = 'flex';
+    
+    // Close modal when clicking outside
+    confirmModal.addEventListener('click', (e) => {
+        if (e.target === confirmModal) {
+            confirmModal.remove();
+        }
+    });
+    
+    // Handle full payment confirmation
+    confirmModal.querySelector('#confirm-full-payment').addEventListener('click', async () => {
+        const form = confirmModal.querySelector('#full-payment-form');
+        const formData = new FormData(form);
+        
+        const formaPagamento = formData.get('payment-method');
+        const observacoes = formData.get('payment-notes');
+        
+        if (!formaPagamento) {
+            showMessage('Selecione uma forma de pagamento', 'error');
+            return;
+        }
+        
+        try {
+            const response = await registerPayment(contaId, valorAberto, formaPagamento, observacoes);
+            
+            if (response.success) {
+                showMessage('Pagamento total registrado com sucesso', 'success');
+                confirmModal.remove();
+                
+                // Recarrega os dados do cliente para atualizar a tabela
+                const clientId = await getClientIdFromConta(contaId);
+                if (clientId) {
+                    // Fecha o modal atual e abre um novo com os dados atualizados
+                    document.querySelector('#client-details-modal')?.remove();
+                    viewClientDetails(clientId);
+                }
+            } else {
+                showMessage(response.message || 'Erro ao registrar pagamento', 'error');
+            }
+        } catch (error) {
+            console.error('Erro ao registrar pagamento:', error);
+            showMessage('Erro ao registrar pagamento', 'error');
+        }
+    });
+}
+
+/**
+ * Registra um pagamento no servidor
+ */
+async function registerPayment(contaId, valorPago, formaPagamento, observacoes) {
+    try {
+        const response = await fetch(`/operador/api/contas_receber/${contaId}/pagamento`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                valor_pago: valorPago,
+                forma_pagamento: formaPagamento,
+                observacoes: observacoes
+            })
+        });
+        
+        return await response.json();
     } catch (error) {
-        console.error('Erro ao buscar contas a receber:', error);
-        showMessage('Erro ao carregar contas a receber', 'error');
-        return [];
+        console.error('Erro ao registrar pagamento:', error);
+        throw error;
     }
 }
 
 /**
- * Busca notas fiscais de um cliente
+ * Obtém o ID do cliente a partir do ID da conta
  */
-async function findNotasFiscaisByClienteId(clienteId) {
+async function getClientIdFromConta(contaId) {
     try {
-        const response = await fetch(`/operador/api/clientes/${clienteId}/notas_fiscais`);
+        const response = await fetch(`/operador/api/contas_receber/${contaId}/cliente`);
         
         if (!response.ok) {
-            throw new Error('Erro ao buscar notas fiscais');
+            throw new Error('Erro ao buscar cliente da conta');
         }
         
-        const notas = await response.json();
-        
-        // Processa os dados para o formato esperado
-        return notas.map(nota => ({
-            id: nota.id,
-            data_emissao: nota.data_emissao,
-            valor_total: nota.valor_total,
-            valor_desconto: nota.valor_desconto || 0,
-            status: nota.status,
-            a_prazo: nota.a_prazo || false,
-            forma_pagamento: nota.forma_pagamento,
-            valor_recebido: nota.valor_recebido,
-            troco: nota.troco,
-            operador_id: nota.operador_id,
-            caixa_id: nota.caixa_id
-        }));
-        
+        const data = await response.json();
+        return data.cliente_id;
     } catch (error) {
-        console.error('Erro ao buscar notas fiscais:', error);
-        showMessage('Erro ao carregar histórico de compras', 'error');
-        return [];
+        console.error('Erro ao buscar cliente da conta:', error);
+        return null;
     }
 }
 
@@ -1075,7 +1295,6 @@ function formatPhone(phone) {
  * Exibe uma mensagem para o usuário
  */
 function showMessage(message, type = 'success') {
-    // Implementação básica - você pode usar sua própria função ou biblioteca
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.textContent = message;
@@ -1084,6 +1303,93 @@ function showMessage(message, type = 'success') {
     setTimeout(() => {
         toast.remove();
     }, 5000);
+}
+
+/**
+ * Busca um cliente pelo ID
+ */
+async function findClientById(clientId) {
+    try {
+        const response = await fetch(`/operador/api/clientes/${clientId}`);
+        
+        if (!response.ok) {
+            throw new Error('Erro ao buscar cliente');
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('Erro ao buscar cliente:', error);
+        return null;
+    }
+}
+
+/**
+ * Busca contas a receber de um cliente
+ */
+async function findContasReceberByClienteId(clienteId) {
+    try {
+        const response = await fetch(`/operador/api/clientes/${clienteId}/contas_receber`);
+        
+        if (!response.ok) {
+            throw new Error('Erro ao buscar contas a receber');
+        }
+        
+        const contas = await response.json();
+        
+        // Processa os dados para o formato esperado
+        return contas.map(conta => ({
+            id: conta.id,
+            descricao: conta.descricao || 'Sem descrição',
+            valor_original: conta.valor_original,
+            valor_aberto: conta.valor_aberto,
+            status: conta.status,
+            data_vencimento: conta.data_vencimento,
+            data_emissao: conta.data_emissao,
+            data_pagamento: conta.data_pagamento,
+            nota_fiscal_id: conta.nota_fiscal_id,
+            observacoes: conta.observacoes
+        }));
+        
+    } catch (error) {
+        console.error('Erro ao buscar contas a receber:', error);
+        showMessage('Erro ao carregar contas a receber', 'error');
+        return [];
+    }
+}
+
+/**
+ * Busca notas fiscais de um cliente
+ */
+async function findNotasFiscaisByClienteId(clienteId) {
+    try {
+        const response = await fetch(`/operador/api/clientes/${clienteId}/notas_fiscais`);
+        
+        if (!response.ok) {
+            throw new Error('Erro ao buscar notas fiscais');
+        }
+        
+        const notas = await response.json();
+        
+        // Processa os dados para o formato esperado
+        return notas.map(nota => ({
+            id: nota.id,
+            data_emissao: nota.data_emissao,
+            valor_total: nota.valor_total,
+            valor_desconto: nota.valor_desconto || 0,
+            status: nota.status,
+            a_prazo: nota.a_prazo || false,
+            forma_pagamento: nota.forma_pagamento,
+            valor_recebido: nota.valor_recebido,
+            troco: nota.troco,
+            operador_id: nota.operador_id,
+            caixa_id: nota.caixa_id
+        }));
+        
+    } catch (error) {
+        console.error('Erro ao buscar notas fiscais:', error);
+        showMessage('Erro ao carregar histórico de compras', 'error');
+        return [];
+    }
 }
 // ==================== FUNÇÕES DE PRODUTOS ====================
 async function loadProducts(forceUpdate = false) {
