@@ -1,10 +1,12 @@
 import base64
 from functools import wraps
 from io import BytesIO
+import textwrap
 # Importações do Flask e sistema
 from flask import current_app, request, jsonify, send_file
 from datetime import datetime
 from io import BytesIO
+from fpdf import FPDF
 from reportlab.lib.styles import getSampleStyleSheet
 # Importações do ReportLab
 from reportlab.pdfgen import canvas
@@ -1875,3 +1877,133 @@ def get_cliente(cliente_id):
     except Exception as e:
         print(f'Erro ao buscar cliente: {str(e)}')
         return jsonify({'error': str(e)}), 500
+    
+# ================ ORÇAMENTO ====================
+@operador_bp.route('/api/orcamento/pdf', methods=['POST'])
+@login_required
+@operador_required
+def gerar_pdf_orcamento():
+    try:
+        from reportlab.lib.pagesizes import mm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        from flask import request, jsonify, make_response
+        from io import BytesIO
+        from datetime import datetime
+        import os
+
+        dados = request.get_json()
+        if not dados or 'itens' not in dados or not dados['itens']:
+            return jsonify({'success': False, 'message': 'Dados do orçamento inválidos'}), 400
+
+        buffer = BytesIO()
+        # Margens zeradas no topo e laterais para imagem colada no topo
+        doc = SimpleDocTemplate(buffer, pagesize=(80*mm, 250*mm), 
+                              rightMargin=0, leftMargin=0,
+                              topMargin=0, bottomMargin=10*mm)
+        elements = []
+
+        styles = getSampleStyleSheet()
+        style_normal = ParagraphStyle('normal', parent=styles['Normal'], 
+                                     fontName='Helvetica', fontSize=8, leading=10)
+        style_centered = ParagraphStyle('centered', parent=style_normal, alignment=1)
+        style_right = ParagraphStyle('right', parent=style_normal, alignment=2)
+        style_bold = ParagraphStyle('bold', parent=style_normal, fontName='Helvetica-Bold')
+        style_italic = ParagraphStyle('italic', parent=style_normal, 
+                                     fontName='Helvetica-Oblique', fontSize=7)
+        style_title = ParagraphStyle('title', parent=style_bold, 
+                                   fontSize=10, alignment=1, spaceAfter=10)
+
+        # Imagem no topo totalmente colada (sem margem superior)
+        logo_path = os.path.join('app', 'static', 'assets', 'logo.jpeg')
+        if os.path.exists(logo_path):
+            try:
+                logo = Image(logo_path, width=80*mm, height=20*mm)
+                logo.hAlign = 'CENTER'
+                elements.append(logo)
+                # Espaçamento mínimo após a imagem
+                elements.append(Spacer(1, 2))
+            except Exception as e:
+                print(f"Erro ao carregar imagem: {e}")
+
+        # Cabeçalho
+        elements.append(Paragraph("ORÇAMENTO", style_title))
+        elements.append(Paragraph(f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}", style_centered))
+        
+        if dados.get('cliente'):
+            cliente = dados['cliente']
+            elements.append(Paragraph(f"Cliente: {cliente.get('nome', 'CONSUMIDOR FINAL')}", style_centered))
+            if cliente.get('documento'):
+                elements.append(Paragraph(f"Documento: {cliente['documento']}", style_centered))
+        
+        elements.append(Spacer(1, 6))
+
+        # Tabela de itens
+        table_data = [[
+            Paragraph("<b>Descrição</b>", style_centered),
+            Paragraph("<b>Qtd</b>", style_centered),
+            Paragraph("<b>Unitário</b>", style_centered),
+            Paragraph("<b>Total</b>", style_centered)
+        ]]
+
+        subtotal = 0
+        desconto_total = 0
+        for item in dados['itens']:
+            descricao = item.get('nome', 'Produto sem nome')
+            qtd = float(item.get('quantidade', 1))
+            valor_unitario = float(item.get('valor_unitario', 0))
+            valor_total = float(item.get('valor_total', qtd * valor_unitario))
+            desconto_item = float(item.get('valor_desconto', 0))
+
+            table_data.append([
+                Paragraph(descricao, style_normal),
+                Paragraph(f"{qtd:.3f}".replace('.', ','), style_right),
+                Paragraph(f"R$ {valor_unitario:.2f}".replace('.', ','), style_right),
+                Paragraph(f"R$ {valor_total:.2f}".replace('.', ','), style_right)
+            ])
+
+            if desconto_item > 0:
+                table_data.append([
+                    Paragraph(f"Desconto: R$ {desconto_item:.2f}".replace('.', ','), style_italic), 
+                    '', '', ''])
+
+            subtotal += valor_total
+            desconto_total += desconto_item
+
+        col_widths = [32*mm, 10*mm, 15*mm, 15*mm]
+        table = Table(table_data, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F5F5F5')),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#DDDDDD')),
+            ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#DDDDDD')),
+        ]))
+        elements.append(table)
+        elements.append(Spacer(1, 8))
+
+        # Totais
+        total = subtotal - desconto_total
+        elements.append(Paragraph(f"Subtotal: R$ {subtotal:.2f}".replace('.', ','), style_right))
+        if desconto_total > 0:
+            elements.append(Paragraph(f"Descontos: -R$ {desconto_total:.2f}".replace('.', ','), style_right))
+        elements.append(Paragraph(f"<b>TOTAL: R$ {total:.2f}</b>".replace('.', ','), style_right))
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph("Este orçamento tem validade de 7 dias a partir da data de emissão.", 
+                               style_centered))
+        elements.append(Paragraph("Agradecemos a preferência!", style_centered))
+
+        # Build do PDF sem marca d'água
+        doc.build(elements)
+
+        buffer.seek(0)
+        response = make_response(buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'inline; filename=orcamento.pdf'
+        return response
+
+    except Exception as e:
+        print(f'ERROR: \n{e}')
+        return jsonify({'success': False, 'message': f'Erro ao gerar PDF: {str(e)}'}), 500

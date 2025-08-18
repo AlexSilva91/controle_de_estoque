@@ -2225,7 +2225,47 @@ async function saveExpense() {
         console.error('Erro ao salvar despesa:', error);
     }
 }
+async function gerarOrcamentoPDF() {
+    try {
+        // Preparar dados para o orçamento
+        const orcamentoData = {
+            cliente: selectedClient || { nome: "CONSUMIDOR FINAL" },
+            itens: selectedProducts.map(produto => ({
+                id: produto.id,
+                nome: produto.name,
+                descricao: produto.description,
+                quantidade: produto.quantity,
+                valor_unitario: produto.originalPrice,
+                valor_total: produto.price * produto.quantity,
+                valor_desconto: (produto.originalPrice * produto.quantity) - (produto.price * produto.quantity),
+                unidade: produto.unit
+            })),
+            observacoes: document.getElementById('sale-notes')?.value || ''
+        };
 
+        // Chamar a API para gerar o PDF
+        const response = await fetch('/operador/api/orcamento/pdf', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(orcamentoData)
+        });
+
+        if (!response.ok) {
+            throw new Error('Erro ao gerar orçamento');
+        }
+
+        // Criar blob e abrir em nova janela
+        const pdfBlob = await response.blob();
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        window.open(pdfUrl, '_blank');
+        
+    } catch (error) {
+        console.error('Erro ao gerar orçamento:', error);
+        showMessage(error.message, 'error');
+    }
+}
 // ==================== FUNÇÕES DE VENDAS DO DIA ====================
 async function loadDaySales() {
     const tableBody = document.querySelector('#day-sales-table tbody');

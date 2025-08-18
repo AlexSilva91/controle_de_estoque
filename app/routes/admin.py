@@ -3306,7 +3306,11 @@ def relatorio_vendas_produtos_pdf():
                 pdf.set_text_color(0, 0, 0)  # Resetar cor
 
         # Gerar PDF
-        pdf_output = pdf.output(dest='S').encode('latin1')
+        pdf_output = pdf.output(dest='S')
+        if isinstance(pdf_output, str):
+            pdf_output = pdf_output.encode('latin1')  # fpdf clássico
+        else:
+            pdf_output = bytes(pdf_output) 
         
         response = make_response(pdf_output)
         response.headers['Content-Type'] = 'application/pdf'
