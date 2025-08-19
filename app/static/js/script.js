@@ -2752,9 +2752,6 @@ async function loadCaixaFinanceiro(caixaId) {
         const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
         if (tableBody) {
           tableBody.innerHTML = '';
-
-          // REMOVA O CÁLCULO MANUAL DE ENTRADAS/SAÍDAS
-          // Use os totais calculados pelo backend (response.totais)
           
           response.data.forEach(item => {
             const row = document.createElement('tr');

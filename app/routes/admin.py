@@ -1,6 +1,7 @@
 import csv
 from functools import wraps
 import io
+import math
 from zoneinfo import ZoneInfo
 from flask import Blueprint, Response, app, render_template, request, jsonify
 from flask_login import login_required, current_user
@@ -2065,7 +2066,7 @@ def caixa_detail(caixa_id):
                 'observacoes_operador': caixa.observacoes_operador,
                 'observacoes_admin': caixa.observacoes_admin
             }
-            print(f'\nDEBUG: caixa_detail\n {caixa_data}')
+
             return jsonify({"success": True, "data": caixa_data})
             
         except Exception as e:
@@ -2233,12 +2234,25 @@ def get_caixa_financeiro(caixa_id):
         # 3. CALCULA VALORES FÍSICOS E DIGITAIS
         valor_dinheiro = formas_pagamento.get('dinheiro', 0.0)
         valor_fisico = valor_dinheiro
-        print(f'DEGUB:\n {total_entradas}\n{total_saidas}')
+        
         if caixa.valor_fechamento and caixa.valor_abertura:
-            diferenca = float(caixa.valor_fechamento) - float(caixa.valor_abertura)
-            if diferenca > 0:
-                valor_fisico = max(valor_dinheiro - diferenca, 0.0)
+            valor_abertura = float(caixa.valor_abertura)
+            valor_fechamento = float(caixa.valor_fechamento)
+            valor_fisico = max((valor_dinheiro + valor_abertura) - valor_fechamento - total_saidas, 0.0)
 
+            # Pega parte inteira e parte decimal
+            parte_inteira = math.floor(valor_fisico)
+            parte_decimal = valor_fisico - parte_inteira
+
+            if parte_decimal == 0.5:
+                # Mantém o valor original (sem arredondar)
+                valor_fisico = valor_fisico
+            elif parte_decimal > 0.5:
+                valor_fisico = math.ceil(valor_fisico)  # mais perto do de cima
+            else:
+                valor_fisico = math.floor(valor_fisico)  # mais perto do de baixo
+            
+        formas_pagamento['dinheiro'] = valor_fisico
         valor_digital = sum([
             formas_pagamento.get('pix_loja', 0.0),
             formas_pagamento.get('pix_fabiano', 0.0),
