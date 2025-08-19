@@ -1986,7 +1986,7 @@ def gerar_pdf_orcamento():
         # Margens zeradas no topo e laterais para imagem colada no topo
         doc = SimpleDocTemplate(buffer, pagesize=(80*mm, 250*mm), 
                               rightMargin=0, leftMargin=0,
-                              topMargin=-5, bottomMargin=10*mm)
+                              topMargin=-6, bottomMargin=10*mm)
         elements = []
 
         styles = getSampleStyleSheet()
@@ -2014,6 +2014,9 @@ def gerar_pdf_orcamento():
 
         # Cabeçalho
         elements.append(Paragraph("ORÇAMENTO", style_title))
+        elements.append(Paragraph(f"Contato: (87) 9 8152-1788", style_centered))
+        elements.append(Paragraph(f"Av. Fernando Bezerra, 123 - Centro - Ouricuri-PE", style_centered))
+        elements.append(Spacer(1, 6))
         elements.append(Paragraph(f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}", style_centered))
         
         if dados.get('cliente'):
@@ -2070,7 +2073,7 @@ def gerar_pdf_orcamento():
         elements.append(Spacer(1, 8))
 
         # Totais
-        total = subtotal - desconto_total
+        total = subtotal
         elements.append(Paragraph(f"Subtotal: R$ {subtotal:.2f}".replace('.', ','), style_right))
         if desconto_total > 0:
             elements.append(Paragraph(f"Descontos: -R$ {desconto_total:.2f}".replace('.', ','), style_right))
@@ -2082,7 +2085,7 @@ def gerar_pdf_orcamento():
 
         elements.append(
             Paragraph(
-                f"Este orçamento tem validade até hoje!",
+                f"Orçamento válido até a presente data.",
                 style_centered
             )
         )
