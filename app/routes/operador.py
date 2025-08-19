@@ -1901,7 +1901,7 @@ def gerar_pdf_orcamento():
         # Margens zeradas no topo e laterais para imagem colada no topo
         doc = SimpleDocTemplate(buffer, pagesize=(80*mm, 250*mm), 
                               rightMargin=0, leftMargin=0,
-                              topMargin=0, bottomMargin=10*mm)
+                              topMargin=-5, bottomMargin=10*mm)
         elements = []
 
         styles = getSampleStyleSheet()
@@ -1911,9 +1911,9 @@ def gerar_pdf_orcamento():
         style_right = ParagraphStyle('right', parent=style_normal, alignment=2)
         style_bold = ParagraphStyle('bold', parent=style_normal, fontName='Helvetica-Bold')
         style_italic = ParagraphStyle('italic', parent=style_normal, 
-                                     fontName='Helvetica-Oblique', fontSize=7)
+                                     fontName='Helvetica-Oblique', fontSize=8)
         style_title = ParagraphStyle('title', parent=style_bold, 
-                                   fontSize=10, alignment=1, spaceAfter=10)
+                                   fontSize=14, alignment=1, spaceAfter=10)
 
         # Imagem no topo totalmente colada (sem margem superior)
         logo_path = os.path.join('app', 'static', 'assets', 'logo.jpeg')
@@ -1943,8 +1943,8 @@ def gerar_pdf_orcamento():
         table_data = [[
             Paragraph("<b>Descrição</b>", style_centered),
             Paragraph("<b>Qtd</b>", style_centered),
-            Paragraph("<b>Unitário</b>", style_centered),
-            Paragraph("<b>Total</b>", style_centered)
+            Paragraph("<b>Unitário R$</b>", style_centered),
+            Paragraph("<b>Total R$</b>", style_centered)
         ]]
 
         subtotal = 0
@@ -1958,9 +1958,9 @@ def gerar_pdf_orcamento():
 
             table_data.append([
                 Paragraph(descricao, style_normal),
-                Paragraph(f"{qtd:.3f}".replace('.', ','), style_right),
-                Paragraph(f"R$ {valor_unitario:.2f}".replace('.', ','), style_right),
-                Paragraph(f"R$ {valor_total:.2f}".replace('.', ','), style_right)
+                Paragraph(f"{qtd:.1f}".replace('.', ','), style_right),
+                Paragraph(f"{valor_unitario:.2f}".replace('.', ','), style_right),
+                Paragraph(f"{valor_total:.2f}".replace('.', ','), style_right)
             ])
 
             if desconto_item > 0:
@@ -1991,10 +1991,16 @@ def gerar_pdf_orcamento():
             elements.append(Paragraph(f"Descontos: -R$ {desconto_total:.2f}".replace('.', ','), style_right))
         elements.append(Paragraph(f"<b>TOTAL: R$ {total:.2f}</b>".replace('.', ','), style_right))
         elements.append(Spacer(1, 10))
-        elements.append(Paragraph("Este orçamento tem validade de 7 dias a partir da data de emissão.", 
-                               style_centered))
-        elements.append(Paragraph("Agradecemos a preferência!", style_centered))
 
+        agora = datetime.now()
+        validade = (agora + timedelta(days=7)).replace(hour=18, minute=0, second=0, microsecond=0)
+
+        elements.append(
+            Paragraph(
+                f"Este orçamento tem validade até {validade.strftime('%d/%m/%Y às %H:%M')}.",
+                style_centered
+            )
+        )
         # Build do PDF sem marca d'água
         doc.build(elements)
 
