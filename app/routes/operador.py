@@ -33,7 +33,7 @@ from app.utils.nfce import gerar_nfce_pdf_bobina_bytesio
 from app.models.entities import (
      Caixa, Cliente, ContaReceber, Desconto, Entrega, Financeiro, NotaFiscal,
      NotaFiscalItem, PagamentoNotaFiscal, Produto, TipoDesconto, TipoEstoque, 
-     TipoUsuario, produto_desconto_association, NotaFiscal
+     TipoUsuario, produto_desconto_association, NotaFiscal, PagamentoContaReceber
 )
 from app.schemas import (
     ClienteCreate,
@@ -885,7 +885,7 @@ def gerar_pdf_vendas_dia():
     from io import BytesIO
     from flask import send_file, request, jsonify, current_app
     from datetime import datetime
-    from sqlalchemy import func
+    from sqlalchemy import func, and_
     import os
 
     # Configuração para impressora térmica (80mm ~ 72mm de área imprimível)
@@ -935,6 +935,56 @@ def gerar_pdf_vendas_dia():
         }
     else:
         dados = resultado['data']
+
+    # BUSCAR CONTAS A RECEBER PAGAS NO DIA ATUAL
+    contas_receber_pagas = []
+    total_contas_receber_pagas = 0
+    
+    try:
+        # Calcular início e fim do dia
+        inicio_dia = datetime.combine(data_relatorio, datetime.min.time())
+        fim_dia = datetime.combine(data_relatorio, datetime.max.time())
+        
+        # Buscar pagamentos de contas a receber realizados no dia
+        pagamentos_do_dia = PagamentoContaReceber.query.filter(
+            and_(
+                PagamentoContaReceber.data_pagamento >= inicio_dia,
+                PagamentoContaReceber.data_pagamento <= fim_dia,
+                PagamentoContaReceber.caixa_id == caixa_id
+            )
+        ).all()
+        
+        # Agrupar pagamentos por conta
+        pagamentos_por_conta = {}
+        for pagamento in pagamentos_do_dia:
+            if pagamento.conta_id not in pagamentos_por_conta:
+                pagamentos_por_conta[pagamento.conta_id] = {
+                    'conta': pagamento.conta,
+                    'pagamentos': [],
+                    'total_pago': 0
+                }
+            pagamentos_por_conta[pagamento.conta_id]['pagamentos'].append(pagamento)
+            pagamentos_por_conta[pagamento.conta_id]['total_pago'] += float(pagamento.valor_pago)
+        
+        # Preparar dados para exibição
+        for conta_id, info in pagamentos_por_conta.items():
+            conta = info['conta']
+            total_pago = info['total_pago']
+            
+            contas_receber_pagas.append({
+                'id': conta.id,
+                'cliente': conta.cliente.nome if conta.cliente else 'N/A',
+                'descricao': conta.descricao,
+                'valor_original': float(conta.valor_original),
+                'total_pago': total_pago,
+                'data_vencimento': conta.data_vencimento,
+                'pagamentos': info['pagamentos']
+            })
+            total_contas_receber_pagas += total_pago
+            
+    except Exception as e:
+        print(f"Erro ao buscar contas a receber pagas: {e}")
+        contas_receber_pagas = []
 
     buffer = BytesIO()
 
@@ -1103,6 +1153,7 @@ def gerar_pdf_vendas_dia():
             if 'a_prazo' in v and v['a_prazo'] and 'pagamentos' in v
         )
 
+    # Adicionar total de contas a receber pagas ao resumo
     elements.append(Paragraph("RESUMO FINANCEIRO", estilos['subtitulo']))
     elements.append(Spacer(1, 5))
     dados_resumo = [
@@ -1113,7 +1164,8 @@ def gerar_pdf_vendas_dia():
         ["Total Entradas", total_vendas_positivas],
         ["Total Saídas", dados.get('total_saidas', 0)],
         ["Total a Prazo Pendente", total_a_prazo_pendente],
-        ["Saldo Líquido", total_liquido]
+        ["Contas Recebidas", total_contas_receber_pagas],  # NOVA LINHA
+        ["Saldo Líquido", total_liquido + total_contas_receber_pagas]  # ATUALIZADO
     ]
     elements.append(criar_tabela_adaptavel(
         dados_resumo,
@@ -1125,42 +1177,36 @@ def gerar_pdf_vendas_dia():
     ))
     elements.append(Spacer(1, 10))
 
-    # CORREÇÃO PRINCIPAL: Formas de Pagamento usando os dados corretos da função obter_detalhes_vendas_dia
+    # Formas de Pagamento
     elements.append(Paragraph("FORMAS DE PAGAMENTO", estilos['subtitulo']))
     elements.append(Spacer(1, 5))
     dados_pagamentos = [["Forma de Pagamento", "Qtd", "Total"]]
     total_geral_pagamentos = 0
     total_geral_transacoes = 0
     
-    # USAR DIRETAMENTE OS DADOS DA FUNÇÃO obter_detalhes_vendas_dia
     por_forma_pagamento = dados.get('por_forma_pagamento', {})
     
     if por_forma_pagamento:
-        # Contar transações por forma de pagamento (EXCLUINDO ESTORNOS)
         contadores_transacoes = {}
         
         for venda in dados.get('vendas', []):
-            # PULAR ESTORNOS (vendas com valor negativo)
             if venda.get('valor_total', 0) < 0:
                 continue
                 
-            # Se tem pagamentos registrados, usa eles
             if 'pagamentos' in venda and venda['pagamentos']:
                 for pagamento in venda['pagamentos']:
-                    if pagamento.get('valor', 0) > 0:  # Só conta pagamentos positivos
+                    if pagamento.get('valor', 0) > 0:
                         forma = pagamento['forma_pagamento']
                         if forma not in contadores_transacoes:
                             contadores_transacoes[forma] = 0
                         contadores_transacoes[forma] += 1
             else:
-                # Caso contrário, usa a forma de pagamento da venda (se não for estorno)
                 if venda.get('valor_total', 0) > 0:
                     forma = venda.get('forma_pagamento', 'nao_informado')
                     if forma not in contadores_transacoes:
                         contadores_transacoes[forma] = 0
                     contadores_transacoes[forma] += 1
         
-        # Ordena por valor total (decrescente)
         formas_ordenadas = sorted(por_forma_pagamento.items(), key=lambda x: x[1], reverse=True)
         
         for forma, total in formas_ordenadas:
@@ -1175,7 +1221,6 @@ def gerar_pdf_vendas_dia():
             total_geral_pagamentos += total
             total_geral_transacoes += qtd_transacoes
     else:
-        # Adiciona linha vazia se não houver pagamentos
         dados_pagamentos.append(["Nenhum pagamento registrado", 0, 0])
     
     dados_pagamentos.append(["TOTAL GERAL", total_geral_transacoes, total_geral_pagamentos])
@@ -1190,7 +1235,52 @@ def gerar_pdf_vendas_dia():
     ))
     elements.append(Spacer(1, 15))
 
-    # Detalhes das Vendas - apenas se houver vendas
+    # NOVA SEÇÃO: CONTAS A RECEBER PAGAS NO DIA
+    if contas_receber_pagas:
+        elements.append(Paragraph("CONTAS A RECEBER PAGAS", estilos['subtitulo']))
+        elements.append(Spacer(1, 5))
+        
+        for conta in contas_receber_pagas:
+            elements.append(Paragraph(f"CONTA #{conta['id']}", estilos['negrito']))
+            elements.append(Spacer(1, 3))
+            
+            info_conta = [
+                ["Cliente", conta['cliente']],
+                ["Descrição", conta['descricao']],
+                ["Valor Original", moeda_br(conta['valor_original'])],
+                ["Total Pago", moeda_br(conta['total_pago'])],
+                ["Vencimento", conta['data_vencimento'].strftime('%d/%m/%Y') if hasattr(conta['data_vencimento'], 'strftime') else str(conta['data_vencimento'])]
+            ]
+            
+            elements.append(criar_tabela_adaptavel(
+                info_conta,
+                colWidths=['30%', '70%'],
+                estilo=[('FONTNAME', (0, 0), (0, -1), FONTE_NEGRITO)],
+                quebrar_linhas=True
+            ))
+            elements.append(Spacer(1, 5))
+            
+            # Detalhes dos pagamentos
+            if conta['pagamentos']:
+                elements.append(Paragraph("PAGAMENTOS:", estilos['negrito']))
+                dados_pagamentos_conta = [["Data", "Forma", "Valor"]]
+                for pagamento in conta['pagamentos']:
+                    dados_pagamentos_conta.append([
+                        pagamento.data_pagamento.strftime('%d/%m/%Y %H:%M'),
+                        pagamento.forma_pagamento.value.replace('_', ' ').title(),
+                        pagamento.valor_pago
+                    ])
+                elements.append(criar_tabela_adaptavel(
+                    dados_pagamentos_conta,
+                    colWidths=['40%', '30%', '30%'],
+                    estilo=[('ALIGN', (2, 1), (2, -1), 'RIGHT')]
+                ))
+            
+            elements.append(Spacer(1, 10))
+        
+        elements.append(Spacer(1, 10))
+
+    # Detalhes das Vendas
     if 'vendas' in dados and dados['vendas']:
         elements.append(Paragraph("DETALHES DAS VENDAS", estilos['subtitulo']))
         elements.append(Spacer(1, 5))
@@ -1201,7 +1291,6 @@ def gerar_pdf_vendas_dia():
             elements.append(Paragraph(titulo_venda, estilos['estorno'] if is_estorno else estilos['negrito']))
             elements.append(Spacer(1, 3))
             
-            # Calcular valor pendente para vendas a prazo
             valor_pendente = None
             if venda.get('a_prazo', False):
                 total_pago = sum(p['valor'] for p in venda['pagamentos']) if 'pagamentos' in venda else 0
@@ -1217,7 +1306,6 @@ def gerar_pdf_vendas_dia():
                 ["Desconto", venda.get('valor_desconto', 0)],
             ]
             
-            # Adicionar valor pendente se for venda a prazo
             if venda.get('a_prazo', False) and valor_pendente is not None:
                 info_venda_data.append(["Pendente", valor_pendente])
             
@@ -1229,7 +1317,6 @@ def gerar_pdf_vendas_dia():
             ))
             elements.append(Spacer(1, 5))
             
-            # Detalhes dos pagamentos se for venda a prazo
             if venda.get('a_prazo', False) and 'pagamentos' in venda and venda['pagamentos']:
                 elements.append(Paragraph("PAGAMENTOS REALIZADOS:", estilos['negrito']))
                 dados_pagamentos_venda = [["Data", "Forma", "Valor"]]
@@ -1246,7 +1333,6 @@ def gerar_pdf_vendas_dia():
                 ))
                 elements.append(Spacer(1, 5))
             
-            # Itens da venda
             if 'itens' in venda and venda['itens']:
                 dados_itens = [["Produto", "Qtd", "Unit.", "Total"]]
                 for item in venda['itens']:
@@ -1269,7 +1355,6 @@ def gerar_pdf_vendas_dia():
             if i < len(dados['vendas']) - 1:
                 elements.append(Spacer(1, 10))
     else:
-        # Mensagem quando não há vendas
         elements.append(Paragraph("DETALHES DAS VENDAS", estilos['subtitulo']))
         elements.append(Spacer(1, 5))
         elements.append(Paragraph("Nenhuma venda registrada no período", estilos['normal']))
@@ -1997,7 +2082,7 @@ def gerar_pdf_orcamento():
 
         elements.append(
             Paragraph(
-                f"Este orçamento tem validade até {validade.strftime('%d/%m/%Y às %H:%M')}.",
+                f"Este orçamento tem validade até hoje!",
                 style_centered
             )
         )
