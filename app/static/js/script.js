@@ -3435,56 +3435,6 @@ async function loadCaixaFinanceiro(caixaId) {
   // Event Listeners para Movimentações
   document.getElementById('filterMovimentacoes')?.addEventListener('click', loadMovimentacoesData);
 
-  // ===== FINANCEIRO =====
-  async function loadFinanceiroData() {
-    try {
-      const dateInicio = document.getElementById('dateInicio')?.value;
-      const dateFim = document.getElementById('dateFim')?.value;
-      
-      let url = '/admin/financeiro';
-      if (dateInicio || dateFim) {
-        url += `?data_inicio=${dateInicio}&data_fim=${dateFim}`;
-      }
-      
-      const data = await fetchWithErrorHandling(url);
-      
-      if (data.success) {
-        const receitasValue = document.getElementById('receitasValue');
-        if (receitasValue) receitasValue.textContent = data.resumo.receitas;
-        
-        const despesasValue = document.getElementById('despesasValue');
-        if (despesasValue) despesasValue.textContent = data.resumo.despesas;
-        
-        const saldoValue = document.getElementById('saldoValue');
-        if (saldoValue) saldoValue.textContent = data.resumo.saldo;
-        
-        const financeiroTable = document.querySelector('#financeiroTable tbody');
-        if (financeiroTable) {
-          financeiroTable.innerHTML = '';
-          
-          data.lancamentos.forEach(lanc => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${lanc.data}</td>
-              <td><span class="badge ${lanc.tipo === 'Entrada' ? 'badge-success' : 'badge-danger'}">${lanc.tipo}</span></td>
-              <td>${lanc.categoria}</td>
-              <td style="font-weight: 500; color: ${lanc.tipo === 'Entrada' ? 'var(--success-dark)' : 'var(--danger-dark)'}">${lanc.valor}</td>
-              <td>${lanc.descricao}</td>
-              <td>${lanc.nota}</td>
-            `;
-            financeiroTable.appendChild(row);
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao carregar dados financeiros:', error);
-      showFlashMessage('error', 'Erro ao carregar dados financeiros');
-    }
-  }
-
-  // Event Listeners para Financeiro
-  document.getElementById('filterFinanceiro')?.addEventListener('click', loadFinanceiroData);
-
   // ===== USUÁRIOS =====
   async function loadUsuariosData() {
     try {

@@ -93,12 +93,6 @@
                             <span class="nav-text">Relatório de Saída de Produtos</span>
                         </a>
                     </li>
-                    <li data-tab="financeiro">
-                        <a href="#financeiro" class="nav-link">
-                            <i class="fas fa-chart-line"></i>
-                            <span class="nav-text">Financeiro</span>
-                        </a>
-                    </li>
                     <li data-tab="contas-receber">
                         <a href="#contas-receber" class="nav-link">
                             <i class="fas fa-chart-line"></i>
@@ -487,86 +481,7 @@
                         </div>
                     </div>
                 </div>
-                <!-- Financeiro -->
-                <div id="financeiro" class="tab-content">
-                    <div class="action-bar">
-                        <div class="filter-container">
-                            <div class="filter-group">
-                                <label for="dateInicio">De:</label>
-                                <input type="date" id="dateInicio" class="form-control">
-                            </div>
-                            <div class="filter-group">
-                                <label for="dateFim">Até:</label>
-                                <input type="date" id="dateFim" class="form-control">
-                            </div>
-                            <button class="btn btn-primary" id="filterFinanceiro">
-                                <i class="fas fa-filter"></i>
-                                <span>Filtrar</span>
-                            </button>
-                        </div>
-                        <div class="action-buttons">
-                            <button class="btn btn-secondary" aria-label="Exportar">
-                                <i class="fas fa-file-export"></i>
-                                <span>Exportar</span>
-                            </button>
-                        </div>
-                    </div>
 
-                    <div class="metrics-grid">
-                        <div class="metric-card revenue">
-                            <div class="metric-icon">
-                                <i class="fas fa-arrow-up"></i>
-                            </div>
-                            <div class="metric-info">
-                                <h3>Receitas</h3>
-                                <div class="value" id="receitasValue">R$ 0,00</div>
-                            </div>
-                        </div>
-                        <div class="metric-card expense">
-                            <div class="metric-icon">
-                                <i class="fas fa-arrow-down"></i>
-                            </div>
-                            <div class="metric-info">
-                                <h3>Despesas</h3>
-                                <div class="value" id="despesasValue">R$ 0,00</div>
-                            </div>
-                        </div>
-                        <div class="metric-card balance">
-                            <div class="metric-icon">
-                                <i class="fas fa-balance-scale"></i>
-                            </div>
-                            <div class="metric-info">
-                                <h3>Saldo</h3>
-                                <div class="value" id="saldoValue">R$ 0,00</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-header">
-                            <h3><i class="fas fa-file-invoice-dollar"></i> Lançamentos Financeiros</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table id="financeiroTable">
-                                    <thead>
-                                        <tr>
-                                            <th>Data</th>
-                                            <th>Tipo</th>
-                                            <th>Categoria</th>
-                                            <th>Valor</th>
-                                            <th>Descrição</th>
-                                            <th>Nota Fiscal</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <!-- Dados serão preenchidos via JavaScript -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                 <!-- Contas a Receber -->
                 <div id="contas-receber" class="tab-content">
                     <div class="action-bar">
