@@ -2194,6 +2194,9 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('relatorioTotalQuantidade').textContent = meta.total_quantidade_vendida;
       document.getElementById('relatorioTotalValor').textContent = formatarMoeda(meta.total_valor_vendido);
       document.getElementById('relatorioEstoqueCritico').textContent = meta.produtos_estoque_critico;
+      document.getElementById('relatorioCustoTotal').textContent = formatCurrency(meta.total_custo);
+      document.getElementById('relatorioLucroBruto').textContent = formatCurrency(meta.lucro_bruto);
+      document.getElementById('relatorioLucroLiquido').textContent = formatCurrency(meta.lucro_liquido);
   }
 
   function preencherTabelaRelatorio(dados) {

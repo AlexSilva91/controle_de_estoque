@@ -15,6 +15,17 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
     Table as PlatypusTable
 )
+from flask import make_response, request, jsonify
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from datetime import datetime
+import io
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from io import BytesIO
@@ -2761,7 +2772,7 @@ def relatorio_vendas_produtos():
         except ValueError:
             return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
         
-        # Construir a query base
+        # Construir a query base para produtos vendidos
         query = db.session.query(
             Produto.id.label('produto_id'),
             Produto.nome.label('produto_nome'),
@@ -2769,6 +2780,7 @@ def relatorio_vendas_produtos():
             Produto.unidade.label('unidade'),
             func.sum(NotaFiscalItem.quantidade).label('quantidade_vendida'),
             func.sum(NotaFiscalItem.valor_total).label('valor_total_vendido'),
+            func.sum(NotaFiscalItem.quantidade * Produto.valor_unitario_compra).label('custo_total'),
             Produto.estoque_loja.label('estoque_atual_loja'),
             Produto.estoque_minimo.label('estoque_minimo')
         ).join(
@@ -2804,9 +2816,39 @@ def relatorio_vendas_produtos():
         # Executar a query
         resultados = query.all()
         
+        # Calcular despesas e estornos no período
+        despesas_query = db.session.query(
+            func.sum(Financeiro.valor).label('total_despesas')
+        ).filter(
+            Financeiro.tipo == TipoMovimentacao.saida,
+            Financeiro.categoria == CategoriaFinanceira.despesa,
+            Financeiro.data >= data_inicio,
+            Financeiro.data <= data_fim + timedelta(days=1)
+        ).first()
+        
+        estornos_query = db.session.query(
+            func.sum(Financeiro.valor).label('total_estornos')
+        ).filter(
+            Financeiro.tipo == TipoMovimentacao.saida_estorno,
+            Financeiro.data >= data_inicio,
+            Financeiro.data <= data_fim + timedelta(days=1)
+        ).first()
+        
+        total_despesas = despesas_query.total_despesas or 0
+        total_estornos = estornos_query.total_estornos or 0
+        
         # Processar os resultados para o relatório
         relatorio = []
+        lucro_bruto_total = 0
+        
         for r in resultados:
+            # Calcular lucro bruto para este produto
+            custo_total = float(r.custo_total) if r.custo_total else 0
+            valor_total_vendido = float(r.valor_total_vendido)
+            lucro_bruto = valor_total_vendido - custo_total
+            
+            lucro_bruto_total += lucro_bruto
+            
             # Calcular percentual de estoque atual em relação ao mínimo
             percentual_estoque = 0
             if r.estoque_minimo > 0:
@@ -2818,7 +2860,10 @@ def relatorio_vendas_produtos():
                 'produto_codigo': r.produto_codigo,
                 'unidade': r.unidade.value,
                 'quantidade_vendida': float(r.quantidade_vendida),
-                'valor_total_vendido': float(r.valor_total_vendido),
+                'valor_total_vendido': valor_total_vendido,
+                'custo_total': custo_total,
+                'lucro_bruto': lucro_bruto,
+                'margem_lucro': (lucro_bruto / valor_total_vendido * 100) if valor_total_vendido > 0 else 0,
                 'estoque_atual_loja': float(r.estoque_atual_loja),
                 'estoque_minimo': float(r.estoque_minimo),
                 'percentual_estoque': round(percentual_estoque, 2),
@@ -2829,9 +2874,13 @@ def relatorio_vendas_produtos():
                 )
             })
         
+        # Calcular lucro líquido total
+        lucro_liquido_total = lucro_bruto_total - float(total_despesas) - float(total_estornos)
+        
         # Adicionar totais ao relatório
         total_vendido = sum(item['valor_total_vendido'] for item in relatorio)
         total_quantidade = sum(item['quantidade_vendida'] for item in relatorio)
+        total_custo = sum(item['custo_total'] for item in relatorio)
         
         meta_relatorio = {
             'data_inicio': data_inicio.strftime('%Y-%m-%d'),
@@ -2839,6 +2888,9 @@ def relatorio_vendas_produtos():
             'total_produtos': len(relatorio),
             'total_quantidade_vendida': total_quantidade,
             'total_valor_vendido': total_vendido,
+            'total_custo': total_custo,
+            'lucro_bruto': lucro_bruto_total,
+            'lucro_liquido': lucro_liquido_total,
             'produtos_estoque_critico': sum(1 for item in relatorio if item['status_estoque'] == 'CRÍTICO')
         }
         
@@ -3164,21 +3216,6 @@ def relatorio_vendas_produtos_detalhes():
         print(f"Erro no relatório de vendas detalhado: {str(e)}")
         return jsonify({'success': False, 'message': 'Erro interno no servidor'}), 500
 
-from flask import make_response
-from fpdf import FPDF
-from datetime import datetime
-
-class PDF(FPDF):
-    def header(self):
-        self.set_font('Arial', 'B', 16)
-        self.cell(0, 10, 'Relatório de Vendas de Produtos', 0, 1, 'C')
-        self.set_font('Arial', '', 12)
-        self.ln(5)
-
-    def footer(self):
-        self.set_y(-15)
-        self.set_font('Arial', 'I', 8)
-        self.cell(0, 10, f"Página {self.page_no()} - Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", 0, 0, 'C')
 
 @admin_bp.route('/relatorios/vendas-produtos/pdf', methods=['GET'])
 @login_required
@@ -3197,18 +3234,63 @@ def relatorio_vendas_produtos_pdf():
         data_inicio_fmt = data_inicio.strftime("%d/%m/%Y")
         data_fim_fmt = data_fim.strftime("%d/%m/%Y")
 
-        pdf = PDF(orientation='P', unit='mm', format='A4')
-        pdf.add_page()
-        pdf.set_auto_page_break(auto=True, margin=15)
+        # Criar buffer para o PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, 
+                              leftMargin=15*mm, rightMargin=15*mm,
+                              topMargin=20*mm, bottomMargin=20*mm)
+        
+        styles = getSampleStyleSheet()
+        elements = []
+        
+        # Estilos personalizados
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            alignment=TA_CENTER,
+            spaceAfter=12
+        )
+        
+        subtitle_style = ParagraphStyle(
+            'CustomSubtitle',
+            parent=styles['Normal'],
+            fontSize=12,
+            alignment=TA_CENTER,
+            spaceAfter=6
+        )
+        
+        normal_style = styles['Normal']
+        bold_style = ParagraphStyle(
+            'Bold',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold'
+        )
+        
+        # Título
+        elements.append(Paragraph('Relatório de Vendas de Produtos', title_style))
         
         # Informações do relatório
-        pdf.set_font('Arial', '', 12)
-        pdf.cell(0, 10, f"Período: {data_inicio_fmt} a {data_fim_fmt}", 0, 1, 'C')
-        pdf.cell(0, 10, f"Total de produtos: {relatorio_data['meta']['total_produtos']}", 0, 1, 'C')
-        pdf.cell(0, 10, f"Quantidade total vendida: {relatorio_data['meta']['total_quantidade_vendida']}", 0, 1, 'C')
-        pdf.cell(0, 10, f"Valor total vendido: {formatarMoeda(relatorio_data['meta']['total_valor_vendido'])}", 0, 1, 'C')
-        pdf.ln(10)
-
+        elements.append(Paragraph(f"Período: {data_inicio_fmt} a {data_fim_fmt}", subtitle_style))
+        elements.append(Paragraph(f"Total de produtos: {relatorio_data['meta']['total_produtos']}", subtitle_style))
+        elements.append(Paragraph(f"Quantidade total vendida: {relatorio_data['meta']['total_quantidade_vendida']}", subtitle_style))
+        elements.append(Paragraph(f"Valor total vendido: {formatarMoeda(relatorio_data['meta']['total_valor_vendido'])}", subtitle_style))
+        elements.append(Paragraph(f"Custo total: {formatarMoeda(relatorio_data['meta']['total_custo'])}", subtitle_style))
+        elements.append(Paragraph(f"Lucro bruto total: {formatarMoeda(relatorio_data['meta']['lucro_bruto'])}", subtitle_style))
+        
+        # Lucro líquido com destaque
+        lucro_liquido = relatorio_data['meta']['lucro_liquido']
+        lucro_style = ParagraphStyle(
+            'LucroStyle',
+            parent=subtitle_style,
+            fontName='Helvetica-Bold',
+            fontSize=14,
+            textColor=colors.darkgreen if lucro_liquido >= 0 else colors.red
+        )
+        elements.append(Paragraph(f"Lucro líquido total: {formatarMoeda(lucro_liquido)}", lucro_style))
+        
+        elements.append(Spacer(1, 15))
+        
         # Verificar se é detalhado ou geral
         produto_id = request.args.get('produto_id')
         if produto_id:
@@ -3217,125 +3299,142 @@ def relatorio_vendas_produtos_pdf():
             if not detalhes_data.get('success'):
                 return jsonify(detalhes_data), 500
 
-            # Informações do produto
-            pdf.set_font('Arial', 'B', 14)
-            pdf.cell(0, 10, f"Detalhes do Produto: {detalhes_data['produto']['produto_nome']}", 0, 1, 'C')
+            # Título do produto
+            produto_title_style = ParagraphStyle(
+                'ProdutoTitle',
+                parent=styles['Heading2'],
+                fontSize=14,
+                alignment=TA_CENTER,
+                spaceAfter=12
+            )
+            elements.append(Paragraph(f"Detalhes do Produto: {detalhes_data['produto']['produto_nome']}", produto_title_style))
             
-            # Tabela de informações (2 colunas)
-            col_width = 85  # Largura de cada coluna
-            pdf.set_font('Arial', '', 12)
-            pdf.set_x((pdf.w - col_width*2)/2)  # Centralizar tabela
+            # Tabela de informações do produto
+            produto_info_data = [
+                ['Código:', detalhes_data['produto']['produto_id']],
+                ['Nome:', detalhes_data['produto']['produto_nome']],
+                ['Unidade:', detalhes_data['produto']['unidade']],
+                ['Quantidade Vendida:', f"{detalhes_data['produto']['quantidade_vendida']}"],
+                ['Valor Total Vendido:', formatarMoeda(detalhes_data['produto']['valor_total_vendido'])],
+                ['Custo Total:', formatarMoeda(detalhes_data['produto']['custo_total'])],
+                ['Lucro Bruto:', formatarMoeda(detalhes_data['produto']['lucro_bruto'])],
+                ['Estoque Atual:', f"{detalhes_data['produto']['estoque_atual_loja']}"]
+            ]
             
-            with pdf.table(width=col_width*2, col_widths=(col_width, col_width), text_align=('L', 'L')) as table:
-                # Adicionar linhas da tabela...
-                pass
+            produto_table = Table(produto_info_data, colWidths=[60*mm, 100*mm])
+            produto_table.setStyle(TableStyle([
+                ('FONT', (0, 0), (-1, -1), 'Helvetica', 10),
+                ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
             
-            pdf.ln(10)
+            elements.append(produto_table)
+            elements.append(Spacer(1, 15))
             
             # Histórico de vendas
-            pdf.set_font('Arial', 'B', 12)
-            pdf.cell(0, 10, 'Histórico de Vendas:', 0, 1, 'C')
+            elements.append(Paragraph('Histórico de Vendas:', styles['Heading2']))
             
-            # Definir larguras das colunas (total não deve ultrapassar 190mm para A4)
-            col_widths = [25, 20, 30, 30, 85]  # Total: 190mm
-            
-            # Centralizar tabela
-            table_width = sum(col_widths)
-            pdf.set_x((pdf.w - table_width)/2)
-            
-            # Cabeçalho
-            pdf.set_fill_color(70, 130, 180)
-            pdf.set_text_color(255, 255, 255)
-            pdf.set_font('Arial', 'B', 10)
-            
-            headers = ['Data', 'Qtd.', 'Valor Unit.', 'Valor Total', 'Cliente']
-            for i, header in enumerate(headers):
-                pdf.cell(col_widths[i], 10, header, 1, 0, 'C', 1)
-            pdf.ln()
-            
-            # Conteúdo
-            pdf.set_text_color(0, 0, 0)
-            pdf.set_font('Arial', '', 10)
-            
-            for venda in detalhes_data['historico']:
-                pdf.set_x((pdf.w - table_width)/2)  # Recentralizar a cada linha
-                data = datetime.fromisoformat(venda['data_emissao']).strftime('%d/%m/%Y')
+            if detalhes_data['historico']:
+                # Cabeçalho da tabela
+                historico_data = [['Data', 'Qtd.', 'Valor Unit.', 'Valor Total', 'Cliente']]
                 
-                # Truncar o nome do cliente se for muito longo
-                cliente_nome = venda['cliente_nome'] or 'Consumidor'
-                if len(cliente_nome) > 30:
-                    cliente_nome = cliente_nome[:27] + '...'
+                # Dados das vendas
+                for venda in detalhes_data['historico']:
+                    data = datetime.fromisoformat(venda['data_emissao']).strftime('%d/%m/%Y')
+                    cliente_nome = venda['cliente_nome'] or 'Consumidor'
+                    if len(cliente_nome) > 30:
+                        cliente_nome = cliente_nome[:27] + '...'
+                    
+                    historico_data.append([
+                        data,
+                        str(venda['quantidade']),
+                        formatarMoeda(venda['valor_unitario']),
+                        formatarMoeda(venda['valor_total']),
+                        cliente_nome
+                    ])
                 
-                for i, item in enumerate([
-                    data,
-                    str(venda['quantidade']),
-                    formatarMoeda(venda['valor_unitario']),
-                    formatarMoeda(venda['valor_total']),
-                    cliente_nome
-                ]):
-                    pdf.cell(col_widths[i], 10, item, 1)
-                pdf.ln()
+                # Criar tabela
+                historico_table = Table(historico_data, colWidths=[25*mm, 20*mm, 30*mm, 30*mm, 85*mm])
+                historico_table.setStyle(TableStyle([
+                    ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 10),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4682B4')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('ALIGN', (4, 1), (4, -1), 'LEFT'),
+                    ('FONT', (0, 1), (-1, -1), 'Helvetica', 9),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+                ]))
+                
+                elements.append(historico_table)
+            else:
+                elements.append(Paragraph('Nenhuma venda encontrada para este período.', normal_style))
+                
         else:
             # MODO GERAL - Lista de produtos
-            pdf.set_font('Arial', 'B', 12)
-            pdf.cell(0, 10, 'Lista de Produtos:', 0, 1, 'C')
+            elements.append(Paragraph('Lista de Produtos:', styles['Heading2']))
             
-            # Definir larguras das colunas (total não deve ultrapassar 190mm para A4)
-            col_widths = [15, 95, 15, 20, 25, 15, 15]  # Total: 200mm (ajustado para caber em A4)
-            
-            # Centralizar tabela
-            table_width = sum(col_widths)
-            pdf.set_x((pdf.w - table_width)/2)
-            
-            # Cabeçalho
-            pdf.set_fill_color(70, 130, 180)
-            pdf.set_text_color(255, 255, 255)
-            pdf.set_font('Arial', 'B', 10)
-            
-            headers = ['ID', 'Produto', 'Unid.', 'Qtd. Vend.', 'Valor Vend.', 'Estoque', 'Status']
-            for i, header in enumerate(headers):
-                pdf.cell(col_widths[i], 10, header, 1, 0, 'C', 1)
-            pdf.ln()
-            
-            # Conteúdo
-            pdf.set_text_color(0, 0, 0)
-            pdf.set_font('Arial', '', 10)
-            
-            for produto in relatorio_data['dados']:
-                pdf.set_x((pdf.w - table_width)/2)  # Recentralizar a cada linha
+            if relatorio_data['dados']:
+                # Cabeçalho da tabela
+                table_data = [['ID', 'Produto', 'Unid.', 'Qtd.', 'Vendas', 'Custo', 'Lucro', 'Estoque']]
                 
-                # ID
-                pdf.cell(col_widths[0], 10, str(produto['produto_id']), 1, 0, 'C')
+                # Dados dos produtos
+                for produto in relatorio_data['dados']:
+                    # Truncar nome do produto se necessário
+                    nome_produto = produto['produto_nome']
+                    if len(nome_produto) > 40:
+                        nome_produto = nome_produto[:37] + '...'
+                    
+                    table_data.append([
+                        str(produto['produto_id']),
+                        nome_produto,
+                        produto['unidade'],
+                        str(round(produto['quantidade_vendida'], 2)),
+                        formatarMoeda(produto['valor_total_vendido']),
+                        formatarMoeda(produto['custo_total']),
+                        formatarMoeda(produto['lucro_bruto']),
+                        str(round(produto['estoque_atual_loja'], 2))
+                    ])
                 
-                # Produto - truncar se for muito longo (mantendo uma linha)
-                nome_produto = produto['produto_nome']
-                if len(nome_produto) > 35:  # Ajuste este valor conforme necessário
-                    nome_produto = nome_produto[:32] + '...'
-                pdf.cell(col_widths[1], 10, nome_produto, 1, 0, 'L')
+                # Criar tabela
+                col_widths = [15*mm, 60*mm, 15*mm, 15*mm, 20*mm, 20*mm, 20*mm, 15*mm]
+                produto_table = Table(table_data, colWidths=col_widths, repeatRows=1)
                 
-                # Demais células...
-                pdf.cell(col_widths[2], 10, produto['unidade'], 1, 0, 'C')
-                pdf.cell(col_widths[3], 10, str(round(produto['quantidade_vendida'], 2)), 1, 0, 'R')
-                pdf.cell(col_widths[4], 10, formatarMoeda(produto['valor_total_vendido']), 1, 0, 'R')
-                pdf.cell(col_widths[5], 10, str(round(produto['estoque_atual_loja'], 2)), 1, 0, 'R')
+                # Estilo da tabela
+                table_style = TableStyle([
+                    ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 8),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4682B4')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+                    ('ALIGN', (3, 1), (-1, -1), 'RIGHT'),
+                    ('FONT', (0, 1), (-1, -1), 'Helvetica', 8),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+                ])
                 
-                # Status com cor
-                if produto['status_estoque'] == 'CRÍTICO':
-                    pdf.set_text_color(255, 0, 0)
-                else:
-                    pdf.set_text_color(0, 128, 0)
+                # Adicionar cores para lucro positivo/negativo
+                for i in range(1, len(table_data)):
+                    lucro = produto['lucro_bruto'] if i == 1 else relatorio_data['dados'][i-1]['lucro_bruto']
+                    if lucro < 0:
+                        table_style.add('TEXTCOLOR', (6, i), (6, i), colors.red)
+                    else:
+                        table_style.add('TEXTCOLOR', (6, i), (6, i), colors.darkgreen)
                 
-                pdf.cell(col_widths[6], 10, produto['status_estoque'], 1, 1, 'C')
-                pdf.set_text_color(0, 0, 0)  # Resetar cor
-
-        # Gerar PDF
-        pdf_output = pdf.output(dest='S')
-        if isinstance(pdf_output, str):
-            pdf_output = pdf_output.encode('latin1')  # fpdf clássico
-        else:
-            pdf_output = bytes(pdf_output) 
+                produto_table.setStyle(table_style)
+                elements.append(produto_table)
+            else:
+                elements.append(Paragraph('Nenhum produto encontrado para este período.', normal_style))
         
-        response = make_response(pdf_output)
+        # Gerar PDF
+        doc.build(elements)
+        
+        # Preparar resposta
+        buffer.seek(0)
+        response = make_response(buffer.getvalue())
         response.headers['Content-Type'] = 'application/pdf'
         response.headers['Content-Disposition'] = 'inline; filename=relatorio_vendas_produtos.pdf'
         

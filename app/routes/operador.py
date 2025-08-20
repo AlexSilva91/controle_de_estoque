@@ -6,7 +6,6 @@ import textwrap
 from flask import current_app, request, jsonify, send_file
 from datetime import datetime
 from io import BytesIO
-from fpdf import FPDF
 from reportlab.lib.styles import getSampleStyleSheet
 # Importações do ReportLab
 from reportlab.pdfgen import canvas
@@ -28,7 +27,7 @@ from app.bot.bot_movimentacao import enviar_resumo_movimentacao_diaria
 from flask import send_file
 from app.utils.preparar_notas import preparar_dados_nota
 from app.utils.converter_endereco import parse_endereco_string
-from app.utils.format_data_moeda import format_number
+from app.utils.format_data_moeda import format_currency, format_number
 from app.utils.nfce import gerar_nfce_pdf_bobina_bytesio
 from app.models.entities import (
      Caixa, Cliente, ContaReceber, Desconto, Entrega, Financeiro, NotaFiscal,
@@ -892,7 +891,7 @@ def gerar_pdf_vendas_dia():
     LARGURA_IMPRESSORA = 72 * mm
     ALTURA_IMPRESSORA = 1000 * mm
     MARGEM = 2 * mm
-    TAMANHO_FONTE = 7
+    TAMANHO_FONTE = 10
     ESPACAMENTO = 1.2
 
     try:
@@ -1991,12 +1990,12 @@ def gerar_pdf_orcamento():
 
         styles = getSampleStyleSheet()
         style_normal = ParagraphStyle('normal', parent=styles['Normal'], 
-                                     fontName='Helvetica', fontSize=8, leading=10)
+                                     fontName='Helvetica', fontSize=10, leading=10)
         style_centered = ParagraphStyle('centered', parent=style_normal, alignment=1)
         style_right = ParagraphStyle('right', parent=style_normal, alignment=2)
         style_bold = ParagraphStyle('bold', parent=style_normal, fontName='Helvetica-Bold')
         style_italic = ParagraphStyle('italic', parent=style_normal, 
-                                     fontName='Helvetica-Oblique', fontSize=8)
+                                     fontName='Helvetica-Oblique', fontSize=10)
         style_title = ParagraphStyle('title', parent=style_bold, 
                                    fontSize=14, alignment=1, spaceAfter=10)
 
@@ -2016,7 +2015,7 @@ def gerar_pdf_orcamento():
         elements.append(Paragraph("ORÇAMENTO", style_title))
         elements.append(Paragraph(f"Contato: (87) 9 8152-1788", style_centered))
         elements.append(Paragraph(f"Av. Fernando Bezerra, 123 - Centro - Ouricuri-PE", style_centered))
-        elements.append(Spacer(1, 6))
+        elements.append(Spacer(1, 18))
         elements.append(Paragraph(f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}", style_centered))
         
         if dados.get('cliente'):
@@ -2025,7 +2024,7 @@ def gerar_pdf_orcamento():
             if cliente.get('documento'):
                 elements.append(Paragraph(f"Documento: {cliente['documento']}", style_centered))
         
-        elements.append(Spacer(1, 6))
+        elements.append(Spacer(1, 18))
 
         # Tabela de itens
         table_data = [[
@@ -2047,8 +2046,8 @@ def gerar_pdf_orcamento():
             table_data.append([
                 Paragraph(descricao, style_normal),
                 Paragraph(f"{qtd:.1f}".replace('.', ','), style_right),
-                Paragraph(f"{valor_unitario:.2f}".replace('.', ','), style_right),
-                Paragraph(f"{valor_total:.2f}".replace('.', ','), style_right)
+                Paragraph(f"{format_currency(valor_unitario)}".replace('.', ','), style_right),
+                Paragraph(f"{format_currency(valor_total)}".replace('.', ','), style_right)
             ])
 
             if desconto_item > 0:
@@ -2059,7 +2058,7 @@ def gerar_pdf_orcamento():
             subtotal += valor_total
             desconto_total += desconto_item
 
-        col_widths = [32*mm, 10*mm, 15*mm, 15*mm]
+        col_widths = [30*mm, 12*mm, 17*mm, 17*mm]
         table = Table(table_data, colWidths=col_widths, repeatRows=1)
         table.setStyle(TableStyle([
             ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
@@ -2074,22 +2073,19 @@ def gerar_pdf_orcamento():
 
         # Totais
         total = subtotal
-        elements.append(Paragraph(f"Subtotal: R$ {subtotal:.2f}".replace('.', ','), style_right))
+        elements.append(Paragraph(f"Subtotal: R$ {format_currency(subtotal)}".replace('.', ','), style_right))
         if desconto_total > 0:
-            elements.append(Paragraph(f"Descontos: -R$ {desconto_total:.2f}".replace('.', ','), style_right))
-        elements.append(Paragraph(f"<b>TOTAL: R$ {total:.2f}</b>".replace('.', ','), style_right))
+            elements.append(Paragraph(f"Descontos: -R$ {format_currency(desconto_total)}".replace('.', ','), style_right))
+        elements.append(Paragraph(f"<b>TOTAL: R$ {format_currency(total)}</b>".replace('.', ','), style_right))
         elements.append(Spacer(1, 10))
-
-        agora = datetime.now()
-        validade = (agora + timedelta(days=7)).replace(hour=18, minute=0, second=0, microsecond=0)
-
+        
         elements.append(
             Paragraph(
                 f"Orçamento válido até a presente data.",
                 style_centered
             )
         )
-        # Build do PDF sem marca d'água
+        
         doc.build(elements)
 
         buffer.seek(0)
