@@ -1,49 +1,206 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cavalcanti Rações - Login</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_login.css') }}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cavalcanti Rações - Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#FEC629',
+            secondary: '#1D1D1B',
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.6s ease-out forwards',
+            'slide-up': 'slideUp 0.5s ease-out forwards',
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0', transform: 'translateY(10px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' },
+            },
+            slideUp: {
+              '0%': { opacity: '0', transform: 'translateY(15px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      min-height: 100vh;
+    }
+    
+    .elegant-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      box-shadow: 
+        0 20px 25px -5px rgba(0, 0, 0, 0.1),
+        0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+    
+    .logo-container {
+      background: linear-gradient(135deg, #FEC629 0%, #f59e0b 100%);
+      border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+    }
+    
+    .logo-image {
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+    
+    .input-elegant {
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid #e2e8f0;
+      transition: all 0.3s ease;
+    }
+    
+    .input-elegant:focus {
+      background: rgba(255, 255, 255, 1);
+      border-color: #FEC629;
+      box-shadow: 
+        0 0 0 3px rgba(254, 198, 41, 0.1),
+        0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+    
+    .btn-elegant {
+      background: linear-gradient(135deg, #FEC629 0%, #f59e0b 100%);
+      transition: all 0.3s ease;
+      box-shadow: 
+        0 4px 6px -1px rgba(254, 198, 41, 0.2),
+        0 2px 4px -1px rgba(254, 198, 41, 0.1);
+    }
+    
+    .btn-elegant:hover {
+      transform: translateY(-1px);
+      box-shadow: 
+        0 6px 8px -1px rgba(254, 198, 41, 0.25),
+        0 4px 6px -1px rgba(254, 198, 41, 0.15);
+    }
+    
+    .btn-elegant:active {
+      transform: translateY(0);
+    }
+    
+    .flash-success { 
+      background: #f0fdf4; 
+      color: #166534; 
+      border: 1px solid #bbf7d0;
+      border-left: 4px solid #22c55e;
+    }
+    .flash-error { 
+      background: #fef2f2; 
+      color: #dc2626; 
+      border: 1px solid #fecaca;
+      border-left: 4px solid #ef4444;
+    }
+    .flash-warning { 
+      background: #fffbeb; 
+      color: #d97706; 
+      border: 1px solid #fde68a;
+      border-left: 4px solid #f59e0b;
+    }
+    .flash-info { 
+      background: #eff6ff; 
+      color: #2563eb; 
+      border: 1px solid #bfdbfe;
+      border-left: 4px solid #3b82f6;
+    }
+  </style>
 </head>
-<body>
-    <div class="login-container">
-        <div class="logo">
-            <img src="{{ url_for('static', filename='assets/logo1.jpeg') }}" alt="Cavalcanti Rações" id="logo-image">
-            <div class="logo-text" id="logo-text" style="display: none;">Cavalcanti Rações</div>
+<body class="min-h-screen flex items-center justify-center py-8 px-4">
+
+  <div class="w-full max-w-sm animate-fade-in">
+    <div class="elegant-card rounded-2xl overflow-hidden">
+
+      <!-- Cabeçalho com logo -->
+      <div class="logo-container px-6 py-5">
+        <div class="flex justify-center">
+          <img src="{{ url_for('static', filename='assets/logo.jpeg') }}" 
+               alt="Cavalcanti Rações" 
+               class="logo-image h-20 w-auto rounded-xl object-contain"
+               onerror="this.style.display='none'; document.getElementById('logo-text').classList.remove('hidden');">
+          <div id="logo-text" class="hidden text-secondary font-semibold text-xl flex items-center">
+            <i class="fas fa-paw mr-2 text-primary"></i>
+            Cavalcanti Rações
+          </div>
+        </div>
+      </div>
+
+      <!-- Conteúdo principal -->
+      <div class="px-6 py-5 animate-slide-up">
+        <div class="text-center mb-6">
+          <h1 class="text-xl font-semibold text-secondary mb-1">Acesso ao Sistema</h1>
+          <p class="text-gray-600 text-sm">Digite suas credenciais para continuar</p>
+        </div>
+        
+        <!-- Flash messages -->
+        <div id="flash-messages" class="mb-4">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="flash-{{ category }} p-3 rounded-lg mb-3 text-sm font-medium">
+                  {{ message }}
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
         </div>
 
-        <h1>Bem-vindo ao Sistema</h1>
-        <p class="subtitle">Faça login para continuar</p>
-
-        <!-- Área para mensagens dinâmicas -->
-        <div id="flash-messages">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-        </div>
-
-        <!-- Formulário modificado para usar AJAX -->
-        <form id="login-form">
-            <div class="input-group">
-                <input type="text" name="cpf" id="cpf" placeholder="CPF (somente números)" maxlength="11" required>
+        <!-- Formulário -->
+        <form id="login-form" class="space-y-4">
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="fas fa-user text-gray-400 text-sm"></i>
             </div>
-            <div class="input-group">
-                <input type="password" name="senha" id="senha" placeholder="Senha" required>
+            <input type="text" name="cpf" id="cpf"
+                   class="input-elegant w-full pl-10 pr-4 py-3 rounded-lg focus:outline-none text-secondary font-medium"
+                   placeholder="CPF (somente números)" maxlength="11" required>
+          </div>
+
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="fas fa-lock text-gray-400 text-sm"></i>
             </div>
-            <button type="submit" id="login-button">Entrar</button>
+            <input type="password" name="senha" id="senha"
+                   class="input-elegant w-full pl-10 pr-4 py-3 rounded-lg focus:outline-none text-secondary font-medium"
+                   placeholder="Senha" required>
+          </div>
+
+          <button type="submit" id="login-button"
+                  class="btn-elegant w-full text-white py-3 rounded-lg font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/50 mt-6">
+            Entrar
+          </button>
         </form>
-
-        <div class="footer">
-            <p>Problemas para acessar?</p>
-            <p>Contate o administrador</p>
-        </div>
+      </div>
+      
+      <!-- Rodapé -->
+      <div class="bg-gray-50/70 px-6 py-4 border-t border-gray-100">
+        <p class="text-center text-sm text-gray-500">
+          Problemas para acessar?<br>
+          <button class="font-medium text-secondary hover:text-primary transition-colors duration-200 mt-1 focus:outline-none">
+            Contate o administrador
+          </button>
+        </p>
+      </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/script_login.js') }}"></script>
+    <!-- Copyright -->
+    <p class="text-center text-xs text-gray-400 mt-6">
+      &copy; 2025 Cavalcanti Rações. Todos os direitos reservados.
+    </p>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/script_login.js') }}"></script>
 </body>
 </html>
