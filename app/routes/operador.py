@@ -516,7 +516,7 @@ def visualizar_pdf_venda(id_list):
         
         # Buscar os dados das notas fiscais
         resultado_busca = buscar_pagamentos_notas_fiscais(db.session, ids)
-        
+        print(resultado_busca)
         if not resultado_busca or not resultado_busca['data']:
             abort(404, description="Nenhuma nota encontrada com os IDs fornecidos")
         
@@ -2081,7 +2081,7 @@ def gerar_pdf_orcamento():
         
         elements.append(
             Paragraph(
-                f"Orçamento válido até a presente data.",
+                f"Orçamento válido somente até hoje.",
                 style_centered
             )
         )

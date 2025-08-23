@@ -109,7 +109,8 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict) -> BytesIO:
     formas_pagamento = dados_nota.get("formas_pagamento", []) or []
     endereco_entrega = dados_nota.get("endereco_entrega", {}) or {}
     metadados = dados_nota.get("metadados", {}) or {}
-
+    codigo_nota = dados_nota.get("nota_fiscal_id") or {}
+    
     try:
         emissao_str = dados_nota.get("data_emissao", "")
         emissao = datetime.strptime(emissao_str, "%Y-%m-%dT%H:%M:%S") if emissao_str else datetime.now()
@@ -218,7 +219,7 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict) -> BytesIO:
         y -= 5 * mm
 
     c.setFont("Helvetica", 7)
-    c.drawString(5*mm, y, f"Emissão: {emissao.strftime('%d/%m/%Y %H:%M')}")
+    c.drawString(5*mm, y, f"Emissão: {emissao.strftime('%d/%m/%Y %H:%M')}   ID Nota: {codigo_nota}")
     y -= 8 * mm
 
     # Tabela
