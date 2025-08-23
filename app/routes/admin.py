@@ -2275,6 +2275,15 @@ def get_caixa_financeiro(caixa_id):
 
         a_prazo = formas_pagamento.get('a_prazo', 0.0)
         
+        # 4. CALCULA TOTAL RECEBIDO DE CONTAS A PRAZO PARA ESTE CAIXA
+        total_contas_prazo_recebidas = session.query(
+            func.sum(PagamentoContaReceber.valor_pago)
+        ).filter(
+            PagamentoContaReceber.caixa_id == caixa_id
+        ).scalar() or 0.0
+        
+        total_contas_prazo_recebidas = float(total_contas_prazo_recebidas)
+        
         return jsonify({
             'success': True,
             'data': dados,
@@ -2284,7 +2293,8 @@ def get_caixa_financeiro(caixa_id):
                 'saldo': total_entradas - total_saidas,
                 'valor_fisico': valor_fisico,
                 'valor_digital': valor_digital,
-                'a_prazo': a_prazo
+                'a_prazo': a_prazo,
+                'contas_prazo_recebidas': total_contas_prazo_recebidas  # Novo campo adicionado
             },
             'vendas_por_forma_pagamento': formas_pagamento
         })
@@ -2339,7 +2349,14 @@ def gerar_pdf_caixa_financeiro(caixa_id):
             NotaFiscal.status == StatusNota.emitida
         ).group_by(PagamentoNotaFiscal.forma_pagamento).all()
 
+        # --- Total recebido de contas a prazo ---
+        total_contas_prazo_recebidas = session.query(
+            func.sum(PagamentoContaReceber.valor_pago)
+        ).filter(
+            PagamentoContaReceber.caixa_id == caixa_id
+        ).scalar() or 0.0
         
+        total_contas_prazo_recebidas = float(total_contas_prazo_recebidas)
         
         totais_vendas = {}
         for forma, total in vendas_por_forma_pagamento:
@@ -2494,6 +2511,7 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         elements.append(linha_dupla("Valor Físico:", moeda_br(valor_fisico)))
         elements.append(linha_dupla("Valor Digital:", moeda_br(valor_digital)))
         elements.append(linha_dupla("A Prazo:", moeda_br(a_prazo)))
+        elements.append(linha_dupla("A Prazo Recebidos:", moeda_br(total_contas_prazo_recebidas)))  # Nova linha adicionada
         
         elements.append(Spacer(1, 4))
         elements.append(linha_separadora())
@@ -2525,37 +2543,6 @@ def gerar_pdf_caixa_financeiro(caixa_id):
             if valor > 0:
                 nome_forma = nomes_formas.get(forma, forma)
                 elements.append(linha_dupla(f"{nome_forma}:", moeda_br(valor)))
-
-        # # --- Movimentações Financeiras ---
-        # elements.append(Spacer(1, 8))
-        # elements.append(linha_separadora())
-        # elements.append(Paragraph("MOVIMENTAÇÕES", subtitle_style))
-        # elements.append(Spacer(1, 6))
-        # elements.append(linha_separadora())
-        # for mov in movimentacoes:
-        #     tipo_cat = f"{mov.tipo.value}"
-        #     if mov.categoria:
-        #         tipo_cat += f" - {mov.categoria.value}"
-        #     elements.append(linha_dupla(tipo_cat, moeda_br(float(mov.valor))))
-        #     if mov.descricao:
-        #         descricao = mov.descricao
-        #         if len(descricao) > 25:
-        #             words = descricao
-        #             lines = []
-        #             current_line = ""
-        #             for word in words:
-        #                 if len(current_line + word) > 25:
-        #                     lines.append(current_line)
-        #                     current_line = word + ""
-        #                 else:
-        #                     current_line += word + ""
-        #             if current_line:
-        #                 lines.append(current_line)
-        #             for line in lines:
-        #                 elements.append(Paragraph(line, normal_style))
-        #         else:
-        #             elements.append(Paragraph(descricao, normal_style))
-        #     elements.append(linha_tracejada())
 
         # --- Assinaturas ---
         elements.append(Spacer(1, 15))

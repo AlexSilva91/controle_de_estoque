@@ -2798,7 +2798,11 @@ async function loadCaixaFinanceiro(caixaId) {
           if (document.getElementById('caixaAPrazo')) {
             document.getElementById('caixaAPrazo').textContent = formatarMoeda(response.totais.a_prazo || 0);
           }
-
+          if(document.getElementById('totalAPrazoRecebido')){
+            
+          document.getElementById('totalAPrazoRecebido').textContent = formatarMoeda(response.totais.contas_prazo_recebidas || 0);
+          }
+          
           const formasPagamento = response.vendas_por_forma_pagamento || {};
 
           document.getElementById('totalPixFabiano').textContent = formatarMoeda(formasPagamento.pix_fabiano || 0);
