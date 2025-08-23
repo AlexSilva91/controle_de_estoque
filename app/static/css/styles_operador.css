@@ -2600,3 +2600,291 @@ body {
     background-color: #28a745;
     color: white;
 }
+/* Estilos para o modal de detalhes do cliente */
+.client-details-modal .modal-content {
+    max-width: 1200px;
+    width: 95%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.client-section {
+    margin-top: 25px;
+    border-top: 2px solid #eee;
+    padding-top: 20px;
+}
+
+.client-section h4 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+/* Estilos para os cartões de conta a receber */
+.conta-receber-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.conta-header {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.conta-header h5 {
+    margin: 0;
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-size: 0.85em;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-badge.pendente {
+    background: #f39c12;
+    color: white;
+}
+
+.status-badge.quitado {
+    background: #27ae60;
+    color: white;
+}
+
+.status-badge.parcial {
+    background: #e67e22;
+    color: white;
+}
+
+.conta-details {
+    padding: 20px;
+}
+
+.conta-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 5px;
+}
+
+.conta-info div {
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Estilos para a seção de produtos */
+.produtos-section {
+    margin-top: 20px;
+    border-top: 1px solid #eee;
+    padding-top: 15px;
+}
+
+.produtos-section h6 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+.table-container {
+    overflow-x: auto;
+    margin-bottom: 15px;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.produtos-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    font-size: 0.9em;
+}
+
+.produtos-table th {
+    background: linear-gradient(135deg, #34495e, #2c3e50);
+    color: white;
+    padding: 12px 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.produtos-table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #eee;
+    vertical-align: top;
+}
+
+.produtos-table tbody tr:nth-child(even) {
+    background: #f8f9fa;
+}
+
+.produtos-table tbody tr:hover {
+    background: #e3f2fd;
+}
+
+.produtos-table tfoot tr {
+    background: #ecf0f1;
+    font-weight: 600;
+}
+
+.produtos-table tfoot td {
+    padding: 12px 8px;
+    border-top: 2px solid #bdc3c7;
+}
+
+/* Resumo da venda */
+.venda-resumo {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+    padding: 15px;
+    background: linear-gradient(135deg, #ecf0f1, #bdc3c7);
+    border-radius: 5px;
+}
+
+.resumo-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.resumo-item span {
+    color: #7f8c8d;
+    font-size: 0.9em;
+}
+
+.resumo-item strong {
+    color: #2c3e50;
+}
+
+/* Ações da conta */
+.conta-actions {
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #eee;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.btn-pay-partial, .btn-pay-full {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-pay-partial {
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+    color: white;
+}
+
+.btn-pay-partial:hover {
+    background: linear-gradient(135deg, #e67e22, #d35400);
+    transform: translateY(-1px);
+}
+
+.btn-pay-full {
+    background: linear-gradient(135deg, #27ae60, #229954);
+    color: white;
+}
+
+.btn-pay-full:hover {
+    background: linear-gradient(135deg, #229954, #1e8449);
+    transform: translateY(-1px);
+}
+
+.status-info {
+    color: #27ae60;
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+/* Mensagens quando não há dados */
+.no-products, .no-accounts {
+    text-align: center;
+    padding: 30px;
+    color: #7f8c8d;
+    font-style: italic;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .client-details-modal .modal-content {
+        width: 98%;
+        margin: 10px;
+    }
+    
+    .conta-info {
+        grid-template-columns: 1fr;
+    }
+    
+    .produtos-table {
+        font-size: 0.8em;
+    }
+    
+    .produtos-table th,
+    .produtos-table td {
+        padding: 6px 4px;
+    }
+    
+    .venda-resumo {
+        grid-template-columns: 1fr;
+    }
+    
+    .conta-actions {
+        flex-direction: column;
+    }
+    
+    .btn-pay-partial, .btn-pay-full {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+}
+
+/* Melhorias na exibição de valores com desconto */
+.produtos-table td:last-child {
+    text-align: right;
+}
+
+.produtos-table th:last-child {
+    text-align: right;
+}
+
+/* Destaque para valores importantes */
+.valor-destaque {
+    color: #27ae60;
+    font-weight: 700;
+    font-size: 1.1em;
+}
+
+.desconto-destaque {
+    color: #e74c3c;
+    font-weight: 600;
+}

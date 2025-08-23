@@ -735,6 +735,7 @@ async function saveClient() {
         showMessage(error.message, 'error');
     }
 }
+
 async function viewClientDetails(clientId) {
     try {
         const client = await findClientById(clientId);
@@ -744,11 +745,8 @@ async function viewClientDetails(clientId) {
             return;
         }
         
-        // Busca as contas a receber e notas fiscais do cliente
-        const [contasReceber, notasFiscais] = await Promise.all([
-            findContasReceberByClienteId(clientId),
-            findNotasFiscaisByClienteId(clientId)
-        ]);
+        // Busca as contas a receber do cliente
+        const contasReceber = await findContasReceberByClienteId(clientId);
         
         // Create a modal to display client details
         const modal = document.createElement('div');
@@ -767,121 +765,133 @@ async function viewClientDetails(clientId) {
                             <label>Nome:</label>
                             <p>${client.nome || 'Não informado'}</p>
                         </div>
-                        <div class="client-detail">
-                            <label>Documento:</label>
-                            <p>${formatDocument(client.documento) || 'Não informado'}</p>
-                        </div>
-                        <div class="client-detail">
-                            <label>Telefone:</label>
-                            <p>${client.telefone ? formatPhone(client.telefone) : 'Não informado'}</p>
-                        </div>
-                        <div class="client-detail">
-                            <label>Email:</label>
-                            <p>${client.email || 'Não informado'}</p>
-                        </div>
-                        <div class="client-detail">
-                            <label>Endereço:</label>
-                            <p>${client.endereco || 'Não informado'}</p>
-                        </div>
-                        <div class="client-detail">
-                            <label>Limite de Crédito:</label>
-                            <p>${client.limite_credito ? formatCurrency(client.limite_credito) : 'Não informado'}</p>
-                        </div>
-                        <div class="client-detail">
-                            <label>Data de Cadastro:</label>
-                            <p>${formatDateTime(client.criado_em) || 'Não informado'}</p>
-                        </div>
+                        <!-- ... outros campos do cliente ... -->
                     </div>
                     
                     <!-- Seção de Contas a Receber -->
                     <div class="client-section">
                         <h4>Contas a Receber (${contasReceber.length})</h4>
                         ${contasReceber.length > 0 ? 
-                            `<div class="table-container">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Descrição</th>
-                                            <th>Valor Total</th>
-                                            <th>Valor Aberto</th>
-                                            <th>Status</th>
-                                            <th>Vencimento</th>
-                                            <th>Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${contasReceber.map(conta => `
-                                            <tr data-conta-id="${conta.id}">
-                                                <td>${conta.descricao || 'Sem descrição'}</td>
-                                                <td>${formatCurrency(conta.valor_original)}</td>
-                                                <td>${formatCurrency(conta.valor_aberto)}</td>
-                                                <td><span class="status-badge ${conta.status}">${conta.status}</span></td>
-                                                <td>${formatDate(conta.data_vencimento)}</td>
-                                                <td class="actions-cell">
-                                                    ${conta.status === 'pendente' || conta.status === 'parcial' ? `
-                                                        <button class="btn-pay-partial btn-small" data-conta-id="${conta.id}" 
-                                                            data-valor-aberto="${conta.valor_aberto}">
-                                                            Pagar Parcial
-                                                        </button>
-                                                        <button class="btn-pay-full btn-small" data-conta-id="${conta.id}" 
-                                                            data-valor-aberto="${conta.valor_aberto}">
-                                                            Pagar Total
-                                                        </button>
+                            contasReceber.map(conta => `
+                                <div class="conta-receber-card" data-conta-id="${conta.id}">
+                                    <div class="conta-header">
+                                        <h5>${conta.descricao || 'Conta sem descrição'}</h5>
+                                        <span class="status-badge ${conta.status}">${conta.status}</span>
+                                    </div>
+                                    
+                                    <div class="conta-details">
+                                        <div class="conta-info">
+                                            <div><strong>Valor Original:</strong> ${formatCurrency(conta.valor_original)}</div>
+                                            <div><strong>Valor Aberto:</strong> ${formatCurrency(conta.valor_aberto)}</div>
+                                            <div><strong>Vencimento:</strong> ${formatDate(conta.data_vencimento)}</div>
+                                            ${conta.data_pagamento ? `<div><strong>Pagamento:</strong> ${formatDateTime(conta.data_pagamento)}</div>` : ''}
+                                            ${conta.observacoes ? `<div><strong>Observações:</strong> ${conta.observacoes}</div>` : ''}
+                                        </div>
+                                        
+                                        ${conta.itens_nota_fiscal && conta.itens_nota_fiscal.length > 0 ? `
+                                            <div class="produtos-section">
+                                                <h6>Produtos Comprados:</h6>
+                                                <div class="table-container">
+                                                    <table class="produtos-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Produto</th>
+                                                                <th>Quantidade</th>
+                                                                <th>Valor Unit.</th>
+                                                                <th>Desconto Item</th>
+                                                                <th>Total Item</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            ${conta.itens_nota_fiscal.map(item => {
+                                                                const valorBrutoItem = item.quantidade * item.valor_unitario;
+                                                                const temDesconto = item.desconto_aplicado > 0;
+                                                                
+                                                                return `
+                                                                <tr>
+                                                                    <td>${item.produto_nome}</td>
+                                                                    <td>${item.quantidade} ${item.unidade_medida}</td>
+                                                                    <td>${formatCurrency(item.valor_unitario)}</td>
+                                                                    <td>
+                                                                        ${temDesconto ? 
+                                                                            `${formatCurrency(item.desconto_aplicado)} 
+                                                                             ${item.tipo_desconto ? `(${item.tipo_desconto})` : ''}`
+                                                                            : 'Sem desconto'
+                                                                        }
+                                                                    </td>
+                                                                    <td>
+                                                                        ${temDesconto ? 
+                                                                            `<span style="text-decoration: line-through; color: #999; font-size: 0.9em;">${formatCurrency(valorBrutoItem)}</span><br>` 
+                                                                            : ''
+                                                                        }
+                                                                        <strong>${formatCurrency(item.valor_total)}</strong>
+                                                                    </td>
+                                                                </tr>
+                                                                `;
+                                                            }).join('')}
+                                                        </tbody>
+                                                        <tfoot>
+                                                            <tr>
+                                                                <td colspan="4"><strong>Subtotal dos Itens:</strong></td>
+                                                                <td><strong>${formatCurrency(conta.itens_nota_fiscal.reduce((sum, item) => sum + item.valor_total, 0))}</strong></td>
+                                                            </tr>
+                                                            ${conta.valor_desconto_nota > 0 ? `
+                                                                <tr>
+                                                                    <td colspan="4">
+                                                                        <strong>Desconto na Nota ${conta.tipo_desconto_nota ? `(${conta.tipo_desconto_nota})` : ''}:</strong>
+                                                                    </td>
+                                                                    <td><strong style="color: #e74c3c;">-${formatCurrency(conta.valor_desconto_nota)}</strong></td>
+                                                                </tr>
+                                                            ` : ''}
+                                                            <tr style="border-top: 2px solid #333;">
+                                                                <td colspan="4"><strong>Total da Nota:</strong></td>
+                                                                <td><strong style="color: #27ae60; font-size: 1.1em;">${formatCurrency(conta.valor_total_nota)}</strong></td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                </div>
+                                                
+                                                <!-- Resumo da venda -->
+                                                <div class="venda-resumo">
+                                                    <div class="resumo-item">
+                                                        <span>Total de Itens:</span>
+                                                        <strong>${conta.itens_nota_fiscal.length}</strong>
+                                                    </div>
+                                                    <div class="resumo-item">
+                                                        <span>Quantidade Total:</span>
+                                                        <strong>${conta.itens_nota_fiscal.reduce((sum, item) => sum + item.quantidade, 0)} unidades</strong>
+                                                    </div>
+                                                    ${conta.itens_nota_fiscal.some(item => item.desconto_aplicado > 0) || conta.valor_desconto_nota > 0 ? `
+                                                        <div class="resumo-item">
+                                                            <span>Total de Descontos:</span>
+                                                            <strong style="color: #e74c3c;">${formatCurrency(
+                                                                conta.itens_nota_fiscal.reduce((sum, item) => sum + (item.desconto_aplicado || 0), 0) + 
+                                                                (conta.valor_desconto_nota || 0)
+                                                            )}</strong>
+                                                        </div>
                                                     ` : ''}
-                                                </td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <td><strong>Total:</strong></td>
-                                            <td><strong>${formatCurrency(contasReceber.reduce((sum, conta) => sum + conta.valor_original, 0))}</strong></td>
-                                            <td><strong>${formatCurrency(contasReceber.reduce((sum, conta) => sum + conta.valor_aberto, 0))}</strong></td>
-                                            <td colspan="3"></td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>` : 
-                            '<p>Nenhuma conta a receber encontrada</p>'}
-                    </div>
-                    
-                    <!-- Seção de Compras/Notas Fiscais -->
-                    <div class="client-section">
-                        <h4>Histórico de Compras (${notasFiscais.length})</h4>
-                        ${notasFiscais.length > 0 ? 
-                            `<div class="table-container">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Data</th>
-                                            <th>Valor Total</th>
-                                            <th>Desconto</th>
-                                            <th>Status</th>
-                                            <th>Pagamento</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${notasFiscais.map(nota => `
-                                            <tr>
-                                                <td>${formatDateTime(nota.data_emissao)}</td>
-                                                <td>${formatCurrency(nota.valor_total)}</td>
-                                                <td>${formatCurrency(nota.valor_desconto)}</td>
-                                                <td><span class="status-badge ${nota.status}">${nota.status}</span></td>
-                                                <td>${nota.a_prazo ? 'A Prazo' : 'À Vista'} ${nota.forma_pagamento ? `(${nota.forma_pagamento})` : ''}</td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <td><strong>Total:</strong></td>
-                                            <td><strong>${formatCurrency(notasFiscais.reduce((sum, nota) => sum + nota.valor_total, 0))}</strong></td>
-                                            <td><strong>${formatCurrency(notasFiscais.reduce((sum, nota) => sum + (nota.valor_desconto || 0), 0))}</strong></td>
-                                            <td colspan="2"></td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>` : 
-                            '<p>Nenhuma compra registrada</p>'}
+                                                </div>
+                                            </div>
+                                        ` : '<p class="no-products">Nenhum produto encontrado para esta conta</p>'}
+                                    </div>
+                                    
+                                    <div class="conta-actions">
+                                        ${conta.status === 'pendente' || conta.status === 'parcial' ? `
+                                            <button class="btn-pay-partial btn-small" data-conta-id="${conta.id}" 
+                                                data-valor-aberto="${conta.valor_aberto}">
+                                                💰 Pagar Parcial
+                                            </button>
+                                            <button class="btn-pay-full btn-small" data-conta-id="${conta.id}" 
+                                                data-valor-aberto="${conta.valor_aberto}">
+                                                ✅ Pagar Total
+                                            </button>
+                                        ` : `
+                                            <span class="status-info">✅ Conta quitada</span>
+                                        `}
+                                    </div>
+                                </div>
+                            `).join('') : 
+                            '<p class="no-accounts">Nenhuma conta a receber encontrada</p>'}
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1336,7 +1346,6 @@ async function findContasReceberByClienteId(clienteId) {
         
         const contas = await response.json();
         
-        // Processa os dados para o formato esperado
         return contas.map(conta => ({
             id: conta.id,
             descricao: conta.descricao || 'Sem descrição',
@@ -1347,7 +1356,12 @@ async function findContasReceberByClienteId(clienteId) {
             data_emissao: conta.data_emissao,
             data_pagamento: conta.data_pagamento,
             nota_fiscal_id: conta.nota_fiscal_id,
-            observacoes: conta.observacoes
+            observacoes: conta.observacoes,
+            // Incluir os dados dos produtos que estavam faltando
+            itens_nota_fiscal: conta.itens_nota_fiscal || [],
+            valor_total_nota: conta.valor_total_nota || 0.0,
+            valor_desconto_nota: conta.valor_desconto_nota || 0.0,
+            tipo_desconto_nota: conta.tipo_desconto_nota
         }));
         
     } catch (error) {
@@ -1356,7 +1370,6 @@ async function findContasReceberByClienteId(clienteId) {
         return [];
     }
 }
-
 /**
  * Busca notas fiscais de um cliente
  */

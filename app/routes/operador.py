@@ -1823,12 +1823,26 @@ def get_contas_receber_cliente(cliente_id):
         if not cliente:
             return jsonify({'error': 'Cliente não encontrado'}), 404
 
-        # Busca as contas a receber do cliente
+        # Busca as contas a receber do cliente com os itens da nota fiscal
         contas = ContaReceber.query.filter_by(cliente_id=cliente_id).all()
         
         contas_data = []
         for conta in contas:
-            contas_data.append({
+            # Busca os itens da nota fiscal associada
+            itens_nota = []
+            if conta.nota_fiscal:
+                for item in conta.nota_fiscal.itens:
+                    itens_nota.append({
+                        'produto_nome': item.produto.nome if item.produto else 'Produto não encontrado',
+                        'quantidade': float(item.quantidade),
+                        'unidade_medida': item.produto.unidade.value if item.produto else '',
+                        'valor_unitario': float(item.valor_unitario),
+                        'valor_total': float(item.valor_total),
+                        'desconto_aplicado': float(item.desconto_aplicado) if item.desconto_aplicado else 0.0,
+                        'tipo_desconto': item.tipo_desconto.value if item.tipo_desconto else None
+                    })
+            
+            conta_data = {
                 'id': conta.id,
                 'descricao': conta.descricao,
                 'valor_original': float(conta.valor_original),
@@ -1838,8 +1852,14 @@ def get_contas_receber_cliente(cliente_id):
                 'data_pagamento': conta.data_pagamento.isoformat() if conta.data_pagamento else None,
                 'status': conta.status.value,
                 'nota_fiscal_id': conta.nota_fiscal_id,
-                'observacoes': conta.observacoes
-            })
+                'observacoes': conta.observacoes,
+                'itens_nota_fiscal': itens_nota,
+                'valor_total_nota': float(conta.nota_fiscal.valor_total) if conta.nota_fiscal else 0.0,
+                'valor_desconto_nota': float(conta.nota_fiscal.valor_desconto) if conta.nota_fiscal and conta.nota_fiscal.valor_desconto else 0.0,
+                'tipo_desconto_nota': conta.nota_fiscal.tipo_desconto.value if conta.nota_fiscal and conta.nota_fiscal.tipo_desconto else None
+            }
+            contas_data.append(conta_data)
+        
         print(f'contas cliente: \n{contas_data}')
         return jsonify(contas_data)
 
