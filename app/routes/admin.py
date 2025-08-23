@@ -2313,43 +2313,107 @@ def get_caixa_financeiro(caixa_id):
 @login_required
 @admin_required
 def gerar_pdf_caixa_financeiro(caixa_id):
+    session = Session(db.engine)
     try:
-        session = Session(db.engine)
-
         # --- Busca informações do caixa e operador ---
         caixa = session.query(Caixa).filter_by(id=caixa_id).first()
         if not caixa:
             raise Exception("Caixa não encontrado")
         operador_nome = caixa.operador.nome if caixa.operador else "Operador não identificado"
-        caixa_data = caixa.data_fechamento
-        # --- Busca movimentações ---
+        caixa_data = caixa.data_fechamento if caixa.data_fechamento else caixa.data_abertura
+
+        # --- BUSCA EXATAMENTE COMO NA API ---
+        # Busca todas as movimentações financeiras do caixa
         movimentacoes = session.query(Financeiro)\
             .filter_by(caixa_id=caixa_id)\
             .order_by(Financeiro.data.desc())\
             .all()
 
-        # Calcula totais excluindo abertura e fechamento de caixa
-        total_entradas = sum(float(mov.valor) for mov in movimentacoes 
-                             if mov.tipo == TipoMovimentacao.entrada and mov.categoria 
-                             != CategoriaFinanceira.abertura_caixa and mov.categoria 
-                             != CategoriaFinanceira.estorno)
-        
-        total_saidas = sum(float(mov.valor) for mov in movimentacoes 
-                           if mov.tipo == TipoMovimentacao.saida and mov.categoria 
-                           != CategoriaFinanceira.abertura_caixa 
-                           and mov.categoria != CategoriaFinanceira.estorno 
-                           and mov.categoria != CategoriaFinanceira.fechamento_caixa)
-        print(f'Saídas: {total_saidas}')
-        # --- Vendas por forma de pagamento ---
-        vendas_por_forma_pagamento = session.query(
+        # --- CALCULA TOTAIS EXATAMENTE COMO NA API ---
+        # 1. CALCULA TOTAL DE ENTRADAS - SOMA TODAS AS FORMAS DE PAGAMENTO
+        # Busca pagamentos de notas fiscais (MESMO QUE NA API)
+        pagamentos_notas = session.query(
             PagamentoNotaFiscal.forma_pagamento,
-            func.sum(PagamentoNotaFiscal.valor)
-        ).join(NotaFiscal).filter(
+            func.sum(PagamentoNotaFiscal.valor).label('total')
+        ).join(
+            NotaFiscal,
+            PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+        ).filter(
             NotaFiscal.caixa_id == caixa_id,
             NotaFiscal.status == StatusNota.emitida
-        ).group_by(PagamentoNotaFiscal.forma_pagamento).all()
+        ).group_by(
+            PagamentoNotaFiscal.forma_pagamento
+        ).all()
+        
+        # Busca pagamentos de contas a receber (MESMO QUE NA API)
+        pagamentos_contas = session.query(
+            PagamentoContaReceber.forma_pagamento,
+            func.sum(PagamentoContaReceber.valor_pago).label('total')
+        ).filter(
+            PagamentoContaReceber.caixa_id == caixa_id
+        ).group_by(
+            PagamentoContaReceber.forma_pagamento
+        ).all()
+        
+        # Combina os resultados e calcula totais (MESMO QUE NA API)
+        total_entradas = 0.0
+        formas_pagamento = {}
+        
+        for forma, total in pagamentos_notas:
+            valor = float(total) if total else 0.0
+            formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor
+            total_entradas += valor
+            
+        for forma, total in pagamentos_contas:
+            valor = float(total) if total else 0.0
+            formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor
+            total_entradas += valor
 
-        # --- Total recebido de contas a prazo ---
+        # 2. CALCULA TOTAL DE SAÍDAS - SOMENTE DESPESAS (MESMO QUE NA API)
+        total_saidas = session.query(
+            func.sum(Financeiro.valor)
+        ).filter(
+            Financeiro.caixa_id == caixa_id,
+            Financeiro.tipo == TipoMovimentacao.saida,
+            Financeiro.categoria == CategoriaFinanceira.despesa
+        ).scalar() or 0.0
+        
+        total_saidas = float(total_saidas)
+
+        # 3. CALCULA VALORES FÍSICOS E DIGITAIS (MESMO QUE NA API)
+        valor_dinheiro = formas_pagamento.get('dinheiro', 0.0)
+        valor_fisico = valor_dinheiro
+        
+        if caixa.valor_fechamento and caixa.valor_abertura:
+            valor_abertura = float(caixa.valor_abertura)
+            valor_fechamento = float(caixa.valor_fechamento)
+            valor_fisico = max((valor_dinheiro + valor_abertura) - valor_fechamento - total_saidas, 0.0)
+
+            # Pega parte inteira e parte decimal (MESMO QUE NA API)
+            parte_inteira = math.floor(valor_fisico)
+            parte_decimal = valor_fisico - parte_inteira
+
+            if parte_decimal == 0.5:
+                # Mantém o valor original (sem arredondar)
+                valor_fisico = valor_fisico
+            elif parte_decimal > 0.5:
+                valor_fisico = math.ceil(valor_fisico)  # mais perto do de cima
+            else:
+                valor_fisico = math.floor(valor_fisico)  # mais perto do de baixo
+            
+        formas_pagamento['dinheiro'] = valor_fisico
+        valor_digital = sum([
+            formas_pagamento.get('pix_loja', 0.0),
+            formas_pagamento.get('pix_fabiano', 0.0),
+            formas_pagamento.get('pix_edfrance', 0.0),
+            formas_pagamento.get('pix_maquineta', 0.0),
+            formas_pagamento.get('cartao_debito', 0.0),
+            formas_pagamento.get('cartao_credito', 0.0)
+        ])
+
+        a_prazo = formas_pagamento.get('a_prazo', 0.0)
+        
+        # 4. CALCULA TOTAL RECEBIDO DE CONTAS A PRAZO (MESMO QUE NA API)
         total_contas_prazo_recebidas = session.query(
             func.sum(PagamentoContaReceber.valor_pago)
         ).filter(
@@ -2357,36 +2421,6 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         ).scalar() or 0.0
         
         total_contas_prazo_recebidas = float(total_contas_prazo_recebidas)
-        
-        totais_vendas = {}
-        for forma, total in vendas_por_forma_pagamento:
-            total = float(total) if total is not None else 0.0
-            if forma == 'a_prazo':
-                total_entradas += total
-            totais_vendas[forma.value] = total
-
-        # --- Calcula os novos campos ---
-        valor_dinheiro = totais_vendas.get('dinheiro', 0.0)
-        valor_fisico = valor_dinheiro
-        valor_abertura = 0.0
-        valor_fechamento = 0.0
-        if caixa.valor_fechamento and caixa.valor_abertura:
-            try:
-                valor_fechamento = float(caixa.valor_fechamento)
-                valor_abertura = float(caixa.valor_abertura)
-                valor_fisico = max((valor_dinheiro + valor_abertura) - valor_fechamento - total_saidas, 0.0)
-            except (TypeError, ValueError):
-                pass
-
-        valor_digital = sum([
-            totais_vendas.get('pix_loja', 0.0),
-            totais_vendas.get('pix_fabiano', 0.0),
-            totais_vendas.get('pix_edfrance', 0.0),
-            totais_vendas.get('pix_maquineta', 0.0),
-            totais_vendas.get('cartao_debito', 0.0),
-            totais_vendas.get('cartao_credito', 0.0)
-        ])
-        a_prazo = totais_vendas.get('a_prazo', 0.0)
 
         # --- Configuração para bobina 80mm ---
         bobina_width = 226
@@ -2493,8 +2527,7 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         elements.append(Paragraph("RELATÓRIO FINANCEIRO", header_style))
         elements.append(linha_separadora())
         elements.append(Spacer(1, 6))
-        data = caixa_data  # supondo que já seja um datetime
-        data_relatorio = data.strftime("%d/%m/%Y %H:%M")
+        data_relatorio = caixa_data.strftime("%d/%m/%Y %H:%M") if caixa_data else "Data não disponível"
         elements.append(Paragraph(f"Data: {data_relatorio}", normal_style))
         elements.append(Paragraph(f"Operador: {operador_nome}", normal_style))
         elements.append(Spacer(1, 6))
@@ -2511,7 +2544,7 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         elements.append(linha_dupla("Valor Físico:", moeda_br(valor_fisico)))
         elements.append(linha_dupla("Valor Digital:", moeda_br(valor_digital)))
         elements.append(linha_dupla("A Prazo:", moeda_br(a_prazo)))
-        elements.append(linha_dupla("A Prazo Recebidos:", moeda_br(total_contas_prazo_recebidas)))  # Nova linha adicionada
+        elements.append(linha_dupla("A Prazo Recebidos:", moeda_br(total_contas_prazo_recebidas)))
         
         elements.append(Spacer(1, 4))
         elements.append(linha_separadora())
@@ -2519,6 +2552,11 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         elements.append(Paragraph("Valores do Caixa", subtitle_style))
         elements.append(Spacer(1, 6))
         elements.append(linha_separadora())
+        
+        # Adiciona valores de abertura e fechamento apenas se existirem
+        valor_abertura = float(caixa.valor_abertura) if caixa.valor_abertura else 0.0
+        valor_fechamento = float(caixa.valor_fechamento) if caixa.valor_fechamento else 0.0
+        
         elements.append(linha_dupla("Abertura:", moeda_br(valor_abertura)))
         elements.append(linha_dupla("Fechamento:", moeda_br(valor_fechamento)))
         
@@ -2529,6 +2567,7 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         elements.append(Paragraph("FORMAS DE PAGAMENTO", subtitle_style))
         elements.append(Spacer(1, 6))
         elements.append(linha_separadora())
+        
         nomes_formas = {
             'dinheiro': 'Dinheiro',
             'pix_loja': 'PIX Loja',
@@ -2539,11 +2578,43 @@ def gerar_pdf_caixa_financeiro(caixa_id):
             'cartao_credito': 'Cartão Crédito',
             'a_prazo': 'A Prazo'
         }
-        for forma, valor in totais_vendas.items():
+        
+        # Exibe todas as formas de pagamento que têm valor
+        for forma, valor in formas_pagamento.items():
             if valor > 0:
                 nome_forma = nomes_formas.get(forma, forma)
                 elements.append(linha_dupla(f"{nome_forma}:", moeda_br(valor)))
-
+        # --- Movimentações Financeiras ---
+        elements.append(Spacer(1, 8))
+        elements.append(linha_separadora())
+        elements.append(Paragraph("MOVIMENTAÇÕES", subtitle_style))
+        elements.append(Spacer(1, 6))
+        elements.append(linha_separadora())
+        for mov in movimentacoes:
+            tipo_cat = f"{mov.tipo.value}"
+            if mov.categoria:
+                tipo_cat += f" - {mov.categoria.value}"
+            elements.append(linha_dupla(tipo_cat, moeda_br(float(mov.valor))))
+            if mov.descricao:
+                descricao = mov.descricao
+                if len(descricao) > 25:
+                    words = descricao
+                    lines = []
+                    current_line = ""
+                    for word in words:
+                        if len(current_line + word) > 25:
+                            lines.append(current_line)
+                            current_line = word + ""
+                        else:
+                            current_line += word + ""
+                    if current_line:
+                        lines.append(current_line)
+                    for line in lines:
+                        elements.append(Paragraph(line, normal_style))
+                else:
+                    elements.append(Paragraph(descricao, normal_style))
+            elements.append(linha_separadora())
+        
         # --- Assinaturas ---
         elements.append(Spacer(1, 15))
         elements.append(linha_separadora())
@@ -2570,6 +2641,8 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         return response
 
     except Exception as e:
+        session.rollback()
+        print(f"Erro ao gerar PDF do caixa {caixa_id}: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         session.close()
