@@ -888,6 +888,9 @@ async function viewClientDetails(clientId) {
                                         ` : `
                                             <span class="status-info">✅ Conta quitada</span>
                                         `}
+                                        <button class="btn-receipt btn-small" data-conta-id="${conta.id}">
+                                            🧾 Comprovante
+                                        </button>
                                     </div>
                                 </div>
                             `).join('') : 
@@ -935,13 +938,41 @@ async function viewClientDetails(clientId) {
                 confirmFullPayment(contaId, valorAberto);
             });
         });
-        
+        modal.querySelectorAll('.btn-receipt').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const contaId = e.target.getAttribute('data-conta-id');
+                generateReceipt(contaId);
+            });
+        });
     } catch (error) {
         console.error('Erro ao carregar detalhes do cliente:', error);
         showMessage('Erro ao carregar detalhes do cliente', 'error');
     }
 }
 
+async function generateReceipt(contaId) {
+    try {
+        const response = await fetch(`/operador/api/contas_receber/${contaId}/comprovante`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        if (response.ok) {
+            // Cria um blob do PDF e abre em nova aba
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            window.open(url, '_blank');
+        } else {
+            const error = await response.json();
+            showMessage(`Erro ao gerar comprovante: ${error.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao gerar comprovante:', error);
+        showMessage('Erro ao gerar comprovante', 'error');
+    }
+}
 /**
  * Mostra o modal para pagamento parcial
  */

@@ -2888,3 +2888,25 @@ body {
     color: #e74c3c;
     font-weight: 600;
 }
+.btn-receipt {
+    background-color: #95a5a6;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: 5px;
+}
+
+.btn-receipt:hover {
+    background-color: #7f8c8d;
+}
+
+.conta-actions {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
