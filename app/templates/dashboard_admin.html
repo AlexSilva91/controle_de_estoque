@@ -973,6 +973,53 @@
                             </div>
                         </div>
                         
+                        <!-- Opção de conversão -->
+                        <div class="form-group">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="transferenciaConverter">
+                                <label class="form-check-label" for="transferenciaConverter">
+                                    Converter para outra unidade durante a transferência
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Campos de conversão (inicialmente ocultos) -->
+                        <div id="camposConversao" style="display: none;">
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="transferenciaUnidadeDestino">Unidade de Destino</label>
+                                    <select id="transferenciaUnidadeDestino" class="form-control">
+                                        <option value="">Selecione a unidade</option>
+                                        <option value="kg">Quilograma (kg)</option>
+                                        <option value="saco">Saco</option>
+                                        <option value="unidade">Unidade</option>
+                                        <option value="fardo">Fardo</option>
+                                        <option value="pacote">Pacote</option>
+                                    </select>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="transferenciaQuantidadeDestino">Quantidade na Unidade de Destino</label>
+                                    <input type="number" id="transferenciaQuantidadeDestino" class="form-control" step="0.001" min="0.001">
+                                    <small class="text-muted" id="infoConversao"></small>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group col-md-12">
+                                    <label for="transferenciaFatorConversao">Fator de Conversão Personalizado (opcional)</label>
+                                    <div class="input-group">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text">1 <span id="unidadeOrigemTexto"></span> = </span>
+                                        </div>
+                                        <input type="number" id="transferenciaFatorConversao" class="form-control" step="0.001" min="0.001" placeholder="Usar fator padrão do produto">
+                                        <div class="input-group-append">
+                                            <span class="input-group-text" id="unidadeDestinoTexto"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="form-row">
                             <div class="form-group col-md-6">
                                 <label for="transferenciaOrigem">Origem*</label>
@@ -994,12 +1041,12 @@
                         
                         <div class="form-row">
                             <div class="form-group col-md-6">
-                                <label for="transferenciaQuantidade">Quantidade*</label>
+                                <label for="transferenciaQuantidade">Quantidade de Origem*</label>
                                 <input type="number" id="transferenciaQuantidade" class="form-control" step="0.001" min="0.001" required>
                                 <small class="text-muted" id="transferenciaEstoqueDisponivel"></small>
                             </div>
                             <div class="form-group col-md-6">
-                                <label for="transferenciaValorUnitarioDestino">Valor Unitário*</label>
+                                <label for="transferenciaValorUnitarioDestino">Valor Unitário no Destino*</label>
                                 <input type="number" id="transferenciaValorUnitarioDestino" class="form-control" step="0.01" min="0.01" required>
                             </div>
                         </div>

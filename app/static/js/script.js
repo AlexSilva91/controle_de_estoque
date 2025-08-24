@@ -1243,44 +1243,201 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  // Função para abrir o modal de transferência
   async function openTransferenciaModal(produtoId) {
-    try {
-      const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
-      if (response.success) {
-        const produto = response.produto;
-        
-        const transferenciaProdutoId = document.getElementById('transferenciaProdutoId');
-        if (transferenciaProdutoId) transferenciaProdutoId.value = produtoId;
-        
-        const transferenciaProdutoNome = document.getElementById('transferenciaProdutoNome');
-        if (transferenciaProdutoNome) transferenciaProdutoNome.textContent = produto.nome;
-        
-        const transferenciaUnidadeAtual = document.getElementById('transferenciaUnidadeAtual');
-        if (transferenciaUnidadeAtual) transferenciaUnidadeAtual.textContent = produto.unidade;
-        
-        const transferenciaOrigem = document.getElementById('transferenciaOrigem');
-        if (transferenciaOrigem) transferenciaOrigem.value = 'loja';
-        
-        const transferenciaDestino = document.getElementById('transferenciaDestino');
-        if (transferenciaDestino) transferenciaDestino.value = 'deposito';
-        
-        const transferenciaQuantidade = document.getElementById('transferenciaQuantidade');
-        if (transferenciaQuantidade) transferenciaQuantidade.value = '';
-        
-        const transferenciaValorUnitarioDestino = document.getElementById('transferenciaValorUnitarioDestino');
-        if (transferenciaValorUnitarioDestino) transferenciaValorUnitarioDestino.value = produto.valor_unitario;
-        
-        const transferenciaObservacao = document.getElementById('transferenciaObservacao');
-        if (transferenciaObservacao) transferenciaObservacao.value = '';
-        
-        openModal('transferenciaModal');
-        updateEstoqueDisponivel();
+      try {
+          const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
+          if (response.success) {
+              const produto = response.produto;
+              
+              // Preencher campos básicos
+              document.getElementById('transferenciaProdutoId').value = produtoId;
+              document.getElementById('transferenciaProdutoNome').textContent = produto.nome;
+              document.getElementById('transferenciaUnidadeAtual').textContent = produto.unidade;
+              document.getElementById('transferenciaValorUnitarioDestino').value = produto.valor_unitario;
+              
+              // Resetar campos de conversão
+              document.getElementById('transferenciaConverter').checked = false;
+              document.getElementById('camposConversao').style.display = 'none';
+              document.getElementById('transferenciaUnidadeDestino').value = '';
+              document.getElementById('transferenciaQuantidadeDestino').value = '';
+              document.getElementById('transferenciaFatorConversao').value = '';
+              
+              // Atualizar estoque disponível
+              updateEstoqueDisponivel();
+              
+              openModal('transferenciaModal');
+          }
+      } catch (error) {
+          console.error('Erro ao abrir modal de transferência:', error);
+          showFlashMessage('error', 'Erro ao carregar dados do produto');
       }
-    } catch (error) {
-      console.error('Erro ao abrir modal de transferência:', error);
-      showFlashMessage('error', 'Erro ao carregar dados do produto');
-    }
   }
+
+  // Alternar visibilidade dos campos de conversão
+  document.getElementById('transferenciaConverter').addEventListener('change', function() {
+      const camposConversao = document.getElementById('camposConversao');
+      camposConversao.style.display = this.checked ? 'block' : 'none';
+      
+      if (this.checked) {
+          // Preencher informações de unidade
+          const unidadeOrigem = document.getElementById('transferenciaUnidadeAtual').textContent;
+          document.getElementById('unidadeOrigemTexto').textContent = unidadeOrigem;
+      }
+  });
+
+  // Atualizar informações quando selecionar unidade de destino
+  document.getElementById('transferenciaUnidadeDestino').addEventListener('change', function() {
+      const unidadeDestino = this.value;
+      document.getElementById('unidadeDestinoTexto').textContent = unidadeDestino;
+      calcularConversao();
+  });
+
+  // Calcular conversão quando alterar quantidade ou fator
+  document.getElementById('transferenciaQuantidade').addEventListener('input', calcularConversao);
+  document.getElementById('transferenciaFatorConversao').addEventListener('input', calcularConversao);
+
+  // Função para calcular a conversão
+  function calcularConversao() {
+      const produtoId = document.getElementById('transferenciaProdutoId').value;
+      const quantidadeOrigem = parseFloat(document.getElementById('transferenciaQuantidade').value) || 0;
+      const unidadeOrigem = document.getElementById('transferenciaUnidadeAtual').textContent;
+      const unidadeDestino = document.getElementById('transferenciaUnidadeDestino').value;
+      const fatorPersonalizado = parseFloat(document.getElementById('transferenciaFatorConversao').value);
+      
+      if (!unidadeDestino || quantidadeOrigem <= 0) return;
+      
+      // Buscar informações do produto para obter fatores de conversão padrão
+      fetchWithErrorHandling(`/admin/produtos/${produtoId}`)
+          .then(response => {
+              if (response.success) {
+                  const produto = response.produto;
+                  let fatorConversao = 1;
+                  
+                  // Calcular fator de conversão
+                  if (fatorPersonalizado && fatorPersonalizado > 0) {
+                      fatorConversao = fatorPersonalizado;
+                  } else {
+                      // Usar fatores padrão do produto
+                      fatorConversao = calcularFatorPadrao(produto, unidadeOrigem, unidadeDestino);
+                  }
+                  
+                  // Calcular quantidade de destino
+                  const quantidadeDestino = quantidadeOrigem * fatorConversao;
+                  document.getElementById('transferenciaQuantidadeDestino').value = quantidadeDestino.toFixed(3);
+                  
+                  // Exibir informações da conversão
+                  document.getElementById('infoConversao').textContent = 
+                      `1 ${unidadeOrigem} = ${fatorConversao} ${unidadeDestino}`;
+              }
+          })
+          .catch(error => {
+              console.error('Erro ao calcular conversão:', error);
+          });
+  }
+
+  // Função para calcular fator de conversão padrão baseado nas propriedades do produto
+  function calcularFatorPadrao(produto, unidadeOrigem, unidadeDestino) {
+      // Se for a mesma unidade, fator é 1
+      if (unidadeOrigem === unidadeDestino) return 1;
+      
+      // Converter para kg primeiro, depois para a unidade de destino
+      let quantidadeEmKg = 0;
+      
+      // Converter unidade de origem para kg
+      switch(unidadeOrigem) {
+          case 'kg':
+              quantidadeEmKg = 1;
+              break;
+          case 'saco':
+              quantidadeEmKg = produto.peso_kg_por_saco || 50; // Valor padrão 50kg se não definido
+              break;
+          case 'pacote':
+              // Primeiro converter saco para kg, depois dividir por pacotes por saco
+              const kgPorSaco = produto.peso_kg_por_saco || 50;
+              quantidadeEmKg = kgPorSaco / (produto.pacotes_por_saco || 10);
+              break;
+          case 'fardo':
+              // Primeiro converter saco para kg, depois dividir por pacotes por fardo e por pacotes por saco
+              const kgPorSacoFardo = produto.peso_kg_por_saco || 50;
+              const pacotesPorFardo = produto.pacotes_por_fardo || 5;
+              quantidadeEmKg = kgPorSacoFardo / (produto.pacotes_por_saco || 10) / pacotesPorFardo;
+              break;
+          case 'unidade':
+              // Para unidade, assumimos 1kg por unidade (ajustar conforme necessário)
+              quantidadeEmKg = 1;
+              break;
+      }
+      
+      // Converter de kg para unidade de destino
+      switch(unidadeDestino) {
+          case 'kg':
+              return 1 / quantidadeEmKg;
+          case 'saco':
+              return 1 / (quantidadeEmKg * (produto.peso_kg_por_saco || 50));
+          case 'pacote':
+              const kgPorSacoPacote = produto.peso_kg_por_saco || 50;
+              const pacotesPorSaco = produto.pacotes_por_saco || 10;
+              return 1 / (quantidadeEmKg * kgPorSacoPacote / pacotesPorSaco);
+          case 'fardo':
+              const kgPorSacoFardo = produto.peso_kg_por_saco || 50;
+              const pacotesPorSacoFardo = produto.pacotes_por_saco || 10;
+              const pacotesPorFardo = produto.pacotes_por_fardo || 5;
+              return 1 / (quantidadeEmKg * kgPorSacoFardo / pacotesPorSacoFardo / pacotesPorFardo);
+          case 'unidade':
+              return 1 / quantidadeEmKg; // Assumindo 1kg por unidade
+      }
+      
+      return 1; // Fallback
+  }
+
+  // Enviar formulário de transferência
+  document.getElementById('transferenciaForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const produtoId = document.getElementById('transferenciaProdutoId').value;
+      const converterUnidade = document.getElementById('transferenciaConverter').checked;
+      const dados = {
+          produto_id: produtoId,
+          estoque_origem: document.getElementById('transferenciaOrigem').value,
+          estoque_destino: document.getElementById('transferenciaDestino').value,
+          quantidade: parseFloat(document.getElementById('transferenciaQuantidade').value),
+          valor_unitario_destino: parseFloat(document.getElementById('transferenciaValorUnitarioDestino').value),
+          observacao: document.getElementById('transferenciaObservacao').value,
+          converter_unidade: converterUnidade
+      };
+      
+      // Adicionar dados de conversão se aplicável
+      if (converterUnidade) {
+          dados.unidade_destino = document.getElementById('transferenciaUnidadeDestino').value;
+          dados.quantidade_destino = parseFloat(document.getElementById('transferenciaQuantidadeDestino').value);
+          dados.fator_conversao = parseFloat(document.getElementById('transferenciaFatorConversao').value) || null;
+      }
+      
+      try {
+          const response = await fetchWithErrorHandling('/admin/transferencias', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(dados)
+          });
+          
+          if (response.success) {
+              showFlashMessage('success', response.message);
+              closeModal('transferenciaModal');
+              // Recarregar dados da página se necessário
+              if (typeof carregarDados === 'function') {
+                  carregarDados();
+              }
+          } else {
+              showFlashMessage('error', response.message);
+          }
+      } catch (error) {
+          console.error('Erro ao realizar transferência:', error);
+          showFlashMessage('error', 'Erro ao realizar transferência');
+      }
+  });
 
   function updateEstoqueDisponivel() {
     const produtoId = document.getElementById('transferenciaProdutoId')?.value;

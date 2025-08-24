@@ -41,7 +41,7 @@ from app.models.entities import (
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber)
 from app.crud import (
-    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_todos_os_descontos,
+    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_todos_os_descontos, calcular_fator_conversao,
     criar_desconto, deletar_desconto, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
     get_transferencias,get_user_by_cpf, get_user_by_id, get_usuarios, create_user, obter_caixas_completo,
     registrar_transferencia, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
@@ -1720,6 +1720,13 @@ def criar_transferencia():
         if estoque_origem == estoque_destino:
             return jsonify({'success': False, 'message': 'Estoque de origem e destino devem ser diferentes'}), 400
 
+        # Validar conversão se solicitada
+        if converter_unidade:
+            if not data.get('unidade_destino'):
+                return jsonify({'success': False, 'message': 'Unidade de destino é obrigatória para conversão'}), 400
+            if not data.get('quantidade_destino'):
+                return jsonify({'success': False, 'message': 'Quantidade de destino é obrigatória para conversão'}), 400
+
         transferencia_data = {
             'produto_id': produto_id,
             'usuario_id': current_user.id,
@@ -1731,7 +1738,18 @@ def criar_transferencia():
             'converter_unidade': converter_unidade
         }
 
+        # Adicionar dados de conversão se aplicável
+        if converter_unidade:
+            transferencia_data['unidade_destino'] = data['unidade_destino']
+            transferencia_data['quantidade_destino'] = Decimal(str(data['quantidade_destino']))
+
         transferencia = registrar_transferencia(db.session, transferencia_data)
+
+        # Determinar nome do produto para resposta
+        produto_nome = transferencia.produto.nome
+        if transferencia.produto_destino_id and transferencia.produto_destino_id != transferencia.produto_id:
+            produto_destino = db.session.query(Produto).get(transferencia.produto_destino_id)
+            produto_nome = f"{produto_nome} → {produto_destino.nome} ({produto_destino.unidade.value})"
 
         return jsonify({
             'success': True,
@@ -1739,14 +1757,16 @@ def criar_transferencia():
             'transferencia': {
                 'id': transferencia.id,
                 'data': transferencia.data.strftime('%d/%m/%Y %H:%M'),
-                'produto': transferencia.produto.nome,
+                'produto': produto_nome,
                 'origem': transferencia.estoque_origem.value,
                 'destino': transferencia.estoque_destino.value,
-                'quantidade': f"{transferencia.quantidade:.2f}",
-                'unidade': transferencia.unidade_origem
+                'quantidade_origem': f"{transferencia.quantidade:.2f} {transferencia.unidade_origem}",
+                'quantidade_destino': f"{transferencia.quantidade_destino:.2f} {transferencia.unidade_destino}" if transferencia.quantidade_destino else None,
+                'usuario': transferencia.usuario.nome
             }
         })
     except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
     
 @admin_bp.route('/transferencias')
@@ -1771,6 +1791,39 @@ def listar_transferencias():
         return jsonify({'success': True, 'transferencias': result})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+@admin_bp.route('/produtos/<int:produto_id>/calcular-conversao', methods=['POST'])
+@login_required
+@admin_required
+def calcular_conversao(produto_id):
+    try:
+        data = request.get_json()
+        quantidade = Decimal(str(data['quantidade']))
+        unidade_origem = data['unidade_origem']
+        unidade_destino = data['unidade_destino']
+        fator_personalizado = Decimal(str(data.get('fator_personalizado', 0))) or None
+        
+        produto = db.session.query(Produto).filter(Produto.id == produto_id).first()
+        if not produto:
+            return jsonify({'success': False, 'message': 'Produto não encontrado'}), 404
+        
+        # Calcular fator de conversão
+        if fator_personalizado and fator_personalizado > 0:
+            fator_conversao = fator_personalizado
+        else:
+            fator_conversao = calcular_fator_conversao(produto, unidade_origem, unidade_destino)
+        
+        quantidade_destino = quantidade * fator_conversao
+        
+        return jsonify({
+            'success': True,
+            'quantidade_destino': float(quantidade_destino),
+            'fator_conversao': float(fator_conversao),
+            'mensagem': f"1 {unidade_origem} = {fator_conversao} {unidade_destino}"
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/descontos', methods=['POST'])
 @login_required

@@ -31,9 +31,11 @@ from app.models.entities import (
     StatusCaixa,
     StatusNota,
     StatusPagamento,
+    TransferenciaEstoque,
     UnidadeMedida, 
     FormaPagamento,
-    Produto
+    Produto,
+    Usuario
 )
 
 from app.utils.conversor_unidade import converter_quantidade
@@ -544,74 +546,128 @@ def get_movimentacoes(db: Session, skip: int = 0, limit: int = 100):
 
 # ===== Transferência Estoque =====
 def registrar_transferencia(db: Session, transf: dict):
-    produto_orig = db.query(entities.Produto).filter(entities.Produto.id == transf['produto_id']).first()
-    if not produto_orig:
-        raise ValueError("Produto não encontrado")
+    try:
+        produto_orig = db.query(Produto).filter(Produto.id == transf['produto_id']).first()
+        if not produto_orig:
+            raise ValueError("Produto não encontrado")
 
-    usuario = db.query(entities.Usuario).filter(entities.Usuario.id == transf['usuario_id']).first()
-    if not usuario:
-        raise ValueError("Usuário não encontrado")
+        usuario = db.query(Usuario).filter(Usuario.id == transf['usuario_id']).first()
+        if not usuario:
+            raise ValueError("Usuário não encontrado")
 
-    estoque_origem = transf['estoque_origem']
-    quantidade_origem = transf['quantidade']
-    converter_unidade = transf.get('converter_unidade', False)
-    
-    # Verificar estoque disponível
-    estoque_disponivel = {
-        TipoEstoque.loja: produto_orig.estoque_loja,
-        TipoEstoque.deposito: produto_orig.estoque_deposito,
-        TipoEstoque.fabrica: produto_orig.estoque_fabrica,
-    }.get(estoque_origem, Decimal('0'))
+        estoque_origem = transf['estoque_origem']
+        quantidade_origem = Decimal(str(transf['quantidade']))
+        converter_unidade = transf.get('converter_unidade', False)
 
-    if estoque_disponivel < quantidade_origem:
-        raise ValueError(f"Estoque insuficiente no {estoque_origem.value}. Disponível: {estoque_disponivel}")
+        # Verificar estoque disponível
+        estoque_disponivel = {
+            TipoEstoque.loja: produto_orig.estoque_loja,
+            TipoEstoque.deposito: produto_orig.estoque_deposito,
+            TipoEstoque.fabrica: produto_orig.estoque_fabrica,
+        }.get(estoque_origem, Decimal('0'))
 
-    # Atualizar estoque original
-    if estoque_origem == TipoEstoque.loja:
-        produto_orig.estoque_loja -= quantidade_origem
-    elif estoque_origem == TipoEstoque.deposito:
-        produto_orig.estoque_deposito -= quantidade_origem
-    elif estoque_origem == TipoEstoque.fabrica:
-        produto_orig.estoque_fabrica -= quantidade_origem
+        if estoque_disponivel < quantidade_origem:
+            raise ValueError(f"Estoque insuficiente no {estoque_origem.value}. Disponível: {estoque_disponivel}")
 
-    produto_destino = produto_orig  # Sempre o mesmo produto para transferência sem conversão
-    quantidade_destino = quantidade_origem
-    
-    # Adicionar quantidade no estoque destino
-    estoque_destino = transf['estoque_destino']
-    if estoque_destino == TipoEstoque.loja:
-        produto_destino.estoque_loja += quantidade_destino
-    elif estoque_destino == TipoEstoque.deposito:
-        produto_destino.estoque_deposito += quantidade_destino
-    elif estoque_destino == TipoEstoque.fabrica:
-        produto_destino.estoque_fabrica += quantidade_destino
+        # Inicializar produto_destino
+        produto_destino = produto_orig
+        quantidade_destino = quantidade_origem
+        unidade_destino = None
+        valor_unitario_destino = Decimal(str(transf.get('valor_unitario_destino', produto_orig.valor_unitario)))
 
-    # Atualizar valor unitário se fornecido
-    if 'valor_unitario_destino' in transf:
-        produto_destino.valor_unitario = Decimal(str(transf['valor_unitario_destino']))
+        # Lógica de conversão
+        if converter_unidade:
+            unidade_destino = transf.get('unidade_destino')
+            quantidade_destino = Decimal(str(transf.get('quantidade_destino', quantidade_origem)))
 
-    # Registrar transferência
-    transferencia = entities.TransferenciaEstoque(
-        produto_id=produto_orig.id,
-        produto_destino_id=None,  # Sem produto destino para transferência sem conversão
-        usuario_id=transf['usuario_id'],
-        estoque_origem=estoque_origem,
-        estoque_destino=estoque_destino,
-        quantidade=quantidade_origem,
-        quantidade_destino=None,  # Sem quantidade destino para transferência sem conversão
-        unidade_origem=produto_orig.unidade.value,
-        unidade_destino=None,  # Sem unidade destino para transferência sem conversão
-        peso_kg_por_saco=None,
-        pacotes_por_saco=None,
-        pacotes_por_fardo=None,
-        observacao=transf.get('observacao', ''),
-        data=datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
-    )
+            if unidade_destino and unidade_destino != produto_orig.unidade.value:
+                # Tenta buscar produto existente com unidade de destino
+                produto_destino = db.query(Produto).filter(
+                    Produto.nome == produto_orig.nome,
+                    Produto.unidade == unidade_destino,
+                    Produto.ativo == True
+                ).first()
 
-    db.add(transferencia)
-    db.commit()
-    db.refresh(transferencia)
-    return transferencia
+                # Se não existir, cria um novo produto
+                if not produto_destino:
+                    codigo_base = produto_orig.codigo or f"{produto_orig.nome.lower().replace(' ', '_')}"
+                    codigo_novo = f"{codigo_base}_{unidade_destino}"
+                    contador = 1
+                    while db.query(Produto).filter(Produto.codigo == codigo_novo).first():
+                        codigo_novo = f"{codigo_base}_{unidade_destino}_{contador}"
+                        contador += 1
+
+                    produto_destino = Produto(
+                        codigo=codigo_novo,
+                        nome=produto_orig.nome,
+                        tipo=produto_orig.tipo,
+                        marca=produto_orig.marca,
+                        unidade=unidade_destino,
+                        valor_unitario=valor_unitario_destino,
+                        peso_kg_por_saco=produto_orig.peso_kg_por_saco,
+                        pacotes_por_saco=produto_orig.pacotes_por_saco,
+                        pacotes_por_fardo=produto_orig.pacotes_por_fardo,
+                        estoque_loja=0,
+                        estoque_deposito=0,
+                        estoque_fabrica=0,
+                        estoque_minimo=produto_orig.estoque_minimo,
+                        estoque_maximo=produto_orig.estoque_maximo,
+                        ativo=True
+                    )
+                    db.add(produto_destino)
+                    db.flush()  # para obter ID
+
+        # --------- Atualiza somente o que precisa ---------
+        # Atualizar estoque de origem (sempre subtrai quantidade)
+        if estoque_origem == TipoEstoque.loja:
+            produto_orig.estoque_loja -= quantidade_origem
+        elif estoque_origem == TipoEstoque.deposito:
+            produto_orig.estoque_deposito -= quantidade_origem
+        elif estoque_origem == TipoEstoque.fabrica:
+            produto_orig.estoque_fabrica -= quantidade_origem
+
+        # Atualizar estoque de destino SOMENTE se for produto diferente e mesma unidade
+        estoque_destino = transf['estoque_destino']
+        if produto_destino.unidade != produto_orig.unidade:
+            if estoque_destino == TipoEstoque.loja:
+                produto_destino.estoque_loja += quantidade_destino
+            elif estoque_destino == TipoEstoque.deposito:
+                produto_destino.estoque_deposito += quantidade_destino
+            elif estoque_destino == TipoEstoque.fabrica:
+                produto_destino.estoque_fabrica += quantidade_destino
+
+        # Atualizar valor unitário apenas se for produto diferente
+        if produto_destino != produto_orig:
+            produto_destino.valor_unitario = valor_unitario_destino
+
+        # Registrar transferência
+        transferencia = TransferenciaEstoque(
+            produto_id=produto_orig.id,
+            produto_destino_id=produto_destino.id if produto_destino != produto_orig else None,
+            usuario_id=transf['usuario_id'],
+            estoque_origem=estoque_origem,
+            estoque_destino=estoque_destino,
+            quantidade=quantidade_origem,
+            quantidade_destino=quantidade_destino if converter_unidade else None,
+            unidade_origem=produto_orig.unidade.value,
+            unidade_destino=unidade_destino if converter_unidade else None,
+            peso_kg_por_saco=produto_orig.peso_kg_por_saco if converter_unidade else None,
+            pacotes_por_saco=produto_orig.pacotes_por_saco if converter_unidade else None,
+            pacotes_por_fardo=produto_orig.pacotes_por_fardo if converter_unidade else None,
+            observacao=transf.get('observacao', ''),
+            data=datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
+        )
+
+        db.add(transferencia)
+        db.commit()
+        db.refresh(transferencia)
+
+        return transferencia
+
+    except Exception as e:
+        db.rollback()
+        print(e)
+        raise e
 
 def get_transferencia_by_id(db: Session, transf_id: int):
     return db.query(entities.TransferenciaEstoque).filter(entities.TransferenciaEstoque.id == transf_id).first()
@@ -620,6 +676,43 @@ def get_transferencias(db: Session, skip: int = 0, limit: int = 100):
     return db.query(entities.TransferenciaEstoque)\
             .order_by(entities.TransferenciaEstoque.data.desc())\
             .offset(skip).limit(limit).all()
+
+def calcular_fator_conversao(produto, unidade_origem, unidade_destino):
+    if unidade_origem == unidade_destino:
+        return Decimal('1')
+    
+    # Mapeamento completo de conversões
+    fatores = {
+        # Conversões envolvendo kg
+        ('kg', 'saco'): Decimal('1') / (produto.peso_kg_por_saco or Decimal('50')),
+        ('saco', 'kg'): produto.peso_kg_por_saco or Decimal('50'),
+        
+        # Conversões envolvendo pacotes
+        ('saco', 'pacote'): produto.pacotes_por_saco or Decimal('10'),
+        ('pacote', 'saco'): Decimal('1') / (produto.pacotes_por_saco or Decimal('10')),
+        ('kg', 'pacote'): (produto.pacotes_por_saco or Decimal('10')) / (produto.peso_kg_por_saco or Decimal('50')),
+        ('pacote', 'kg'): (produto.peso_kg_por_saco or Decimal('50')) / (produto.pacotes_por_saco or Decimal('10')),
+        
+        # Conversões envolvendo fardos
+        ('saco', 'fardo'): (produto.pacotes_por_saco or Decimal('10')) / (produto.pacotes_por_fardo or Decimal('5')),
+        ('fardo', 'saco'): (produto.pacotes_por_fardo or Decimal('5')) / (produto.pacotes_por_saco or Decimal('10')),
+        ('pacote', 'fardo'): Decimal('1') / (produto.pacotes_por_fardo or Decimal('5')),
+        ('fardo', 'pacote'): produto.pacotes_por_fardo or Decimal('5'),
+        ('kg', 'fardo'): (produto.pacotes_por_saco or Decimal('10')) / (produto.peso_kg_por_saco or Decimal('50')) / (produto.pacotes_por_fardo or Decimal('5')),
+        ('fardo', 'kg'): (produto.peso_kg_por_saco or Decimal('50')) / (produto.pacotes_por_saco or Decimal('10')) * (produto.pacotes_por_fardo or Decimal('5')),
+        
+        # Conversões envolvendo unidades (assumindo 1 unidade = 1kg)
+        ('unidade', 'kg'): Decimal('1'),
+        ('kg', 'unidade'): Decimal('1'),
+        ('unidade', 'saco'): Decimal('1') / (produto.peso_kg_por_saco or Decimal('50')),
+        ('saco', 'unidade'): produto.peso_kg_por_saco or Decimal('50'),
+        ('unidade', 'pacote'): Decimal('1') / (produto.pacotes_por_saco or Decimal('10')) * (produto.peso_kg_por_saco or Decimal('50')),
+        ('pacote', 'unidade'): (produto.pacotes_por_saco or Decimal('10')) / (produto.peso_kg_por_saco or Decimal('50')),
+        ('unidade', 'fardo'): Decimal('1') / (produto.pacotes_por_fardo or Decimal('5')) / (produto.pacotes_por_saco or Decimal('10')) * (produto.peso_kg_por_saco or Decimal('50')),
+        ('fardo', 'unidade'): (produto.pacotes_por_fardo or Decimal('5')) * (produto.pacotes_por_saco or Decimal('10')) / (produto.peso_kg_por_saco or Decimal('50')),
+    }
+    
+    return fatores.get((unidade_origem, unidade_destino), Decimal('1'))
 
 # ===== Cliente =====
 def create_cliente(db: Session, cliente: schemas.ClienteCreate):
