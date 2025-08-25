@@ -494,7 +494,7 @@ document.addEventListener('DOMContentLoaded', function() {
         caixasChart = new Chart(caixasCtx, {
           type: 'bar',
           data: {
-            labels: vendasDiariasData.vendas_mensais_caixa.map(c => 'Caixa ' + c.caixa_id),
+            labels: vendasDiariasData.vendas_mensais_caixa.map(c => c.data_abertura),
             datasets: [{
               label: 'Valor Total',
               data: vendasDiariasData.vendas_mensais_caixa.map(c => 

@@ -170,19 +170,24 @@ def get_vendas_diarias():
         primeiro_dia_mes = datetime(hoje.year, hoje.month, 1).date()
         dados_diarios = []
 
-        # 1. Vendas mensais por caixa
-        vendas_mensais_caixa = db.session.query(
+        # 1. Vendas dos últimos 30 dias por caixa
+        data_inicio_30_dias = hoje - timedelta(days=30)
+        
+        vendas_ultimos_30_dias = db.session.query(
             Caixa.id.label('caixa_id'),
+            Caixa.data_abertura,
             func.sum(Financeiro.valor).label('total_vendas')
         ).join(
             Financeiro, Financeiro.caixa_id == Caixa.id
         ).filter(
             Financeiro.tipo == TipoMovimentacao.entrada,
             Financeiro.categoria == CategoriaFinanceira.venda,
-            Financeiro.data >= primeiro_dia_mes,
+            Financeiro.data >= data_inicio_30_dias,
             Financeiro.data <= hoje
         ).group_by(
-            Caixa.id
+            Caixa.id, Caixa.data_abertura
+        ).order_by(
+            Caixa.data_abertura.asc()
         ).all()
 
         # 2. Total de vendas no mês
@@ -255,8 +260,12 @@ def get_vendas_diarias():
             'success': True,
             'dados': dados_diarios,
             'vendas_mensais_caixa': [
-                {'caixa_id': caixa.caixa_id, 'total_vendas': format_currency(caixa.total_vendas or 0)}
-                for caixa in vendas_mensais_caixa
+                {
+                    #'caixa_id': caixa.caixa_id, 
+                    'data_abertura': caixa.data_abertura.strftime('%d/%m/%Y'),
+                    'total_vendas': format_currency(caixa.total_vendas or 0)
+                }
+                for caixa in vendas_ultimos_30_dias
             ],
             'resumo_mensal': {
                 'total_vendas': format_currency(total_vendas_mes),
