@@ -185,7 +185,21 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ===== FUNÇÕES DE MODAL =====
-  function openModal(modalId) {
+  document.addEventListener('keydown', function(e) {
+    // Fechar modal quando a tecla ESC for pressionada
+    if (e.key === 'Escape' || e.keyCode === 27) {
+      const modaisAbertos = document.querySelectorAll('.modal[style*="display: flex"]');
+      
+      // Fechar todos os modais abertos
+      modaisAbertos.forEach(modal => {
+        closeModal(modal.id);
+      });
+      
+      // Prevenir comportamento padrão se necessário
+      e.preventDefault();
+    }
+  });
+    function openModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
       modal.style.display = 'flex';
