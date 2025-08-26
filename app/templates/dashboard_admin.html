@@ -1760,6 +1760,106 @@
         </div>
     </div>
 
+    <!-- Modal de Vendas por Forma de Pagamento -->
+    <div id="vendasFormaPagamentoModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-credit-card"></i>
+                        <span id="vendasFormaPagamentoTitulo">Vendas por Forma de Pagamento</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table id="vendasFormaPagamentoTable" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Nota Fiscal</th>
+                                    <th>Cliente</th>
+                                    <th>Valor Total</th>
+                                    <th>Valor Pago</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalhes da Venda -->
+    <div id="detalhesVendaModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span id="detalhesVendaTitulo">Detalhes da Venda</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="details-grid mb-3">
+                        <div class="detail-item">
+                            <label>Nota Fiscal:</label>
+                            <div class="value" id="detalheNotaFiscalId"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Data:</label>
+                            <div class="value" id="detalheDataVenda"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Cliente:</label>
+                            <div class="value" id="detalheCliente"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Valor Total:</label>
+                            <div class="value" id="detalheValorTotal"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Desconto:</label>
+                            <div class="value" id="detalheDesconto"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Formas de Pagamento:</label>
+                            <div class="value" id="detalheFormasPagamento"></div>
+                        </div>
+                    </div>
+                    
+                    <h4>Produtos Vendidos</h4>
+                    <div class="table-responsive">
+                        <table id="detalhesProdutosTable" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Produto</th>
+                                    <th>Quantidade</th>
+                                    <th>Unidade</th>
+                                    <th>Valor Unitário</th>
+                                    <th>Desconto</th>
+                                    <th>Valor Total</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <!-- Modal de Edição do Caixa -->
     <div id="editarCaixaModal" class="modal">
         <div class="modal-overlay"></div>

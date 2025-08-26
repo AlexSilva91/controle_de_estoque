@@ -2554,3 +2554,37 @@ canvas {
 #formPagamentoConta .form-group {
     margin-bottom: 1rem;
 }
+/* Adicione ao seu CSS existente */
+.total-item {
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.total-item:hover {
+    background-color: #A29BFE;
+}
+
+.total-item.clickable {
+    cursor: pointer;
+}
+
+.total-item.clickable:hover {
+    background-color: #A29BFE;
+}
+
+.badge-pagamento {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    margin: 0.1rem;
+}
+
+.table-row-clickable {
+    cursor: pointer;
+}
+
+.table-row-clickable:hover {
+    background-color: #A29BFE;
+}

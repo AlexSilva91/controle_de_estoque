@@ -199,12 +199,16 @@ document.addEventListener('DOMContentLoaded', function() {
       e.preventDefault();
     }
   });
-    function openModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-      modal.style.display = 'flex';
+  function openModal(modalElement) {
+      if (typeof modalElement === 'string') {
+          modalElement = document.getElementById(modalElement);
+      }
+      if (!modalElement) {
+          console.error('Modal não encontrado');
+          return;
+      }
+      modalElement.style.display = 'flex';
       document.body.style.overflow = 'hidden';
-    }
   }
 
   function closeModal(modalId) {
@@ -863,7 +867,8 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
-    openModal('clienteModal');
+    openModal(document.getElementById('clienteModal'));
+
   }
 
   function setupClienteActions() {
@@ -2909,7 +2914,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (document.getElementById('visualizarCaixaObsAdmin')) document.getElementById('visualizarCaixaObsAdmin').textContent = caixa.observacoes_admin || 'Nenhuma observação';
         
         await loadCaixaFinanceiro(caixaId);
-        openModal('visualizarCaixaModal');
+        openModal(document.getElementById('visualizarCaixaModal'));
       }
     } catch (error) {
       console.error('Erro ao visualizar caixa:', error);
@@ -2919,86 +2924,297 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadCaixaFinanceiro(caixaId) {
     try {
-      const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
-      caixaIdAtual = caixaId;
+        const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
+        caixaIdAtual = caixaId;
 
-      if (response.success) {
-        const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
-        if (tableBody) {
-          tableBody.innerHTML = '';
-          
-          response.data.forEach(item => {
-            const row = document.createElement('tr');
-            const valor = parseFloat(item.valor);
+        if (response.success) {
+            const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
+            if (tableBody) {
+                tableBody.innerHTML = '';
+                
+                response.data.forEach(item => {
+                    const row = document.createElement('tr');
+                    const valor = parseFloat(item.valor);
 
-            // Format payment methods as tags
-            const paymentTags = item.formas_pagamento && item.formas_pagamento.length > 0 
-              ? item.formas_pagamento.map(p => `<span class="badge badge-info">${p}</span>`).join(' ') 
-              : '-';
+                    // Format payment methods as tags
+                    const paymentTags = item.formas_pagamento && item.formas_pagamento.length > 0 
+                        ? item.formas_pagamento.map(p => `<span class="badge badge-info">${p}</span>`).join(' ') 
+                        : '-';
 
-            row.innerHTML = `
-              <td>${formatDateTime(item.data)}</td>
-              <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
-              <td>${item.categoria || '-'}</td>
-              <td>${formatarMoeda(valor)}</td>
-              <td>
-                ${item.descricao || '-'}
-                ${item.cliente_nome ? `<br><small>Cliente: ${item.cliente_nome}</small>` : ''}
-                ${paymentTags !== '-' ? `<br><small>Pagamento: ${paymentTags}</small>` : ''}
-              </td>
-            `;
-            tableBody.appendChild(row);
-          });
+                    row.innerHTML = `
+                        <td>${formatDateTime(item.data)}</td>
+                        <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
+                        <td>${item.categoria || '-'}</td>
+                        <td>${formatarMoeda(valor)}</td>
+                        <td>
+                            ${item.descricao || '-'}
+                            ${item.cliente_nome ? `<br><small>Cliente: ${item.cliente_nome}</small>` : ''}
+                            ${paymentTags !== '-' ? `<br><small>Pagamento: ${paymentTags}</small>` : ''}
+                        </td>
+                    `;
+                    
+                    // Adiciona evento de clique para abrir detalhes da venda
+                    if (item.nota_fiscal_id) {
+                        row.style.cursor = 'pointer';
+                        row.classList.add('clickable-row');
+                        row.addEventListener('click', () => {
+                            openDetalhesVendaModal(item.nota_fiscal_id);
+                        });
+                    }
+                    
+                    tableBody.appendChild(row);
+                });
 
-          // USE OS TOTAIS DO BACKEND (response.totais) EM VEZ DE CALCULAR NOVAMENTE
-          if (document.getElementById('caixaTotalEntradas')) {
-            document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(response.totais.entradas);
-          }
-          if (document.getElementById('caixaTotalSaidas')) {
-            document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(response.totais.saidas);
-          }
-          if (document.getElementById('caixaSaldo')) {
-            document.getElementById('caixaSaldo').textContent = formatarMoeda(response.totais.saldo);
-          }
-          if (document.getElementById('caixaValorFisico')) {
-            document.getElementById('caixaValorFisico').textContent = formatarMoeda(response.totais.valor_fisico || 0);
-          }
-          if (document.getElementById('caixaValorDigital')) {
-            document.getElementById('caixaValorDigital').textContent = formatarMoeda(response.totais.valor_digital || 0);
-          }
-          if (document.getElementById('caixaAPrazo')) {
-            document.getElementById('caixaAPrazo').textContent = formatarMoeda(response.totais.a_prazo || 0);
-          }
-          if(document.getElementById('totalAPrazoRecebido')){
-            
-          document.getElementById('totalAPrazoRecebido').textContent = formatarMoeda(response.totais.contas_prazo_recebidas || 0);
-          }
-          
-          const formasPagamento = response.vendas_por_forma_pagamento || {};
+                // USE OS TOTAIS DO BACKEND (response.totais) EM VEZ DE CALCULAR NOVAMENTE
+                if (document.getElementById('caixaTotalEntradas')) {
+                    document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(response.totais.entradas);
+                }
+                if (document.getElementById('caixaTotalSaidas')) {
+                    document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(response.totais.saidas);
+                }
+                if (document.getElementById('caixaSaldo')) {
+                    document.getElementById('caixaSaldo').textContent = formatarMoeda(response.totais.saldo);
+                }
+                if (document.getElementById('caixaValorFisico')) {
+                    document.getElementById('caixaValorFisico').textContent = formatarMoeda(response.totais.valor_fisico || 0);
+                }
+                if (document.getElementById('caixaValorDigital')) {
+                    document.getElementById('caixaValorDigital').textContent = formatarMoeda(response.totais.valor_digital || 0);
+                }
+                if (document.getElementById('caixaAPrazo')) {
+                    document.getElementById('caixaAPrazo').textContent = formatarMoeda(response.totais.a_prazo || 0);
+                }
+                if(document.getElementById('totalAPrazoRecebido')){
+                    document.getElementById('totalAPrazoRecebido').textContent = formatarMoeda(response.totais.contas_prazo_recebidas || 0);
+                }
+                
+                const formasPagamento = response.vendas_por_forma_pagamento || {};
 
-          document.getElementById('totalPixFabiano').textContent = formatarMoeda(formasPagamento.pix_fabiano || 0);
-          document.getElementById('totalPixMaquineta').textContent = formatarMoeda(formasPagamento.pix_maquineta || 0);
-          document.getElementById('totalPixEdFrance').textContent = formatarMoeda(formasPagamento.pix_edfrance || 0);
-          document.getElementById('totalPixLoja').textContent = formatarMoeda(formasPagamento.pix_loja || 0);
-          document.getElementById('totalDinheiro').textContent = formatarMoeda(formasPagamento.dinheiro || 0);
-          document.getElementById('totalCartaoCredito').textContent = formatarMoeda(formasPagamento.cartao_credito || 0);
-          document.getElementById('totalCartaoDebito').textContent = formatarMoeda(formasPagamento.cartao_debito || 0);
-          document.getElementById('totalAPrazo').textContent = formatarMoeda(formasPagamento.a_prazo || 0);
+                document.getElementById('totalPixFabiano').textContent = formatarMoeda(formasPagamento.pix_fabiano || 0);
+                document.getElementById('totalPixMaquineta').textContent = formatarMoeda(formasPagamento.pix_maquineta || 0);
+                document.getElementById('totalPixEdFrance').textContent = formatarMoeda(formasPagamento.pix_edfrance || 0);
+                document.getElementById('totalPixLoja').textContent = formatarMoeda(formasPagamento.pix_loja || 0);
+                document.getElementById('totalDinheiro').textContent = formatarMoeda(formasPagamento.dinheiro || 0);
+                document.getElementById('totalCartaoCredito').textContent = formatarMoeda(formasPagamento.cartao_credito || 0);
+                document.getElementById('totalCartaoDebito').textContent = formatarMoeda(formasPagamento.cartao_debito || 0);
+                document.getElementById('totalAPrazo').textContent = formatarMoeda(formasPagamento.a_prazo || 0);
+
+                // Adiciona eventos de clique para os cards de formas de pagamento
+                addFormaPagamentoClickEvents(caixaId);
+            }
         }
-      }
     } catch (error) {
-      console.error('Erro ao carregar financeiro do caixa:', error);
-      showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
+        console.error('Erro ao carregar financeiro do caixa:', error);
+        showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
     }
-  }
-  document.getElementById('abrirPdfCaixa').addEventListener('click', () => {
+}
+
+// Função para adicionar eventos de clique aos cards de formas de pagamento
+function addFormaPagamentoClickEvents(caixaId) {
+    const formasPagamentoIds = [
+        'totalPixFabiano', 'totalPixMaquineta', 'totalPixEdFrance', 
+        'totalPixLoja', 'totalDinheiro', 'totalCartaoCredito', 
+        'totalCartaoDebito', 'totalAPrazo'
+    ];
+
+    const formaPagamentoMap = {
+        'totalPixFabiano': 'pix_fabiano',
+        'totalPixMaquineta': 'pix_maquineta',
+        'totalPixEdFrance': 'pix_edfrance',
+        'totalPixLoja': 'pix_loja',
+        'totalDinheiro': 'dinheiro',
+        'totalCartaoCredito': 'cartao_credito',
+        'totalCartaoDebito': 'cartao_debito',
+        'totalAPrazo': 'a_prazo'
+    };
+
+    formasPagamentoIds.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            // Encontra o elemento pai (total-item) para tornar clicável
+            const card = element.closest('.total-item');
+            if (card) {
+                card.style.cursor = 'pointer';
+                card.classList.add('clickable-card');
+                card.addEventListener('click', () => {
+                    const formaPagamento = formaPagamentoMap[id];
+                    openVendasFormaPagamentoModal(caixaId, formaPagamento);
+                });
+            }
+        }
+    });
+}
+
+// Função para abrir modal de vendas por forma de pagamento
+async function openVendasFormaPagamentoModal(caixaId, formaPagamento) {
+    try {
+        const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/vendas-por-pagamento?forma_pagamento=${formaPagamento}`);
+        
+        if (response.success) {
+            const modal = document.getElementById('vendasFormaPagamentoModal');
+            const tableBody = document.querySelector('#vendasFormaPagamentoTable tbody');
+            const titulo = document.getElementById('vendasFormaPagamentoTitulo');
+            
+            // Atualiza título do modal
+            titulo.textContent = `Vendas - ${formatFormaPagamento(formaPagamento)}`;
+            
+            // Limpa tabela
+            tableBody.innerHTML = '';
+            
+            // Preenche tabela com vendas
+            response.vendas.forEach(venda => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${formatDateTime(venda.data_emissao)}</td>
+                    <td>${venda.id}</td>
+                    <td>${venda.cliente_nome || 'Não informado'}</td>
+                    <td>${formatarMoeda(venda.valor_total)}</td>
+                    <td>${formatarMoeda(venda.valor_pago)}</td>
+                    <td>
+                        <button class="btn-view-venda" data-venda-id="${venda.id}">
+                            <i class="fas fa-eye"></i> Ver Detalhes
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+            
+            // Adiciona eventos de clique para os botões de visualização
+            document.querySelectorAll('.btn-view-venda').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const vendaId = btn.getAttribute('data-venda-id');
+                    openDetalhesVendaModal(vendaId);
+                });
+            });
+            
+            // Abre o modal
+            openModal(modal);
+        } else {
+            showFlashMessage('error', response.error || 'Erro ao carregar vendas');
+        }
+    } catch (error) {
+        console.error('Erro ao abrir modal de vendas:', error);
+        showFlashMessage('error', 'Erro ao carregar vendas');
+    }
+}
+
+// Função para abrir modal de detalhes da venda
+async function openDetalhesVendaModal(vendaId) {
+    try {
+        const response = await fetchWithErrorHandling(`/admin/vendas/${vendaId}/detalhes`);
+        
+        if (response.success) {
+            const modal = document.getElementById('detalhesVendaModal');
+            const venda = response.venda;
+            
+            // Preenche informações básicas
+            document.getElementById('detalheNotaFiscalId').textContent = venda.id;
+            document.getElementById('detalheDataVenda').textContent = formatDateTime(venda.data_emissao);
+            document.getElementById('detalheCliente').textContent = venda.cliente_nome || 'Não informado';
+            document.getElementById('detalheValorTotal').textContent = formatarMoeda(venda.valor_total);
+            
+            // Preence informações de desconto
+            const desconto = venda.valor_desconto > 0 
+                ? `${formatarMoeda(venda.valor_desconto)} (${venda.tipo_desconto || 'N/A'})`
+                : 'Nenhum';
+            document.getElementById('detalheDesconto').textContent = desconto;
+            
+            // Preenche formas de pagamento
+            const formasPagamento = venda.pagamentos.map(p => 
+                `${p.forma_pagamento}: ${formatarMoeda(p.valor)}`
+            ).join(', ');
+            document.getElementById('detalheFormasPagamento').textContent = formasPagamento || 'Nenhuma';
+            
+            // Preenche tabela de produtos
+            const produtosTable = document.querySelector('#detalhesProdutosTable tbody');
+            produtosTable.innerHTML = '';
+            
+            venda.itens.forEach(item => {
+                const row = document.createElement('tr');
+                const descontoInfo = item.desconto_aplicado > 0 
+                    ? `${formatarMoeda(item.desconto_aplicado)} (${item.tipo_desconto || 'N/A'})`
+                    : 'Nenhum';
+                
+                row.innerHTML = `
+                    <td>${item.produto_nome}</td>
+                    <td>${item.quantidade}</td>
+                    <td>${item.unidade_medida}</td>
+                    <td>${formatarMoeda(item.valor_unitario)}</td>
+                    <td>${descontoInfo}</td>
+                    <td>${formatarMoeda(item.valor_total)}</td>
+                `;
+                produtosTable.appendChild(row);
+            });
+            
+            // Atualiza título do modal
+            document.getElementById('detalhesVendaTitulo').textContent = `Detalhes da Venda #${venda.id}`;
+            
+            // Abre o modal
+            openModal(modal);
+        } else {
+            showFlashMessage('error', response.error || 'Erro ao carregar detalhes da venda');
+        }
+    } catch (error) {
+        console.error('Erro ao abrir modal de detalhes:', error);
+        showFlashMessage('error', 'Erro ao carregar detalhes da venda');
+    }
+}
+
+// Função auxiliar para formatar o nome da forma de pagamento
+function formatFormaPagamento(forma) {
+    const formatMap = {
+        'pix_fabiano': 'PIX Fabiano',
+        'pix_maquineta': 'PIX Maquineta',
+        'pix_edfrance': 'PIX Edfranci',
+        'pix_loja': 'PIX Loja',
+        'dinheiro': 'Dinheiro',
+        'cartao_credito': 'Cartão Crédito',
+        'cartao_debito': 'Cartão Débito',
+        'a_prazo': 'A Prazo'
+    };
+    
+    return formatMap[forma] || forma;
+}
+
+document.getElementById('abrirPdfCaixa').addEventListener('click', () => {
     if (caixaIdAtual) {
-      const url = `/admin/caixas/${caixaIdAtual}/financeiro/pdf`;
-      window.open(url, '_blank');
+        const url = `/admin/caixas/${caixaIdAtual}/financeiro/pdf`;
+        window.open(url, '_blank');
     } else {
-      alert('Nenhum caixa selecionado');
+        alert('Nenhum caixa selecionado');
     }
-  });
+});
+
+// Adiciona estilos CSS para indicar elementos clicáveis
+const style = document.createElement('style');
+style.textContent = `
+    .clickable-row:hover {
+        background-color: #f8f9fa !important;
+        box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    
+    .clickable-card:hover {
+        background-color: #f0f8ff !important;
+        transform: translateY(-2px);
+        transition: all 0.2s ease;
+    }
+    
+    .btn-view-venda {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+    
+    .btn-view-venda:hover {
+        background: #0056b3;
+    }
+`;
+document.head.appendChild(style);
 
   // Event Listeners para Caixas
   document.getElementById('refreshData')?.addEventListener('click', loadDashboardData);

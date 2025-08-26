@@ -8,6 +8,7 @@ from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm import joinedload
 import traceback
 from flask import send_file, make_response, jsonify
 from reportlab.lib.pagesizes import A4
@@ -2356,7 +2357,7 @@ def get_caixa_financeiro(caixa_id):
                 'valor_fisico': valor_fisico,
                 'valor_digital': valor_digital,
                 'a_prazo': a_prazo,
-                'contas_prazo_recebidas': total_contas_prazo_recebidas  # Novo campo adicionado
+                'contas_prazo_recebidas': total_contas_prazo_recebidas 
             },
             'vendas_por_forma_pagamento': formas_pagamento
         })
@@ -2368,6 +2369,117 @@ def get_caixa_financeiro(caixa_id):
             'success': False,
             'error': 'Erro interno ao processar dados financeiros'
         }), 500
+    finally:
+        session.close()
+
+@admin_bp.route('/caixas/<int:caixa_id>/vendas-por-pagamento')
+@login_required
+@admin_required
+def get_vendas_por_pagamento(caixa_id):
+    session = Session(db.engine)
+    try:
+        forma_pagamento = request.args.get('forma_pagamento')
+        if not forma_pagamento:
+            return jsonify({'success': False, 'error': 'Forma de pagamento não especificada'}), 400
+
+        # Busca vendas com a forma de pagamento específica
+        vendas = session.query(NotaFiscal)\
+            .join(PagamentoNotaFiscal)\
+            .filter(
+                NotaFiscal.caixa_id == caixa_id,
+                NotaFiscal.status == StatusNota.emitida,
+                PagamentoNotaFiscal.forma_pagamento == forma_pagamento
+            )\
+            .all()
+
+        vendas_data = []
+        for venda in vendas:
+            # Calcula o valor pago com esta forma de pagamento
+            valor_pago = session.query(func.sum(PagamentoNotaFiscal.valor))\
+                .filter(
+                    PagamentoNotaFiscal.nota_fiscal_id == venda.id,
+                    PagamentoNotaFiscal.forma_pagamento == forma_pagamento
+                )\
+                .scalar() or 0.0
+
+            vendas_data.append({
+                'id': venda.id,
+                'data_emissao': venda.data_emissao.isoformat(),
+                'cliente_nome': venda.cliente.nome if venda.cliente else None,
+                'valor_total': float(venda.valor_total),
+                'valor_pago': float(valor_pago)
+            })
+
+        return jsonify({
+            'success': True,
+            'vendas': vendas_data,
+            'forma_pagamento': forma_pagamento
+        })
+
+    except Exception as e:
+        session.rollback()
+        print(f"Erro ao buscar vendas por pagamento: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Erro interno'}), 500
+    finally:
+        session.close()
+
+@admin_bp.route('/vendas/<int:venda_id>/detalhes')
+@login_required
+@admin_required
+def get_detalhes_venda(venda_id):
+    session = Session(db.engine)
+    try:
+        venda = session.query(NotaFiscal)\
+            .options(
+                joinedload(NotaFiscal.cliente),
+                joinedload(NotaFiscal.itens).joinedload(NotaFiscalItem.produto),
+                joinedload(NotaFiscal.pagamentos)
+            )\
+            .filter(NotaFiscal.id == venda_id)\
+            .first()
+
+        if not venda:
+            return jsonify({'success': False, 'error': 'Venda não encontrada'}), 404
+
+        venda_data = {
+            'id': venda.id,
+            'data_emissao': venda.data_emissao.isoformat(),
+            'cliente_nome': venda.cliente.nome if venda.cliente else None,
+            'valor_total': float(venda.valor_total),
+            'valor_desconto': float(venda.valor_desconto) if venda.valor_desconto else 0.0,
+            'tipo_desconto': venda.tipo_desconto.value if venda.tipo_desconto else None,
+            'pagamentos': [],
+            'itens': []
+        }
+
+        # Formas de pagamento
+        for pagamento in venda.pagamentos:
+            venda_data['pagamentos'].append({
+                'forma_pagamento': pagamento.forma_pagamento.value,
+                'valor': float(pagamento.valor)
+            })
+
+        # Itens da venda
+        for item in venda.itens:
+            venda_data['itens'].append({
+                'produto_nome': item.produto.nome,
+                'quantidade': float(item.quantidade),
+                'unidade_medida': item.produto.unidade.value,
+                'valor_unitario': float(item.valor_unitario),
+                'valor_total': float(item.valor_total),
+                'desconto_aplicado': float(item.desconto_aplicado) if item.desconto_aplicado else None,
+                'tipo_desconto': item.tipo_desconto.value if item.tipo_desconto else None
+            })
+
+        return jsonify({
+            'success': True,
+            'venda': venda_data
+        })
+
+    except Exception as e:
+        session.rollback()
+        print(f"Erro ao buscar detalhes da venda: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Erro interno'}), 500
     finally:
         session.close()
 
@@ -2647,35 +2759,35 @@ def gerar_pdf_caixa_financeiro(caixa_id):
                 nome_forma = nomes_formas.get(forma, forma)
                 elements.append(linha_dupla(f"{nome_forma}:", moeda_br(valor)))
         # --- Movimentações Financeiras ---
-        elements.append(Spacer(1, 8))
-        elements.append(linha_separadora())
-        elements.append(Paragraph("MOVIMENTAÇÕES", subtitle_style))
-        elements.append(Spacer(1, 6))
-        elements.append(linha_separadora())
-        for mov in movimentacoes:
-            tipo_cat = f"{mov.tipo.value}"
-            if mov.categoria:
-                tipo_cat += f" - {mov.categoria.value}"
-            elements.append(linha_dupla(tipo_cat, moeda_br(float(mov.valor))))
-            if mov.descricao:
-                descricao = mov.descricao
-                if len(descricao) > 25:
-                    words = descricao
-                    lines = []
-                    current_line = ""
-                    for word in words:
-                        if len(current_line + word) > 25:
-                            lines.append(current_line)
-                            current_line = word + ""
-                        else:
-                            current_line += word + ""
-                    if current_line:
-                        lines.append(current_line)
-                    for line in lines:
-                        elements.append(Paragraph(line, normal_style))
-                else:
-                    elements.append(Paragraph(descricao, normal_style))
-            elements.append(linha_separadora())
+        # elements.append(Spacer(1, 8))
+        # elements.append(linha_separadora())
+        # elements.append(Paragraph("MOVIMENTAÇÕES", subtitle_style))
+        # elements.append(Spacer(1, 6))
+        # elements.append(linha_separadora())
+        # for mov in movimentacoes:
+        #     tipo_cat = f"{mov.tipo.value}"
+        #     if mov.categoria:
+        #         tipo_cat += f" - {mov.categoria.value}"
+        #     elements.append(linha_dupla(tipo_cat, moeda_br(float(mov.valor))))
+        #     if mov.descricao:
+        #         descricao = mov.descricao
+        #         if len(descricao) > 25:
+        #             words = descricao
+        #             lines = []
+        #             current_line = ""
+        #             for word in words:
+        #                 if len(current_line + word) > 25:
+        #                     lines.append(current_line)
+        #                     current_line = word + ""
+        #                 else:
+        #                     current_line += word + ""
+        #             if current_line:
+        #                 lines.append(current_line)
+        #             for line in lines:
+        #                 elements.append(Paragraph(line, normal_style))
+        #         else:
+        #             elements.append(Paragraph(descricao, normal_style))
+        #     elements.append(linha_separadora())
         
         # --- Assinaturas ---
         elements.append(Spacer(1, 15))
@@ -3008,7 +3120,7 @@ def relatorio_vendas_produtos():
             'data_inicio': data_inicio.strftime('%Y-%m-%d'),
             'data_fim': data_fim.strftime('%Y-%m-%d'),
             'total_produtos': len(relatorio),
-            'total_quantidade_vendida': total_quantidade,
+            'total_quantidade_vendida': round(total_quantidade, 2),
             'total_valor_vendido': total_vendido,
             'total_custo': total_custo,
             'lucro_bruto': lucro_bruto_total,
