@@ -2371,6 +2371,65 @@ def get_caixa_financeiro(caixa_id):
         }), 500
     finally:
         session.close()
+        
+@admin_bp.route('/vendas/<int:venda_id>/atualizar-pagamentos', methods=['POST'])
+@login_required
+@admin_required
+def atualizar_forma_pagamentos(venda_id):
+    """
+    Atualiza TODOS os pagamentos associados à nota fiscal e registros relacionados
+    para a forma de pagamento recebida no JSON.
+    Recebe JSON com {"pagamentos": [{"forma_pagamento": "PIX"}]}.
+    """
+    data = request.get_json()
+    pagamentos_recebidos = data.get('pagamentos')
+    print(f'DATA: \n {data}\nPAGAMENTOS: \n{pagamentos_recebidos}\n')
+    
+    if not pagamentos_recebidos or not isinstance(pagamentos_recebidos, list):
+        return jsonify({'success': False, 'error': 'Informe a lista de pagamentos'}), 400
+
+    nova_forma = pagamentos_recebidos[0].get('forma_pagamento')
+    if not nova_forma:
+        return jsonify({'success': False, 'error': 'Forma de pagamento inválida'}), 400
+
+    # Converte para Enum se existir
+    if nova_forma in FormaPagamento.__members__:
+        nova_forma_enum = FormaPagamento[nova_forma]
+    else:
+        nova_forma_enum = nova_forma  # fallback, caso seja string exata
+
+    session: Session = db.session
+    try:
+        nota_fiscal = session.query(NotaFiscal).get(venda_id)
+        if not nota_fiscal:
+            return jsonify({'success': False, 'error': 'Nota fiscal não encontrada'}), 404
+        
+        # Atualiza todos os pagamentos da nota
+        pagamentos_nf = session.query(PagamentoNotaFiscal).filter_by(nota_fiscal_id=venda_id).all()
+        for pagamento in pagamentos_nf:
+            pagamento.forma_pagamento = nova_forma_enum
+
+        # Atualiza todos os lançamentos financeiros relacionados a esses pagamentos
+        financeiros = session.query(Financeiro).filter(Financeiro.pagamento_id.in_([p.id for p in pagamentos_nf])).all()
+        for fin in financeiros:
+            fin.forma_pagamento = nova_forma_enum
+
+        # Atualiza a forma de pagamento principal da nota fiscal
+        nota_fiscal.forma_pagamento = nova_forma_enum
+
+        # Atualiza todas as movimentações de estoque vinculadas a essa nota
+        movimentacoes = session.query(MovimentacaoEstoque).filter_by(caixa_id=nota_fiscal.caixa_id, tipo=TipoMovimentacao.saida).all()
+        for mov in movimentacoes:
+            mov.forma_pagamento = nova_forma_enum
+
+        session.commit()
+        return jsonify({'success': True, 'mensagem': 'Formas de pagamento de toda a nota atualizadas com sucesso!'})
+
+    except Exception as e:
+        session.rollback()
+        import logging
+        logging.exception(f"Erro ao atualizar pagamentos da venda {venda_id}: {str(e)}")
+        return jsonify({'success': False, 'error': 'Erro interno ao atualizar pagamentos'}), 500
 
 @admin_bp.route('/caixas/<int:caixa_id>/vendas-por-pagamento')
 @login_required

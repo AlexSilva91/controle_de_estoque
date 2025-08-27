@@ -2588,3 +2588,68 @@ canvas {
 .table-row-clickable:hover {
     background-color: #A29BFE;
 }
+.formas-pagamento-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.forma-pagamento-item {
+    display: flex;
+    align-items: center;
+    background-color: #6c5ce7;
+    border-radius: 12px;
+    padding: 8px 12px;
+    position: relative;
+}
+
+.forma-pagamento-item .badge {
+    margin-right: 8px;
+}
+
+.forma-pagamento-valor {
+    font-weight: bold;
+    margin-right: 15px;
+}
+
+.btn-remover-forma {
+    background: none;
+    border: none;
+    color: #dc3545;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 5px;
+}
+
+.btn-remover-forma:hover {
+    color: #c82333;
+}
+
+.form-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.form-col {
+    flex: 1;
+}
+
+.form-col:last-child {
+    flex: 0 0 auto;
+}
+.btn-editar-pagamento {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+.btn-editar-pagamento:hover {
+    background: #218838;
+}

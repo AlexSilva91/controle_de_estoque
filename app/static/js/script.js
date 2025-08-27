@@ -2950,9 +2950,21 @@ async function loadCaixaFinanceiro(caixaId) {
                             ${item.descricao || '-'}
                             ${item.cliente_nome ? `<br><small>Cliente: ${item.cliente_nome}</small>` : ''}
                             ${paymentTags !== '-' ? `<br><small>Pagamento: ${paymentTags}</small>` : ''}
+                            ${item.nota_fiscal_id ? `
+                                <br>
+                                <button class="btn-editar-pagamento" data-venda-id="${item.nota_fiscal_id}">
+                                    <i class="fas fa-edit"></i> Editar Pagamentos
+                                </button>
+                            ` : ''}
                         </td>
                     `;
-                    
+                    row.querySelectorAll('.btn-editar-pagamento').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const vendaId = btn.getAttribute('data-venda-id');
+                            openEditarFormasPagamentoModal(vendaId);
+                        });
+                    });
                     // Adiciona evento de clique para abrir detalhes da venda
                     if (item.nota_fiscal_id) {
                         row.style.cursor = 'pointer';
@@ -3215,6 +3227,216 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+let vendaEmEdicao = null;
+let formasPagamentoEditadas = [];
+
+// ===== FUNÇÕES PARA EDIÇÃO DE FORMAS DE PAGAMENTO =====
+
+// Função para abrir o modal de edição de formas de pagamento
+async function openEditarFormasPagamentoModal(vendaId) {
+    try {
+        // Busca os detalhes da venda
+        const response = await fetchWithErrorHandling(`/admin/vendas/${vendaId}/detalhes`);
+        
+        if (response.success) {
+            vendaEmEdicao = response.venda;
+            formasPagamentoEditadas = [...vendaEmEdicao.pagamentos];
+            
+            // Atualiza o modal
+            document.getElementById('editarPagamentoVendaId').textContent = vendaId;
+            document.getElementById('totalVendaValor').textContent = formatarMoeda(vendaEmEdicao.valor_total);
+            
+            // Renderiza as formas de pagamento atuais
+            renderFormasPagamento();
+            
+            // Calcula totais
+            calcularTotaisPagamentos();
+            
+            // Abre o modal
+            const modal = document.getElementById('editarFormasPagamentoModal');
+            openModal(modal);
+        } else {
+            showFlashMessage('error', response.error || 'Erro ao carregar detalhes da venda');
+        }
+    } catch (error) {
+        console.error('Erro ao abrir modal de edição:', error);
+        showFlashMessage('error', 'Erro ao carregar detalhes da venda');
+    }
+}
+
+// Função para renderizar as formas de pagamento
+function renderFormasPagamento() {
+    const container = document.getElementById('formasPagamentoAtuais');
+    container.innerHTML = '';
+    
+    formasPagamentoEditadas.forEach((pagamento, index) => {
+        const item = document.createElement('div');
+        item.className = 'forma-pagamento-item';
+        item.innerHTML = `
+            <span class="badge badge-info">${formatFormaPagamento(pagamento.forma_pagamento)}</span>
+            <span class="forma-pagamento-valor">${formatarMoeda(pagamento.valor)}</span>
+            <button class="btn-remover-forma" data-index="${index}">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        container.appendChild(item);
+    });
+    
+    // Adiciona eventos de clique para os botões de remover
+    document.querySelectorAll('.btn-remover-forma').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const index = parseInt(e.currentTarget.getAttribute('data-index'));
+            formasPagamentoEditadas.splice(index, 1);
+            renderFormasPagamento();
+            calcularTotaisPagamentos();
+        });
+    });
+}
+
+// Função para calcular totais dos pagamentos
+function calcularTotaisPagamentos() {
+    const totalPagamentos = formasPagamentoEditadas.reduce((sum, pagamento) => sum + pagamento.valor, 0);
+    const totalVenda = vendaEmEdicao.valor_total;
+    
+    document.getElementById('totalPagamentosValor').textContent = formatarMoeda(totalPagamentos);
+    
+    // Verifica se há diferença
+    const diferencaContainer = document.getElementById('diferencaContainer');
+    const diferencaValor = document.getElementById('diferencaValor');
+    
+    if (Math.abs(totalPagamentos - totalVenda) > 0.01) {
+        const diferenca = totalVenda - totalPagamentos;
+        diferencaValor.textContent = formatarMoeda(diferenca);
+        diferencaValor.className = `total-value ${diferenca < 0 ? 'negative' : 'positive'}`;
+        diferencaContainer.style.display = 'block';
+    } else {
+        diferencaContainer.style.display = 'none';
+    }
+}
+
+// Função para adicionar nova forma de pagamento
+function adicionarNovaFormaPagamento() {
+    const formaSelect = document.getElementById('novaFormaPagamento');
+    const valorInput = document.getElementById('novoValorPagamento');
+    
+    const forma = formaSelect.value;
+    let valor = parseFloat(valorInput.value) || 0;
+    
+    if (!forma) {
+        showFlashMessage('error', 'Selecione uma forma de pagamento');
+        return;
+    }
+    
+    // Se não foi informado valor, calcula automaticamente para distribuir igualmente
+    if (valor <= 0) {
+        const totalAtual = formasPagamentoEditadas.reduce((sum, p) => sum + p.valor, 0);
+        const restante = vendaEmEdicao.valor_total - totalAtual;
+        
+        if (restante <= 0) {
+            showFlashMessage('error', 'O valor total já foi distribuído entre as formas de pagamento');
+            return;
+        }
+        
+        valor = restante;
+    }
+    
+    // Adiciona a nova forma de pagamento
+    formasPagamentoEditadas.push({
+        forma_pagamento: forma,
+        valor: valor
+    });
+    
+    // Limpa os campos
+    formaSelect.value = '';
+    valorInput.value = '';
+    
+    // Atualiza a interface
+    renderFormasPagamento();
+    calcularTotaisPagamentos();
+}
+
+// Função para salvar as alterações
+async function salvarFormasPagamento() {
+    try {
+        // Verifica se a soma dos pagamentos corresponde ao valor total
+        const totalPagamentos = formasPagamentoEditadas.reduce((sum, pagamento) => sum + pagamento.valor, 0);
+        
+        if (Math.abs(totalPagamentos - vendaEmEdicao.valor_total) > 0.01) {
+            if (!confirm('A soma dos pagamentos não corresponde ao valor total da venda. Deseja continuar mesmo assim?')) {
+                return;
+            }
+        }
+        
+        // Envia as alterações para o servidor
+        const response = await fetchWithErrorHandling(`/admin/vendas/${vendaEmEdicao.id}/atualizar-pagamentos`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                pagamentos: formasPagamentoEditadas
+            })
+        });
+        
+        if (response.success) {
+            showFlashMessage('success', 'Formas de pagamento atualizadas com sucesso!');
+            
+            // Fecha o modal
+            closeModal(document.getElementById('editarFormasPagamentoModal'));
+            
+            // Recarrega os dados do caixa
+            if (caixaIdAtual) {
+                await loadCaixaFinanceiro(caixaIdAtual);
+            }
+        } else {
+            showFlashMessage('error', response.error || 'Erro ao atualizar formas de pagamento');
+        }
+    } catch (error) {
+        console.error('Erro ao salvar formas de pagamento:', error);
+        showFlashMessage('error', 'Erro ao atualizar formas de pagamento');
+    }
+}
+
+// Função auxiliar para formatar o nome da forma de pagamento
+function formatFormaPagamento(forma) {
+    const formatMap = {
+        'pix_fabiano': 'PIX Fabiano',
+        'pix_maquineta': 'PIX Maquineta',
+        'pix_edfrance': 'PIX Edfranci',
+        'pix_loja': 'PIX Loja',
+        'dinheiro': 'Dinheiro',
+        'cartao_credito': 'Cartão Crédito',
+        'cartao_debito': 'Cartão Débito',
+        'a_prazo': 'A Prazo'
+    };
+    
+    return formatMap[forma] || forma;
+}
+
+function setupFormasPagamentoEvents() {
+    // Adiciona eventos aos botões do modal
+    const adicionarBtn = document.getElementById('adicionarFormaPagamento');
+    const salvarBtn = document.getElementById('salvarFormasPagamento');
+    const valorInput = document.getElementById('novoValorPagamento');
+    
+    if (adicionarBtn) {
+        adicionarBtn.addEventListener('click', adicionarNovaFormaPagamento);
+    }
+    
+    if (salvarBtn) {
+        salvarBtn.addEventListener('click', salvarFormasPagamento);
+    }
+    
+    // Permite pressionar Enter no campo de valor
+    if (valorInput) {
+        valorInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                adicionarNovaFormaPagamento();
+            }
+        });
+    }
+}
 
   // Event Listeners para Caixas
   document.getElementById('refreshData')?.addEventListener('click', loadDashboardData);
@@ -4293,7 +4515,8 @@ document.head.appendChild(style);
   setupModalEvents();
   setupNavigation();
   setupVendaRetroativaModal();
-  setupClienteActions()
+  setupClienteActions();
+  setupFormasPagamentoEvents();
   
   document.getElementById('confirmarExclusaoBtn')?.addEventListener('click', async function() {
     const id = this.getAttribute('data-id');
