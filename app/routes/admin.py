@@ -3815,6 +3815,8 @@ def contas_receber():
                 ContaReceber.valor_aberto > 0,
                 ContaReceber.valor_aberto < ContaReceber.valor_original
             )
+    else:
+        query = query.filter(ContaReceber.status != StatusPagamento.quitado)
     
     # Executar query
     contas = query.order_by(ContaReceber.data_vencimento.asc()).all()
