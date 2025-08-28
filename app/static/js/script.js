@@ -3456,19 +3456,15 @@ function setupFormasPagamentoEvents() {
       try {
           const nome = document.getElementById('contasReceberClienteNome')?.value || '';
           const documento = document.getElementById('contasReceberClienteDocumento')?.value || '';
-          const dataEmissaoInicio = document.getElementById('contasReceberDataEmissaoInicio')?.value || '';
-          const dataEmissaoFim = document.getElementById('contasReceberDataEmissaoFim')?.value || '';
-          const dataVencimentoInicio = document.getElementById('contasReceberDataVencimentoInicio')?.value || '';
-          const dataVencimentoFim = document.getElementById('contasReceberDataVencimentoFim')?.value || '';
+          const dataInicio = document.getElementById('contasReceberDataInicio')?.value || '';
+          const dataFim = document.getElementById('contasReceberDataFim')?.value || '';
           const status = document.getElementById('contasReceberStatus')?.value || '';
           
           const params = new URLSearchParams();
           if (nome) params.append('cliente_nome', nome);
           if (documento) params.append('cliente_documento', documento);
-          if (dataEmissaoInicio) params.append('data_emissao_inicio', dataEmissaoInicio);
-          if (dataEmissaoFim) params.append('data_emissao_fim', dataEmissaoFim);
-          if (dataVencimentoInicio) params.append('data_vencimento_inicio', dataVencimentoInicio);
-          if (dataVencimentoFim) params.append('data_vencimento_fim', dataVencimentoFim);
+          if (dataInicio) params.append('data_emissao_inicio', dataInicio);
+          if (dataFim) params.append('data_emissao_fim', dataFim);
           if (status) params.append('status', status);
           
           const response = await fetch(`/admin/contas-receber?${params.toString()}`);
@@ -3493,16 +3489,25 @@ function setupFormasPagamentoEvents() {
       }
   }
 
-  // Adicionar este evento no DOMContentLoaded
-  document.getElementById('filtrarContasReceber')?.addEventListener('click', carregarContasReceber);
+  document.addEventListener('DOMContentLoaded', function() {
+      const btnFiltrar = document.getElementById('filtrarContasReceber');
+      if (btnFiltrar) {
+          btnFiltrar.addEventListener('click', carregarContasReceber);
+      }
 
-  // Permitir filtrar com Enter nos campos de filtro
-  document.getElementById('contasReceberClienteNome')?.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') carregarContasReceber();
-  });
+      const inputNome = document.getElementById('contasReceberClienteNome');
+      if (inputNome) {
+          inputNome.addEventListener('keypress', function(e) {
+              if (e.key === 'Enter') carregarContasReceber();
+          });
+      }
 
-  document.getElementById('contasReceberClienteDocumento')?.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') carregarContasReceber();
+      const inputDocumento = document.getElementById('contasReceberClienteDocumento');
+      if (inputDocumento) {
+          inputDocumento.addEventListener('keypress', function(e) {
+              if (e.key === 'Enter') carregarContasReceber();
+          });
+      }
   });
 
   // Função para atualizar a tabela de contas a receber

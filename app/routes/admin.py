@@ -3745,67 +3745,49 @@ def formatarMoeda(valor):
 @login_required
 @admin_required
 def contas_receber():
-    # Obter parâmetros de filtro
     cliente_nome = request.args.get('cliente_nome', '').strip()
     cliente_documento = request.args.get('cliente_documento', '').strip()
-    data_emissao_inicio = request.args.get('data_emissao_inicio')
-    data_emissao_fim = request.args.get('data_emissao_fim')
-    data_vencimento_inicio = request.args.get('data_vencimento_inicio')
-    data_vencimento_fim = request.args.get('data_vencimento_fim')
+    data_emissao_inicio = request.args.get('data_emissao_inicio') or request.args.get('data_inicio')
+    data_emissao_fim = request.args.get('data_emissao_fim') or request.args.get('data_fim')
     status = request.args.get('status')
-
-    # Query base
-    query = ContaReceber.query.join(Cliente)
     
-    # Filtros
+    params = request.args
+    print("[DEBUG] request.args completos:", params)
+
+
+    query = ContaReceber.query.join(Cliente)
+
+    # Filtros de cliente
     if cliente_nome:
         query = query.filter(Cliente.nome.ilike(f'%{cliente_nome}%'))
-    
     if cliente_documento:
         query = query.filter(Cliente.documento.ilike(f'%{cliente_documento}%'))
-    
-    # Filtro por data de emissão
+
+    # Filtros de data
     if data_emissao_inicio:
         try:
-            data_emissao_inicio = datetime.strptime(data_emissao_inicio, '%Y-%m-%d').date()
-            query = query.filter(ContaReceber.data_emissao >= data_emissao_inicio)
+            inicio = datetime.strptime(data_emissao_inicio, '%Y-%m-%d')
+            inicio = inicio.replace(hour=0, minute=0, second=0, microsecond=0)
+            query = query.filter(ContaReceber.data_emissao >= inicio)
         except ValueError:
             pass
-    
+
     if data_emissao_fim:
         try:
-            data_emissao_fim = datetime.strptime(data_emissao_fim, '%Y-%m-%d').date()
-            query = query.filter(ContaReceber.data_emissao <= data_emissao_fim)
-        except ValueError:
-            pass
-    
-    # Filtro por data de vencimento
-    if data_vencimento_inicio:
-        try:
-            data_vencimento_inicio = datetime.strptime(data_vencimento_inicio, '%Y-%m-%d').date()
-            query = query.filter(ContaReceber.data_vencimento >= data_vencimento_inicio)
-        except ValueError:
-            pass
-    
-    if data_vencimento_fim:
-        try:
-            data_vencimento_fim = datetime.strptime(data_vencimento_fim, '%Y-%m-%d').date()
-            query = query.filter(ContaReceber.data_vencimento <= data_vencimento_fim)
+            fim = datetime.strptime(data_emissao_fim, '%Y-%m-%d')
+            fim = fim.replace(hour=23, minute=59, second=59, microsecond=999999)
+            query = query.filter(ContaReceber.data_emissao <= fim)
         except ValueError:
             pass
 
     # Filtro de status
-    hoje = datetime.now().date()
+    hoje = datetime.now()
     if status:
+        status = status.lower()
         if status == 'pendente':
             query = query.filter(
                 ContaReceber.status != StatusPagamento.quitado,
                 ContaReceber.data_vencimento >= hoje
-            )
-        elif status == 'atrasado':
-            query = query.filter(
-                ContaReceber.status != StatusPagamento.quitado,
-                ContaReceber.data_vencimento < hoje
             )
         elif status == 'quitado':
             query = query.filter(ContaReceber.status == StatusPagamento.quitado)
@@ -3816,32 +3798,26 @@ def contas_receber():
                 ContaReceber.valor_aberto < ContaReceber.valor_original
             )
     else:
+        # Se nenhum status selecionado, retorna todas não quitadas
         query = query.filter(ContaReceber.status != StatusPagamento.quitado)
-    
-    # Executar query
+
     contas = query.order_by(ContaReceber.data_vencimento.asc()).all()
 
-    # Serialização
-    contas_json = []
-    for conta in contas:
-        contas_json.append({
+    contas_json = [
+        {
             'id': conta.id,
-            'cliente': {
-                'nome': conta.cliente.nome,
-                'documento': conta.cliente.documento
-            },
+            'cliente': {'nome': conta.cliente.nome, 'documento': conta.cliente.documento},
             'descricao': conta.descricao,
             'valor_original': float(conta.valor_original),
             'valor_aberto': float(conta.valor_aberto),
             'data_emissao': conta.data_emissao.strftime('%Y-%m-%d'),
             'data_vencimento': conta.data_vencimento.strftime('%Y-%m-%d'),
             'status': conta.status.value
-        })
+        }
+        for conta in contas
+    ]
 
-    return jsonify({
-        'success': True,
-        'contas': contas_json
-    })
+    return jsonify({'success': True, 'contas': contas_json})
     
 @admin_bp.route('/contas-receber/<int:id>/detalhes', methods=['GET'])
 @login_required
@@ -3855,7 +3831,7 @@ def conta_receber_detalhes(id):
         'data_abertura': c.data_abertura.strftime('%Y-%m-%d'),
         'status': c.status.value
     } for c in caixas]
-    print(f'{caixas_json}')
+    
     return jsonify({
         'id': conta.id,
         'cliente': conta.cliente.nome,
