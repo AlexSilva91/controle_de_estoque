@@ -12,12 +12,12 @@ from sqlalchemy.orm import joinedload
 import traceback
 from flask import send_file, make_response, jsonify
 from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
     Table as PlatypusTable
 )
 from flask import make_response, request, jsonify
-from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -3855,6 +3855,210 @@ def conta_receber_detalhes(id):
         } for p in conta.pagamentos],
         'caixas': caixas_json  
     })
+
+@admin_bp.route('/contas-receber/<int:id>/pdf', methods=['GET'])
+@login_required
+@admin_required
+def gerar_pdf_conta_receber(id):
+    conta = ContaReceber.query.get_or_404(id)
+    
+    # Criar um buffer para o PDF
+    buffer = io.BytesIO()
+    
+    # Definir o tamanho da página para 80mm de largura (aproximadamente 226 pontos)
+    width = 80 * mm  # 80mm em pontos
+    height = 300 * mm  # Altura variável
+    
+    # Criar o canvas
+    c = canvas.Canvas(buffer, pagesize=(width, height))
+    
+    # Configurações iniciais
+    c.setFont("Helvetica", 9)
+    margin = 5 * mm
+    y_position = height - margin
+    
+    # Cabeçalho - informações da empresa
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(margin, y_position, "MINHA EMPRESSA LTDA")
+    y_position -= 5 * mm
+    
+    c.setFont("Helvetica", 8)
+    c.drawString(margin, y_position, "CNPJ: 12.345.678/0001-90")
+    y_position -= 4 * mm
+    c.drawString(margin, y_position, "Endereço: Rua Exemplo, 123 - Centro")
+    y_position -= 4 * mm
+    c.drawString(margin, y_position, "Telefone: (11) 9999-9999")
+    y_position -= 6 * mm
+    
+    # Linha separadora
+    c.line(margin, y_position, width - margin, y_position)
+    y_position -= 6 * mm
+    
+    # Título do documento
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(width / 2, y_position, "CONTA A RECEBER")
+    y_position -= 8 * mm
+    
+    # Informações da conta
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(margin, y_position, "Nº Documento:")
+    c.setFont("Helvetica", 9)
+    c.drawString(margin + 35 * mm, y_position, f"{conta.id}")
+    y_position -= 5 * mm
+    
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(margin, y_position, "Emissão:")
+    c.setFont("Helvetica", 9)
+    c.drawString(margin + 35 * mm, y_position, conta.data_emissao.strftime('%d/%m/%Y'))
+    y_position -= 5 * mm
+    
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(margin, y_position, "Vencimento:")
+    c.setFont("Helvetica", 9)
+    c.drawString(margin + 35 * mm, y_position, conta.data_vencimento.strftime('%d/%m/%Y'))
+    y_position -= 5 * mm
+    
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(margin, y_position, "Status:")
+    c.setFont("Helvetica", 9)
+    
+    status_text = ""
+    if conta.status == StatusPagamento.quitado:
+        status_text = "QUITADO"
+    elif conta.status == StatusPagamento.parcial:
+        status_text = "PAGAMENTO PARCIAL"
+    else:
+        hoje = datetime.now()
+        if conta.data_vencimento < hoje.date():
+            status_text = "VENCIDO"
+        else:
+            status_text = "PENDENTE"
+    
+    c.drawString(margin + 35 * mm, y_position, status_text)
+    y_position -= 8 * mm
+    
+    # Informações do cliente
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(margin, y_position, "CLIENTE")
+    y_position -= 5 * mm
+    
+    c.setFont("Helvetica", 9)
+    c.drawString(margin, y_position, f"{conta.cliente.nome}")
+    y_position -= 4 * mm
+    
+    if conta.cliente.documento:
+        c.drawString(margin, y_position, f"Documento: {conta.cliente.documento}")
+        y_position -= 4 * mm
+    
+    y_position -= 4 * mm
+    
+    # Descrição
+    if conta.descricao:
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(margin, y_position, "Descrição:")
+        y_position -= 4 * mm
+        
+        c.setFont("Helvetica", 9)
+        # Quebra de linha para descrição longa
+        desc_lines = []
+        words = conta.descricao.split()
+        line = ""
+        for word in words:
+            test_line = line + word + " "
+            if c.stringWidth(test_line, "Helvetica", 9) < (width - 2 * margin):
+                line = test_line
+            else:
+                desc_lines.append(line)
+                line = word + " "
+        if line:
+            desc_lines.append(line)
+        
+        for line in desc_lines:
+            c.drawString(margin, y_position, line)
+            y_position -= 4 * mm
+        
+        y_position -= 4 * mm
+    
+    # Valores
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(margin, y_position, "VALORES")
+    y_position -= 5 * mm
+    
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(margin, y_position, "Valor Original:")
+    c.setFont("Helvetica", 9)
+    c.drawString(margin + 35 * mm, y_position, f"R$ {conta.valor_original:.2f}")
+    y_position -= 5 * mm
+    
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(margin, y_position, "Valor Pendente:")
+    c.setFont("Helvetica", 9)
+    c.drawString(margin + 35 * mm, y_position, f"R$ {conta.valor_aberto:.2f}")
+    y_position -= 8 * mm
+    
+    # Pagamentos realizados (se houver)
+    if conta.pagamentos:
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(margin, y_position, "PAGAMENTOS REALIZADOS")
+        y_position -= 5 * mm
+        
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(margin, y_position, "Data")
+        c.drawString(margin + 20 * mm, y_position, "Valor")
+        c.drawString(margin + 40 * mm, y_position, "Forma")
+        y_position -= 4 * mm
+        
+        c.line(margin, y_position, width - margin, y_position)
+        y_position -= 4 * mm
+        
+        c.setFont("Helvetica", 8)
+        for pagamento in conta.pagamentos:
+            if y_position < 20 * mm:  # Verificar se precisa de nova página
+                c.showPage()
+                y_position = height - margin
+                c.setFont("Helvetica", 8)
+            
+            c.drawString(margin, y_position, pagamento.data_pagamento.strftime('%d/%m/%Y'))
+            c.drawString(margin + 20 * mm, y_position, f"R$ {pagamento.valor_pago:.2f}")
+            
+            # Forma de pagamento abreviada
+            forma_pagamento = pagamento.forma_pagamento.value
+            if forma_pagamento == 'dinheiro':
+                forma_abrev = 'DIN'
+            elif 'pix' in forma_pagamento:
+                forma_abrev = 'PIX'
+            elif 'cartao_credito' in forma_pagamento:
+                forma_abrev = 'CC'
+            elif 'cartao_debito' in forma_pagamento:
+                forma_abrev = 'CD'
+            else:
+                forma_abrev = forma_pagamento[:3].upper()
+            
+            c.drawString(margin + 40 * mm, y_position, forma_abrev)
+            y_position -= 4 * mm
+        
+        y_position -= 4 * mm
+    
+    # Rodapé
+    if y_position < 30 * mm:
+        c.showPage()
+        y_position = height - margin
+    
+    c.setFont("Helvetica-Oblique", 7)
+    c.drawCentredString(width / 2, 10 * mm, f"Emitido em: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    
+    # Finalizar o PDF
+    c.save()
+    
+    # Obter o valor do buffer
+    buffer.seek(0)
+    
+    # Criar resposta
+    response = make_response(buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=conta_receber_{conta.id}.pdf'
+    
+    return response
 
 @admin_bp.route('/contas-receber/<int:id>/pagar', methods=['POST'])
 @login_required

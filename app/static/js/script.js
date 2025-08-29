@@ -3454,15 +3454,11 @@ function setupFormasPagamentoEvents() {
   // Função para carregar as contas a receber
   async function carregarContasReceber() {
       try {
-          const nome = document.getElementById('contasReceberClienteNome')?.value || '';
-          const documento = document.getElementById('contasReceberClienteDocumento')?.value || '';
           const dataInicio = document.getElementById('contasReceberDataInicio')?.value || '';
           const dataFim = document.getElementById('contasReceberDataFim')?.value || '';
           const status = document.getElementById('contasReceberStatus')?.value || '';
           
           const params = new URLSearchParams();
-          if (nome) params.append('cliente_nome', nome);
-          if (documento) params.append('cliente_documento', documento);
           if (dataInicio) params.append('data_emissao_inicio', dataInicio);
           if (dataFim) params.append('data_emissao_fim', dataFim);
           if (status) params.append('status', status);
@@ -3495,19 +3491,6 @@ function setupFormasPagamentoEvents() {
           btnFiltrar.addEventListener('click', carregarContasReceber);
       }
 
-      const inputNome = document.getElementById('contasReceberClienteNome');
-      if (inputNome) {
-          inputNome.addEventListener('keypress', function(e) {
-              if (e.key === 'Enter') carregarContasReceber();
-          });
-      }
-
-      const inputDocumento = document.getElementById('contasReceberClienteDocumento');
-      if (inputDocumento) {
-          inputDocumento.addEventListener('keypress', function(e) {
-              if (e.key === 'Enter') carregarContasReceber();
-          });
-      }
   });
 
   // Função para atualizar a tabela de contas a receber
