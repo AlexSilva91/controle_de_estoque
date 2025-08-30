@@ -726,56 +726,64 @@
 
                 <!-- Caixas -->
                 <div id="caixas" class="tab-content">
+                    <!-- Barra de ações e filtros -->
                     <div class="action-bar">
                         <div class="filter-container">
+                            <!-- Filtro de status -->
                             <div class="filter-group">
                                 <label for="caixaStatus">Status:</label>
                                 <select id="caixaStatus" class="form-control">
                                     <option value="">Todos</option>
                                     <option value="aberto">Abertos</option>
                                     <option value="fechado">Fechados</option>
-                                    <option value="analise">Em análise</option>
+                                    <option value="em_analise">Em análise</option>
+                                    <option value="recusado">Recusados</option>
                                 </select>
                             </div>
+                            <!-- Filtro Data Início -->
+                            <div class="filter-group">
+                                <label for="caixaDataInicio">Data Início:</label>
+                                <input type="date" id="caixaDataInicio" class="form-control">
+                            </div>
+                            <!-- Filtro Data Fim -->
+                            <div class="filter-group">
+                                <label for="caixaDataFim">Data Fim:</label>
+                                <input type="date" id="caixaDataFim" class="form-control">
+                            </div>
+                            <!-- Botão Filtrar -->
                             <button class="btn btn-primary" id="filterCaixas">
                                 <i class="fas fa-filter"></i>
                                 <span>Filtrar</span>
                             </button>
                         </div>
+                        <!-- Botões de ação (atualizar) -->
                         <div class="action-buttons">
                             <button class="btn btn-outline" id="refreshCaixas" aria-label="Atualizar">
                                 <i class="fas fa-sync-alt"></i>
                             </button>
                         </div>
                     </div>
-
-                    <div class="card">
-                        <div class="card-header">
-                            <h3><i class="fas fa-cash-register"></i> Histórico de Caixas</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table id="caixasTable">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Operador</th>
-                                            <th>Abertura</th>
-                                            <th>Fechamento</th>
-                                            <th>Valor Abertura</th>
-                                            <th>Valor Fechamento</th>
-                                            <th>Status</th>
-                                            <th>Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <!-- Dados serão preenchidos via JavaScript -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                    <!-- Tabela de Caixas -->
+                    <div class="table-responsive">
+                        <table class="table table-hover-effect" id="caixasTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Operador</th>
+                                    <th>Abertura</th>
+                                    <th>Fechamento</th>
+                                    <th>Valor Abertura</th>
+                                    <th>Valor Fechamento</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Linhas preenchidas dinamicamente via JS -->
+                            </tbody>
+                        </table>
                     </div>
-                </div>
+                </div>                 
 
                 <!-- Descontos -->
                 <div id="descontos" class="tab-content">

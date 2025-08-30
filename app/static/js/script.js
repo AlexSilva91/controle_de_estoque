@@ -276,7 +276,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelector('.sidebar-nav li[data-tab="contas-receber"]').addEventListener('click', function(e) {
         e.preventDefault();
         openModal('contasReceberModal');
-        carregarContasReceber();
+        loadContasReceber();
     });
     const navItems = document.querySelectorAll('.sidebar-nav li');
     const tabContents = document.querySelectorAll('.tab-content');
@@ -314,7 +314,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tabId === 'descontos') loadDescontosData();
         if (tabId === 'caixas') loadCaixasData();
         if (tabId === 'relatorio-saidas') loadRelatorioSaidasData();
-        if (tabId === 'contas-receber') carregarContasReceber();
+        if (tabId === 'contas-receber') loadContasReceber();
       });
     });
 
@@ -2026,77 +2026,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  async function loadContasReceber() {
-      try {
-          // Obter valores dos filtros
-          const dataInicio = document.getElementById('contasReceberDataInicio').value;
-          const dataFim = document.getElementById('contasReceberDataFim').value;
-          const status = document.getElementById('contasReceberStatus').value;
-          
-          // Construir parâmetros da URL
-          const params = new URLSearchParams();
-          if (dataInicio) params.append('data_inicio', dataInicio);
-          if (dataFim) params.append('data_fim', dataFim);
-          if (status) params.append('status', status);
-          
-          // Fazer a requisição
-          const response = await fetchWithErrorHandling(`/admin/contas-receber?${params.toString()}`);
-          
-          if (response && response.success) {
-              const tbody = document.querySelector('#tabelaContasReceber tbody');
-              tbody.innerHTML = '';
-              
-              if (response.contas && response.contas.length > 0) {
-                  const hoje = new Date();
-                  
-                  response.contas.forEach(conta => {
-                      // Determinar o status correto para exibição
-                      let statusExibicao = conta.status;
-                      let badgeClass = '';
-                      
-                      // Se não for quitado, verificar se está atrasado
-                      if (statusExibicao !== 'quitado') {
-                          const dataVencimento = new Date(conta.data_vencimento);
-                          statusExibicao = dataVencimento >= hoje ? 'pendente' : 'atrasado';
-                      }
-                      
-                      // Formatar o status para exibição
-                      const statusFormatado = formatarStatus(statusExibicao);
-                      badgeClass = getStatusBadgeClass(statusExibicao);
-                      
-                      const tr = document.createElement('tr');
-                      tr.innerHTML = `
-                          <td>${conta.id}</td>
-                          <td>${conta.cliente.nome}</td>
-                          <td>${conta.cliente.documento || '-'}</td>
-                          <td>${conta.descricao || '-'}</td>
-                          <td>${formatarMoeda(conta.valor_original)}</td>
-                          <td>${formatarMoeda(conta.valor_aberto)}</td>
-                          <td>${formatarData(conta.data_emissao)}</td>
-                          <td>${formatarData(conta.data_vencimento)}</td>
-                          <td>
-                              <span class="badge ${badgeClass}">
-                                  ${statusFormatado}
-                              </span>
-                          </td>
-                          <td>
-                              <button class="btn-icon btn-info btn-detalhes-conta" data-id="${conta.id}" title="Ver detalhes">
-                                  <i class="fas fa-info-circle"></i>
-                              </button>
-                          </td>
-                      `;
-                      tbody.appendChild(tr);
-                  });
-              } else {
-                  tbody.innerHTML = '<tr><td colspan="10" class="text-center">Nenhuma conta encontrada</td></tr>';
-              }
-          }
-      } catch (error) {
-          console.error('Erro ao carregar contas a receber:', error);
-          showFlashMessage('error', 'Erro ao carregar contas a receber');
-      }
-  }
-
   // Funções auxiliares para formatação
   function formatarData(dataString) {
       if (!dataString) return '-';
@@ -2630,30 +2559,38 @@ document.addEventListener('DOMContentLoaded', function() {
   // ===== CAIXAS =====
   async function loadCaixasData() {
     try {
-      const status = document.getElementById('caixaStatus')?.value;
+      const status = document.getElementById('caixaStatus')?.value || '';
+      const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
+      const dataFim = document.getElementById('caixaDataFim')?.value || '';
+  
+      // Monta query string dinamicamente
+      const params = new URLSearchParams();
+      if (status) params.append('status', status);
+      if (dataInicio) params.append('data_inicio', dataInicio);
+      if (dataFim) params.append('data_fim', dataFim);
+  
       let url = '/admin/caixas';
-      
-      if (status) {
-        url += `?status=${status}`;
+      if ([...params].length > 0) {
+        url += `?${params.toString()}`;
       }
-      
+  
       const data = await fetchWithErrorHandling(url);
-      
+  
       if (data.success) {
         const caixasTable = document.querySelector('#caixasTable tbody');
         if (caixasTable) {
           caixasTable.innerHTML = '';
-          
+  
           data.data.forEach(caixa => {
             const row = document.createElement('tr');
-            
+  
             const dataAbertura = formatDateTime(caixa.data_abertura);
             const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
-            
+  
             const valorAbertura = formatarMoeda(caixa.valor_abertura);
             const valorFechamento = caixa.valor_fechamento ? formatarMoeda(caixa.valor_fechamento) : '-';
             const valorConfirmado = caixa.valor_confirmado ? formatarMoeda(caixa.valor_confirmado) : '-';
-            
+  
             let statusClass = '';
             let statusText = '';
             if (caixa.status === 'aberto') {
@@ -2662,14 +2599,14 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (caixa.status === 'fechado') {
               statusClass = 'badge-primary';
               statusText = 'Fechado';
-            } else if (caixa.status === 'analise') {
+            } else if (caixa.status === 'analise' || caixa.status === 'em_analise') {
               statusClass = 'badge-warning';
               statusText = 'Em Análise';
-            } else if (caixa.status === 'rejeitado') {
+            } else if (caixa.status === 'rejeitado' || caixa.status === 'recusado') {
               statusClass = 'badge-danger';
               statusText = 'Rejeitado';
             }
-            
+  
             row.innerHTML = `
               <td>${caixa.id}</td>
               <td>${caixa.operador?.nome || '-'}</td>
@@ -2703,7 +2640,7 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
             caixasTable.appendChild(row);
           });
-          
+  
           setupCaixaActions();
         }
       }
@@ -2712,6 +2649,19 @@ document.addEventListener('DOMContentLoaded', function() {
       showFlashMessage('error', 'Erro ao carregar lista de caixas');
     }
   }
+  
+  // Eventos de filtro
+  document.getElementById('filterCaixas')?.addEventListener('click', () => {
+    loadCaixasData();
+  });
+  
+  document.getElementById('refreshCaixas')?.addEventListener('click', () => {
+    document.getElementById('caixaStatus').value = '';
+    document.getElementById('caixaDataInicio').value = '';
+    document.getElementById('caixaDataFim').value = '';
+    loadCaixasData();
+  });
+  
 
   function setupCaixaActions() {
     document.querySelectorAll('.visualizar-caixa').forEach(btn => {
@@ -3446,13 +3396,13 @@ function setupFormasPagamentoEvents() {
 
   // Função para abrir o modal de contas a receber
   function openContasReceberModal() {
-      carregarContasReceber();
+      loadContasReceber();
       carregarCaixasAbertos();
       openModal('contasReceberModal');
   }
 
   // Função para carregar as contas a receber
-  async function carregarContasReceber() {
+  async function loadContasReceber() {
       try {
           const dataInicio = document.getElementById('contasReceberDataInicio')?.value || '';
           const dataFim = document.getElementById('contasReceberDataFim')?.value || '';
@@ -3488,10 +3438,53 @@ function setupFormasPagamentoEvents() {
   document.addEventListener('DOMContentLoaded', function() {
       const btnFiltrar = document.getElementById('filtrarContasReceber');
       if (btnFiltrar) {
-          btnFiltrar.addEventListener('click', carregarContasReceber);
+          btnFiltrar.addEventListener('click', loadContasReceber);
       }
-
   });
+
+  // Função para gerar PDF da conta
+  async function gerarPDFConta(contaId) {
+      try {
+          // Mostrar indicador de carregamento (opcional)
+          const btnPDF = document.querySelector(`button[data-pdf-id="${contaId}"]`);
+          if (btnPDF) {
+              const originalHTML = btnPDF.innerHTML;
+              btnPDF.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+              btnPDF.disabled = true;
+              
+              // Restaurar botão após um tempo
+              setTimeout(() => {
+                  btnPDF.innerHTML = originalHTML;
+                  btnPDF.disabled = false;
+              }, 3000);
+          }
+          
+          // Fazer requisição para gerar o PDF
+          const response = await fetch(`/admin/contas-receber/${contaId}/pdf`);
+          
+          if (!response.ok) {
+              throw new Error('Erro ao gerar PDF');
+          }
+          
+          // Criar blob com o PDF
+          const pdfBlob = await response.blob();
+          
+          // Criar URL temporária para o blob
+          const pdfUrl = window.URL.createObjectURL(pdfBlob);
+          
+          // Abrir em nova guia
+          window.open(pdfUrl, '_blank');
+          
+          // Limpar URL temporária após um tempo
+          setTimeout(() => {
+              window.URL.revokeObjectURL(pdfUrl);
+          }, 1000);
+          
+      } catch (error) {
+          console.error('Erro ao gerar PDF:', error);
+          showFlashMessage('error', 'Erro ao gerar PDF da conta');
+      }
+  }
 
   // Função para atualizar a tabela de contas a receber
   function atualizarTabelaContasReceber() {
@@ -3501,7 +3494,7 @@ function setupFormasPagamentoEvents() {
       tbody.innerHTML = '';
       
       if (contasReceberData.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="10" class="text-center">Nenhuma conta encontrada</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="11" class="text-center">Nenhuma conta encontrada</td></tr>';
           return;
       }
       
@@ -3541,6 +3534,9 @@ function setupFormasPagamentoEvents() {
                   <button class="btn btn-sm btn-info btn-detalhes-conta" data-id="${conta.id}" title="Detalhes">
                       <i class="fas fa-eye"></i>
                   </button>
+                  <button class="btn btn-sm btn-danger btn-pdf-conta" data-pdf-id="${conta.id}" title="Gerar PDF">
+                      <i class="fas fa-file-pdf"></i>
+                  </button>
               </td>
           `;
           
@@ -3552,6 +3548,14 @@ function setupFormasPagamentoEvents() {
           btn.addEventListener('click', function() {
               const contaId = this.getAttribute('data-id');
               abrirModalDetalhesConta(contaId);
+          });
+      });
+      
+      // Adicionar eventos aos botões de PDF
+      document.querySelectorAll('.btn-pdf-conta').forEach(btn => {
+          btn.addEventListener('click', function() {
+              const contaId = this.getAttribute('data-pdf-id');
+              gerarPDFConta(contaId);
           });
       });
   }
@@ -3776,7 +3780,7 @@ function setupFormasPagamentoEvents() {
 
               if (pagarTotal) {
                   closeModal('detalhesContaModal');
-                  carregarContasReceber();
+                  loadContasReceber();
               }
           }
       } catch (error) {
@@ -3860,7 +3864,7 @@ function setupFormasPagamentoEvents() {
       }
       
       // Filtro
-      document.getElementById('btnFiltrarContas')?.addEventListener('click', carregarContasReceber);
+      document.getElementById('btnFiltrarContas')?.addEventListener('click', loadContasReceber);
       
       // Formulário de pagamento
       document.getElementById('formPagamentoConta')?.addEventListener('submit', function(e) {
@@ -3885,13 +3889,13 @@ function setupFormasPagamentoEvents() {
       // Permitir filtrar com Enter nos campos de texto
       document.getElementById('filtroClienteNome')?.addEventListener('keypress', function(e) {
           if (e.key === 'Enter') {
-              carregarContasReceber();
+              loadContasReceber();
           }
       });
       
       document.getElementById('filtroClienteDocumento')?.addEventListener('keypress', function(e) {
           if (e.key === 'Enter') {
-              carregarContasReceber();
+              loadContasReceber();
           }
       });
       // Adicione isso no final do arquivo, dentro do DOMContentLoaded
@@ -4568,7 +4572,7 @@ function setupFormasPagamentoEvents() {
           loadRelatorioSaidasData();
           loadCategoriasProdutos();
         }
-        if (tabId === 'contas-receber') carregarContasReceber();
+        if (tabId === 'contas-receber') loadContasReceber();
       }
     } catch (error) {
       console.error('Erro ao carregar dados iniciais:', error);

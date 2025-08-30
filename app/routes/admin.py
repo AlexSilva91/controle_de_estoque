@@ -40,7 +40,7 @@ from app.models.entities import (
     Cliente, Produto, NotaFiscal, UnidadeMedida, StatusNota,
     Financeiro, TipoMovimentacao, CategoriaFinanceira, MovimentacaoEstoque, ContaReceber,
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
-    Desconto, PagamentoContaReceber)
+    Desconto, PagamentoContaReceber, Usuario)
 from app.crud import (
     TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_todos_os_descontos, calcular_fator_conversao,
     criar_desconto, deletar_desconto, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
@@ -2051,16 +2051,51 @@ def buscar_desconto_por_id(desconto_id):
 @admin_required
 def get_caixas():
     session = Session(db.engine)
-    resultado = obter_caixas_completo(session)
-    
-    if resultado['success']:
-        return jsonify({
-            'success': True,
-            'data': resultado['data'],
-            'count': len(resultado['data'])
+
+    status = request.args.get('status')
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+
+    query = session.query(Caixa).join(Usuario, Caixa.operador_id == Usuario.id)
+
+    if status:
+        try:
+            status_enum = StatusCaixa(status)
+            query = query.filter(Caixa.status == status_enum)
+        except ValueError:
+            pass  # ignora se status inválido
+
+    if data_inicio:
+        try:
+            dt_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
+            query = query.filter(Caixa.data_abertura >= dt_inicio)
+        except ValueError:
+            pass
+
+    if data_fim:
+        try:
+            dt_fim = datetime.strptime(data_fim, "%Y-%m-%d")
+            dt_fim = dt_fim.replace(hour=23, minute=59, second=59)
+            query = query.filter(Caixa.data_abertura <= dt_fim)
+        except ValueError:
+            pass
+
+    caixas = query.order_by(Caixa.data_abertura.desc()).all()
+
+    data = []
+    for c in caixas:
+        data.append({
+            "id": c.id,
+            "operador": {"id": c.operador.id, "nome": c.operador.nome} if c.operador else None,
+            "data_abertura": c.data_abertura.isoformat() if c.data_abertura else None,
+            "data_fechamento": c.data_fechamento.isoformat() if c.data_fechamento else None,
+            "valor_abertura": float(c.valor_abertura) if c.valor_abertura else None,
+            "valor_fechamento": float(c.valor_fechamento) if c.valor_fechamento else None,
+            "valor_confirmado": float(c.valor_confirmado) if c.valor_confirmado else None,
+            "status": c.status.value if c.status else None
         })
-    else:
-        return jsonify({'success': False, 'error': resultado['message']}), 500
+
+    return jsonify({"success": True, "data": data, "count": len(data)})
 
 @admin_bp.route('/caixas/<int:caixa_id>', methods=['PUT'])
 @login_required
@@ -3879,7 +3914,7 @@ def gerar_pdf_conta_receber(id):
     
     # Cabeçalho - informações da empresa
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(margin, y_position, "MINHA EMPRESSA LTDA")
+    c.drawString(margin, y_position, "MINHA EMPRESA LTDA")
     y_position -= 5 * mm
     
     c.setFont("Helvetica", 8)
@@ -3928,8 +3963,16 @@ def gerar_pdf_conta_receber(id):
     elif conta.status == StatusPagamento.parcial:
         status_text = "PAGAMENTO PARCIAL"
     else:
-        hoje = datetime.now()
-        if conta.data_vencimento < hoje.date():
+        # CORREÇÃO: Converter ambas as datas para o mesmo tipo
+        hoje = datetime.now().date()  # Converter para date
+        
+        # Verificar se conta.data_vencimento é datetime ou date
+        if isinstance(conta.data_vencimento, datetime):
+            vencimento = conta.data_vencimento.date()
+        else:
+            vencimento = conta.data_vencimento
+            
+        if vencimento < hoje:
             status_text = "VENCIDO"
         else:
             status_text = "PENDENTE"
@@ -4018,7 +4061,13 @@ def gerar_pdf_conta_receber(id):
                 y_position = height - margin
                 c.setFont("Helvetica", 8)
             
-            c.drawString(margin, y_position, pagamento.data_pagamento.strftime('%d/%m/%Y'))
+            # CORREÇÃO: Verificar se a data do pagamento é datetime ou date
+            if isinstance(pagamento.data_pagamento, datetime):
+                data_pagamento_str = pagamento.data_pagamento.strftime('%d/%m/%Y')
+            else:
+                data_pagamento_str = pagamento.data_pagamento.strftime('%d/%m/%Y')
+            
+            c.drawString(margin, y_position, data_pagamento_str)
             c.drawString(margin + 20 * mm, y_position, f"R$ {pagamento.valor_pago:.2f}")
             
             # Forma de pagamento abreviada
