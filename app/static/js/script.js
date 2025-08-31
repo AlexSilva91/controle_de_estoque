@@ -2662,7 +2662,37 @@ document.addEventListener('DOMContentLoaded', function() {
     loadCaixasData();
   });
   
-
+  // Evento para gerar PDF
+  document.getElementById('gerarPdfCaixas')?.addEventListener('click', () => {
+      gerarPdfCaixas();
+  });
+  
+  async function gerarPdfCaixas() {
+      try {
+          const status = document.getElementById('caixaStatus')?.value || '';
+          const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
+          const dataFim = document.getElementById('caixaDataFim')?.value || '';
+          
+          // Montar query string com os filtros atuais
+          const params = new URLSearchParams();
+          if (status) params.append('status', status);
+          if (dataInicio) params.append('data_inicio', dataInicio);
+          if (dataFim) params.append('data_fim', dataFim);
+          
+          let url = '/admin/caixas/pdf';
+          if ([...params].length > 0) {
+              url += `?${params.toString()}`;
+          }
+          
+          // Abrir PDF em nova aba
+          window.open(url, '_blank');
+          
+      } catch (error) {
+          console.error('Erro ao gerar PDF:', error);
+          showFlashMessage('error', 'Erro ao gerar PDF');
+      }
+  }
+  
   function setupCaixaActions() {
     document.querySelectorAll('.visualizar-caixa').forEach(btn => {
       btn.addEventListener('click', function() {
