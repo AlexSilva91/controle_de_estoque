@@ -1716,7 +1716,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'pix_loja': 'PIX Loja',
         'pix_fabiano': 'PIX Fabiano',
         'pix_maquineta': 'PIX Maquineta',
-        'pix_edfrance': 'PIX EDFrance',
+        'pix_edfrance': 'PIX Edfranci',
         'cartao_credito': 'Cartão Crédito',
         'cartao_debito': 'Cartão Débito',
         'a_prazo': 'A Prazo'
@@ -1770,10 +1770,6 @@ document.addEventListener('DOMContentLoaded', function() {
           select.appendChild(option);
         });
         
-        $(select).select2({
-          placeholder: "Selecione um cliente",
-          width: '100%'
-        });
       }
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
@@ -1798,11 +1794,6 @@ document.addEventListener('DOMContentLoaded', function() {
           option.setAttribute('data-valor', produto.valor_unitario);
           option.setAttribute('data-unidade', produto.unidade);
           select.appendChild(option);
-        });
-        
-        $(select).select2({
-          placeholder: "Selecione um produto",
-          width: '100%'
         });
       }
     } catch (error) {
@@ -3824,7 +3815,7 @@ function setupFormasPagamentoEvents() {
           'pix_loja': 'PIX Loja',
           'pix_fabiano': 'PIX Fabiano',
           'pix_maquineta': 'PIX Maquineta',
-          'pix_edfrance': 'PIX EDFrance',
+          'pix_edfrance': 'PIX Edfranci',
           'cartao_credito': 'Cartão Crédito',
           'cartao_debito': 'Cartão Débito',
           'a_prazo': 'A Prazo'
