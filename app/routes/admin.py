@@ -4452,76 +4452,125 @@ def conta_receber_detalhes(id):
 def gerar_pdf_conta_receber(id):
     conta = ContaReceber.query.get_or_404(id)
     
-    # Criar um buffer para o PDF
+    # Configuração para bobina 80mm
+    bobina_width = 226
+    bobina_height = 3000
+    
     buffer = io.BytesIO()
-    
-    # Definir o tamanho da página para 80mm de largura (aproximadamente 226 pontos)
-    width = 80 * mm  # 80mm em pontos
-    height = 300 * mm  # Altura variável
-    
-    # Criar o canvas
-    c = canvas.Canvas(buffer, pagesize=(width, height))
-    
-    # Configurações iniciais
-    c.setFont("Helvetica", 9)
-    margin = 5 * mm
-    y_position = height - margin
-    
-    # Cabeçalho - informações da empresa
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(margin, y_position, "MINHA EMPRESA LTDA")
-    y_position -= 5 * mm
-    
-    c.setFont("Helvetica", 8)
-    c.drawString(margin, y_position, "CNPJ: 12.345.678/0001-90")
-    y_position -= 4 * mm
-    c.drawString(margin, y_position, "Endereço: Rua Exemplo, 123 - Centro")
-    y_position -= 4 * mm
-    c.drawString(margin, y_position, "Telefone: (11) 9999-9999")
-    y_position -= 6 * mm
-    
-    # Linha separadora
-    c.line(margin, y_position, width - margin, y_position)
-    y_position -= 6 * mm
-    
-    # Título do documento
-    c.setFont("Helvetica-Bold", 12)
-    c.drawCentredString(width / 2, y_position, "CONTA A RECEBER")
-    y_position -= 8 * mm
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=(bobina_width, bobina_height),
+        leftMargin=5,
+        rightMargin=5,
+        topMargin=-6,
+        bottomMargin=5
+    )
+    elements = []
+
+    # Estilos
+    styles = getSampleStyleSheet()
+    header_style = ParagraphStyle(
+        name='Header',
+        parent=styles['Heading1'],
+        fontSize=14,
+        leading=14,
+        alignment=1,
+        fontName='Helvetica-Bold',
+        spaceAfter=6
+    )
+    subtitle_style = ParagraphStyle(
+        name='Subtitle',
+        parent=styles['Heading2'],
+        fontSize=12,
+        leading=12,
+        alignment=1,
+        fontName='Helvetica-Bold',
+        spaceAfter=4
+    )
+    normal_style = ParagraphStyle(
+        name='Normal',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=10,
+        alignment=0,
+        fontName='Helvetica'
+    )
+    valor_style = ParagraphStyle(
+        name='Valor',
+        parent=normal_style,
+        alignment=2,
+        fontName='Helvetica-Bold'
+    )
+    linha_style = ParagraphStyle(
+        name='Linha',
+        parent=normal_style,
+        alignment=1,
+        textColor=colors.black
+    )
+
+    def moeda_br(valor):
+        return f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+    def linha_separadora():
+        return Paragraph("=" * 34, linha_style)
+
+    # Função para criar linha alinhada com tabela invisível
+    def linha_dupla(label, valor):
+        from reportlab.platypus import Table, TableStyle
+        tabela = Table(
+            [[Paragraph(label, normal_style), Paragraph(valor, valor_style)]],
+            colWidths=[120, 80]
+        )
+        tabela.setStyle(TableStyle([
+            ('ALIGN', (0,0), (0,0), 'LEFT'),
+            ('ALIGN', (1,0), (1,0), 'RIGHT'),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('FONTNAME', (0,0), (0,0), 'Helvetica'),
+            ('FONTNAME', (1,0), (1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 10),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+            ('TOPPADDING', (0,0), (-1,-1), 0),
+        ]))
+        return tabela
+
+    # Logo (se disponível)
+    from flask import current_app
+    import os
+    from PIL import Image as PILImage
+    from reportlab.platypus import Image, Spacer
+    logo_path = os.path.join(current_app.root_path, 'static', 'assets', 'logo.jpeg')
+    if os.path.exists(logo_path):
+        try:
+            with PILImage.open(logo_path) as img:
+                img_width, img_height = img.size
+                aspect_ratio = img_width / img_height
+            logo_width = 250
+            logo_height = logo_width / aspect_ratio
+            logo = Image(logo_path, width=logo_width, height=logo_height)
+            logo.hAlign = 'CENTER'
+            elements.append(logo)
+            elements.append(Spacer(0, 6))
+        except Exception as e:
+            print(f"Erro ao carregar a logo: {e}")
+
+    # Cabeçalho
+    elements.append(Paragraph("CONTA A RECEBER", header_style))
+    elements.append(linha_separadora())
+    elements.append(Spacer(1, 6))
     
     # Informações da conta
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(margin, y_position, "Nº Documento:")
-    c.setFont("Helvetica", 9)
-    c.drawString(margin + 35 * mm, y_position, f"{conta.id}")
-    y_position -= 5 * mm
+    elements.append(linha_dupla("Nº Documento:", str(conta.id)))
+    elements.append(linha_dupla("Emissão:", conta.data_emissao.strftime('%d/%m/%Y')))
+    elements.append(linha_dupla("Vencimento:", conta.data_vencimento.strftime('%d/%m/%Y')))
     
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(margin, y_position, "Emissão:")
-    c.setFont("Helvetica", 9)
-    c.drawString(margin + 35 * mm, y_position, conta.data_emissao.strftime('%d/%m/%Y'))
-    y_position -= 5 * mm
-    
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(margin, y_position, "Vencimento:")
-    c.setFont("Helvetica", 9)
-    c.drawString(margin + 35 * mm, y_position, conta.data_vencimento.strftime('%d/%m/%Y'))
-    y_position -= 5 * mm
-    
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(margin, y_position, "Status:")
-    c.setFont("Helvetica", 9)
-    
+    # Status
     status_text = ""
     if conta.status == StatusPagamento.quitado:
         status_text = "QUITADO"
     elif conta.status == StatusPagamento.parcial:
         status_text = "PAGAMENTO PARCIAL"
     else:
-        # CORREÇÃO: Converter ambas as datas para o mesmo tipo
-        hoje = datetime.now().date()  # Converter para date
-        
-        # Verificar se conta.data_vencimento é datetime ou date
+        hoje = datetime.now().date()
         if isinstance(conta.data_vencimento, datetime):
             vencimento = conta.data_vencimento.date()
         else:
@@ -4532,38 +4581,35 @@ def gerar_pdf_conta_receber(id):
         else:
             status_text = "PENDENTE"
     
-    c.drawString(margin + 35 * mm, y_position, status_text)
-    y_position -= 8 * mm
+    elements.append(linha_dupla("Status:", status_text))
+    elements.append(Spacer(1, 6))
     
     # Informações do cliente
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(margin, y_position, "CLIENTE")
-    y_position -= 5 * mm
+    elements.append(linha_separadora())
+    elements.append(Paragraph("CLIENTE", subtitle_style))
+    elements.append(Spacer(1, 4))
+    elements.append(linha_separadora())
     
-    c.setFont("Helvetica", 9)
-    c.drawString(margin, y_position, f"{conta.cliente.nome}")
-    y_position -= 4 * mm
-    
+    elements.append(Paragraph(conta.cliente.nome, normal_style))
     if conta.cliente.documento:
-        c.drawString(margin, y_position, f"Documento: {conta.cliente.documento}")
-        y_position -= 4 * mm
+        elements.append(Paragraph(f"Documento: {conta.cliente.documento}", normal_style))
     
-    y_position -= 4 * mm
+    elements.append(Spacer(1, 6))
     
-    # Descrição
+    # Descrição (se houver)
     if conta.descricao:
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(margin, y_position, "Descrição:")
-        y_position -= 4 * mm
+        elements.append(linha_separadora())
+        elements.append(Paragraph("DESCRIÇÃO", subtitle_style))
+        elements.append(Spacer(1, 4))
+        elements.append(linha_separadora())
         
-        c.setFont("Helvetica", 9)
         # Quebra de linha para descrição longa
         desc_lines = []
         words = conta.descricao.split()
         line = ""
         for word in words:
             test_line = line + word + " "
-            if c.stringWidth(test_line, "Helvetica", 9) < (width - 2 * margin):
+            if len(test_line) < 35:  # Aproximadamente a largura da bobina
                 line = test_line
             else:
                 desc_lines.append(line)
@@ -4572,60 +4618,106 @@ def gerar_pdf_conta_receber(id):
             desc_lines.append(line)
         
         for line in desc_lines:
-            c.drawString(margin, y_position, line)
-            y_position -= 4 * mm
+            elements.append(Paragraph(line, normal_style))
         
-        y_position -= 4 * mm
+        elements.append(Spacer(1, 6))
+    
+    # Produtos da nota fiscal (se houver)
+    if conta.nota_fiscal and conta.nota_fiscal.itens:
+        elements.append(linha_separadora())
+        elements.append(Paragraph("PRODUTOS DA NOTA FISCAL", subtitle_style))
+        elements.append(Spacer(1, 4))
+        elements.append(linha_separadora())
+        
+        # Cabeçalho da tabela de produtos
+        from reportlab.platypus import Table, TableStyle
+        data = [['Produto', 'Qtd', 'Valor Unit.', 'Total']]
+        
+        for item in conta.nota_fiscal.itens:
+            # Formata quantidade com 3 casas decimais
+            quantidade_str = f"{float(item.quantidade):.2f}"
+            
+            # Quebra o nome do produto em múltiplas linhas se for muito longo
+            nome_produto = item.produto.nome
+            if len(nome_produto) > 20:
+                nome_lines = []
+                words = nome_produto.split()
+                line = ""
+                for word in words:
+                    test_line = line + word + " "
+                    if len(test_line) < 20:
+                        line = test_line
+                    else:
+                        nome_lines.append(line)
+                        line = word + " "
+                if line:
+                    nome_lines.append(line)
+                nome_cell = []
+                for line in nome_lines:
+                    nome_cell.append(Paragraph(line, normal_style))
+            else:
+                nome_cell = Paragraph(nome_produto, normal_style)
+            
+            data.append([
+                nome_cell,
+                quantidade_str,
+                moeda_br(item.valor_unitario),
+                moeda_br(item.valor_total)
+            ])
+        
+        # Cria tabela
+        tabela = Table(data, colWidths=[100, 30, 45, 45])
+        tabela.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+            ('ALIGN', (2, 0), (3, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        
+        elements.append(tabela)
+        elements.append(Spacer(1, 6))
+        
+        # Total da nota fiscal
+        if conta.nota_fiscal:
+            elements.append(linha_dupla("Total Nota:", moeda_br(conta.nota_fiscal.valor_total)))
+            if conta.nota_fiscal.valor_desconto > 0:
+                elements.append(linha_dupla("Desconto:", moeda_br(conta.nota_fiscal.valor_desconto)))
+            elements.append(Spacer(1, 6))
     
     # Valores
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(margin, y_position, "VALORES")
-    y_position -= 5 * mm
+    elements.append(linha_separadora())
+    elements.append(Paragraph("VALORES", subtitle_style))
+    elements.append(Spacer(1, 4))
+    elements.append(linha_separadora())
     
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(margin, y_position, "Valor Original:")
-    c.setFont("Helvetica", 9)
-    c.drawString(margin + 35 * mm, y_position, f"R$ {conta.valor_original:.2f}")
-    y_position -= 5 * mm
-    
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(margin, y_position, "Valor Pendente:")
-    c.setFont("Helvetica", 9)
-    c.drawString(margin + 35 * mm, y_position, f"R$ {conta.valor_aberto:.2f}")
-    y_position -= 8 * mm
+    elements.append(linha_dupla("Valor Original:", moeda_br(conta.valor_original)))
+    elements.append(linha_dupla("Valor Pendente:", moeda_br(conta.valor_aberto)))
+    elements.append(Spacer(1, 6))
     
     # Pagamentos realizados (se houver)
     if conta.pagamentos:
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(margin, y_position, "PAGAMENTOS REALIZADOS")
-        y_position -= 5 * mm
+        elements.append(linha_separadora())
+        elements.append(Paragraph("PAGAMENTOS REALIZADOS", subtitle_style))
+        elements.append(Spacer(1, 4))
+        elements.append(linha_separadora())
         
-        c.setFont("Helvetica-Bold", 8)
-        c.drawString(margin, y_position, "Data")
-        c.drawString(margin + 20 * mm, y_position, "Valor")
-        c.drawString(margin + 40 * mm, y_position, "Forma")
-        y_position -= 4 * mm
+        # Cabeçalho da tabela de pagamentos
+        from reportlab.platypus import Table, TableStyle
+        data = [['Data', 'Valor', 'Forma']]
         
-        c.line(margin, y_position, width - margin, y_position)
-        y_position -= 4 * mm
-        
-        c.setFont("Helvetica", 8)
         for pagamento in conta.pagamentos:
-            if y_position < 20 * mm:  # Verificar se precisa de nova página
-                c.showPage()
-                y_position = height - margin
-                c.setFont("Helvetica", 8)
-            
-            # CORREÇÃO: Verificar se a data do pagamento é datetime ou date
+            # Formata data
             if isinstance(pagamento.data_pagamento, datetime):
                 data_pagamento_str = pagamento.data_pagamento.strftime('%d/%m/%Y')
             else:
                 data_pagamento_str = pagamento.data_pagamento.strftime('%d/%m/%Y')
             
-            c.drawString(margin, y_position, data_pagamento_str)
-            c.drawString(margin + 20 * mm, y_position, f"R$ {pagamento.valor_pago:.2f}")
-            
-            # Forma de pagamento abreviada
+            # Formata forma de pagamento
             forma_pagamento = pagamento.forma_pagamento.value
             if forma_pagamento == 'dinheiro':
                 forma_abrev = 'DIN'
@@ -4638,23 +4730,31 @@ def gerar_pdf_conta_receber(id):
             else:
                 forma_abrev = forma_pagamento[:3].upper()
             
-            c.drawString(margin + 40 * mm, y_position, forma_abrev)
-            y_position -= 4 * mm
+            data.append([data_pagamento_str, moeda_br(pagamento.valor_pago), forma_abrev])
         
-        y_position -= 4 * mm
+        # Cria tabela
+        tabela = Table(data, colWidths=[60, 70, 40])
+        tabela.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        
+        elements.append(tabela)
+        elements.append(Spacer(1, 6))
     
-    # Rodapé
-    if y_position < 30 * mm:
-        c.showPage()
-        y_position = height - margin
+    # Data de emissão do relatório
+    elements.append(Spacer(1, 10))
+    elements.append(linha_separadora())
+    elements.append(Paragraph(f"Emitido em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", normal_style))
     
-    c.setFont("Helvetica-Oblique", 7)
-    c.drawCentredString(width / 2, 10 * mm, f"Emitido em: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-    
-    # Finalizar o PDF
-    c.save()
-    
-    # Obter o valor do buffer
+    # Construir o PDF
+    doc.build(elements)
     buffer.seek(0)
     
     # Criar resposta
