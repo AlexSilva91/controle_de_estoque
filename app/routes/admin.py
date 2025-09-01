@@ -105,6 +105,8 @@ def get_dashboard_metrics():
     try:
         hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
         primeiro_dia_mes = datetime(hoje.year, hoje.month, 1).date()
+        
+        print(f"DEBUG: Período de consulta: {primeiro_dia_mes} a {hoje}")
 
         # Métricas de Estoque (simplificado)
         estoque_metrics = db.session.query(
@@ -128,24 +130,63 @@ def get_dashboard_metrics():
             elif item.unidade == UnidadeMedida.unidade:
                 estoque_dict['unidade'] = item.total or 0
 
-        # Métricas Financeiras (simplificado)
+
+
+        # Métricas Financeiras - Corrigidas
+        # Usar datas naive (sem timezone) pois as datas no banco são naive
+        inicio_mes = datetime.combine(primeiro_dia_mes, datetime.min.time())
+        fim_dia = datetime.combine(hoje, datetime.max.time())
+        
+        print(f"DEBUG: Período sem timezone: {inicio_mes} a {fim_dia}")
+
+        # Entradas do mês (vendas, pagamentos, etc.)
         entradas_mes = db.session.query(
             func.sum(Financeiro.valor)
         ).filter(
             Financeiro.tipo == TipoMovimentacao.entrada,
-            Financeiro.data >= primeiro_dia_mes,
-            Financeiro.data <= hoje
+            Financeiro.data >= inicio_mes,
+            Financeiro.data <= fim_dia
         ).scalar() or 0
 
+        # Saídas do mês (exceto fechamento de caixa)
         saidas_mes = db.session.query(
             func.sum(Financeiro.valor)
         ).filter(
             Financeiro.tipo == TipoMovimentacao.saida,
-            Financeiro.data >= primeiro_dia_mes,
-            Financeiro.data <= hoje,
+            Financeiro.data >= inicio_mes,
+            Financeiro.data <= fim_dia,
             Financeiro.categoria != CategoriaFinanceira.fechamento_caixa
         ).scalar() or 0
 
+        # Debug adicional - verificar se há registros com essas condições específicas
+        debug_entradas = db.session.query(
+            Financeiro.tipo,
+            Financeiro.categoria,
+            Financeiro.valor,
+            Financeiro.data
+        ).filter(
+            Financeiro.tipo == TipoMovimentacao.entrada,
+            Financeiro.data >= inicio_mes,
+            Financeiro.data <= fim_dia
+        ).limit(5).all()
+        
+        debug_saidas = db.session.query(
+            Financeiro.tipo,
+            Financeiro.categoria,
+            Financeiro.valor,
+            Financeiro.data
+        ).filter(
+            Financeiro.tipo == TipoMovimentacao.saida,
+            Financeiro.data >= inicio_mes,
+            Financeiro.data <= fim_dia,
+            Financeiro.categoria != CategoriaFinanceira.fechamento_caixa
+        ).limit(5).all()
+        
+        print(f"DEBUG: Entradas encontradas: {debug_entradas}")
+        print(f"DEBUG: Saídas encontradas: {debug_saidas}")
+
+        print(f"Entradas calculadas: {entradas_mes}, Saídas calculadas: {saidas_mes}")
+        
         return jsonify({
             'success': True,
             'metrics': {
@@ -163,10 +204,11 @@ def get_dashboard_metrics():
         })
 
     except Exception as e:
-        print(e)
+        print(f"Erro na consulta de métricas: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
-
-
+    
 @admin_bp.route('/dashboard/vendas-diarias')
 @login_required
 @admin_required
