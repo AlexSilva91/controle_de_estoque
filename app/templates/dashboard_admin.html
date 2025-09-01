@@ -1972,6 +1972,56 @@
             </div>
         </div>
     </div>
+    <!-- Modal para estornar venda -->
+    <div id="estornarVendaModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-undo"></i>
+                        <span>Estornar Venda</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="estornoVendaId">
+                    
+                    <div class="form-group">
+                        <label>Valor da Venda:</label>
+                        <p id="estornoVendaValor" class="form-control-static"></p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Data da Venda:</label>
+                        <p id="estornoVendaData" class="form-control-static"></p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Cliente:</label>
+                        <p id="estornoVendaCliente" class="form-control-static"></p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Descrição:</label>
+                        <p id="estornoVendaDescricao" class="form-control-static"></p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="motivoEstorno">Motivo do Estorno *</label>
+                        <textarea id="motivoEstorno" class="form-control" rows="3" placeholder="Informe o motivo do estorno" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" id="btnConfirmarEstorno">
+                        <i class="fas fa-undo"></i>
+                        <span>Confirmar Estorno</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>

@@ -48,7 +48,7 @@ from app.models.entities import (
     Desconto, PagamentoContaReceber, Usuario)
 from app.crud import (
     TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_todos_os_descontos, calcular_fator_conversao,
-    criar_desconto, deletar_desconto, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
+    criar_desconto, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
     get_transferencias,get_user_by_cpf, get_user_by_id, get_usuarios, create_user, obter_caixas_completo,
     registrar_transferencia, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
     registrar_movimentacao, get_cliente, get_clientes, create_cliente, 
@@ -2777,6 +2777,37 @@ def caixa_detail(caixa_id):
         except Exception as e:
             db.session.rollback()
             return jsonify({"success": False, "error": f"Erro ao atualizar caixa: {str(e)}"}), 500
+
+@admin_bp.route('/caixa/venda/<int:venda_id>/estornar', methods=['POST'])
+@login_required
+@admin_required
+def rota_estornar_venda(venda_id):
+    """
+    Rota para estornar uma venda
+    """
+    try:
+        dados = request.get_json()
+        
+        if not dados:
+            return jsonify({'success': False, 'message': 'Dados não fornecidos'}), 400
+            
+        motivo_estorno = dados.get('motivo_estorno')
+        if not motivo_estorno:
+            return jsonify({'success': False, 'message': 'Motivo do estorno é obrigatório'}), 400
+            
+        usuario_id = current_user.id
+        
+        resultado = estornar_venda(db, venda_id, motivo_estorno, usuario_id)
+        
+        return jsonify(resultado), 200 if resultado['success'] else 400
+            
+    except Exception as e:
+        db.session.rollback()
+        print(e)
+        return jsonify({
+            'success': False,
+            'message': 'Erro interno ao processar estorno'
+        }), 500  
         
 @admin_bp.route('/caixas/<int:caixa_id>/financeiro')
 @login_required

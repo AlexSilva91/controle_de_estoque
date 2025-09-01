@@ -2902,6 +2902,62 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
+function openEstornarVendaModal(vendaId, valor, data, cliente, descricao) {
+    // Preencher os dados da venda no modal
+    document.getElementById('estornoVendaId').value = vendaId;
+    document.getElementById('estornoVendaValor').textContent = formatarMoeda(valor);
+    document.getElementById('estornoVendaData').textContent = formatDateTime(data);
+    document.getElementById('estornoVendaCliente').textContent = cliente || 'Não informado';
+    document.getElementById('estornoVendaDescricao').textContent = descricao || 'Não informado';
+    
+    // Limpar o campo de motivo
+    document.getElementById('motivoEstorno').value = '';
+    
+    // Abrir o modal
+    openModal(document.getElementById('estornarVendaModal'));
+}
+
+// Função para processar o estorno
+async function processarEstorno() {
+    const vendaId = document.getElementById('estornoVendaId').value;
+    const motivoEstorno = document.getElementById('motivoEstorno').value.trim();
+    
+    if (!motivoEstorno) {
+        showFlashMessage('error', 'Por favor, informe o motivo do estorno');
+        return;
+    }
+    
+    try {
+        showLoading(true);
+        const response = await fetchWithErrorHandling(`/admin/caixa/venda/${vendaId}/estornar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                motivo_estorno: motivoEstorno
+            })
+        });
+        
+        if (response.success) {
+            showFlashMessage('success', response.message || 'Venda estornada com sucesso');
+            closeModal(document.getElementById('estornarVendaModal'));
+            
+            // Recarregar os dados do caixa
+            if (caixaIdAtual) {
+                await loadCaixaFinanceiro(caixaIdAtual);
+            }
+        } else {
+            showFlashMessage('error', response.message || 'Erro ao estornar venda');
+        }
+    } catch (error) {
+        console.error('Erro ao estornar venda:', error);
+        showFlashMessage('error', 'Erro ao processar estorno');
+    } finally {
+        showLoading(false);
+    }
+}
+
 async function loadCaixaFinanceiro(caixaId) {
     try {
         const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
@@ -2916,6 +2972,9 @@ async function loadCaixaFinanceiro(caixaId) {
                     const row = document.createElement('tr');
                     const valor = parseFloat(item.valor);
 
+                    // Verificar se é uma venda que pode ser estornada
+                    const isVendaEstornavel = item.tipo === 'entrada' && item.nota_fiscal_id;
+                    
                     // Format payment methods as tags
                     const paymentTags = item.formas_pagamento && item.formas_pagamento.length > 0 
                         ? item.formas_pagamento.map(p => `<span class="badge badge-info">${p}</span>`).join(' ') 
@@ -2932,12 +2991,22 @@ async function loadCaixaFinanceiro(caixaId) {
                             ${paymentTags !== '-' ? `<br><small>Pagamento: ${paymentTags}</small>` : ''}
                             ${item.nota_fiscal_id ? `
                                 <br>
-                                <button class="btn-editar-pagamento" data-venda-id="${item.nota_fiscal_id}">
+                                <button class="btn btn-sm btn-info btn-editar-pagamento" data-venda-id="${item.nota_fiscal_id}">
                                     <i class="fas fa-edit"></i> Editar Pagamentos
+                                </button>
+                                <button class="btn btn-sm btn-danger btn-estornar-venda" 
+                                        data-venda-id="${item.nota_fiscal_id}"
+                                        data-valor="${valor}"
+                                        data-data="${item.data}"
+                                        data-cliente="${item.cliente_nome || ''}"
+                                        data-descricao="${item.descricao || ''}">
+                                    <i class="fas fa-undo"></i> Estornar
                                 </button>
                             ` : ''}
                         </td>
                     `;
+                    
+                    // Adicionar eventos aos botões de editar pagamento
                     row.querySelectorAll('.btn-editar-pagamento').forEach(btn => {
                         btn.addEventListener('click', (e) => {
                             e.stopPropagation();
@@ -2945,6 +3014,20 @@ async function loadCaixaFinanceiro(caixaId) {
                             openEditarFormasPagamentoModal(vendaId);
                         });
                     });
+                    
+                    // Adicionar eventos aos botões de estornar
+                    row.querySelectorAll('.btn-estornar-venda').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const vendaId = btn.getAttribute('data-venda-id');
+                            const valor = btn.getAttribute('data-valor');
+                            const data = btn.getAttribute('data-data');
+                            const cliente = btn.getAttribute('data-cliente');
+                            const descricao = btn.getAttribute('data-descricao');
+                            openEstornarVendaModal(vendaId, valor, data, cliente, descricao);
+                        });
+                    });
+                    
                     // Adiciona evento de clique para abrir detalhes da venda
                     if (item.nota_fiscal_id) {
                         row.style.cursor = 'pointer';
@@ -3000,7 +3083,29 @@ async function loadCaixaFinanceiro(caixaId) {
         showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
     }
 }
-
+function showLoading(show) {
+    const loadingElement = document.getElementById('loadingOverlay');
+    if (loadingElement) {
+        loadingElement.style.display = show ? 'flex' : 'none';
+    }
+}
+window.addEventListener('load', function() {
+    // Adicionar event listener para o botão de confirmar estorno no modal
+    const btnConfirmarEstorno = document.getElementById('btnConfirmarEstorno');
+    if (btnConfirmarEstorno) {
+        btnConfirmarEstorno.addEventListener('click', processarEstorno);
+    }
+    
+    // Adicionar event listener para o campo de motivo (submeter com Enter)
+    const motivoEstornoInput = document.getElementById('motivoEstorno');
+    if (motivoEstornoInput) {
+        motivoEstornoInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                processarEstorno();
+            }
+        });
+    }
+});
 // Função para adicionar eventos de clique aos cards de formas de pagamento
 function addFormaPagamentoClickEvents(caixaId) {
     const formasPagamentoIds = [
