@@ -23,7 +23,8 @@ Este projeto é um sistema web para gerenciamento de vendas, clientes, produtos 
 ## Estrutura do Projeto
 
 ```
-/
+
+controle_de_estoque
 ├─ README.md
 ├─ app
 │  ├─ __init__.py
@@ -58,22 +59,31 @@ Este projeto é um sistema web para gerenciamento de vendas, clientes, produtos 
 │  │  │  ├─ sales_icon.png
 │  │  │  └─ user_icon.png
 │  │  ├─ css
+│  │  │  ├─ style.css
+│  │  │  ├─ style_login.css
 │  │  │  └─ styles_operador.css
 │  │  └─ js
+│  │     ├─ script.js
+│  │     ├─ script_login.js
 │  │     └─ script_operador.js
-│  └─ templates
-│     ├─ cadastro_cliente.html
-│     ├─ cadastro_produto.html
-│     ├─ dashboard_admin.html
-│     ├─ dashboard_operador.html
-│     └─ login.html
+│  ├─ templates
+│  │  ├─ dashboard_admin.html
+│  │  ├─ dashboard_operador.html
+│  │  └─ login.html
+│  └─ utils
+│     ├─ conversor_unidade.py
+│     ├─ converter_endereco.py
+│     ├─ format_data_moeda.py
+│     ├─ nfce.py
+│     ├─ preparar_notas.py
+│     └─ signature.py
 ├─ config.py
+├─ docs
+│  └─ DOCUMENTATION.md
 ├─ requirements.txt
-├─ tests
-│  ├─ add_user.py
-│  ├─ get_user_by_cpf.py
-│  └─ popular_banco.py
+├─ run.py
 └─ wsgi.py
+
 ```
 
 ## Como Executar o Projeto
