@@ -105,10 +105,7 @@ def get_dashboard_metrics():
     try:
         hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
         primeiro_dia_mes = datetime(hoje.year, hoje.month, 1).date()
-        
-        print(f"DEBUG: Período de consulta: {primeiro_dia_mes} a {hoje}")
 
-        # Métricas de Estoque (simplificado)
         estoque_metrics = db.session.query(
             Produto.unidade,
             func.sum(Produto.estoque_loja).label('total')
@@ -130,20 +127,14 @@ def get_dashboard_metrics():
             elif item.unidade == UnidadeMedida.unidade:
                 estoque_dict['unidade'] = item.total or 0
 
-
-
-        # Métricas Financeiras - Corrigidas
-        # Usar datas naive (sem timezone) pois as datas no banco são naive
         inicio_mes = datetime.combine(primeiro_dia_mes, datetime.min.time())
         fim_dia = datetime.combine(hoje, datetime.max.time())
         
-        print(f"DEBUG: Período sem timezone: {inicio_mes} a {fim_dia}")
-
-        # Entradas do mês (vendas, pagamentos, etc.)
         entradas_mes = db.session.query(
             func.sum(Financeiro.valor)
         ).filter(
             Financeiro.tipo == TipoMovimentacao.entrada,
+            Financeiro.categoria == CategoriaFinanceira.venda,
             Financeiro.data >= inicio_mes,
             Financeiro.data <= fim_dia
         ).scalar() or 0
@@ -153,40 +144,12 @@ def get_dashboard_metrics():
             func.sum(Financeiro.valor)
         ).filter(
             Financeiro.tipo == TipoMovimentacao.saida,
+            Financeiro.categoria == CategoriaFinanceira.despesa,
             Financeiro.data >= inicio_mes,
             Financeiro.data <= fim_dia,
             Financeiro.categoria != CategoriaFinanceira.fechamento_caixa
         ).scalar() or 0
 
-        # Debug adicional - verificar se há registros com essas condições específicas
-        debug_entradas = db.session.query(
-            Financeiro.tipo,
-            Financeiro.categoria,
-            Financeiro.valor,
-            Financeiro.data
-        ).filter(
-            Financeiro.tipo == TipoMovimentacao.entrada,
-            Financeiro.data >= inicio_mes,
-            Financeiro.data <= fim_dia
-        ).limit(5).all()
-        
-        debug_saidas = db.session.query(
-            Financeiro.tipo,
-            Financeiro.categoria,
-            Financeiro.valor,
-            Financeiro.data
-        ).filter(
-            Financeiro.tipo == TipoMovimentacao.saida,
-            Financeiro.data >= inicio_mes,
-            Financeiro.data <= fim_dia,
-            Financeiro.categoria != CategoriaFinanceira.fechamento_caixa
-        ).limit(5).all()
-        
-        print(f"DEBUG: Entradas encontradas: {debug_entradas}")
-        print(f"DEBUG: Saídas encontradas: {debug_saidas}")
-
-        print(f"Entradas calculadas: {entradas_mes}, Saídas calculadas: {saidas_mes}")
-        
         return jsonify({
             'success': True,
             'metrics': {
@@ -253,7 +216,7 @@ def get_vendas_diarias():
             func.sum(Financeiro.valor)
         ).filter(
             Financeiro.tipo == TipoMovimentacao.saida,
-            Financeiro.categoria != CategoriaFinanceira.fechamento_caixa,
+            Financeiro.categoria == CategoriaFinanceira.despesa,
             Financeiro.data >= primeiro_dia_mes,
             Financeiro.data <= hoje
         ).scalar() or 0
@@ -276,7 +239,7 @@ def get_vendas_diarias():
                 func.sum(Financeiro.valor)
             ).filter(
                 Financeiro.tipo == TipoMovimentacao.saida,
-                Financeiro.categoria != CategoriaFinanceira.fechamento_caixa,
+                Financeiro.categoria == CategoriaFinanceira.despesa,
                 func.date(Financeiro.data) == data
             ).scalar() or 0
 
@@ -309,7 +272,6 @@ def get_vendas_diarias():
             'dados': dados_diarios,
             'vendas_mensais_caixa': [
                 {
-                    #'caixa_id': caixa.caixa_id, 
                     'data_abertura': caixa.data_abertura.strftime('%d/%m/%Y'),
                     'total_vendas': format_currency(caixa.total_vendas or 0)
                 }
@@ -365,7 +327,7 @@ def get_vendas_mensais():
                 func.sum(Financeiro.valor)
             ).filter(
                 Financeiro.tipo == TipoMovimentacao.saida,
-                Financeiro.categoria != CategoriaFinanceira.fechamento_caixa,
+                Financeiro.categoria == CategoriaFinanceira.despesa,
                 Financeiro.data >= primeiro_dia,
                 Financeiro.data <= ultimo_dia
             ).scalar() or 0
@@ -1012,7 +974,6 @@ def api_registrar_venda_retroativa():
 
     try:
         dados_venda = request.get_json()
-        print("Dados recebidos:", dados_venda)  # Log para depuração
         
         if dados_venda is None:
             return jsonify({'success': False, 'message': 'JSON inválido ou não enviado'}), 400
@@ -2391,7 +2352,7 @@ def gerar_pdf_caixas_detalhado():
                 ['RESUMO FINANCEIRO', '', ''],
                 ['Total de Entradas', '', moeda_br(total_geral_entradas)],
                 ['Total de Saídas', '', moeda_br(total_geral_saidas)],
-                ['Saldo Geral', '', moeda_br(saldo_geral)]
+                ['Saldo Líquido', '', moeda_br(saldo_geral)]
             ]
             
             resumo_table = Table(resumo_data, colWidths=[150, 100, 130])
@@ -2700,7 +2661,6 @@ def gerar_pdf_caixas_detalhado():
 def atualizar_caixa_route(caixa_id):
     try:
         dados = request.get_json()
-        print(f"Dados recebidos para atualização do caixa {caixa_id}: {dados}")
         if not dados:
             return jsonify({'success': False, "error": "Dados não fornecidos"}), 400
             
@@ -2919,7 +2879,6 @@ def get_caixa_financeiro(caixa_id):
             })
 
         # 1. CALCULA TOTAL DE ENTRADAS - SOMA TODAS AS FORMAS DE PAGAMENTO
-        # Busca pagamentos de notas fiscais
         pagamentos_notas = session.query(
             PagamentoNotaFiscal.forma_pagamento,
             func.sum(PagamentoNotaFiscal.valor).label('total')
@@ -2976,7 +2935,6 @@ def get_caixa_financeiro(caixa_id):
             valor_abertura = float(caixa.valor_abertura)
             valor_fechamento = float(caixa.valor_fechamento)
             valor_fisico = max((valor_dinheiro + valor_abertura) - valor_fechamento - total_saidas, 0.0)
-
             # Pega parte inteira e parte decimal
             parte_inteira = math.floor(valor_fisico)
             parte_decimal = valor_fisico - parte_inteira
