@@ -1821,7 +1821,8 @@ function addEmptyProductRow() {
 async function registerSale() {
     try {
         const clienteId = selectedClientIdInput?.value ? parseInt(selectedClientIdInput.value) : 1;
-        
+        const observacao = document.getElementById('sale-notes')?.value || '';
+
         if (selectedProducts.length === 0) {
             showMessage('Adicione pelo menos um produto', 'error');
             throw new Error('Nenhum produto selecionado');
@@ -1916,7 +1917,7 @@ async function registerSale() {
             itens: items,
             pagamentos: paymentMethods, // Sempre envia a lista de pagamentos
             total_descontos: items.reduce((sum, item) => sum + item.valor_desconto, 0),
-            observacao: document.getElementById('sale-notes')?.value
+            observacao: observacao
         };
 
         if (deliveryAddress) {
@@ -1961,6 +1962,16 @@ async function registerSale() {
         showMessage(error.message, 'error');
     }
 }
+// Adicione este evento listener no seu código de inicialização
+document.getElementById('sale-notes').addEventListener('input', function(e) {
+    const maxLength = 500;
+    const currentLength = e.target.value.length;
+    
+    if (currentLength > maxLength) {
+        e.target.value = e.target.value.substring(0, maxLength);
+        showMessage('Observação limitada a 500 caracteres', 'warning');
+    }
+});
 
 function calculateSaleTotal() {
     let subtotal = 0;

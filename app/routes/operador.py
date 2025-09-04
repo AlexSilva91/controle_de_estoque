@@ -363,7 +363,8 @@ def api_registrar_venda():
             forma_pagamento= FormaPagamento.dinheiro,  # Será atualizado abaixo
             valor_recebido=valor_recebido,
             troco=max(valor_recebido - valor_total, Decimal(0)) if not a_prazo_usado else Decimal(0),
-            a_prazo=a_prazo_usado
+            a_prazo=a_prazo_usado,
+            observacao=dados_venda.get('observacao', '')
         )
 
         # Criar Entrega, se presente - COM TRATAMENTO SEGURO
