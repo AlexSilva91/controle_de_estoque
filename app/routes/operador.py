@@ -1162,7 +1162,7 @@ def gerar_pdf_vendas_dia():
         ["Total Estornos", total_estornos],
         ["Total Descontos", dados.get('total_descontos', 0)],
         ["Total Entradas", total_vendas_positivas],
-        ["Total Saídas", dados.get('total_saidas', 0)],
+        ["Total Saídas", dados.get('total_saidas', 0) - total_estornos],
         ["Total a Prazo Pendente", total_a_prazo_pendente],
         ["Contas Recebidas", total_contas_receber_pagas],  # NOVA LINHA
         ["Saldo Líquido", total_liquido + total_contas_receber_pagas]  # ATUALIZADO
