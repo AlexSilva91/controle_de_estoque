@@ -808,6 +808,9 @@ document.addEventListener('DOMContentLoaded', function() {
               <td><span class="badge ${status === 'Ativo' ? 'badge-success' : 'badge-danger'}">${status}</span></td>
               <td>
                 <div class="table-actions">
+                  <button class="btn-icon btn-info detalhes-cliente" data-id="${cliente.id}" title="Detalhes">
+                    <i class="fas fa-eye"></i>
+                  </button>
                   <button class="btn-icon btn-warning editar-cliente" data-id="${cliente.id}" title="Editar">
                     <i class="fas fa-edit"></i>
                   </button>
@@ -827,6 +830,202 @@ document.addEventListener('DOMContentLoaded', function() {
       console.error('Erro ao carregar clientes:', error);
       showFlashMessage('error', 'Erro ao carregar lista de clientes');
     }
+  }
+  async function openDetalhesClienteModal(clienteId) {
+      const content = document.getElementById('detalhesClienteContent');
+      if (content) content.innerHTML = '<p class="loading-text">Carregando dados...</p>';
+
+      try {
+          const response = await fetchWithErrorHandling(`/admin/clientes/${clienteId}/detalhes`);
+          if (!response.success) {
+              showFlashMessage('error', response.message || 'Erro ao carregar detalhes');
+              return;
+          }
+
+          const c = response.cliente;
+
+          // HTML com seções retráteis
+          let html = `
+              <div class="details-main-info">
+                  <h3 class="section-title">Informações do Cliente</h3>
+                  <div class="details-grid">
+                      <div class="detail-item">
+                          <label>Nome:</label>
+                          <div class="value">${c.nome || '-'}</div>
+                      </div>
+                      <div class="detail-item">
+                          <label>Documento:</label>
+                          <div class="value">${c.documento || '-'}</div>
+                      </div>
+                      <div class="detail-item">
+                          <label>Telefone:</label>
+                          <div class="value">${c.telefone || '-'}</div>
+                      </div>
+                      <div class="detail-item">
+                          <label>Email:</label>
+                          <div class="value">${c.email || '-'}</div>
+                      </div>
+                      <div class="detail-item full-width">
+                          <label>Endereço:</label>
+                          <div class="value">${c.endereco || '-'}</div>
+                      </div>
+                      <div class="detail-item">
+                          <label>Total de Compras:</label>
+                          <div class="value">${response.total_compras}</div>
+                      </div>
+                      <div class="detail-item">
+                          <label>Valor Total:</label>
+                          <div class="value monetary">R$ ${response.valor_total_compras.toFixed(2)}</div>
+                      </div>
+                  </div>
+              </div>
+
+              <!-- Produtos Comprados -->
+              <div class="collapsible-section">
+                  <button class="collapsible btn btn-outline">
+                      <i class="fas fa-shopping-bag"></i> Produtos Comprados (${response.produtos_comprados.length})
+                      <i class="fas fa-chevron-down toggle-icon"></i>
+                  </button>
+                  <div class="collapsible-content" style="display:none;">
+                      <div class="details-table-container">
+                          <table class="table compact-table">
+                              <thead>
+                                  <tr>
+                                      <th>Produto</th><th>Qtd</th><th>Un</th><th>Valor Unit.</th><th>Valor Total</th><th>Data</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  ${response.produtos_comprados.map(p => `
+                                      <tr>
+                                          <td>${p.nome}</td>
+                                          <td>${p.quantidade}</td>
+                                          <td>${p.unidade}</td>
+                                          <td class="monetary">R$ ${p.valor_unitario.toFixed(2)}</td>
+                                          <td class="monetary">R$ ${p.valor_total.toFixed(2)}</td>
+                                          <td>${new Date(p.data_compra).toLocaleDateString()}</td>
+                                      </tr>
+                                  `).join('')}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              </div>
+
+              <!-- Top Produtos Mais Comprados -->
+              <div class="collapsible-section">
+                  <button class="collapsible btn btn-outline">
+                      <i class="fas fa-trophy"></i> Top Produtos Mais Comprados (${response.produtos_mais_comprados.length})
+                      <i class="fas fa-chevron-down toggle-icon"></i>
+                  </button>
+                  <div class="collapsible-content" style="display:none;">
+                      <div class="details-table-container">
+                          <table class="table compact-table">
+                              <thead>
+                                  <tr>
+                                      <th>Produto</th><th>Quantidade Total</th><th>Unidade</th><th>Vezes Comprado</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  ${response.produtos_mais_comprados.map(p => `
+                                      <tr>
+                                          <td>${p.nome}</td>
+                                          <td>${p.quantidade_total}</td>
+                                          <td>${p.unidade}</td>
+                                          <td>${p.vezes_comprado}x</td>
+                                      </tr>
+                                  `).join('')}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              </div>
+
+              <!-- Contas em Aberto -->
+              <div class="collapsible-section">
+                  <button class="collapsible btn btn-outline">
+                      <i class="fas fa-clock"></i> Contas em Aberto (${response.contas_abertas.length})
+                      <i class="fas fa-chevron-down toggle-icon"></i>
+                  </button>
+                  <div class="collapsible-content" style="display:none;">
+                      ${response.contas_abertas.length ? `
+                          <div class="details-table-container">
+                              <table class="table compact-table">
+                                  <thead>
+                                      <tr>
+                                          <th>Descrição</th><th>Vencimento</th><th>Valor em Aberto</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody>
+                                      ${response.contas_abertas.map(ca => `
+                                          <tr>
+                                              <td>${ca.descricao}</td>
+                                              <td>${new Date(ca.data_vencimento).toLocaleDateString()}</td>
+                                              <td class="monetary">R$ ${ca.valor_aberto.toFixed(2)}</td>
+                                          </tr>
+                                      `).join('')}
+                                  </tbody>
+                              </table>
+                          </div>
+                      ` : '<p class="no-data-message">Nenhuma conta em aberto</p>'}
+                  </div>
+              </div>
+
+              <!-- Contas Quitadas -->
+              <div class="collapsible-section">
+                  <button class="collapsible btn btn-outline">
+                      <i class="fas fa-check-circle"></i> Contas Quitadas (${response.contas_quitadas.length})
+                      <i class="fas fa-chevron-down toggle-icon"></i>
+                  </button>
+                  <div class="collapsible-content" style="display:none;">
+                      ${response.contas_quitadas.length ? `
+                          <div class="details-table-container">
+                              <table class="table compact-table">
+                                  <thead>
+                                      <tr>
+                                          <th>Descrição</th><th>Data de Pagamento</th><th>Valor Original</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody>
+                                      ${response.contas_quitadas.map(cq => `
+                                          <tr>
+                                              <td>${cq.descricao}</td>
+                                              <td>${new Date(cq.data_pagamento || cq.data_vencimento).toLocaleDateString()}</td>
+                                              <td class="monetary">R$ ${cq.valor_original.toFixed(2)}</td>
+                                          </tr>
+                                      `).join('')}
+                                  </tbody>
+                              </table>
+                          </div>
+                      ` : '<p class="no-data-message">Nenhuma conta quitada</p>'}
+                  </div>
+              </div>
+          `;
+
+          content.innerHTML = html;
+
+          // Ativar colapsáveis
+          document.querySelectorAll('.collapsible').forEach(btn => {
+              btn.addEventListener('click', function() {
+                  this.classList.toggle('active');
+                  const contentDiv = this.nextElementSibling;
+                  const toggleIcon = this.querySelector('.toggle-icon');
+                  
+                  if (contentDiv.style.display === 'block') {
+                      contentDiv.style.display = 'none';
+                      toggleIcon.classList.remove('rotated');
+                  } else {
+                      contentDiv.style.display = 'block';
+                      toggleIcon.classList.add('rotated');
+                  }
+              });
+          });
+
+          openModal('detalhesClienteModal');
+
+      } catch (err) {
+          console.error(err);
+          showFlashMessage('error', 'Erro ao carregar detalhes do cliente');
+      }
   }
 
   async function openEditarClienteModal(clienteId) {
@@ -872,6 +1071,13 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function setupClienteActions() {
+    document.querySelectorAll('.detalhes-cliente').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const clienteId = this.getAttribute('data-id');
+        openDetalhesClienteModal(clienteId);
+      });
+    });
+
     document.querySelectorAll('.editar-cliente').forEach(btn => {
       btn.addEventListener('click', function() {
         const clienteId = this.getAttribute('data-id');

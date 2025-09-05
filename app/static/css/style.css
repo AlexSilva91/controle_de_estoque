@@ -2728,3 +2728,76 @@ canvas {
   align-self: flex-end;
   height: fit-content;
 }
+/* Estilos específicos para o modal de detalhes do cliente */
+.loading-text {
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--text-muted);
+}
+
+.section-title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    margin-bottom: var(--space-md);
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--space-sm);
+}
+
+.collapsible-section {
+    margin-bottom: var(--space-md);
+}
+
+.collapsible {
+    width: 100%;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md);
+    border-radius: var(--border-radius-sm);
+    transition: all 0.3s ease;
+}
+
+.collapsible.active {
+    background-color: var(--bg-tertiary);
+    border-color: var(--primary-color);
+}
+
+.collapsible-content {
+    padding: var(--space-md) 0;
+    border-radius: 0 0 var(--border-radius-sm) var(--border-radius-sm);
+}
+
+.no-data-message {
+    text-align: center;
+    padding: var(--space-lg);
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.monetary {
+    font-family: 'Courier New', monospace;
+    font-weight: var(--font-weight-semibold);
+}
+
+.toggle-icon {
+    transition: transform 0.3s ease;
+    margin-left: var(--space-sm);
+}
+
+.toggle-icon.rotated {
+    transform: rotate(180deg);
+}
+
+/* Ajustes para telas menores */
+@media (max-width: 768px) {
+    .collapsible {
+        padding: var(--space-sm);
+        font-size: var(--font-size-sm);
+    }
+    
+    .collapsible-content {
+        padding: var(--space-sm) 0;
+    }
+}
