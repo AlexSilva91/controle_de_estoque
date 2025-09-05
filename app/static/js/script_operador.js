@@ -1694,12 +1694,12 @@ function applyManualDiscount() {
 function renderProductsList() {
     if (!productsList) return;
     productsList.innerHTML = '';
-    
+
     selectedProducts.forEach((product, index) => {
-        const totalValue = product.price * product.quantity;
-        const originalTotalValue = product.originalPrice * product.quantity;
+        const totalValue = product.price * (product.quantity || 0);
+        const originalTotalValue = product.originalPrice * (product.quantity || 0);
         const discountValue = originalTotalValue - totalValue;
-        
+
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>
@@ -1707,35 +1707,27 @@ function renderProductsList() {
                 ${product.hasDiscount ? 
                     `<span class="discount-badge" title="${product.discountInfo.descricao || 'Desconto aplicado'}">
                         <i class="fas fa-tag"></i> ${product.discountInfo.identificador || 'DESCONTO'}
-                    </span>` : 
-                    ''
+                    </span>` : ''
                 }
             </td>
             <td>${product.description}</td>
             <td>
                 ${formatCurrency(product.price)}
                 ${product.hasDiscount ? 
-                    `<small class="original-price">${formatCurrency(product.originalPrice)}</small>` : 
-                    ''
+                    `<small class="original-price">${formatCurrency(product.originalPrice)}</small>` : ''
                 }
             </td>
             <td>
-                ${product.allowsFraction ? 
-                    `<input type="text" class="quantity-input" 
-                            value="${product.quantity.toFixed(3).replace('.', ',')}" 
-                            data-index="${index}" pattern="[0-9]+([,\.][0-9]+)?" 
-                            title="Use vírgula ou ponto para decimais">` :
-                    `<input type="number" class="quantity-input" 
-                            value="${product.quantity}" min="1" 
-                            max="${product.stock}" data-index="${index}">`
-                }
+                <input type="text" class="quantity-input" 
+                       value="${product.quantity !== null && product.quantity !== undefined ? product.quantity.toString().replace('.', ',') : ''}" 
+                       data-index="${index}" 
+                       title="Digite números com vírgula ou ponto. Pode deixar em branco.">
                 <small>${product.unit}</small>
             </td>
             <td class="product-total">
                 ${formatCurrency(totalValue)}
                 ${product.hasDiscount ? 
-                    `<small class="discount-value">(Economia: ${formatCurrency(discountValue)})</small>` : 
-                    ''
+                    `<small class="discount-value">(Economia: ${formatCurrency(discountValue)})</small>` : ''
                 }
             </td>
             <td>
@@ -1746,18 +1738,27 @@ function renderProductsList() {
         `;
         productsList.appendChild(row);
     });
-    
+
+    // Adiciona os eventos para os inputs
     document.querySelectorAll('.quantity-input').forEach(input => {
+        // Evento input: permite digitação livre, só bloqueia caracteres inválidos
+        input.addEventListener('input', function(e) {
+            let value = e.target.value;
+            if (!/^[0-9]*[,.]?[0-9]*$/.test(value)) {
+                e.target.value = value.slice(0, -1);
+            }
+        });
+
+        // Evento change: atualiza quantidade ao sair do input
         input.addEventListener('change', async function(e) {
             await updateProductQuantity(e.target);
         });
-        input.addEventListener('input', function(e) {
-            if (e.target.type === 'text') {
-                const value = e.target.value;
-                if (!/^[0-9]*([,\.][0-9]*)?$/.test(value)) {
-                    e.target.value = value.slice(0, -1);
-                }
-            }
+    });
+
+    // Eventos de remover produto
+    document.querySelectorAll('.btn-remove').forEach(button => {
+        button.addEventListener('click', function() {
+            removeProductRow(button);
         });
     });
 }
@@ -1766,42 +1767,31 @@ async function updateProductQuantity(input) {
     const index = parseInt(input.dataset.index);
     if (isNaN(index)) return;
 
-    let newQuantity;
     const product = selectedProducts[index];
-    
-    if (product.allowsFraction) {
-        const value = input.value.trim().replace(',', '.');
-        newQuantity = parseFloat(value);
-        if (isNaN(newQuantity)) {
-            input.value = product.quantity.toFixed(3).replace('.', ',');
-            return;
-        }
+    const value = input.value.trim().replace(',', '.');
+
+    let newQuantity = parseFloat(value);
+    if (isNaN(newQuantity)) {
+        // Permite campo vazio
+        product.quantity = null;
+        input.value = '';
     } else {
-        newQuantity = parseInt(input.value);
-        if (isNaN(newQuantity)) {
-            input.value = product.quantity;
-            return;
-        }
+        product.quantity = newQuantity;
     }
-    
+
     const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(
-        product.originalPrice, 
-        newQuantity, 
+        product.originalPrice,
+        product.quantity || 0,
         product.availableDiscounts || []
     );
-    
+
     selectedProducts[index] = {
         ...product,
-        quantity: newQuantity > 0 ? newQuantity : product.quantity,
         price: finalPrice,
         hasDiscount: discountApplied,
         discountInfo: discountInfo || product.discountInfo
     };
-    
-    input.value = product.allowsFraction ? 
-        selectedProducts[index].quantity.toFixed(3).replace('.', ',') : 
-        selectedProducts[index].quantity;
-    
+
     calculateSaleTotal();
 }
 
