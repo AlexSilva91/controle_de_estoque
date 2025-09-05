@@ -45,7 +45,7 @@ from app.models.entities import (
     Cliente, Produto, NotaFiscal, UnidadeMedida, StatusNota,
     Financeiro, TipoMovimentacao, CategoriaFinanceira, MovimentacaoEstoque, ContaReceber,
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
-    Desconto, PagamentoContaReceber, Usuario)
+    Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
 from app.crud import (
     TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_todos_os_descontos, calcular_fator_conversao,
     criar_desconto, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
@@ -2143,6 +2143,41 @@ def buscar_desconto_por_id(desconto_id):
                 'ativo': desconto.ativo,
                 'criado_em': formatar_data_br(desconto.criado_em)
             }
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'erro': str(e)}), 500
+    finally:
+        session.close()
+        
+@admin_bp.route('/descontos/<int:desconto_id>/produtos', methods=['GET'])
+@login_required
+def buscar_produtos_desconto_route(desconto_id):
+    try:
+        session = Session(db.engine)
+        
+        # Busca o desconto
+        desconto = session.query(Desconto).get(desconto_id)
+        
+        if not desconto:
+            return jsonify({'success': False, 'erro': 'Desconto não encontrado'}), 404
+        
+        # Busca os produtos associados a este desconto
+        produtos = session.query(Produto).join(
+            produto_desconto_association,
+            Produto.id == produto_desconto_association.c.produto_id
+        ).filter(
+            produto_desconto_association.c.desconto_id == desconto_id
+        ).all()
+        
+        return jsonify({
+            'success': True,
+            'produtos': [{
+                'id': p.id,
+                'codigo': p.codigo,
+                'nome': p.nome,
+                'tipo': p.tipo,
+                'ativo': p.ativo
+            } for p in produtos]
         }), 200
     except Exception as e:
         return jsonify({'success': False, 'erro': str(e)}), 500

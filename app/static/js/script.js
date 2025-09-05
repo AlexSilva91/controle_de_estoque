@@ -4679,6 +4679,8 @@ function setupFormasPagamentoEvents() {
             }
             
             const row = document.createElement('tr');
+            row.classList.add('desconto-row');
+            row.setAttribute('data-id', desconto.id);
             row.innerHTML = `
               <td>${desconto.identificador || '-'}</td>
               <td>${desconto.descricao || '-'}</td>
@@ -4702,11 +4704,74 @@ function setupFormasPagamentoEvents() {
           });
           
           setupDescontoActions();
+          
+          // Adiciona evento de clique nas linhas da tabela
+          document.querySelectorAll('.desconto-row').forEach(row => {
+            row.addEventListener('click', function(e) {
+              // Evita abrir o modal se o clique foi em um botão de ação
+              if (!e.target.closest('.table-actions')) {
+                const descontoId = this.getAttribute('data-id');
+                openProdutosDescontoModal(descontoId);
+              }
+            });
+          });
         }
       }
     } catch (error) {
       console.error('Erro ao carregar descontos:', error);
       showFlashMessage('error', 'Erro ao carregar lista de descontos');
+    }
+  }
+
+  async function openProdutosDescontoModal(descontoId) {
+    try {
+      // Busca os dados do desconto
+      const responseDesconto = await fetchWithErrorHandling(`/admin/descontos/${descontoId}`);
+      
+      if (responseDesconto.success) {
+        const desconto = responseDesconto.desconto;
+        
+        // Preenche as informações do desconto
+        document.getElementById('descontoInfoIdentificador').textContent = desconto.identificador || '-';
+        document.getElementById('descontoInfoDescricao').textContent = desconto.descricao || '-';
+        document.getElementById('descontoInfoValidade').textContent = desconto.valido_ate || '-';
+        
+        const statusElement = document.getElementById('descontoInfoStatus');
+        statusElement.textContent = desconto.ativo ? 'Ativo' : 'Inativo';
+        statusElement.className = desconto.ativo ? 'badge badge-success' : 'badge badge-danger';
+        
+        // Busca os produtos associados a este desconto
+        const responseProdutos = await fetchWithErrorHandling(`/admin/descontos/${descontoId}/produtos`);
+        
+        const tableBody = document.querySelector('#produtosDescontoTable tbody');
+        tableBody.innerHTML = '';
+        
+        if (responseProdutos.success && responseProdutos.produtos && responseProdutos.produtos.length > 0) {
+          responseProdutos.produtos.forEach(produto => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${produto.codigo || '-'}</td>
+              <td>${produto.nome || '-'}</td>
+              <td>${produto.tipo || '-'}</td>
+              <td><span class="badge ${produto.ativo ? 'badge-success' : 'badge-danger'}">${produto.ativo ? 'Ativo' : 'Inativo'}</span></td>
+            `;
+            tableBody.appendChild(row);
+          });
+        } else {
+          tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum produto associado a este desconto</td></tr>';
+        }
+        
+        // Atualiza o título do modal
+        document.getElementById('produtosDescontoModalTitle').textContent = `Produtos do Desconto: ${desconto.identificador}`;
+        
+        // Abre o modal
+        openModal('produtosDescontoModal');
+      } else {
+        showFlashMessage('error', responseDesconto.erro || 'Erro ao carregar dados do desconto');
+      }
+    } catch (error) {
+      console.error('Erro ao carregar produtos do desconto:', error);
+      showFlashMessage('error', 'Erro ao carregar produtos do desconto');
     }
   }
 

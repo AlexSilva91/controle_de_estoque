@@ -857,6 +857,67 @@
                         </div>
                     </div>
                 </div>
+                <!-- Modal de Produtos do Desconto -->
+                <div id="produtosDescontoModal" class="modal">
+                    <div class="modal-overlay"></div>
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h2 id="produtosDescontoModalTitle" class="modal-title">
+                                    <i class="fas fa-tags"></i> Produtos do Desconto
+                                </h2>
+                                <button type="button" class="close-modal">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="details-main-info">
+                                    <h4 class="section-title">Informações do Desconto</h4>
+                                    <div class="details-grid">
+                                        <div class="detail-item">
+                                            <label>Identificador:</label>
+                                            <span id="descontoInfoIdentificador" class="value">-</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <label>Descrição:</label>
+                                            <span id="descontoInfoDescricao" class="value">-</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <label>Validade:</label>
+                                            <span id="descontoInfoValidade" class="value">-</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <label>Status:</label>
+                                            <span id="descontoInfoStatus" class="badge badge-success">Ativo</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="details-table-section">
+                                    <h4 class="section-title">Produtos Associados</h4>
+                                    <div class="details-table-container">
+                                        <table id="produtosDescontoTable" class="compact-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Código</th>
+                                                    <th>Nome</th>
+                                                    <th>Tipo</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <!-- Dados serão preenchidos via JavaScript -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Rodapé -->
