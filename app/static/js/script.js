@@ -783,177 +783,361 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // ===== CLIENTES =====
+  // Variável para armazenar o ID do cliente atual
+  let currentClienteId = null;
+  
+  // Função principal para carregar clientes
   async function loadClientesData() {
-    try {
-      const searchText = document.getElementById('searchCliente')?.value.toLowerCase() || '';
-      const data = await fetchWithErrorHandling('/admin/clientes');
-
-      if (data.success) {
-        const clientesTable = document.querySelector('#clientesTable tbody');
-        if (clientesTable) {
-          clientesTable.innerHTML = '';
-
-          data.clientes.forEach(cliente => {
-            if (searchText && !cliente.nome.toLowerCase().includes(searchText)) return;
-
-            const status = cliente.ativo === 'Ativo' || cliente.ativo === true ? 'Ativo' : 'Inativo';
-
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${cliente.id}</td>
-              <td>${cliente.nome}</td>
-              <td>${cliente.documento || ''}</td>
-              <td>${cliente.telefone || ''}</td>
-              <td>${cliente.email || ''}</td>
-              <td><span class="badge ${status === 'Ativo' ? 'badge-success' : 'badge-danger'}">${status}</span></td>
-              <td>
-                <div class="table-actions">
-                  <button class="btn-icon btn-warning editar-cliente" data-id="${cliente.id}" title="Editar">
-                    <i class="fas fa-edit"></i>
-                  </button>
-                  <button class="btn-icon btn-danger remover-cliente" data-id="${cliente.id}" title="Remover">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </div>
-              </td>
-            `;
-            clientesTable.appendChild(row);
-          });
-
-          setupClienteActions();
-        }
+      try {
+          const searchText = document.getElementById('searchCliente')?.value.toLowerCase() || '';
+          const data = await fetchWithErrorHandling('/admin/clientes');
+  
+          if (data.success) {
+              const clientesTable = document.querySelector('#clientesTable tbody');
+              if (!clientesTable) return;
+  
+              clientesTable.innerHTML = '';
+  
+              data.clientes.forEach(cliente => {
+                  if (searchText && !cliente.nome.toLowerCase().includes(searchText)) return;
+  
+                  const status = cliente.ativo === 'Ativo' || cliente.ativo === true ? 'Ativo' : 'Inativo';
+  
+                  const row = document.createElement('tr');
+                  row.innerHTML = `
+                      <td>${cliente.id}</td>
+                      <td>${cliente.nome}</td>
+                      <td>${cliente.documento || ''}</td>
+                      <td>${cliente.telefone || ''}</td>
+                      <td>${cliente.email || ''}</td>
+                      <td><span class="badge ${status === 'Ativo' ? 'badge-success' : 'badge-danger'}">${status}</span></td>
+                      <td>
+                          <div class="table-actions">
+                              <button class="btn-icon btn-info detalhes-cliente" data-id="${cliente.id}" title="Detalhes">
+                                  <i class="fas fa-eye"></i>
+                              </button>
+                              <button class="btn-icon btn-warning editar-cliente" data-id="${cliente.id}" title="Editar">
+                                  <i class="fas fa-edit"></i>
+                              </button>
+                              <button class="btn-icon btn-danger remover-cliente" data-id="${cliente.id}" title="Remover">
+                                  <i class="fas fa-trash"></i>
+                              </button>
+                          </div>
+                      </td>
+                  `;
+                  clientesTable.appendChild(row);
+              });
+  
+              setupClienteActions();
+          }
+      } catch (error) {
+          console.error('Erro ao carregar clientes:', error);
+          showFlashMessage('error', 'Erro ao carregar lista de clientes');
       }
-    } catch (error) {
-      console.error('Erro ao carregar clientes:', error);
-      showFlashMessage('error', 'Erro ao carregar lista de clientes');
-    }
   }
-
-  async function openEditarClienteModal(clienteId) {
-    const clienteForm = document.getElementById('clienteForm');
-    if (clienteForm) clienteForm.reset();
-    
-    const clienteIdField = document.getElementById('clienteId');
-    if (clienteIdField) clienteIdField.value = '';
-    
-    const clienteStatus = document.getElementById('clienteStatus');
-    if (clienteStatus) clienteStatus.value = 'true';
-
-    const clienteModalTitle = document.getElementById('clienteModalTitle');
-    if (clienteModalTitle) clienteModalTitle.textContent = 'Editar Cliente';
-    
-    const clienteModalSubmitText = document.getElementById('clienteModalSubmitText');
-    if (clienteModalSubmitText) clienteModalSubmitText.textContent = 'Atualizar';
-
-    try {
-      const response = await fetchWithErrorHandling(`/admin/clientes/${clienteId}`);
-      if (response.success) {
-        const cliente = response.cliente;
-        
-        if (document.getElementById('clienteId')) document.getElementById('clienteId').value = cliente.id;
-        if (document.getElementById('clienteNome')) document.getElementById('clienteNome').value = cliente.nome;
-        if (document.getElementById('clienteDocumento')) document.getElementById('clienteDocumento').value = cliente.documento || '';
-        if (document.getElementById('clienteTelefone')) document.getElementById('clienteTelefone').value = cliente.telefone || '';
-        if (document.getElementById('clienteEmail')) document.getElementById('clienteEmail').value = cliente.email || '';
-        if (document.getElementById('clienteEndereco')) document.getElementById('clienteEndereco').value = cliente.endereco || '';
-        if (document.getElementById('clienteStatus')) document.getElementById('clienteStatus').value = cliente.ativo ? 'true' : 'false';
-      } else {
-        showFlashMessage('error', 'Erro ao carregar dados do cliente');
-        return;
-      }
-    } catch (error) {
-      console.error('Erro ao carregar cliente:', error);
-      showFlashMessage('error', 'Erro ao carregar dados do cliente');
-      return;
-    }
-
-    openModal(document.getElementById('clienteModal'));
-
-  }
-
+  
+  // Configura ações de todas as linhas e botões da tabela
   function setupClienteActions() {
-    document.querySelectorAll('.editar-cliente').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const clienteId = this.getAttribute('data-id');
-        openEditarClienteModal(clienteId);
+      document.querySelectorAll('#clientesTable tbody tr').forEach(row => {
+          row.addEventListener('click', (e) => {
+              if (!e.target.closest('.table-actions')) {
+                  const clienteId = row.querySelector('td:first-child').textContent;
+                  openClienteDetails(parseInt(clienteId));
+              }
+          });
+          row.style.cursor = 'pointer';
       });
-    });
-
-    document.querySelectorAll('.remover-cliente').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const clienteId = this.getAttribute('data-id');
-        const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
-        const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
-        
-        if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir o cliente ${clienteId}?`;
-        if (confirmarExclusaoBtn) {
-          confirmarExclusaoBtn.setAttribute('data-id', clienteId);
-          confirmarExclusaoBtn.setAttribute('data-type', 'cliente');
-        }
-        openModal('confirmarExclusaoModal');
+  
+      // Botão de Detalhes
+      document.querySelectorAll('.detalhes-cliente').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const clienteId = btn.getAttribute('data-id');
+              openClienteDetails(parseInt(clienteId));
+          });
       });
-    });
+  
+      // Botão de Editar
+      document.querySelectorAll('.editar-cliente').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const clienteId = btn.getAttribute('data-id');
+              openEditarClienteModal(clienteId);
+          });
+      });
+  
+      // Botão de Remover
+      document.querySelectorAll('.remover-cliente').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const clienteId = btn.getAttribute('data-id');
+              const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
+              const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
+  
+              if (confirmarExclusaoTexto)
+                  confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir o cliente ${clienteId}?`;
+              if (confirmarExclusaoBtn) {
+                  confirmarExclusaoBtn.setAttribute('data-id', clienteId);
+                  confirmarExclusaoBtn.setAttribute('data-type', 'cliente');
+              }
+              openModal('confirmarExclusaoModal');
+          });
+      });
   }
-
-  // Event Listeners para Clientes
+  
+  // Abrir modal de detalhes do cliente
+  async function openClienteDetails(clienteId) {
+      try {
+          currentClienteId = clienteId;
+          const modal = document.getElementById('detalhesClienteModal');
+          modal.style.display = 'flex';
+  
+          const data = await fetchWithErrorHandling(`/admin/clientes/${clienteId}/detalhes`);
+  
+          if (data.success) {
+              document.getElementById('clienteNome').textContent = data.cliente.nome;
+              document.getElementById('clienteDocumento').textContent = `Documento: ${data.cliente.documento || 'Não informado'}`;
+              document.getElementById('clienteContato').textContent = `Contato: ${data.cliente.telefone || 'Não informado'} | ${data.cliente.email || 'Não informado'}`;
+              document.getElementById('clienteEndereco').textContent = `Endereço: ${data.cliente.endereco || 'Não informado'}`;
+              document.getElementById('clienteStatus').textContent = `Status: ${data.cliente.ativo ? 'Ativo' : 'Inativo'}`;
+  
+              fillProdutosTable(data.produtos_comprados);
+              fillMaisCompradosTable(data.produtos_mais_comprados);
+              fillContasTables(data.contas_abertas, data.contas_quitadas);
+  
+              document.getElementById('totalCompras').textContent = data.total_compras;
+              document.getElementById('valorTotalCompras').textContent = `R$ ${data.valor_total_compras.toFixed(2).replace('.', ',')}`;
+          } else {
+              showFlashMessage('error', 'Erro ao carregar detalhes do cliente');
+          }
+      } catch (error) {
+          console.error('Erro ao abrir detalhes do cliente:', error);
+          showFlashMessage('error', 'Erro ao carregar detalhes do cliente');
+      }
+  }
+  
+  // Funções para preencher tabelas dentro do modal
+  function fillProdutosTable(produtos) {
+      const tbody = document.querySelector('#produtosTable tbody');
+      tbody.innerHTML = '';
+      
+      if (produtos.length === 0) {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td colspan="5" class="text-center">Nenhum produto comprado</td>`;
+          tbody.appendChild(row);
+          return;
+      }
+      
+      produtos.forEach(produto => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+              <td>${produto.nome}</td>
+              <td>${produto.quantidade} ${produto.unidade || 'un'}</td>
+              <td>R$ ${produto.valor_unitario.toFixed(2).replace('.', ',')}</td>
+              <td>R$ ${produto.valor_total.toFixed(2).replace('.', ',')}</td>
+              <td>${new Date(produto.data_compra).toLocaleDateString('pt-BR')}</td>
+          `;
+          tbody.appendChild(row);
+      });
+  }
+  
+  function fillMaisCompradosTable(produtos) {
+      const tbody = document.querySelector('#maisCompradosTable tbody');
+      tbody.innerHTML = '';
+      
+      if (produtos.length === 0) {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td colspan="3" class="text-center">Nenhum produto comprado</td>`;
+          tbody.appendChild(row);
+          return;
+      }
+      
+      produtos.forEach(produto => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+              <td>${produto.nome}</td>
+              <td>${produto.quantidade_total} ${produto.unidade || 'un'}</td>
+              <td>${produto.vezes_comprado}</td>
+          `;
+          tbody.appendChild(row);
+      });
+  }
+  
+  function fillContasTables(contasAbertas, contasQuitadas) {
+      // Contas em aberto
+      const tbodyAbertas = document.querySelector('#contasAbertasTable tbody');
+      tbodyAbertas.innerHTML = '';
+      
+      if (contasAbertas.length === 0) {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td colspan="5" class="text-center">Nenhuma conta em aberto</td>`;
+          tbodyAbertas.appendChild(row);
+      } else {
+          contasAbertas.forEach(conta => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                  <td>${conta.descricao}</td>
+                  <td>R$ ${conta.valor_original.toFixed(2).replace('.', ',')}</td>
+                  <td>R$ ${conta.valor_aberto.toFixed(2).replace('.', ',')}</td>
+                  <td>${new Date(conta.data_vencimento).toLocaleDateString('pt-BR')}</td>
+                  <td><span class="badge badge-warning">${conta.status}</span></td>
+              `;
+              tbodyAbertas.appendChild(row);
+          });
+      }
+  
+      // Contas quitadas
+      const tbodyQuitadas = document.querySelector('#contasQuitadasTable tbody');
+      tbodyQuitadas.innerHTML = '';
+      
+      if (contasQuitadas.length === 0) {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td colspan="4" class="text-center">Nenhuma conta quitada</td>`;
+          tbodyQuitadas.appendChild(row);
+      } else {
+          contasQuitadas.forEach(conta => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                  <td>${conta.descricao}</td>
+                  <td>R$ ${conta.valor_original.toFixed(2).replace('.', ',')}</td>
+                  <td>${new Date(conta.data_pagamento || conta.data_emissao).toLocaleDateString('pt-BR')}</td>
+                  <td><span class="badge badge-success">${conta.status}</span></td>
+              `;
+              tbodyQuitadas.appendChild(row);
+          });
+      }
+  }
+  
+  // Configura tabs do modal (chame apenas uma vez)
+  function setupTabs() {
+      const tabButtons = document.querySelectorAll('.tab-button');
+      const tabPanes = document.querySelectorAll('.tab-pane');
+  
+      tabButtons.forEach(button => {
+          button.addEventListener('click', () => {
+              tabButtons.forEach(btn => btn.classList.remove('active'));
+              tabPanes.forEach(pane => pane.classList.remove('active'));
+  
+              button.classList.add('active');
+              const tabId = button.getAttribute('data-tab');
+              const pane = document.getElementById(`tab-${tabId}`);
+              if (pane) pane.classList.add('active');
+          });
+      });
+  }
+  
+  // Modal: fechar
+  document.querySelectorAll('#detalhesClienteModal .close-modal, #fecharModal').forEach(btn => {
+      btn.addEventListener('click', () => {
+          document.getElementById('detalhesClienteModal').style.display = 'none';
+      });
+  });
+  
+  window.addEventListener('click', (e) => {
+      const modal = document.getElementById('detalhesClienteModal');
+      if (e.target === modal) modal.style.display = 'none';
+  });
+  
+  // Inicialização: busca, refresh e adicionar cliente
   document.getElementById('searchCliente')?.addEventListener('input', loadClientesData);
   document.getElementById('refreshClientes')?.addEventListener('click', loadClientesData);
   document.getElementById('addCliente')?.addEventListener('click', () => {
-    const clienteForm = document.getElementById('clienteForm');
-    if (clienteForm) clienteForm.reset();
-    
-    if (document.getElementById('clienteId')) document.getElementById('clienteId').value = '';
-    if (document.getElementById('clienteStatus')) document.getElementById('clienteStatus').value = 'true';
-    
-    const clienteModalTitle = document.getElementById('clienteModalTitle');
-    if (clienteModalTitle) clienteModalTitle.textContent = 'Cadastrar Cliente';
-    
-    const clienteModalSubmitText = document.getElementById('clienteModalSubmitText');
-    if (clienteModalSubmitText) clienteModalSubmitText.textContent = 'Cadastrar';
-    openModal('clienteModal');
+      const clienteForm = document.getElementById('clienteForm');
+      if (clienteForm) clienteForm.reset();
+      if (document.getElementById('clienteId')) document.getElementById('clienteId').value = '';
+      if (document.getElementById('clienteStatus')) document.getElementById('clienteStatus').value = 'true';
+  
+      document.getElementById('clienteModalTitle').textContent = 'Cadastrar Cliente';
+      document.getElementById('clienteModalSubmitText').textContent = 'Cadastrar';
+      openModal('clienteModal');
   });
-
+  
+  // Formulário de cadastro/edição de cliente
   const clienteForm = document.getElementById('clienteForm');
   if (clienteForm) {
-    clienteForm.addEventListener('submit', async function(e) {
-      e.preventDefault();
-
-      const clienteId = document.getElementById('clienteId')?.value || '';
-      const isEdit = clienteId !== '';
-
-      const formData = {
-        nome: document.getElementById('clienteNome')?.value || '',
-        documento: document.getElementById('clienteDocumento')?.value || '',
-        telefone: document.getElementById('clienteTelefone')?.value || '',
-        email: document.getElementById('clienteEmail')?.value || '',
-        endereco: document.getElementById('clienteEndereco')?.value || '',
-        ativo: document.getElementById('clienteStatus')?.value === 'true'
-      };
-
-      const url = isEdit ? `/admin/clientes/${clienteId}` : '/admin/clientes';
-      const method = isEdit ? 'PUT' : 'POST';
-
-      try {
-        const response = await fetchWithErrorHandling(url, {
-          method: method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        });
-
-        if (response.success) {
-          showFlashMessage('success', `Cliente ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
-          closeModal('clienteModal');
-          loadClientesData();
-        } else {
-          showFlashMessage('error', response.message || 'Erro ao salvar cliente');
-        }
-      } catch (error) {
-        console.error('Erro ao salvar cliente:', error);
-        showFlashMessage('error', 'Erro ao salvar cliente');
-      }
-    });
+      clienteForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const clienteId = document.getElementById('clienteId')?.value || '';
+          const isEdit = clienteId !== '';
+  
+          const formData = {
+              nome: document.getElementById('clienteNome')?.value || '',
+              documento: document.getElementById('clienteDocumento')?.value || '',
+              telefone: document.getElementById('clienteTelefone')?.value || '',
+              email: document.getElementById('clienteEmail')?.value || '',
+              endereco: document.getElementById('clienteEndereco')?.value || '',
+              ativo: document.getElementById('clienteStatus')?.value === 'true'
+          };
+  
+          const url = isEdit ? `/admin/clientes/${clienteId}` : '/admin/clientes';
+          const method = isEdit ? 'PUT' : 'POST';
+  
+          try {
+              const response = await fetchWithErrorHandling(url, {
+                  method,
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(formData)
+              });
+  
+              if (response.success) {
+                  showFlashMessage('success', `Cliente ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
+                  closeModal('clienteModal');
+                  loadClientesData();
+              } else {
+                  showFlashMessage('error', response.message || 'Erro ao salvar cliente');
+              }
+          } catch (error) {
+              console.error('Erro ao salvar cliente:', error);
+              showFlashMessage('error', 'Erro ao salvar cliente');
+          }
+      });
   }
-
+  
+  // Função de editar cliente: abre modal preenchido
+  async function openEditarClienteModal(clienteId) {
+      const clienteForm = document.getElementById('clienteForm');
+      if (clienteForm) clienteForm.reset();
+  
+      document.getElementById('clienteId').value = '';
+      document.getElementById('clienteStatus').value = 'true';
+      document.getElementById('clienteModalTitle').textContent = 'Editar Cliente';
+      document.getElementById('clienteModalSubmitText').textContent = 'Atualizar';
+  
+      try {
+          const response = await fetchWithErrorHandling(`/admin/clientes/${clienteId}`);
+          if (response.success) {
+              const cliente = response.cliente;
+              document.getElementById('clienteId').value = cliente.id;
+              document.getElementById('clienteNome').value = cliente.nome;
+              document.getElementById('clienteDocumento').value = cliente.documento || '';
+              document.getElementById('clienteTelefone').value = cliente.telefone || '';
+              document.getElementById('clienteEmail').value = cliente.email || '';
+              document.getElementById('clienteEndereco').value = cliente.endereco || '';
+              document.getElementById('clienteStatus').value = cliente.ativo ? 'true' : 'false';
+          } else {
+              showFlashMessage('error', 'Erro ao carregar dados do cliente');
+              return;
+          }
+      } catch (error) {
+          console.error('Erro ao carregar cliente:', error);
+          showFlashMessage('error', 'Erro ao carregar dados do cliente');
+          return;
+      }
+  
+      openModal('clienteModal');
+  }
+  
+  // Botão de imprimir relatório
+  document.getElementById('imprimirRelatorio')?.addEventListener('click', () => {
+      window.print();
+  });
+  
+  // Inicializa tabs uma única vez após DOM carregado
+  document.addEventListener('DOMContentLoaded', () => {
+      setupTabs();
+      loadClientesData();
+  });
+  
   // ===== PRODUTOS =====
   async function loadProdutosData() {
     try {

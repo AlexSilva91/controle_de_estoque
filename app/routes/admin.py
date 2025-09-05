@@ -499,6 +499,101 @@ def listar_clientes():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@admin_bp.route('/clientes/<int:cliente_id>/detalhes', methods=['GET'])
+@login_required
+@admin_required
+def obter_detalhes_cliente(cliente_id):
+    try:
+        cliente = get_cliente(db.session, cliente_id)
+        if not cliente:
+            return jsonify({'success': False, 'message': 'Cliente não encontrado'}), 404
+
+        # Obter todas as notas fiscais do cliente
+        notas_fiscais = NotaFiscal.query.filter_by(cliente_id=cliente_id).all()
+        
+        # Obter todos os produtos comprados pelo cliente
+        produtos_comprados = []
+        produtos_quantidade = {}
+        
+        for nota in notas_fiscais:
+            for item in nota.itens:
+                produto_info = {
+                    'id': item.produto.id,
+                    'nome': item.produto.nome,
+                    'quantidade': float(item.quantidade),
+                    'valor_unitario': float(item.valor_unitario),
+                    'valor_total': float(item.valor_total),
+                    'data_compra': nota.data_emissao.isoformat(),
+                    'unidade': item.produto.unidade.value if item.produto.unidade else 'un'
+                }
+                produtos_comprados.append(produto_info)
+                
+                # Contabilizar para produtos mais comprados
+                if item.produto.id in produtos_quantidade:
+                    produtos_quantidade[item.produto.id]['quantidade_total'] += float(item.quantidade)
+                    produtos_quantidade[item.produto.id]['vezes_comprado'] += 1
+                else:
+                    produtos_quantidade[item.produto.id] = {
+                        'id': item.produto.id,
+                        'nome': item.produto.nome,
+                        'quantidade_total': float(item.quantidade),
+                        'vezes_comprado': 1,
+                        'unidade': item.produto.unidade.value if item.produto.unidade else 'un'
+                    }
+        
+        # Ordenar produtos mais comprados por quantidade
+        produtos_mais_comprados = sorted(
+            produtos_quantidade.values(), 
+            key=lambda x: x['quantidade_total'], 
+            reverse=True
+        )[:10]  # Top 10 produtos
+        
+        # Obter contas a receber
+        contas_receber = ContaReceber.query.filter_by(cliente_id=cliente_id).all()
+        contas_abertas = []
+        contas_quitadas = []
+        print(f'Contas a receber: {contas_receber} {produtos_mais_comprados} {produtos_comprados} {contas_receber}')
+        for conta in contas_receber:
+            conta_info = {
+                'id': conta.id,
+                'descricao': conta.descricao,
+                'valor_original': float(conta.valor_original),
+                'valor_aberto': float(conta.valor_aberto),
+                'data_vencimento': conta.data_vencimento.isoformat(),
+                'data_emissao': conta.data_emissao.isoformat(),
+                'status': conta.status.value
+            }
+            
+            if conta.status == StatusPagamento.quitado:
+                contas_quitadas.append(conta_info)
+            else:
+                contas_abertas.append(conta_info)
+        
+        # Calcular valor total das compas
+        valor_total_compras = sum(float(nota.valor_total) for nota in notas_fiscais)
+        
+        return jsonify({
+            'success': True,
+            'cliente': {
+                'id': cliente.id,
+                'nome': cliente.nome,
+                'documento': cliente.documento,
+                'telefone': cliente.telefone,
+                'email': cliente.email,
+                'endereco': cliente.endereco,
+                'limite_credito': float(cliente.limite_credito),
+                'ativo': cliente.ativo
+            },
+            'produtos_comprados': produtos_comprados,
+            'produtos_mais_comprados': produtos_mais_comprados,
+            'contas_abertas': contas_abertas,
+            'contas_quitadas': contas_quitadas,
+            'total_compras': len(notas_fiscais),
+            'valor_total_compras': valor_total_compras
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
 @admin_bp.route('/clientes', methods=['POST'])
 @login_required
 @admin_required
