@@ -664,7 +664,7 @@ def obter_vendas_hoje():
                 ],
                 'pagamentos': agregar_pagamentos(venda.pagamentos) if venda.pagamentos else []
             })
-        print(f'Vendas do dia: \n{resultado}')
+        
         return jsonify({
             'success': True,
             'data': resultado,
@@ -1143,7 +1143,7 @@ def gerar_pdf_vendas_dia():
     total_vendas_positivas = sum(v['valor_total'] for v in dados['vendas'] if 'valor_total' in v and v['valor_total'] > 0) if 'vendas' in dados else 0
     total_estornos = sum(abs(v['valor_total']) for v in dados['vendas'] if 'valor_total' in v and v['valor_total'] < 0) if 'vendas' in dados else 0
     total_liquido = total_vendas_positivas - dados.get('total_saidas', 0)
-    
+    print(f"\nTotal saídas: \n{json.dumps(dados.get('total_saidas', 0), indent=2)}\n")
     # Calcular total a prazo pendente
     total_a_prazo_pendente = 0
     if 'vendas' in dados:
@@ -1162,7 +1162,7 @@ def gerar_pdf_vendas_dia():
         ["Total Estornos", total_estornos],
         ["Total Descontos", dados.get('total_descontos', 0)],
         ["Total Entradas", total_vendas_positivas],
-        ["Total Saídas", dados.get('total_saidas', 0) - total_estornos],
+        ["Total Saídas", dados.get('total_saidas', 0)],
         ["Total a Prazo Pendente", total_a_prazo_pendente],
         ["Contas Recebidas", total_contas_receber_pagas],  # NOVA LINHA
         ["Saldo Líquido", total_liquido + total_contas_receber_pagas]  # ATUALIZADO
@@ -1425,7 +1425,6 @@ def api_get_saldo():
 
         total_vendas = Decimal('0.00')
         for lanc in lancamentos:
-            print(lanc.valor)
             total_vendas += Decimal(str(lanc.valor))
 
         # --- Total de DESPESAS do dia ---
@@ -1437,16 +1436,10 @@ def api_get_saldo():
              Financeiro.data <= data_fim,
              Financeiro.caixa_id == caixa.id
         ).all()
-
-        print(f"Despesas do caixa {caixa.id}: {len(despesas)} registros encontrados")
         
         total_despesas = Decimal('0.00')
         for desp in despesas:
             total_despesas += Decimal(str(desp.valor))
-            print(f"Despesa encontrada: {desp.descricao} - Valor: {desp.valor}")
-
-        print(f"Caixa ID: {caixa.id} | Operador: {current_user.nome}")
-        print(f"Total Vendas: {total_vendas}, Total Despesas: {total_despesas}")
 
         # --- Lógica do saldo: abertura + vendas - despesas ---
         abertura = Decimal(str(caixa.valor_abertura))

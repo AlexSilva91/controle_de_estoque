@@ -1914,7 +1914,7 @@ def obter_detalhes_vendas_dia(data=None, caixa_id=None, operador_id=None):
             
             if mov.tipo == TipoMovimentacao.entrada:
                 consolidado['total_entradas'] += valor
-            else:
+            elif mov.tipo == TipoMovimentacao.saida and mov.categoria != CategoriaFinanceira.estorno:
                 consolidado['total_saidas'] += valor
             
             # Categorias financeiras
@@ -1936,7 +1936,6 @@ def obter_detalhes_vendas_dia(data=None, caixa_id=None, operador_id=None):
                 'pagamento_id': mov.pagamento_id
             })
         
-        print(f'Dados corrigidos: {consolidado}')
         return {
             'success': True,
             'data': consolidado,
