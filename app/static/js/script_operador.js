@@ -1772,18 +1772,20 @@ function renderProductsList() {
         row.innerHTML = `
             <td>
                 ${product.name}
-                ${product.hasDiscount && product.discountInfo ? 
-                    `<span class="discount-badge" title="${product.discountInfo.descricao || 'Desconto aplicado'}">
+                <span class="discount-badge" 
+                      title="${product.discountInfo?.descricao || ''}" 
+                      style="display:${product.hasDiscount ? 'inline-block' : 'none'}">
+                    ${product.hasDiscount && product.discountInfo ? `
                         <i class="fas fa-tag"></i> ${product.discountInfo.identificador || 'DESCONTO'}
                         ${product.discountInfo.tipo === 'percentual' ? 
                             ` (${product.discountInfo.valor}%)` : 
                             ` (${formatCurrency(product.discountInfo.valor)})`
                         }
-                    </span>` : ''
-                }
+                    ` : ''}
+                </span>
             </td>
             <td>${product.description}</td>
-            <td>
+            <td class="product-price">
                 ${formatCurrency(product.price)}
                 ${product.hasDiscount ? 
                     `<small class="original-price">${formatCurrency(product.originalPrice)}</small>` : ''
@@ -1811,29 +1813,29 @@ function renderProductsList() {
         productsList.appendChild(row);
     });
 
-    // Adiciona os eventos para os inputs
+    // Adiciona eventos
     document.querySelectorAll('.quantity-input').forEach(input => {
-        // Evento input: permite digitação livre, só bloqueia caracteres inválidos
+        // Validação de caracteres
         input.addEventListener('input', function(e) {
             let value = e.target.value;
             if (!/^[0-9]*[,.]?[0-9]*$/.test(value)) {
                 e.target.value = value.slice(0, -1);
             }
         });
-
-        // Evento change: atualiza quantidade ao sair do input
-        input.addEventListener('change', async function(e) {
+    
+        // 🔹 Atualiza em tempo real enquanto digita
+        input.addEventListener('input', async function(e) {
             await updateProductQuantity(e.target);
         });
     });
 
-    // Eventos de remover produto
     document.querySelectorAll('.btn-remove').forEach(button => {
         button.addEventListener('click', function() {
             removeProductRow(button);
         });
     });
 }
+
 
 async function updateProductQuantity(input) {
     const index = parseInt(input.dataset.index);
@@ -1871,27 +1873,53 @@ async function updateProductQuantity(input) {
 
     calculateSaleTotal();
 
-    // 🔹 Atualiza apenas a linha desse produto
+    // 🔹 Atualiza DOM sem recriar linha
+    const updatedProduct = selectedProducts[index];
     const row = input.closest('tr');
     if (row) {
-        const updatedProduct = selectedProducts[index];
-
-        // Atualiza célula de preço
+        // preço
         const priceCell = row.querySelector('.product-price');
         if (priceCell) {
-            priceCell.textContent = updatedProduct.price.toFixed(2);
+            priceCell.innerHTML = `
+                ${formatCurrency(updatedProduct.price)}
+                ${updatedProduct.hasDiscount ? 
+                    `<small class="original-price">${formatCurrency(updatedProduct.originalPrice)}</small>` : ''
+                }
+            `;
         }
 
-        // Atualiza badge de desconto
+        // badge
         const badgeCell = row.querySelector('.discount-badge');
         if (badgeCell) {
             if (updatedProduct.hasDiscount && updatedProduct.discountInfo) {
-                badgeCell.textContent = updatedProduct.discountInfo.label || 'Desconto';
+                badgeCell.innerHTML = `
+                    <i class="fas fa-tag"></i> ${updatedProduct.discountInfo.identificador || 'DESCONTO'}
+                    ${updatedProduct.discountInfo.tipo === 'percentual' ? 
+                        ` (${updatedProduct.discountInfo.valor}%)` : 
+                        ` (${formatCurrency(updatedProduct.discountInfo.valor)})`
+                    }
+                `;
+                badgeCell.title = updatedProduct.discountInfo.descricao || 'Desconto aplicado';
                 badgeCell.style.display = 'inline-block';
             } else {
-                badgeCell.textContent = '';
+                badgeCell.innerHTML = '';
                 badgeCell.style.display = 'none';
             }
+        }
+
+        // total
+        const totalCell = row.querySelector('.product-total');
+        if (totalCell) {
+            const totalValue = updatedProduct.price * (updatedProduct.quantity || 0);
+            const originalTotalValue = updatedProduct.originalPrice * (updatedProduct.quantity || 0);
+            const discountValue = originalTotalValue - totalValue;
+
+            totalCell.innerHTML = `
+                ${formatCurrency(totalValue)}
+                ${updatedProduct.hasDiscount ? 
+                    `<small class="discount-value">(Economia: ${formatCurrency(discountValue)})</small>` : ''
+                }
+            `;
         }
     }
 }
