@@ -1506,14 +1506,28 @@ function displayProductSearchResults(products) {
 
 async function addProductToSale(product, initialQuantity = 1) {
     if (!product) return;
+    
+    // Busca descontos do produto
     const discounts = await fetchProductDiscounts(product.id);
-    const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(product.valor_unitario, initialQuantity, discounts);
+    const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(
+        product.valor_unitario, 
+        initialQuantity, 
+        discounts
+    );
+    
     const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
     
     if (existingProductIndex >= 0) {
-        selectedProducts[existingProductIndex].quantity += 1;
+        selectedProducts[existingProductIndex].quantity += initialQuantity;
         const newQuantity = selectedProducts[existingProductIndex].quantity;
-        const newPriceInfo = calculateDiscountedPrice(product.valor_unitario, newQuantity, discounts);
+        
+        // Recalcula desconto para a nova quantidade
+        const newPriceInfo = calculateDiscountedPrice(
+            product.valor_unitario, 
+            newQuantity, 
+            discounts
+        );
+        
         selectedProducts[existingProductIndex].price = newPriceInfo.finalPrice;
         selectedProducts[existingProductIndex].hasDiscount = newPriceInfo.discountApplied;
         selectedProducts[existingProductIndex].discountInfo = newPriceInfo.discountInfo;
@@ -1539,6 +1553,24 @@ async function addProductToSale(product, initialQuantity = 1) {
     calculateSaleTotal();
 }
 
+async function refreshAllDiscounts() {
+    await updateAllProductDiscounts();
+    showMessage('Descontos atualizados com sucesso!');
+}
+
+// Adicione um botão para atualizar descontos manualmente (opcional)
+function addDiscountRefreshButton() {
+    const discountSection = document.querySelector('.discount-controls');
+    if (discountSection && !document.getElementById('refresh-discounts-btn')) {
+        const refreshBtn = document.createElement('button');
+        refreshBtn.id = 'refresh-discounts-btn';
+        refreshBtn.className = 'btn-secondary';
+        refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Atualizar Descontos';
+        refreshBtn.addEventListener('click', refreshAllDiscounts);
+        discountSection.appendChild(refreshBtn);
+    }
+}
+
 async function fetchProductDiscounts(productId) {
     try {
         const response = await fetch(`/operador/api/produtos/${productId}/descontos?timestamp=${new Date().getTime()}`);
@@ -1551,7 +1583,8 @@ async function fetchProductDiscounts(productId) {
 }
 
 function calculateDiscountedPrice(basePrice, quantity, discounts) {
-    if (!discounts || discounts.length === 0) {
+    // Verifica se há descontos válidos
+    if (!discounts || discounts.length === 0 || !quantity || quantity <= 0) {
         return {
             finalPrice: basePrice,
             discountApplied: false,
@@ -1561,6 +1594,9 @@ function calculateDiscountedPrice(basePrice, quantity, discounts) {
 
     let bestDiscount = null;
     let bestPrice = basePrice;
+    const hoje = new Date();
+    
+    // Ordenar descontos: percentual primeiro, depois fixo
     const sortedDiscounts = [...discounts].sort((a, b) => {
         if (a.tipo === 'percentual' && b.tipo !== 'percentual') return -1;
         if (a.tipo !== 'percentual' && b.tipo === 'percentual') return 1;
@@ -1568,30 +1604,53 @@ function calculateDiscountedPrice(basePrice, quantity, discounts) {
     });
 
     for (const discount of sortedDiscounts) {
-        if (!discount.ativo) continue;
-        if (discount.valido_ate) {
-            const validUntil = new Date(discount.valido_ate);
-            const today = new Date();
-            if (today > validUntil) continue;
-        }
-        if (quantity < discount.quantidade_minima) continue;
-        if (discount.quantidade_maxima && quantity > discount.quantidade_maxima) continue;
-        
-        let discountedPrice = basePrice;
-        if (discount.tipo === 'percentual') {
-            discountedPrice = basePrice * (1 - (discount.valor / 100));
-        } else if (discount.tipo === 'fixo') {
-            discountedPrice = Math.max(0, basePrice - discount.valor);
-        }
-        
-        if (discountedPrice < bestPrice) {
-            bestPrice = discountedPrice;
-            bestDiscount = {
-                ...discount,
-                valor_aplicado: discount.tipo === 'percentual' 
-                    ? `${discount.valor}%` 
-                    : formatCurrency(discount.valor)
-            };
+        try {
+            // Verifica se o desconto está ativo
+            if (!discount.ativo) {
+                continue;
+            }
+                
+            // Verifica a data limite (se existir)
+            if (discount.valido_ate) {
+                const validoAte = new Date(discount.valido_ate);
+                if (hoje > validoAte) {
+                    continue; // Desconto expirado
+                }
+            }
+            
+            // Verifica quantidade mínima
+            if (quantity < discount.quantidade_minima) {
+                continue;
+            }
+            
+            // Verifica quantidade máxima (se existir)
+            if (discount.quantidade_maxima && quantity > discount.quantidade_maxima) {
+                continue;
+            }
+            
+            // Calcula preço com desconto
+            let discountedPrice = basePrice;
+            
+            if (discount.tipo === 'percentual') {
+                discountedPrice = basePrice * (1 - (discount.valor / 100));
+            } else if (discount.tipo === 'fixo') {
+                discountedPrice = Math.max(0, basePrice - discount.valor);
+            }
+            
+            // Verifica se é o melhor desconto encontrado até agora
+            if (discountedPrice < bestPrice) {
+                bestPrice = discountedPrice;
+                bestDiscount = {
+                    ...discount,
+                    valor_aplicado: discount.tipo === 'percentual' 
+                        ? `${discount.valor}%` 
+                        : formatCurrency(discount.valor),
+                    valor_desconto: basePrice - discountedPrice
+                };
+            }
+        } catch (error) {
+            console.error('Erro ao processar desconto:', error, discount);
+            continue;
         }
     }
     
@@ -1602,22 +1661,31 @@ function calculateDiscountedPrice(basePrice, quantity, discounts) {
     };
 }
 
-function updateAllProductDiscounts() {
-    selectedProducts.forEach(async (product, index) => {
-        const discounts = await fetchProductDiscounts(product.id);
-        const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(
-            product.originalPrice, 
-            product.quantity, 
-            discounts
-        );
-        selectedProducts[index] = {
-            ...product,
-            price: finalPrice,
-            hasDiscount: discountApplied,
-            discountInfo: discountInfo,
-            availableDiscounts: discounts
-        };
-    });
+// Adicione esta chamada na inicialização para criar o botão de atualização
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(addDiscountRefreshButton, 1000);
+});
+
+async function updateAllProductDiscounts() {
+    for (let i = 0; i < selectedProducts.length; i++) {
+        const product = selectedProducts[i];
+        if (product.quantity && product.quantity > 0) {
+            const discounts = await fetchProductDiscounts(product.id);
+            const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(
+                product.originalPrice,
+                product.quantity,
+                discounts
+            );
+            
+            selectedProducts[i] = {
+                ...product,
+                price: finalPrice,
+                hasDiscount: discountApplied,
+                discountInfo: discountInfo,
+                availableDiscounts: discounts
+            };
+        }
+    }
     renderProductsList();
     calculateSaleTotal();
 }
@@ -1704,9 +1772,13 @@ function renderProductsList() {
         row.innerHTML = `
             <td>
                 ${product.name}
-                ${product.hasDiscount ? 
+                ${product.hasDiscount && product.discountInfo ? 
                     `<span class="discount-badge" title="${product.discountInfo.descricao || 'Desconto aplicado'}">
                         <i class="fas fa-tag"></i> ${product.discountInfo.identificador || 'DESCONTO'}
+                        ${product.discountInfo.tipo === 'percentual' ? 
+                            ` (${product.discountInfo.valor}%)` : 
+                            ` (${formatCurrency(product.discountInfo.valor)})`
+                        }
                     </span>` : ''
                 }
             </td>
@@ -1771,28 +1843,57 @@ async function updateProductQuantity(input) {
     const value = input.value.trim().replace(',', '.');
 
     let newQuantity = parseFloat(value);
-    if (isNaN(newQuantity)) {
-        // Permite campo vazio
+    if (isNaN(newQuantity) || newQuantity <= 0) {
         product.quantity = null;
         input.value = '';
+        product.price = product.originalPrice;
+        product.hasDiscount = false;
+        product.discountInfo = null;
     } else {
         product.quantity = newQuantity;
+
+        // Busca descontos atualizados e aplica automaticamente
+        const discounts = await fetchProductDiscounts(product.id);
+        const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(
+            product.originalPrice,
+            newQuantity,
+            discounts
+        );
+
+        selectedProducts[index] = {
+            ...product,
+            price: finalPrice,
+            hasDiscount: discountApplied,
+            discountInfo: discountInfo,
+            availableDiscounts: discounts
+        };
     }
 
-    const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(
-        product.originalPrice,
-        product.quantity || 0,
-        product.availableDiscounts || []
-    );
-
-    selectedProducts[index] = {
-        ...product,
-        price: finalPrice,
-        hasDiscount: discountApplied,
-        discountInfo: discountInfo || product.discountInfo
-    };
-
     calculateSaleTotal();
+
+    // 🔹 Atualiza apenas a linha desse produto
+    const row = input.closest('tr');
+    if (row) {
+        const updatedProduct = selectedProducts[index];
+
+        // Atualiza célula de preço
+        const priceCell = row.querySelector('.product-price');
+        if (priceCell) {
+            priceCell.textContent = updatedProduct.price.toFixed(2);
+        }
+
+        // Atualiza badge de desconto
+        const badgeCell = row.querySelector('.discount-badge');
+        if (badgeCell) {
+            if (updatedProduct.hasDiscount && updatedProduct.discountInfo) {
+                badgeCell.textContent = updatedProduct.discountInfo.label || 'Desconto';
+                badgeCell.style.display = 'inline-block';
+            } else {
+                badgeCell.textContent = '';
+                badgeCell.style.display = 'none';
+            }
+        }
+    }
 }
 
 function removeProductRow(button) {
