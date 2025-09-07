@@ -552,7 +552,6 @@ def obter_detalhes_cliente(cliente_id):
         contas_receber = ContaReceber.query.filter_by(cliente_id=cliente_id).all()
         contas_abertas = []
         contas_quitadas = []
-        print(f'Contas a receber: {contas_receber} {produtos_mais_comprados} {produtos_comprados} {contas_receber}')
         for conta in contas_receber:
             conta_info = {
                 'id': conta.id,
