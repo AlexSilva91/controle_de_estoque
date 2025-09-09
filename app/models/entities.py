@@ -242,6 +242,78 @@ class Caixa(Base):
         if fechamento:
             db.session.delete(fechamento)
 
+    def to_dict(self, incluir_relacionamentos=True):
+        """Retorna todas as informações do caixa em formato de dicionário"""
+        data = {
+            "id": self.id,
+            "operador_id": self.operador_id,
+            "operador": self.operador.nome if self.operador else None,
+            "administrador_id": self.administrador_id,
+            "administrador": self.administrador.nome if self.administrador else None,
+            "data_abertura": self.data_abertura.isoformat() if self.data_abertura else None,
+            "data_fechamento": self.data_fechamento.isoformat() if self.data_fechamento else None,
+            "data_analise": self.data_analise.isoformat() if self.data_analise else None,
+            "valor_abertura": float(self.valor_abertura) if self.valor_abertura else None,
+            "valor_fechamento": float(self.valor_fechamento) if self.valor_fechamento else None,
+            "valor_confirmado": float(self.valor_confirmado) if self.valor_confirmado else None,
+            "status": self.status.value if self.status else None,
+            "observacoes_operador": self.observacoes_operador,
+            "observacoes_admin": self.observacoes_admin,
+            "observacoes": self.observacoes,
+            "sincronizado": self.sincronizado,
+        }
+
+        if incluir_relacionamentos:
+            data["movimentacoes"] = [
+                {
+                    "id": m.id,
+                    "produto_id": m.produto_id,
+                    "produto": m.produto.nome if m.produto else None,
+                    "usuario_id": m.usuario_id,
+                    "usuario": m.usuario.nome if m.usuario else None,
+                    "cliente_id": m.cliente_id,
+                    "cliente": m.cliente.nome if m.cliente else None,
+                    "tipo": m.tipo.value if m.tipo else None,
+                    "quantidade": float(m.quantidade),
+                    "valor_unitario": float(m.valor_unitario),
+                    "valor_recebido": float(m.valor_recebido) if m.valor_recebido else None,
+                    "forma_pagamento": m.forma_pagamento.value if m.forma_pagamento else None,
+                    "data": m.data.isoformat() if m.data else None,
+                }
+                for m in self.movimentacoes
+            ]
+
+            data["notas_fiscais"] = [
+                {
+                    "id": nf.id,
+                    "cliente_id": nf.cliente_id,
+                    "cliente": nf.cliente.nome if nf.cliente else None,
+                    "operador_id": nf.operador_id,
+                    "operador": nf.operador.nome if nf.operador else None,
+                    "valor_total": float(nf.valor_total),
+                    "valor_desconto": float(nf.valor_desconto),
+                    "status": nf.status.value if nf.status else None,
+                    "forma_pagamento": nf.forma_pagamento.value if nf.forma_pagamento else None,
+                    "data_emissao": nf.data_emissao.isoformat() if nf.data_emissao else None,
+                }
+                for nf in self.notas_fiscais
+            ]
+
+            data["pagamentos"] = [
+                {
+                    "id": p.id,
+                    "conta_id": p.conta_id,
+                    "valor_pago": float(p.valor_pago),
+                    "forma_pagamento": p.forma_pagamento.value if p.forma_pagamento else None,
+                    "data_pagamento": p.data_pagamento.isoformat() if p.data_pagamento else None,
+                }
+                for p in self.pagamentos
+            ]
+
+            data["financeiros"] = [f.to_raw_dict() for f in self.financeiros]
+
+        return data
+
 # --------------------
 # Desconto (modelo principal)
 # --------------------
