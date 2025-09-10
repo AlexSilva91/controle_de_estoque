@@ -3413,7 +3413,15 @@ async function openVendasFormaPagamentoModal(caixaId, formaPagamento) {
         showFlashMessage('error', 'Erro ao carregar vendas');
     }
 }
-
+// Configurar botão de PDF de movimentações
+document.getElementById('abrirPdfMovimentacoes')?.addEventListener('click', function() {
+    if (caixaIdAtual) {
+        const url = `/admin/caixas/${caixaIdAtual}/financeiro/pdf`;
+        window.open(url, '_blank');
+    } else {
+        showFlashMessage('error', 'Nenhum caixa selecionado');
+    }
+});
 // Função para abrir modal de detalhes da venda
 async function openDetalhesVendaModal(vendaId) {
     try {

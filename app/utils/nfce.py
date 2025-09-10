@@ -299,3 +299,122 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict) -> BytesIO:
     c.save()
     buffer.seek(0)
     return buffer
+
+
+def generate_caixa_financeiro_pdf(data):
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.units import inch, mm
+    from reportlab.lib import colors
+    from reportlab.platypus import Table, TableStyle, Paragraph, Spacer, SimpleDocTemplate
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+    from io import BytesIO
+    import textwrap
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, 
+                           leftMargin=20*mm, rightMargin=20*mm,
+                           topMargin=20*mm, bottomMargin=20*mm)
+    
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Estilos personalizados
+    title_style = ParagraphStyle(
+        'Title',
+        parent=styles['Heading1'],
+        fontSize=16,
+        alignment=TA_CENTER,
+        spaceAfter=12
+    )
+    
+    header_style = ParagraphStyle(
+        'Header',
+        parent=styles['Heading2'],
+        fontSize=12,
+        alignment=TA_LEFT,
+        spaceAfter=6
+    )
+    
+    # Título
+    title = Paragraph(f"Relatório Financeiro - Caixa #{data['caixa_id']}", title_style)
+    elements.append(title)
+    elements.append(Spacer(1, 12))
+    
+    # Informações do caixa
+    info_data = [
+        [Paragraph('<b>Operador:</b>', styles['Normal']), data['operador']],
+        [Paragraph('<b>Data Abertura:</b>', styles['Normal']), data['data_abertura']],
+        [Paragraph('<b>Data Fechamento:</b>', styles['Normal']), data['data_fechamento']],
+        [Paragraph('<b>Status:</b>', styles['Normal']), data['status']]
+    ]
+    
+    info_table = Table(info_data, colWidths=[50*mm, 100*mm])
+    info_table.setStyle(TableStyle([
+        ('FONT', (0, 0), (-1, -1), 'Helvetica', 10),
+        ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+        ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    elements.append(info_table)
+    elements.append(Spacer(1, 20))
+    
+    # Tabela de movimentações
+    mov_headers = [
+        Paragraph('<b>Data</b>', styles['Normal']),
+        Paragraph('<b>Tipo</b>', styles['Normal']),
+        Paragraph('<b>Categoria</b>', styles['Normal']),
+        Paragraph('<b>Valor (R$)</b>', styles['Normal']),
+        Paragraph('<b>Descrição</b>', styles['Normal']),
+        Paragraph('<b>Cliente</b>', styles['Normal']),
+        Paragraph('<b>Formas Pagamento</b>', styles['Normal'])
+    ]
+    
+    mov_data = [mov_headers]
+    
+    for mov in data['movimentacoes']:
+        # Formatar formas de pagamento com quebra de linha
+        formas_pagamento = []
+        for fp in mov['formas_pagamento']:
+            formas_pagamento.append(f"{fp['forma']}: R$ {fp['valor']:.2f}")
+        formas_pagamento_text = "<br/>".join(formas_pagamento) if formas_pagamento else "N/A"
+        
+        # Criar parágrafos para permitir quebra de texto
+        mov_data.append([
+            Paragraph(mov['data'], styles['Normal']),
+            Paragraph(mov['tipo'].capitalize(), styles['Normal']),
+            Paragraph(mov['categoria'].capitalize() if mov['categoria'] != 'N/A' else 'N/A', styles['Normal']),
+            Paragraph(f"{mov['valor']:.2f}", styles['Normal']),
+            Paragraph(mov['descricao'], styles['Normal']),
+            Paragraph(mov['cliente_nome'] or 'N/A', styles['Normal']),
+            Paragraph(formas_pagamento_text, styles['Normal'])
+        ])
+    
+    # Calcular larguras das colunas (proporcionais ao conteúdo)
+    col_widths = [25*mm, 20*mm, 25*mm, 20*mm, 40*mm, 30*mm, 40*mm]
+    
+    # Criar tabela com as movimentações
+    mov_table = Table(mov_data, colWidths=col_widths, repeatRows=1)
+    
+    # Estilo da tabela
+    mov_table.setStyle(TableStyle([
+        ('FONT', (0, 0), (-1, -1), 'Helvetica', 8),
+        ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 8),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('ALIGN', (3, 0), (3, -1), 'RIGHT'),
+        ('ALIGN', (0, 0), (2, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.whitesmoke]),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.grey),
+    ]))
+    
+    elements.append(mov_table)
+    
+    # Gerar PDF
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue()

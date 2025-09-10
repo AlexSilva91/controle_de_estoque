@@ -62,6 +62,7 @@ from app.schemas import (
     ClienteCreate, ClienteUpdate, FinanceiroCreate, FinanceiroUpdate
 )
 from app.utils.format_data_moeda import formatar_data_br, format_number
+from app.utils.nfce import generate_caixa_financeiro_pdf
 from app.utils.signature import SignatureLine
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -3125,7 +3126,100 @@ def get_caixa_financeiro(caixa_id):
         }), 500
     finally:
         session.close()
+  
+@admin_bp.route('/caixas/<int:caixa_id>/financeiro/pdf')
+@login_required
+@admin_required
+def get_caixa_financeiro_pdf(caixa_id):
+    session = Session(db.engine)
+    try:
+        # Busca informações do caixa
+        caixa = session.query(Caixa).filter_by(id=caixa_id).first()
+        if not caixa:
+            return jsonify({'success': False, 'error': 'Caixa não encontrado'}), 404
+            
+        # Busca todas as movimentações financeiras do caixa
+        movimentacoes = session.query(Financeiro)\
+            .filter_by(caixa_id=caixa_id)\
+            .order_by(Financeiro.data.desc())\
+            .all()
         
+        # Busca informações adicionais para o PDF
+        operador_nome = caixa.operador.nome if caixa.operador else "Desconhecido"
+        data_abertura = caixa.data_abertura.strftime('%d/%m/%Y %H:%M') if caixa.data_abertura else "N/A"
+        data_fechamento = caixa.data_fechamento.strftime('%d/%m/%Y %H:%M') if caixa.data_fechamento else "N/A"
+        
+        # Prepara dados para o PDF
+        pdf_data = {
+            'caixa_id': caixa_id,
+            'operador': operador_nome,
+            'data_abertura': data_abertura,
+            'data_fechamento': data_fechamento,
+            'status': caixa.status.value,
+            'movimentacoes': []
+        }
+        
+        for mov in movimentacoes:
+            # Busca informações do cliente
+            cliente_nome = None
+            if mov.cliente_id:
+                cliente = session.query(Cliente).get(mov.cliente_id)
+                cliente_nome = cliente.nome if cliente else None
+            
+            # Busca formas de pagamento detalhadas
+            formas_pagamento_detalhadas = []
+            if mov.nota_fiscal_id:
+                pagamentos = session.query(PagamentoNotaFiscal)\
+                    .filter_by(nota_fiscal_id=mov.nota_fiscal_id)\
+                    .all()
+                for p in pagamentos:
+                    formas_pagamento_detalhadas.append({
+                        'forma': p.forma_pagamento.value,
+                        'valor': float(p.valor)
+                    })
+            
+            if mov.conta_receber_id:
+                pagamentos = session.query(PagamentoContaReceber)\
+                    .filter_by(conta_id=mov.conta_receber_id)\
+                    .all()
+                for p in pagamentos:
+                    formas_pagamento_detalhadas.append({
+                        'forma': p.forma_pagamento.value,
+                        'valor': float(p.valor_pago)
+                    })
+            
+            pdf_data['movimentacoes'].append({
+                'data': mov.data.strftime('%d/%m/%Y %H:%M'),
+                'tipo': mov.tipo.value,
+                'categoria': mov.categoria.value if mov.categoria else 'N/A',
+                'valor': float(mov.valor),
+                'descricao': mov.descricao or 'N/A',
+                'cliente_nome': cliente_nome,
+                'formas_pagamento': formas_pagamento_detalhadas,
+                'nota_fiscal_id': mov.nota_fiscal_id
+            })
+        
+        # Gera o PDF
+        pdf_content = generate_caixa_financeiro_pdf(pdf_data)
+        
+        return Response(
+            pdf_content,
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename=caixa_{caixa_id}_financeiro.pdf'
+            }
+        )
+        
+    except Exception as e:
+        session.rollback()
+        print(f"Erro ao gerar PDF do caixa {caixa_id}: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno ao gerar PDF'
+        }), 500
+    finally:
+        session.close()
+
 @admin_bp.route('/vendas/<int:venda_id>/atualizar-pagamentos', methods=['POST'])
 @login_required
 @admin_required
