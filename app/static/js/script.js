@@ -1176,7 +1176,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const row = document.createElement('tr');
             row.innerHTML = `
-              <td>${produto.id}</td>
+              <td>${produto.codigo}</td>
               <td>${produto.nome}</td>
               <td>${produto.tipo}</td>
               <td>${produto.unidade}</td>

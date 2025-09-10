@@ -1013,6 +1013,7 @@ def remover_produto(produto_id):
 
     except Exception as e:
         db.session.rollback()
+        print(e)
         return jsonify({'success': False, 'message': 'Erro ao remover produto.'}), 500
 
 @admin_bp.route('/produtos/<int:produto_id>/movimentacao', methods=['POST'])
@@ -3839,6 +3840,7 @@ def relatorio_vendas_produtos():
         ).group_by(
             Produto.id
         ).order_by(
+            Produto.nome.asc(),
             func.sum(NotaFiscalItem.quantidade).desc()
         )
         
@@ -4550,8 +4552,11 @@ def contas_receber():
     else:
         # Se nenhum status selecionado, retorna todas não quitadas
         query = query.filter(ContaReceber.status != StatusPagamento.quitado)
-
-    contas = query.order_by(ContaReceber.data_vencimento.asc()).all()
+        
+    contas = query.order_by(
+        Cliente.nome.asc(),           # Ordena pelo nome do cliente (A-Z)
+        ContaReceber.data_vencimento.asc()  # Ordena por data de vencimento caso nomes sejam iguais
+    ).all()
 
     contas_json = [
         {

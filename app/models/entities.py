@@ -422,6 +422,31 @@ class Produto(Base):
         back_populates="produtos"
     )
 
+    @classmethod
+    def gerar_codigo_sequencial(cls):
+        """
+        Gera um código sequencial único para produtos, preenchendo lacunas.
+        Exemplo: se existem códigos 1,2,4,5 -> gera 3
+        """
+        # Busca todos os códigos existentes que sejam numéricos
+        produtos = cls.query.filter(cls.codigo.isnot(None)).all()
+        
+        numeros_existentes = set()
+        for p in produtos:
+            if p.codigo:
+                try:
+                    numero = int(p.codigo)
+                    numeros_existentes.add(numero)
+                except ValueError:
+                    continue  # ignora códigos não numéricos existentes
+
+        # Começa do 1 e procura o menor número disponível
+        novo_numero = 1
+        while novo_numero in numeros_existentes:
+            novo_numero += 1
+
+        return str(novo_numero)
+
 # --------------------
 # Cliente
 # --------------------

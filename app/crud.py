@@ -232,7 +232,9 @@ def get_user_by_id(db: Session, user_id: int):
     return db.query(entities.Usuario).filter(entities.Usuario.id == user_id).first()
 
 def get_usuarios(db: Session):
-    return db.query(entities.Usuario).all()
+    return db.query(entities.Usuario)\
+             .order_by(entities.Usuario.nome.asc())\
+             .all()
 
 def create_user(db: Session, user: schemas.UsuarioCreate):
     if not validar_cpf(user.cpf):
@@ -316,13 +318,16 @@ def get_produto(db: Session, produto_id: int):
     return db.query(entities.Produto).filter(entities.Produto.id == produto_id, entities.Produto.ativo == True).first()
 
 def get_produtos(db: Session):
-    return db.query(entities.Produto).filter(entities.Produto.ativo == True).all()
+    return db.query(entities.Produto)\
+             .filter(entities.Produto.ativo == True)\
+             .order_by(entities.Produto.nome.asc())\
+             .all()
 
 def create_produto(db: Session, produto: schemas.ProdutoCreate):
-    if produto.codigo:
-        existing = db.query(entities.Produto).filter(entities.Produto.codigo == produto.codigo).first()
-        if existing:
-            raise ValueError("Código de produto já cadastrado.")
+    # if produto.codigo:
+    #     existing = db.query(entities.Produto).filter(entities.Produto.codigo == produto.codigo).first()
+    #     if existing:
+    #         raise ValueError("Código de produto já cadastrado.")
     
     if produto.unidade not in [u.value for u in UnidadeMedida]:
         raise ValueError(f"Unidade de medida inválida. Deve ser um dos: {[u.value for u in UnidadeMedida]}")
@@ -331,7 +336,7 @@ def create_produto(db: Session, produto: schemas.ProdutoCreate):
         raise ValueError("Valor unitário deve ser maior que zero.")
     
     db_produto = entities.Produto(
-        codigo=produto.codigo,
+        codigo=entities.Produto.gerar_codigo_sequencial(),
         nome=produto.nome,
         tipo=produto.tipo,
         marca=produto.marca,
