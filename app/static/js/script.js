@@ -1164,7 +1164,9 @@ document.addEventListener('DOMContentLoaded', function() {
   async function loadProdutosData() {
     try {
       const searchText = document.getElementById('searchProduto')?.value.toLowerCase() || '';
-      const data = await fetchWithErrorHandling('/admin/produtos');
+      const incluirInativos = document.getElementById('mostrarInativos')?.checked ? 'true' : 'false';
+      
+      const data = await fetchWithErrorHandling(`/admin/produtos?incluir_inativos=${incluirInativos}`);
       
       if (data.success) {
         const produtosTable = document.querySelector('#produtosTable tbody');
@@ -1177,7 +1179,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const row = document.createElement('tr');
             row.innerHTML = `
               <td>${produto.codigo}</td>
-              <td>${produto.nome}</td>
+              <td>${produto.nome} ${!produto.ativo ? '<span class="badge badge-danger">Inativo</span>' : ''}</td>
               <td>${produto.tipo}</td>
               <td>${produto.unidade}</td>
               <td>${produto.valor}</td>
@@ -1209,6 +1211,9 @@ document.addEventListener('DOMContentLoaded', function() {
       showFlashMessage('error', 'Erro ao carregar lista de produtos');
     }
   }
+  
+  // recarregar lista ao clicar no refresh ou trocar checkbox
+  document.getElementById('mostrarInativos').addEventListener('change', loadProdutosData);
 
   function setupProdutoActions() {
     document.querySelectorAll('.editar-produto').forEach(btn => {
@@ -1699,7 +1704,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Event Listeners para Produtos
   document.getElementById('searchProduto')?.addEventListener('input', loadProdutosData);
-  document.getElementById('refreshProdutos')?.addEventListener('click', loadProdutosData);
+  document.addEventListener('DOMContentLoaded', function() {
+      // Registrar eventos após o DOM estar totalmente carregado
+      const refreshButton = document.getElementById('refreshProdutos');
+      if (refreshButton) {
+          refreshButton.addEventListener('click', function(e) {
+              e.preventDefault();
+              console.log('Botão refresh clicado!'); // Debug
+              loadProdutosData();
+          });
+      }
+  });
   document.getElementById('addProduto')?.addEventListener('click', () => {
     const produtoForm = document.getElementById('produtoForm');
     if (produtoForm) produtoForm.reset();
@@ -3381,7 +3396,13 @@ async function openVendasFormaPagamentoModal(caixaId, formaPagamento) {
                     openDetalhesVendaModal(vendaId);
                 });
             });
-            
+            // botão PDF
+            const btnExportarPdf = document.getElementById('btnExportarPdf');
+            btnExportarPdf.onclick = () => {
+                const url = `/admin/caixas/${caixaId}/vendas-por-pagamento/pdf?forma_pagamento=${formaPagamento}`;
+                window.open(url, '_blank');
+            };
+
             // Abre o modal
             openModal(modal);
         } else {

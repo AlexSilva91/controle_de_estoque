@@ -317,11 +317,11 @@ def delete_user(db: Session, user_id: int):
 def get_produto(db: Session, produto_id: int):
     return db.query(entities.Produto).filter(entities.Produto.id == produto_id, entities.Produto.ativo == True).first()
 
-def get_produtos(db: Session):
-    return db.query(entities.Produto)\
-             .filter(entities.Produto.ativo == True)\
-             .order_by(entities.Produto.nome.asc())\
-             .all()
+def get_produtos(db: Session, incluir_inativos: bool = False):
+    query = db.query(entities.Produto)
+    if not incluir_inativos:
+        query = query.filter(entities.Produto.ativo == True)
+    return query.order_by(entities.Produto.nome.asc()).all()
 
 def create_produto(db: Session, produto: schemas.ProdutoCreate):
     # if produto.codigo:

@@ -365,9 +365,10 @@
                                 <i class="fas fa-plus"></i>
                                 <span>Novo Produto</span>
                             </button>
-                            <button class="btn btn-outline" id="refreshProdutos" aria-label="Atualizar">
-                                <i class="fas fa-sync-alt"></i>
-                            </button>
+                            <label class="ml-2 d-flex align-items-center">
+                                <input type="checkbox" id="mostrarInativos" class="form-check-input">
+                                <span class="ml-1">Mostrar inativos</span>
+                            </label>
                         </div>
                     </div>
 
@@ -1935,6 +1936,9 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                    <button id="btnExportarPdf" type="button" class="btn btn-primary">
+                        <i class="fas fa-file-pdf"></i> Exportar PDF
+                    </button>
                 </div>
             </div>
         </div>

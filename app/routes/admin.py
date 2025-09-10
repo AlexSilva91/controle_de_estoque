@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload
 import traceback
 from flask import send_file, make_response, jsonify
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, HRFlowable
@@ -698,7 +698,9 @@ def remover_cliente(cliente_id):
 def listar_produtos():
     try:
         search = request.args.get('search', '').lower()
-        produtos = get_produtos(db.session)
+        incluir_inativos = request.args.get('incluir_inativos', 'false').lower() == 'true'
+
+        produtos = get_produtos(db.session, incluir_inativos=incluir_inativos)
         
         result = []
         for produto in produtos:
@@ -716,7 +718,8 @@ def listar_produtos():
                 'estoque_loja': f"{produto.estoque_loja:,.2f}",
                 'estoque_deposito': f"{produto.estoque_deposito:,.2f}",
                 'estoque_fabrica': f"{produto.estoque_fabrica:,.2f}",
-                'marca': produto.marca or ''
+                'marca': produto.marca or '',
+                'ativo': produto.ativo
             })
         
         return jsonify({'success': True, 'produtos': result})
@@ -3232,6 +3235,91 @@ def get_vendas_por_pagamento(caixa_id):
         return jsonify({'success': False, 'error': 'Erro interno'}), 500
     finally:
         session.close()
+
+@admin_bp.route('/caixas/<int:caixa_id>/vendas-por-pagamento/pdf')
+@login_required
+@admin_required
+def get_vendas_por_pagamento_pdf(caixa_id):
+    session = Session(db.engine)
+    try:
+        forma_pagamento = request.args.get('forma_pagamento')
+        if not forma_pagamento:
+            return jsonify({'success': False, 'error': 'Forma de pagamento não especificada'}), 400
+
+        # Busca vendas
+        vendas = session.query(NotaFiscal)\
+            .join(PagamentoNotaFiscal)\
+            .filter(
+                NotaFiscal.caixa_id == caixa_id,
+                NotaFiscal.status == StatusNota.emitida,
+                PagamentoNotaFiscal.forma_pagamento == forma_pagamento
+            )\
+            .all()
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(A4),
+            rightMargin=20, leftMargin=20,
+            topMargin=20, bottomMargin=20
+        )
+        styles = getSampleStyleSheet()
+        elements = []
+
+        # Título
+        elements.append(Paragraph(f"Relatório de Vendas - {forma_pagamento}", styles['Title']))
+        elements.append(Spacer(1, 12))
+
+        # Cabeçalho da tabela
+        data = [["Data", "Nota Fiscal", "Cliente", "Valor Total", "Valor Pago"]]
+
+        # Preencher linhas
+        for venda in vendas:
+            valor_pago = session.query(func.sum(PagamentoNotaFiscal.valor))\
+                .filter(
+                    PagamentoNotaFiscal.nota_fiscal_id == venda.id,
+                    PagamentoNotaFiscal.forma_pagamento == forma_pagamento
+                )\
+                .scalar() or 0.0
+
+            data.append([
+                venda.data_emissao.strftime("%d/%m/%Y %H:%M"),
+                str(venda.id),
+                venda.cliente.nome if venda.cliente else "Não informado",
+                f"R$ {venda.valor_total:,.2f}",
+                f"R$ {valor_pago:,.2f}"
+            ])
+
+        # Criar tabela
+        table = Table(data, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#f2f2f2")),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,0), 11),
+            ('BOTTOMPADDING', (0,0), (-1,0), 8),
+            ('GRID', (0,0), (-1,-1), 0.25, colors.grey),
+        ]))
+        elements.append(table)
+
+        # Montar PDF
+        doc.build(elements)
+        pdf = buffer.getvalue()
+        buffer.close()
+
+        response = make_response(pdf)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=vendas_{forma_pagamento}.pdf'
+        return response
+
+    except Exception as e:
+        session.rollback()
+        print(f"Erro ao gerar PDF de vendas: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Erro interno ao gerar PDF'}), 500
+    finally:
+        session.close()
+
 
 @admin_bp.route('/vendas/<int:venda_id>/detalhes')
 @login_required
