@@ -1,81 +1,76 @@
+import os
 import time
 import logging
 from logging.handlers import RotatingFileHandler
-from flask import Flask, request, g, send_from_directory
+from flask import Flask, abort, request, g, send_from_directory, render_template
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from werkzeug.exceptions import HTTPException
+from sqlalchemy.orm import Session
+from datetime import datetime
 from config import config
-from .models import db
+from app.models.entities import Log, Usuario
+from app.models import db
 from .routes import init_app
-from app.models.entities import Usuario
-import os
 
-def create_app(config_name='development'):
-    app = Flask(__name__)
-    app.config.from_object(config[config_name])
-
-    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
-    app.jinja_env.cache = {}
-
-    configure_logging(app)
-
-    db.init_app(app)
-    Migrate(app, db)
-
-    login_manager = LoginManager()
-    login_manager.init_app(app)
-    login_manager.login_view = "auth.login"
-
-    @login_manager.user_loader
-    def load_user(user_id):
-        return Usuario.query.get(int(user_id))
-
-    init_app(app)
-
-    @app.route('/favicon.ico')
-    def favicon():
-        return send_from_directory(
-            os.path.join(app.root_path, 'static'),
-            'favicon.ico',
-            mimetype='image/vnd.microsoft.icon'
-        )
-        
-    @app.after_request
-    def add_no_cache_headers(response):
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0, private"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
-        return response
-
-    return app
+# --------------------
+# Handler customizado para gravar logs no DB
+# --------------------
+class DBHandler(logging.Handler):
+    """Handler que grava logs diretamente no banco de dados."""
+    def emit(self, record):
+        try:
+            log_entry = Log(
+                nivel=record.levelname,
+                modulo=record.module,
+                mensagem=record.getMessage(),
+                criado_em=datetime.now()
+            )
+            session = Session(db.engine)
+            session.add(log_entry)
+            session.commit()
+            session.close()
+        except Exception:
+            print("Falha ao gravar log no DB:", record.getMessage())
 
 
+# --------------------
+# Configuração de logging
+# --------------------
 def configure_logging(app):
-    """Configura logging global com access log e tratamento diferenciado de erros."""
-
-    log_formatter = logging.Formatter(
+    formatter = logging.Formatter(
         "[%(asctime)s] [%(levelname)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"
     )
 
+    # --- Arquivo ---
     file_handler = RotatingFileHandler(
         "logs/app.log", maxBytes=5*1024*1024, backupCount=5, encoding="utf-8"
     )
-    file_handler.setFormatter(log_formatter)
+    file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.INFO)
 
+    # --- Console ---
     console_handler = logging.StreamHandler()
-    console_handler.setFormatter(log_formatter)
+    console_handler.setFormatter(formatter)
     console_handler.setLevel(logging.DEBUG)
-    
+
+    # --- DB ---
+    db_handler = DBHandler()
+    db_handler.setLevel(logging.INFO)
+
+    # Limpa handlers antigos
     if app.logger.hasHandlers():
         app.logger.handlers.clear()
 
     app.logger.setLevel(logging.DEBUG)
     app.logger.addHandler(file_handler)
     app.logger.addHandler(console_handler)
+    app.logger.addHandler(db_handler)
 
+    # --------------------
+    # Timer e log detalhado de requisições
+    # --------------------
     @app.before_request
     def start_timer():
         g.start_time = time.time()
@@ -89,18 +84,145 @@ def configure_logging(app):
         status = response.status_code
         size = response.calculate_content_length() or 0
 
-        app.logger.info(f'{ip} "{method} {path}" {status} {size}B {duration}s')
+        # Dados da requisição
+        request_data = {
+            "args": request.args.to_dict(),
+            "form": request.form.to_dict(),
+            "json": request.get_json(silent=True)
+        }
 
+        # Corpo da resposta (limitado)
+        try:
+            response_body = response.get_data(as_text=True)
+            if len(response_body) > 1000:
+                response_body = response_body[:1000] + "...[truncated]"
+        except Exception:
+            response_body = "<não capturado>"
+
+        extra = {
+            "ip": ip,
+            "method": method,
+            "path": path,
+            "status": status,
+            "duration_s": duration,
+            "request": request_data,
+            "response": response_body,
+            "size_bytes": size
+        }
+
+        app.logger.info(f'{method} {path} {status}', extra={'extra_data': extra})
         return response
 
+
+# --------------------
+# Criação do app Flask
+# --------------------
+def create_app(config_name='development'):
+    app = Flask(__name__)
+    app.config.from_object(config[config_name])
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+    app.jinja_env.cache = {}
+
+    # Logging
+    configure_logging(app)
+
+    # DB e Migrations
+    db.init_app(app)
+    Migrate(app, db)
+
+    # Login
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    login_manager.login_view = "auth.login"
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        return Usuario.query.get(int(user_id))
+
+    # Rotas
+    init_app(app)
+
+    # Favicon
+    @app.route('/favicon.ico')
+    def favicon():
+        return send_from_directory(
+            os.path.join(app.root_path, 'static'),
+            'favicon.ico',
+            mimetype='image/vnd.microsoft.icon'
+        )
+
+    # No-cache
+    @app.after_request
+    def add_no_cache_headers(response):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0, private"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
+    # --------------------
+    # Tratamento de erros
+    # --------------------
+    @app.errorhandler(400)
+    def bad_request_error(e):
+        app.logger.warning(f"400 Bad Request em {request.path}: {e}")
+        return render_template("errors/400.html"), 400
+
+    @app.errorhandler(403)
+    def forbidden_error(e):
+        app.logger.warning(f"403 Forbidden em {request.path}: {e}")
+        return render_template("errors/403.html"), 403
+
+    @app.errorhandler(404)
+    def not_found_error(e):
+        app.logger.warning(f"404 Not Found em {request.path}: {e}")
+        return render_template("errors/404.html"), 404
+
+    @app.errorhandler(500)
+    def internal_error(e):
+        app.logger.exception(f"500 Internal Server Error em {request.path}: {e}")
+        return render_template("errors/500.html"), 500
+
+    # Tratamento de indisponibilidade
+    @app.errorhandler(ConnectionError)
+    @app.errorhandler(OSError)
+    @app.errorhandler(TimeoutError)
+    def service_unavailable_error(e):
+        app.logger.error(f"Serviço indisponível: {e}")
+        return render_template("errors/503.html"), 503
+
+    # Captura global de exceções
     @app.errorhandler(Exception)
     def handle_exception(e):
         if isinstance(e, HTTPException):
             if request.path == '/favicon.ico':
-                return '', 204  
-
+                return '', 204
             app.logger.warning(f"HTTP {e.code} em {request.path}: {e.description}")
             return e
 
         app.logger.exception("Erro não tratado:")
-        return "Erro interno no servidor", 500
+        return render_template("errors/500.html"), 500
+
+    # --------------------
+    # Rotas de teste de erro
+    # --------------------
+    @app.route("/test-400")
+    def test_400():
+        abort(400, description="Teste de Bad Request")
+
+    @app.route("/test-403")
+    def test_403():
+        abort(403, description="Teste de Forbidden")
+
+    @app.route("/test-404")
+    def test_404():
+        abort(404, description="Teste de Not Found")
+
+    @app.route("/test-500")
+    def test_500():
+        raise Exception("Teste de Internal Server Error")
+
+    @app.route("/test-503")
+    def test_503():
+        raise ConnectionError("Teste de Serviço Indisponível")
+
+    return app

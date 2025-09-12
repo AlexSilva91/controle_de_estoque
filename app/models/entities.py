@@ -763,3 +763,14 @@ class Financeiro(Base):
             'caixa_id': self.caixa_id,
             'conta_receber_id': self.conta_receber_id
         }
+        
+# --------------------
+# Tabela de logs
+# --------------------
+class Log(Base):
+    __tablename__ = "logs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nivel = Column(String(20), nullable=False)
+    modulo = Column(String(100), nullable=True)
+    mensagem = Column(Text, nullable=False)
+    criado_em = Column(DateTime, default=datetime.now, nullable=False)
