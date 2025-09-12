@@ -323,6 +323,16 @@ def get_produtos(db: Session, incluir_inativos: bool = False):
         query = query.filter(entities.Produto.ativo == True)
     return query.order_by(entities.Produto.nome.asc()).all()
 
+def buscar_produto_por_nome_unidade(db: Session, nome: str, unidade: str):
+    """
+    Busca produto pelo nome e unidade exatos
+    """
+    return db.query(entities.Produto).filter(
+        func.lower(entities.Produto.nome) == func.lower(nome),
+        entities.Produto.unidade == unidade,
+        entities.Produto.ativo == True
+    ).first()
+
 def create_produto(db: Session, produto: schemas.ProdutoCreate):
     # if produto.codigo:
     #     existing = db.query(entities.Produto).filter(entities.Produto.codigo == produto.codigo).first()

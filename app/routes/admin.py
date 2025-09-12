@@ -733,7 +733,108 @@ def listar_produtos():
 def criar_produto():
     try:
         data = request.get_json()
+        usuario_id = current_user.id  # ID do usuário logado
 
+        # VERIFICAÇÃO DE PRODUTO EXISTENTE (NOME + UNIDADE)
+        nome = data['nome']
+        unidade = data['unidade']
+        
+        # Buscar produto existente com mesmo nome e unidade
+        produto_existente = db.session.query(Produto).filter(
+            func.lower(Produto.nome) == func.lower(nome),
+            Produto.unidade == unidade,
+            Produto.ativo == True
+        ).first()
+
+        if produto_existente:
+            # Calcular quantidades adicionadas
+            estoque_loja_add = Decimal(data.get('estoque_loja', 0))
+            estoque_deposito_add = Decimal(data.get('estoque_deposito', 0))
+            estoque_fabrica_add = Decimal(data.get('estoque_fabrica', 0))
+            
+            # Atualizar estoques
+            novo_estoque_loja = produto_existente.estoque_loja + estoque_loja_add
+            novo_estoque_deposito = produto_existente.estoque_deposito + estoque_deposito_add
+            novo_estoque_fabrica = produto_existente.estoque_fabrica + estoque_fabrica_add
+            
+            update_data = {
+                'estoque_loja': novo_estoque_loja,
+                'estoque_deposito': novo_estoque_deposito,
+                'estoque_fabrica': novo_estoque_fabrica
+            }
+            
+            if 'valor_unitario_compra' in data:
+                update_data['valor_unitario_compra'] = Decimal(data['valor_unitario_compra'])
+            
+            produto_update = ProdutoUpdate(**update_data)
+            produto = update_produto(db.session, produto_existente.id, produto_update)
+            
+            # REGISTRAR MOVIMENTAÇÃO DE ENTRADA PARA PRODUTO EXISTENTE (SEM VINCULAR A CAIXA)
+            if estoque_loja_add > 0:
+                movimentacao =MovimentacaoEstoque(
+                    produto_id=produto.id,
+                    usuario_id=usuario_id,
+                    caixa_id=None,  # Removido o vínculo com caixa
+                    tipo=TipoMovimentacao.entrada,
+                    estoque_destino=TipoEstoque.loja,
+                    quantidade=estoque_loja_add,
+                    valor_unitario=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
+                    data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                    observacao=f"Entrada de estoque - produto existente"
+                )
+                db.session.add(movimentacao)
+            
+            if estoque_deposito_add > 0:
+                movimentacao = MovimentacaoEstoque(
+                    produto_id=produto.id,
+                    usuario_id=usuario_id,
+                    caixa_id=None,  # Removido o vínculo com caixa
+                    tipo=TipoMovimentacao.entrada,
+                    estoque_destino=TipoEstoque.deposito,
+                    quantidade=estoque_deposito_add,
+                    valor_unitario=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
+                    data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                    observacao=f"Entrada de estoque - produto existente"
+                )
+                db.session.add(movimentacao)
+            
+            if estoque_fabrica_add > 0:
+                movimentacao = MovimentacaoEstoque(
+                    produto_id=produto.id,
+                    usuario_id=usuario_id,
+                    caixa_id=None,  # Removido o vínculo com caixa
+                    tipo=TipoMovimentacao.entrada,
+                    estoque_destino=TipoEstoque.fabrica,
+                    quantidade=estoque_fabrica_add,
+                    valor_unitario=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
+                    data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                    observacao=f"Entrada de estoque - produto existente"
+                )
+                db.session.add(movimentacao)
+            
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'Produto existente atualizado com sucesso',
+                'produto': {
+                    'id': produto.id,
+                    'nome': produto.nome,
+                    'tipo': produto.tipo,
+                    'unidade': produto.unidade.value,
+                    'valor_unitario': str(produto.valor_unitario),
+                    'valor_unitario_compra': str(produto.valor_unitario_compra),
+                    'valor_total_compra': str(produto.valor_total_compra),
+                    'imcs': str(produto.imcs),
+                    'estoque_loja': str(produto.estoque_loja),
+                    'estoque_deposito': str(produto.estoque_deposito),
+                    'estoque_fabrica': str(produto.estoque_fabrica),
+                    'estoque_minimo': str(produto.estoque_minimo),
+                    'action': 'updated'
+                }
+            })
+
+        # Se não existe, criar novo produto
         produto_data = ProdutoCreate(
             codigo=data.get('codigo'),
             nome=data['nome'],
@@ -753,6 +854,56 @@ def criar_produto():
         )
 
         produto = create_produto(db.session, produto_data)
+        
+        # REGISTRAR MOVIMENTAÇÃO DE ENTRADA PARA NOVO PRODUTO (SEM VINCULAR A CAIXA)
+        estoque_loja = Decimal(data.get('estoque_loja', 0))
+        estoque_deposito = Decimal(data.get('estoque_deposito', 0))
+        estoque_fabrica = Decimal(data.get('estoque_fabrica', 0))
+        
+        if estoque_loja > 0:
+            movimentacao = MovimentacaoEstoque(
+                produto_id=produto.id,
+                usuario_id=usuario_id,
+                caixa_id=None,  # Removido o vínculo com caixa
+                tipo=TipoMovimentacao.entrada,
+                estoque_destino=TipoEstoque.loja,
+                quantidade=estoque_loja,
+                valor_unitario=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
+                data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                observacao=f"Entrada de estoque - novo produto"
+            )
+            db.session.add(movimentacao)
+        
+        if estoque_deposito > 0:
+            movimentacao = MovimentacaoEstoque(
+                produto_id=produto.id,
+                usuario_id=usuario_id,
+                caixa_id=None,  # Removido o vínculo com caixa
+                tipo=TipoMovimentacao.entrada,
+                estoque_destino=TipoEstoque.deposito,
+                quantidade=estoque_deposito,
+                valor_unitario=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
+                data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                observacao=f"Entrada de estoque - novo produto"
+            )
+            db.session.add(movimentacao)
+        
+        if estoque_fabrica > 0:
+            movimentacao = MovimentacaoEstoque(
+                produto_id=produto.id,
+                usuario_id=usuario_id,
+                caixa_id=None,  # Removido o vínculo com caixa
+                tipo=TipoMovimentacao.entrada,
+                estoque_destino=TipoEstoque.fabrica,
+                quantidade=estoque_fabrica,
+                valor_unitario=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
+                data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                observacao=f"Entrada de estoque - novo produto"
+            )
+            db.session.add(movimentacao)
+        
+        db.session.commit()
+
         return jsonify({
             'success': True,
             'message': 'Produto criado com sucesso',
@@ -768,10 +919,13 @@ def criar_produto():
                 'estoque_loja': str(produto.estoque_loja),
                 'estoque_deposito': str(produto.estoque_deposito),
                 'estoque_fabrica': str(produto.estoque_fabrica),
-                'estoque_minimo': str(produto.estoque_minimo)
+                'estoque_minimo': str(produto.estoque_minimo),
+                'action': 'created'
             }
         })
     except Exception as e:
+        print(e)
+        db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
 
 def to_decimal_or_none(value):

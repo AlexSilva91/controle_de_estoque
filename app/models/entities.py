@@ -480,7 +480,7 @@ class MovimentacaoEstoque(Base):
     produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
-    caixa_id = Column(Integer, ForeignKey("caixas.id"), nullable=False)
+    caixa_id = Column(Integer, ForeignKey("caixas.id"), nullable=True)
     tipo = Column(Enum(TipoMovimentacao), nullable=False)
     estoque_origem = Column(Enum(TipoEstoque), nullable=True)
     estoque_destino = Column(Enum(TipoEstoque), nullable=True)
