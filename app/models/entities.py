@@ -767,10 +767,20 @@ class Financeiro(Base):
 # --------------------
 # Tabela de logs
 # --------------------
-class Log(Base):
-    __tablename__ = "logs"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    nivel = Column(String(20), nullable=False)
-    modulo = Column(String(100), nullable=True)
-    mensagem = Column(Text, nullable=False)
-    criado_em = Column(DateTime, default=datetime.now, nullable=False)
+class Log(db.Model):
+    __tablename__ = 'logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nivel = db.Column(db.String(20), nullable=False)
+    modulo = db.Column(db.String(100), nullable=False)
+    mensagem = db.Column(db.Text, nullable=False)
+    acao = db.Column(db.String(50))  # Ex: 'criar', 'atualizar', 'deletar', 'login'
+    entidade = db.Column(db.String(50))  # Ex: 'Usuario', 'Produto', 'Cliente'
+    entidade_id = db.Column(db.Integer)  # ID da entidade afetada
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
+    detalhes = db.Column(db.Text)  # JSON ou texto com detalhes da ação
+    ip = db.Column(db.String(45))  # Para armazenar IPv6 se necessário
+    criado_em = db.Column(db.DateTime, default=datetime.now)
+    
+    # Relacionamento opcional
+    usuario = db.relationship('Usuario', backref='logs')

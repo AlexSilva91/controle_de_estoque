@@ -4840,8 +4840,6 @@ def contas_receber():
     status = request.args.get('status')
     
     params = request.args
-    print("[DEBUG] request.args completos:", params)
-
 
     query = ContaReceber.query.join(Cliente)
 
