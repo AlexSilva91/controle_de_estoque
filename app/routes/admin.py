@@ -3475,7 +3475,7 @@ def get_detalhes_venda(venda_id):
     finally:
         session.close()
 
-@admin_bp.route('/caixas/<int:caixa_id>/financeiro/pdf')
+@admin_bp.route('/caixas/<int:caixa_id>/financeiro/movimentacoes/pdf')
 @login_required
 @admin_required
 def gerar_pdf_caixa_financeiro(caixa_id):

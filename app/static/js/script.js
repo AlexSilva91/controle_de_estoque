@@ -3416,7 +3416,7 @@ async function openVendasFormaPagamentoModal(caixaId, formaPagamento) {
 // Configurar botão de PDF de movimentações
 document.getElementById('abrirPdfMovimentacoes')?.addEventListener('click', function() {
     if (caixaIdAtual) {
-        const url = `/admin/caixas/${caixaIdAtual}/financeiro/pdf`;
+        const url = `/admin/caixas/${caixaIdAtual}/financeiro/movimentacoes/pdf`;
         window.open(url, '_blank');
     } else {
         showFlashMessage('error', 'Nenhum caixa selecionado');
