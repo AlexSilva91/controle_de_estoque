@@ -6,32 +6,11 @@ from flask import Flask, abort, request, g, send_from_directory, render_template
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from werkzeug.exceptions import HTTPException
-from sqlalchemy.orm import Session
 from datetime import datetime
 from config import config
-from app.models.entities import Log, Usuario
+from app.models.entities import Usuario
 from app.models import db
 from .routes import init_app
-
-# --------------------
-# Handler customizado para gravar logs no DB
-# --------------------
-class DBHandler(logging.Handler):
-    """Handler que grava logs diretamente no banco de dados."""
-    def emit(self, record):
-        try:
-            log_entry = Log(
-                nivel=record.levelname,
-                modulo=record.module,
-                mensagem=record.getMessage(),
-                criado_em=datetime.now()
-            )
-            session = Session(db.engine)
-            session.add(log_entry)
-            session.commit()
-            session.close()
-        except Exception:
-            print("Falha ao gravar log no DB:", record.getMessage())
 
 
 # --------------------
@@ -55,10 +34,6 @@ def configure_logging(app):
     console_handler.setFormatter(formatter)
     console_handler.setLevel(logging.DEBUG)
 
-    # --- DB ---
-    db_handler = DBHandler()
-    db_handler.setLevel(logging.INFO)
-
     # Limpa handlers antigos
     if app.logger.hasHandlers():
         app.logger.handlers.clear()
@@ -66,7 +41,6 @@ def configure_logging(app):
     app.logger.setLevel(logging.DEBUG)
     app.logger.addHandler(file_handler)
     app.logger.addHandler(console_handler)
-    app.logger.addHandler(db_handler)
 
     # --------------------
     # Timer e log detalhado de requisições
@@ -182,7 +156,6 @@ def create_app(config_name='development'):
         app.logger.exception(f"500 Internal Server Error em {request.path}: {e}")
         return render_template("errors/500.html"), 500
 
-    # Tratamento de indisponibilidade
     @app.errorhandler(ConnectionError)
     @app.errorhandler(OSError)
     @app.errorhandler(TimeoutError)
@@ -190,7 +163,6 @@ def create_app(config_name='development'):
         app.logger.error(f"Serviço indisponível: {e}")
         return render_template("errors/503.html"), 503
 
-    # Captura global de exceções
     @app.errorhandler(Exception)
     def handle_exception(e):
         if isinstance(e, HTTPException):
@@ -202,9 +174,7 @@ def create_app(config_name='development'):
         app.logger.exception("Erro não tratado:")
         return render_template("errors/500.html"), 500
 
-    # --------------------
     # Rotas de teste de erro
-    # --------------------
     @app.route("/test-400")
     def test_400():
         abort(400, description="Teste de Bad Request")
