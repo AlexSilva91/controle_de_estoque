@@ -63,8 +63,10 @@ from app.crud import (
     update_cliente,
     delete_cliente
 )
+import logging
 
 operador_bp = Blueprint('operador', __name__, url_prefix='/operador')
+logger = logging.getLogger(__name__)
 
 def operador_required(f):
     @wraps(f)
@@ -81,6 +83,7 @@ def operador_required(f):
 @login_required
 @operador_required
 def dashboard():
+    logger.info(f"Acessando dashboard do operador: {current_user.nome}")
     return render_template('dashboard_operador.html', nome_usuario=current_user.nome)
 
 # ===== API CLIENTES =====
@@ -108,6 +111,7 @@ def api_create_cliente():
         cliente = ClienteCreate(**data)
         cliente.ativo = True
         db_cliente = create_cliente(db.session, cliente)
+        logger.info(f"Cliente criado com sucesso: {db_cliente.nome} (ID: {db_cliente.id})")
         return jsonify({
             'id': db_cliente.id,
             'nome': db_cliente.nome,
@@ -117,6 +121,7 @@ def api_create_cliente():
             'endereco': db_cliente.endereco
         }), 201
     except ValueError as e:
+        logger.error(f"Erro ao criar cliente: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 @operador_bp.route('/api/clientes/<int:cliente_id>', methods=['PUT'])
@@ -127,6 +132,7 @@ def api_update_cliente(cliente_id):
     try:
         cliente_data = ClienteBase(**data)
         db_cliente = update_cliente(db.session, cliente_id, cliente_data)
+        logger.info(f"Cliente atualizado com sucesso: {db_cliente.nome} (ID: {db_cliente.id})")
         return jsonify({
             'id': db_cliente.id,
             'nome': db_cliente.nome,
@@ -136,6 +142,7 @@ def api_update_cliente(cliente_id):
             'endereco': db_cliente.endereco
         })
     except ValueError as e:
+        logger.error(f"Erro ao atualizar cliente ID {cliente_id}: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 @operador_bp.route('/api/clientes/<int:cliente_id>', methods=['DELETE'])
@@ -144,8 +151,10 @@ def api_update_cliente(cliente_id):
 def api_delete_cliente(cliente_id):
     try:
         success = delete_cliente(db.session, cliente_id)
+        logger.info(f"Cliente ID {cliente_id} deletado com sucesso")
         return jsonify({'success': success}), 200
     except ValueError as e:
+        logger.error(f"Erro ao deletar cliente ID {cliente_id}: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 # ===== API PRODUTOS =====
@@ -187,7 +196,7 @@ def api_get_produtos():
         return jsonify(produtos_formatados)
     
     except Exception as e:
-        app.logger.error(f"Erro ao obter produtos: {str(e)}", exc_info=True)
+        logger.error(f"Erro ao obter produtos: {str(e)}", exc_info=True)
         return jsonify({'error': 'Erro interno ao buscar produtos'}), 500
 
 @operador_bp.route('/api/produtos/<int:produto_id>', methods=['GET'])
@@ -218,11 +227,11 @@ def api_get_produto(produto_id):
                 'atualizado_em': produto.atualizado_em.isoformat() if produto.atualizado_em else None,
                 'sincronizado': produto.sincronizado
             })
-        
+        logger.warning(f"Produto não encontrado: {produto_id}")
         return jsonify({'error': 'Produto não encontrado'}), 404
     
     except Exception as e:
-        app.logger.error(f"Erro ao obter produto ID {produto_id}: {str(e)}", exc_info=True)
+        logger.error(f"Erro ao obter produto ID {produto_id}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Erro interno ao buscar produto'}), 500
 
 # ===== API VENDAS =====
@@ -232,7 +241,7 @@ def api_get_produto(produto_id):
 def api_registrar_venda():
     # Verificação inicial do conteúdo da requisição
     if not request.is_json:
-        app.logger.error("Requisição sem cabeçalho Content-Type: application/json")
+        logger.error("Requisição sem cabeçalho Content-Type: application/json")
         return jsonify({
             'success': False,
             'message': 'Content-Type deve ser application/json'
@@ -241,19 +250,19 @@ def api_registrar_venda():
     try:
         dados_venda = request.get_json()
         if dados_venda is None:
-            app.logger.error("Nenhum dado JSON recebido ou JSON inválido")
+            logger.error("Nenhum dado JSON recebido ou JSON inválido")
             return jsonify({
                 'success': False,
                 'message': 'JSON inválido ou não enviado'
             }), 400
 
-        app.logger.info(f"Dados recebidos: {dados_venda}")
+        logger.info(f"Dados recebidos: {dados_venda}")
 
         # Campos obrigatórios
         required_fields = ['cliente_id', 'itens', 'pagamentos', 'valor_total']
         for field in required_fields:
             if field not in dados_venda:
-                app.logger.error(f"Campo obrigatório faltando: {field}")
+                logger.error(f"Campo obrigatório faltando: {field}")
                 return jsonify({
                     'success': False,
                     'message': f'Campo obrigatório faltando: {field}'
@@ -261,14 +270,14 @@ def api_registrar_venda():
 
         # Validação de tipos
         if not isinstance(dados_venda['itens'], list) or len(dados_venda['itens']) == 0:
-            app.logger.error("Lista de itens inválida ou vazia")
+            logger.error("Lista de itens inválida ou vazia")
             return jsonify({
                 'success': False,
                 'message': 'Lista de itens inválida ou vazia'
             }), 400
 
         if not isinstance(dados_venda['pagamentos'], list) or len(dados_venda['pagamentos']) == 0:
-            app.logger.error("Lista de pagamentos inválida ou vazia")
+            logger.error("Lista de pagamentos inválida ou vazia")
             return jsonify({
                 'success': False,
                 'message': 'Lista de pagamentos inválida ou vazia'
@@ -290,7 +299,7 @@ def api_registrar_venda():
             # O valor recebido é apenas o que não é a prazo
             valor_recebido = valor_a_vista
         except (ValueError, InvalidOperation) as e:
-            app.logger.error(f"Erro na conversão de valores: {str(e)}")
+            logger.error(f"Erro na conversão de valores: {str(e)}")
             return jsonify({
                 'success': False,
                 'message': 'Valores numéricos inválidos'
@@ -299,7 +308,7 @@ def api_registrar_venda():
         # Consultar cliente
         cliente =  Cliente.query.get(cliente_id)
         if not cliente:
-            app.logger.error(f"Cliente não encontrado: ID {cliente_id}")
+            logger.error(f"Cliente não encontrado: ID {cliente_id}")
             return jsonify({
                 'success': False,
                 'message': f'Cliente não encontrado: ID {cliente_id}'
@@ -315,14 +324,14 @@ def api_registrar_venda():
                 
                 produto =  Produto.query.get(produto_id)
                 if not produto:
-                    app.logger.error(f"Produto não encontrado: ID {produto_id}")
+                    logger.error(f"Produto não encontrado: ID {produto_id}")
                     return jsonify({
                         'success': False,
                         'message': f'Produto não encontrado: ID {produto_id}'
                     }), 404
 
             except (ValueError, InvalidOperation, TypeError) as e:
-                app.logger.error(f"Erro ao processar item: {str(e)}")
+                logger.error(f"Erro ao processar item: {str(e)}")
                 return jsonify({
                     'success': False,
                     'message': 'Dados do item inválidos'
@@ -334,7 +343,7 @@ def api_registrar_venda():
             a_prazo_usado = any(p.get('forma_pagamento') == 'a_prazo' for p in dados_venda['pagamentos'])
             
         except (ValueError, InvalidOperation, TypeError) as e:
-            app.logger.error(f"Erro ao verificar pagamentos: {str(e)}")
+            logger.error(f"Erro ao verificar pagamentos: {str(e)}")
             return jsonify({
                 'success': False,
                 'message': 'Dados de pagamento inválidos'
@@ -344,7 +353,7 @@ def api_registrar_venda():
         caixa_aberto = get_caixa_aberto(db.session, operador_id=current_user.id)
         
         if not caixa_aberto:
-            app.logger.error("Nenhum caixa aberto encontrado")
+            logger.error("Nenhum caixa aberto encontrado")
             return jsonify({
                 'success': False,
                 'message': 'Nenhum caixa aberto encontrado'
@@ -491,7 +500,7 @@ def api_registrar_venda():
 
     except SQLAlchemyError as e:
         db.session.rollback()
-        app.logger.error(f'Erro no banco ao registrar venda: {str(e)}')
+        logger.error(f'Erro no banco ao registrar venda: {str(e)}')
         return jsonify({
             'success': False,
             'message': 'Erro ao registrar venda no banco',
@@ -500,7 +509,7 @@ def api_registrar_venda():
         
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f'Erro inesperado ao registrar venda: {str(e)}', exc_info=True)
+        logger.error(f'Erro inesperado ao registrar venda: {str(e)}', exc_info=True)
         return jsonify({
             'success': False,
             'message': 'Erro inesperado ao registrar venda',
@@ -537,7 +546,7 @@ def visualizar_pdf_venda(id_list):
     except ValueError:
         abort(400, description="Formato inválido. Use um número ou números separados por vírgula (ex: 44 ou 44,45)")
     except Exception as e:
-        app.logger.error(f"Erro ao gerar PDF: {str(e)}")
+        logger.error(f"Erro ao gerar PDF: {str(e)}")
         abort(500, description="Ocorreu um erro ao gerar o PDF")
 
 @operador_bp.route('/api/vendas/hoje', methods=['GET'])
@@ -552,6 +561,7 @@ def obter_vendas_hoje():
         # Verificação robusta do caixa
         caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
         if not caixa:
+            logger.error("Nenhum caixa aberto para o operador atual")
             return jsonify({
                 'success': False,
                 'message': 'Nenhuma venda a exibir! Caixa Fechado!'
@@ -566,6 +576,7 @@ def obter_vendas_hoje():
             try:
                 data_filtro = datetime.strptime(data_str, '%Y-%m-%d').date()
             except ValueError:
+                logger.error(f"Formato de data inválido: {data_str}")
                 return jsonify({
                     'success': False,
                     'message': 'Formato de data inválido. Use YYYY-MM-DD'
@@ -595,6 +606,7 @@ def obter_vendas_hoje():
         if operador_id and operador_id != current_user.id:
             # Verifica se o usuário tem permissão para consultar outros operadores
             if not current_user.tipo ==  TipoUsuario.admin:
+                logger.error(f"Operador {current_user.id} tentou acessar vendas de outro operador sem permissão")
                 return jsonify({
                     'success': False,
                     'message': 'Apenas administradores podem filtrar por outros operadores'
@@ -677,7 +689,7 @@ def obter_vendas_hoje():
         })
 
     except Exception as e:
-        app.logger.error(f"Erro em obter_vendas_hoje: {str(e)}", exc_info=True)
+        logger.error(f"Erro em obter_vendas_hoje: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
             'message': 'Erro interno ao processar vendas'
@@ -749,6 +761,7 @@ def resumo_vendas_diarias():
         })
     
     except Exception as e:
+        logger.error(f"Erro em resumo_vendas_diarias: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
             'message': f'Erro ao obter resumo diário: {str(e)}'
@@ -828,13 +841,13 @@ def obter_detalhes_venda(venda_id):
             } if nota_fiscal.entrega else None
         }
         
-        print(f'Detalhes: \n{detalhes}\n')
         return jsonify({
             'success': True,
             'data': detalhes
         })
     
     except Exception as e:
+        logger.error(f"Erro em obter_detalhes_venda: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
             'message': f'Erro ao obter detalhes da venda: {str(e)}'
@@ -851,10 +864,12 @@ def rota_estornar_venda(sale_id):
         dados = request.get_json()
         
         if not dados:
+            logger.error("Dados para estorno não fornecidos")
             return jsonify({'success': False, 'message': 'Dados não fornecidos'}), 400
             
         motivo_estorno = dados.get('motivo_estorno')
         if not motivo_estorno:
+            logger.error("Motivo do estorno não fornecido")
             return jsonify({'success': False, 'message': 'Motivo do estorno é obrigatório'}), 400
             
         usuario_id = current_user.id
@@ -865,7 +880,7 @@ def rota_estornar_venda(sale_id):
             
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Erro ao estornar venda {sale_id}: {str(e)}")
+        logger.error(f"Erro ao estornar venda {sale_id}: {str(e)}")
         return jsonify({
             'success': False,
             'message': 'Erro interno ao processar estorno'
@@ -907,6 +922,7 @@ def gerar_pdf_vendas_dia():
     # Obter caixa aberto do operador atual
     caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
     if not caixa:
+        logger.error("Nenhum caixa aberto encontrado para o operador atual")
         return jsonify({'success': False, 'message': 'Nenhum caixa aberto encontrado para o operador'}), 400
     
     caixa_id = caixa.id
@@ -919,6 +935,7 @@ def gerar_pdf_vendas_dia():
         try:
             data = datetime.strptime(data_str, '%Y-%m-%d').date()
         except ValueError:
+            logger.error(f"Formato de data inválido: {data_str}")
             return jsonify({'success': False, 'message': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
 
     data_relatorio = data if data else datetime.now().date()
@@ -926,6 +943,7 @@ def gerar_pdf_vendas_dia():
     # Obter dados das vendas - agora com fallback padrão se não houver vendas
     resultado = obter_detalhes_vendas_dia(data, caixa_id, operador_id)
     if not resultado['success']:
+        logger.error("Erro ao obter detalhes das vendas do dia")
         # Se não houver vendas, criar estrutura vazia mas ainda gerar o PDF
         dados = {
             'vendas': [],
@@ -983,7 +1001,7 @@ def gerar_pdf_vendas_dia():
             total_contas_receber_pagas += total_pago
             
     except Exception as e:
-        print(f"Erro ao buscar contas a receber pagas: {e}")
+        logger.error(f"Erro ao buscar contas a receber pagas: {str(e)}", exc_info=True)
         contas_receber_pagas = []
 
     buffer = BytesIO()
@@ -1391,6 +1409,7 @@ def api_get_saldo():
         caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
 
         if not caixa:
+            logger.info(f"Operador {current_user.id} tentou acessar saldo sem caixa aberto")
             return jsonify({
                 'sucess': False,
                 'saldo': 0.00,
@@ -1457,7 +1476,7 @@ def api_get_saldo():
         })
 
     except Exception as e:
-        app.logger.error(f"Erro ao calcular saldo para operador {current_user.id}: {str(e)}")
+        logger.error(f"Erro ao calcular saldo para operador {current_user.id}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -1502,6 +1521,7 @@ def obter_detalhes_cliente(cliente_id):
             'compras': compras
         })
     except Exception as e:
+        logger.error(f"Erro ao obter detalhes do cliente {cliente_id}: {str(e)}")
         return jsonify({
             'success': False,
             'message': str(e)
@@ -1521,14 +1541,17 @@ def registrar_pagamento_cliente():
         
         # Validações
         if not all([conta_id, nota_fiscal_id, valor_pago, forma_pagamento]):
+            logger.warning(f"Dados incompletos para registrar pagamento: {data}")
             return jsonify({'success': False, 'message': 'Dados incompletos'}), 400
             
         conta = ContaReceber.query.get_or_404(conta_id)
         
         if valor_pago <= 0:
+            logger.warning(f"Valor de pagamento inválido: {valor_pago}")
             return jsonify({'success': False, 'message': 'Valor deve ser positivo'}), 400
             
         if valor_pago > conta.valor_aberto:
+            logger.warning(f"Valor de pagamento excede o devido: {valor_pago} > {conta.valor_aberto}")
             return jsonify({'success': False, 'message': 'Valor excede o devido'}), 400
             
         # Obtém caixa aberto
@@ -1538,6 +1561,7 @@ def registrar_pagamento_cliente():
         ).first()
         
         if not caixa:
+            logger.warning(f"Operador {current_user.id} tentou registrar pagamento sem caixa aberto")
             return jsonify({'success': False, 'message': 'Nenhum caixa aberto encontrado'}), 400
         
         # Registra pagamento
@@ -1569,6 +1593,7 @@ def registrar_pagamento_cliente():
         })
         
     except Exception as e:
+        logger.error(f"Erro ao registrar pagamento para conta {data.get('conta_id')}: {str(e)}", exc_info=True) 
         db.session.rollback()
         return jsonify({
             'success': False,
@@ -1586,6 +1611,7 @@ def api_abrir_caixa():
         valor = Decimal(str(data.get('valor_abertura', 0)))
         
         if valor <= 0:
+            logger.warning(f"Operador {current_user.id} tentou abrir caixa com valor inválido: {valor}")
             return jsonify({'error': 'Valor de abertura inválido'}), 400
         
         caixa = abrir_caixa(
@@ -1602,6 +1628,7 @@ def api_abrir_caixa():
         })
     
     except Exception as e:
+        logger.error(f"Erro ao abrir caixa para operador {current_user.id}: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 400
 
 # ===== API FECHAMENTO DE CAIXA =====
@@ -1614,14 +1641,17 @@ def api_fechar_caixa():
         
         # Verificação mais robusta do valor
         if 'valor_fechamento' not in data:
+            logger.warning(f"Operador {current_user.id} não forneceu valor_fechamento ao fechar caixa")
             return jsonify({'error': 'Campo valor_fechamento é obrigatório'}), 400
             
         try:
             valor = Decimal(str(data['valor_fechamento']))
         except (TypeError, ValueError, InvalidOperation):
+            logger.warning(f"Operador {current_user.id} forneceu valor_fechamento inválido: {data['valor_fechamento']}")
             return jsonify({'error': 'Valor de fechamento inválido'}), 400
         
         if valor <= 0:
+            logger.warning(f"Operador {current_user.id} tentou fechar caixa com valor_fechamento não positivo: {valor}")
             return jsonify({'error': 'Valor de fechamento deve ser positivo'}), 400
         
         # Restante da função permanece igual
@@ -1641,6 +1671,7 @@ def api_fechar_caixa():
         })
     
     except Exception as e:
+        logger.error(f"Erro ao fechar caixa para operador {current_user.id}: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 400
 
 # ===== API BUSCAS =====
@@ -1703,7 +1734,7 @@ def api_buscar_produtos():
         return jsonify(resultados)
     
     except Exception as e:
-        app.logger.error(f"Erro na busca de produtos: {str(e)}", exc_info=True)
+        logger.error(f"Erro na busca de produtos: {str(e)}", exc_info=True)
         return jsonify({'error': 'Erro interno na busca de produtos'}), 500
 
 @operador_bp.route('/api/usuario', methods=['GET'])
@@ -1728,6 +1759,7 @@ def registrar_despesa():
     caixa_id = data.get("caixa_id")
 
     if not descricao or not valor or not caixa_id:
+        logger.warning(f"Operador {current_user.id} tentou registrar despesa com dados incompletos: {data}")
         return jsonify({"erro": "Descrição, valor e caixa_id são obrigatórios"}), 400
 
     try:
@@ -1753,6 +1785,7 @@ def registrar_despesa():
         return jsonify({"mensagem": "Despesa registrada com sucesso"}), 201
 
     except Exception as e:
+        logger.error(f"Erro ao registrar despesa: {str(e)}", exc_info=True)
         db.session.rollback()
         return jsonify({"erro": str(e)}), 500
     
@@ -1764,6 +1797,7 @@ def api_get_produto_descontos(produto_id):
         # Busca o produto
         produto = db.session.query( Produto).get(produto_id)
         if not produto:
+            logger.warning(f"Produto com ID {produto_id} não encontrado ao buscar descontos")
             return jsonify({'error': 'Produto não encontrado'}), 404
         
         # Busca todos os descontos associados a este produto
@@ -1804,7 +1838,7 @@ def api_get_produto_descontos(produto_id):
         return jsonify(descontos_validos)
         
     except Exception as e:
-        app.logger.error(f"Erro ao buscar descontos do produto {produto_id}: {str(e)}", exc_info=True)
+        logger.error(f"Erro ao buscar descontos do produto {produto_id}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Erro interno ao buscar descontos'}), 500
     
 @operador_bp.route('/api/clientes/<int:cliente_id>/contas_receber', methods=['GET'])
@@ -1815,6 +1849,7 @@ def get_contas_receber_cliente(cliente_id):
         # Verifica se o cliente existe
         cliente = Cliente.query.get(cliente_id)
         if not cliente:
+            logger.warning(f"Cliente com ID {cliente_id} não encontrado ao buscar contas a receber")
             return jsonify({'error': 'Cliente não encontrado'}), 404
 
         # Busca as contas a receber do cliente com os itens da nota fiscal
@@ -1853,12 +1888,12 @@ def get_contas_receber_cliente(cliente_id):
                 'tipo_desconto_nota': conta.nota_fiscal.tipo_desconto.value if conta.nota_fiscal and conta.nota_fiscal.tipo_desconto else None
             }
             contas_data.append(conta_data)
-        
-        print(f'contas cliente: \n{contas_data}')
+
+        logger.info(f"Contas a receber do cliente {cliente_id}: {contas_data}")
         return jsonify(contas_data)
 
     except Exception as e:
-        print(f'ERROR: \n {e}')
+        logger.error(f"Erro ao buscar contas a receber do cliente {cliente_id}: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 from flask import make_response
@@ -1877,6 +1912,7 @@ def gerar_comprovante_conta(conta_id):
         # Busca a conta a receber
         conta = ContaReceber.query.get(conta_id)
         if not conta:
+            logger.warning(f"Conta a receber com ID {conta_id} não encontrada para gerar comprovante")
             return jsonify({'error': 'Conta não encontrada'}), 404
         
         # Busca informações do cliente
@@ -2073,7 +2109,7 @@ def gerar_comprovante_conta(conta_id):
         return response
         
     except Exception as e:
-        print(f'Erro ao gerar comprovante: {e}')
+        logger.error(f"Erro ao gerar comprovante para conta {conta_id}: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
     
 @operador_bp.route('/api/clientes/<int:cliente_id>/notas_fiscais', methods=['GET'])
@@ -2084,6 +2120,7 @@ def get_notas_fiscais_cliente(cliente_id):
         # Verifica se o cliente existe
         cliente = Cliente.query.get(cliente_id)
         if not cliente:
+            logger.warning(f"Cliente com ID {cliente_id} não encontrado ao buscar notas fiscais")
             return jsonify({'error': 'Cliente não encontrado'}), 404
 
         # Busca as notas fiscais do cliente
@@ -2104,10 +2141,11 @@ def get_notas_fiscais_cliente(cliente_id):
                 'operador_id': nota.operador_id,
                 'caixa_id': nota.caixa_id
             })
-        print(f'notas fiscal: \n{notas_data}')
+        
         return jsonify(notas_data)
 
     except Exception as e:
+        logger.error(f"Erro ao buscar notas fiscais do cliente {cliente_id}: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
     
 @operador_bp.route('/api/contas_receber/<int:conta_id>/pagamento', methods=['POST'])
@@ -2123,16 +2161,20 @@ def registrar_pagamento_conta(conta_id):
         # Verifica se a conta existe
         conta = ContaReceber.query.get(conta_id)
         if not conta:
+            logger.warning(f"Conta a receber com ID {conta_id} não encontrada ao registrar pagamento")
             return jsonify({'success': False, 'message': 'Conta não encontrada'}), 404
         
         # Validações
         if valor_pago <= 0:
+            logger.warning(f"Valor de pagamento inválido: {valor_pago} para conta {conta_id}")
             return jsonify({'success': False, 'message': 'Valor do pagamento deve ser positivo'}), 400
             
         if valor_pago > conta.valor_aberto:
+            logger.warning(f"Valor de pagamento excede o valor em aberto: {valor_pago} > {conta.valor_aberto} para conta {conta_id}")
             return jsonify({'success': False, 'message': 'Valor do pagamento excede o valor em aberto'}), 400
             
         if not forma_pagamento:
+            logger.warning(f"Forma de pagamento não informada para conta {conta_id}")
             return jsonify({'success': False, 'message': 'Forma de pagamento não informada'}), 400
         
         # Obtém o caixa aberto do operador atual
@@ -2142,6 +2184,7 @@ def registrar_pagamento_conta(conta_id):
         ).order_by(Caixa.data_abertura.desc()).first()
         
         if not caixa_aberto:
+            logger.warning(f"Operador {current_user.id} tentou registrar pagamento sem caixa aberto para conta {conta_id}")
             return jsonify({'success': False, 'message': 'Nenhum caixa aberto encontrado para o operador'}), 400
         
         # Registra o pagamento
@@ -2162,8 +2205,8 @@ def registrar_pagamento_conta(conta_id):
         })
         
     except Exception as e:
+        logger.error(f"Erro ao registrar pagamento para conta {conta_id}: {str(e)}", exc_info=True)
         db.session.rollback()
-        print(f'Erro ao registrar pagamento: {str(e)}')
         return jsonify({'success': False, 'message': f'Erro ao registrar pagamento: {str(e)}'}), 500
 
 @operador_bp.route('/api/clientes/<int:cliente_id>', methods=['GET'])
@@ -2173,6 +2216,7 @@ def get_cliente(cliente_id):
     try:
         cliente = Cliente.query.get(cliente_id)
         if not cliente:
+            logger.warning(f"Cliente com ID {cliente_id} não encontrado")
             return jsonify({'error': 'Cliente não encontrado'}), 404
             
         return jsonify({
@@ -2188,7 +2232,7 @@ def get_cliente(cliente_id):
         })
         
     except Exception as e:
-        print(f'Erro ao buscar cliente: {str(e)}')
+        logger.error(f"Erro ao buscar cliente {cliente_id}: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
     
 # ================ ORÇAMENTO ====================
@@ -2208,6 +2252,7 @@ def gerar_pdf_orcamento():
 
         dados = request.get_json()
         if not dados or 'itens' not in dados or not dados['itens']:
+            logger.warning(f"Dados do orçamento inválidos: {dados}")
             return jsonify({'success': False, 'message': 'Dados do orçamento inválidos'}), 400
 
         buffer = BytesIO()
@@ -2324,5 +2369,5 @@ def gerar_pdf_orcamento():
         return response
 
     except Exception as e:
-        print(f'ERROR: \n{e}')
+        logger.error(f"Erro ao gerar PDF do orçamento: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'message': f'Erro ao gerar PDF: {str(e)}'}), 500

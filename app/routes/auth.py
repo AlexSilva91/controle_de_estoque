@@ -17,8 +17,10 @@ from app.models.entities import Caixa, StatusCaixa
 from zoneinfo import ZoneInfo 
 from datetime import datetime
 from app import schemas
+import logging
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/')
+logger = logging.getLogger(__name__)
 
 def get_session():
     """Obtém uma nova sessão do banco"""
@@ -35,6 +37,7 @@ def login():
             senha = request.form.get('senha', '').strip()
 
             if not cpf or not senha:
+                logger.warning("CPF ou senha não fornecidos")
                 return jsonify({
                     'success': False,
                     'message': 'Preencha CPF e senha corretamente.'
@@ -42,18 +45,21 @@ def login():
 
             usuario = get_user_by_cpf(db, cpf)
             if not usuario:
+                logger.warning(f"Usuário não encontrado para CPF: {cpf}")
                 return jsonify({
                     'success': False,
                     'message': 'Usuário não encontrado.'
                 })
 
             if not verify_password(senha, usuario.senha_hash):
+                logger.warning(f"Senha incorreta para CPF: {cpf}")
                 return jsonify({
                     'success': False,
                     'message': 'Senha incorreta.'
                 })
 
             if not usuario.status:
+                logger.warning(f"Usuário inativo. Contate o administrador. CPF: {cpf}")
                 return jsonify({
                     'success': False,
                     'message': 'Usuário inativo. Contate o administrador.'
@@ -70,6 +76,7 @@ def login():
 
             # Verificar caixa aberto apenas para operadores
             if usuario.tipo.value == 'operador':
+                logger.info(f"Verificando caixa para operador {usuario.id}")
                 caixa_aberto = get_caixa_aberto(db, operador_id=usuario.id)
                 
                 if not caixa_aberto:
@@ -125,11 +132,12 @@ def login():
                                     'message': f'Caixa #{novo_caixa.id} aberto automaticamente com R$ {valor_abertura:.2f}'
                                 })
                             else:
+                                logger.error("Falha ao criar o caixa automaticamente")
                                 raise Exception("Falha ao criar o caixa")
                                 
                         except Exception as e:
                             db.rollback()
-                            print(f"Erro na abertura automática: {str(e)}")
+                            logger.error(f"Erro na abertura automática: {str(e)}")
                             # Se falhar na abertura automática, solicita abertura manual
                             return jsonify({
                                 'success': True,
@@ -141,8 +149,7 @@ def login():
                                 'message': f'Erro na abertura automática: {str(e)}. Por favor, abra manualmente.'
                             })
                 else:
-                    # Se já tem caixa aberto, registra no log e segue normalmente
-                    print(f"Usuário {usuario.id} já tem caixa aberto #{caixa_aberto.id}")
+                    logger.info(f"Usuário {usuario.id} já tem caixa aberto #{caixa_aberto.id}")
 
             return jsonify({
                 'success': True,
@@ -153,14 +160,14 @@ def login():
             
         except SQLAlchemyError as e:
             db.rollback()
-            print(f"Erro SQL: {str(e)}")
+            logger.error(f"Erro SQL: {str(e)}")
             return jsonify({
                 'success': False,
                 'message': 'Erro ao atualizar dados de acesso.'
             }), 500
         except Exception as e:
             db.rollback()
-            print(f"Erro geral no login: {str(e)}")
+            logger.error(f"Erro geral no login: {str(e)}")
             return jsonify({
                 'success': False,
                 'message': f'Erro interno: {str(e)}'
@@ -174,6 +181,7 @@ def login():
 @login_required
 def abrir_caixa_manual():
     if current_user.tipo.value != 'operador':
+        logger.warning(f"Tentativa de abertura de caixa por usuário não operador: {current_user.id}")
         return jsonify({
             'success': False,
             'message': 'Apenas operadores podem abrir caixa'
@@ -184,15 +192,18 @@ def abrir_caixa_manual():
     
     try:
         if not request.is_json:
+            logger.warning("Content-Type inválido na abertura de caixa manual")
             return jsonify({'success': False, 'message': 'Content-Type deve ser application/json'}), 400
 
         data = request.get_json()
         if not data:
+            logger.warning("Dados inválidos na abertura de caixa manual")
             return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
 
         try:
             valor_abertura = Decimal(str(data.get('valor_abertura', 0)))
         except (ValueError, TypeError) as e:
+            logger.warning(f"Valor de abertura inválido: {str(e)}")
             return jsonify({
                 'success': False,
                 'message': f'Valor de abertura inválido: {str(e)}'
@@ -203,6 +214,7 @@ def abrir_caixa_manual():
         # Verifica se já existe caixa aberto para o usuário atual
         caixa_existente = get_caixa_aberto(db, operador_id=current_user.id)
         if caixa_existente:
+            logger.warning(f"Usuário {current_user.id} já tem caixa aberto #{caixa_existente.id}")
             return jsonify({
                 'success': False,
                 'message': f'Você já tem um caixa aberto (Caixa #{caixa_existente.id} aberto em {caixa_existente.data_abertura.strftime("%d/%m/%Y %H:%M")})',
@@ -219,6 +231,7 @@ def abrir_caixa_manual():
         )
         
         if not novo_caixa:
+            logger.error("Falha ao criar o caixa manualmente")
             raise ValueError("Erro ao criar caixa")
         
         return jsonify({
@@ -229,14 +242,15 @@ def abrir_caixa_manual():
         })
 
     except ValueError as e:
+        logger.warning(f"Erro de valor na abertura manual: {str(e)}")
         db.rollback()
         return jsonify({
             'success': False,
             'message': str(e)
         }), 400
     except Exception as e:
+        logger.error(f"Erro na abertura manual: {str(e)}", exc_info=True)
         db.rollback()
-        print(f"Erro na abertura manual: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Erro ao abrir caixa: {str(e)}'
@@ -257,7 +271,7 @@ def logout():
             usuario.ultimo_acesso = datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
             db.commit()
     except SQLAlchemyError as e:
-        print(f"Erro ao atualizar último acesso no logout: {str(e)}")
+        logger.error(f"Erro ao atualizar último acesso no logout: {str(e)}")
         db.rollback()
     finally:
         db.close()

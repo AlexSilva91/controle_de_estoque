@@ -38,7 +38,6 @@ from io import BytesIO
 
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
-from app import schemas
 from app.models import db
 from app.utils.format_data_moeda import format_currency, format_number
 from app.models.entities import ( 
@@ -61,11 +60,13 @@ from app.schemas import (
     UsuarioCreate, UsuarioUpdate, ProdutoCreate, ProdutoUpdate, MovimentacaoEstoqueCreate,
     ClienteCreate, ClienteUpdate, FinanceiroCreate, FinanceiroUpdate
 )
+import logging
 from app.utils.format_data_moeda import formatar_data_br, format_number
 from app.utils.nfce import generate_caixa_financeiro_pdf
 from app.utils.signature import SignatureLine
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
+logger = logging.getLogger(__name__)
 
 def admin_required(f):
     @wraps(f)
@@ -97,6 +98,7 @@ def to_decimal_2(value):
 @login_required
 @admin_required
 def dashboard():
+    logger.info(f"Acessando dashboard admin - Usuário: {current_user.nome}")
     return render_template('dashboard_admin.html', nome_usuario=current_user.nome)
 
 @admin_bp.route('/dashboard/metrics')
@@ -168,7 +170,7 @@ def get_dashboard_metrics():
         })
 
     except Exception as e:
-        print(f"Erro na consulta de métricas: {str(e)}")
+        logger.error(f"Erro na consulta de métricas: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -289,7 +291,7 @@ def get_vendas_diarias():
             }
         })
     except Exception as e:
-        print(e)
+        logger.error(f"Erro na consulta de vendas diárias: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/dashboard/vendas-mensais')
@@ -344,7 +346,7 @@ def get_vendas_mensais():
             'despesas': despesas
         })
     except Exception as e:
-        print(e)
+        logger.error(f"Erro na consulta de vendas mensais: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/dashboard/movimentacoes')
@@ -369,6 +371,7 @@ def get_movimentacoes():
         
         return jsonify({'success': True, 'movimentacoes': result})
     except Exception as e:
+        logger.error(f"Erro na consulta de movimentações: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ===== Caixa Routes =====
@@ -387,7 +390,7 @@ def abrir_caixa_route():
             valor_abertura=valor_abertura,
             observacao=observacao
         )
-        
+        logger.info(f"Caixa {caixa.id} aberto por usuário {current_user.id}")
         return jsonify({
             'success': True,
             'message': 'Caixa aberto com sucesso',
@@ -398,6 +401,7 @@ def abrir_caixa_route():
             }
         })
     except Exception as e:
+        logger.error(f"Erro ao abrir caixa: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/caixa/fechar', methods=['POST'])
@@ -415,7 +419,7 @@ def fechar_caixa_route():
             valor_fechamento=valor_fechamento,
             observacao=observacao
         )
-        
+        logger.info(f"Caixa {caixa.id} fechado por usuário {current_user.id}")
         return jsonify({
             'success': True,
             'message': 'Caixa fechado com sucesso',
@@ -426,6 +430,7 @@ def fechar_caixa_route():
             }
         })
     except Exception as e:
+        logger.error(f"Erro ao fechar caixa: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/caixa/status')
@@ -435,6 +440,7 @@ def get_caixa_status():
     try:
         caixa = get_caixas_abertos(db.session)
         if caixa:
+            logger.info(f"Status do caixa {caixa.id} obtido por usuário {current_user.id}")
             return jsonify({
                 'success': True,
                 'aberto': True,
@@ -448,6 +454,7 @@ def get_caixa_status():
         else:
             return jsonify({'success': True, 'aberto': False})
     except Exception as e:
+        logger.error(f"Erro ao obter status do caixa: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/caixa/historico')
@@ -469,6 +476,7 @@ def get_caixa_historico():
             })
         return jsonify({'success': True, 'caixas': result})
     except Exception as e:
+        logger.error(f"Erro ao obter histórico de caixas: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ===== Cliente Routes =====
@@ -483,7 +491,7 @@ def listar_clientes():
         result = []
         for cliente in clientes:
             if search and (search not in cliente.nome.lower() and 
-                          search not in (cliente.documento or '').lower()):
+                        search not in (cliente.documento or '').lower()):
                 continue
                 
             result.append({
@@ -498,6 +506,7 @@ def listar_clientes():
             
         return jsonify({'success': True, 'clientes': result})
     except Exception as e:
+        logger.error(f"Erro ao listar clientes: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/clientes/<int:cliente_id>/detalhes', methods=['GET'])
@@ -592,6 +601,7 @@ def obter_detalhes_cliente(cliente_id):
             'valor_total_compras': valor_total_compras
         })
     except Exception as e:
+        logger.error(f"Erro ao obter detalhes do cliente: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/clientes', methods=['POST'])
@@ -611,6 +621,8 @@ def criar_cliente():
         )
         
         cliente = create_cliente(db.session, cliente_data)
+        
+        logger.info(f"Cliente {cliente.nome} criado por usuário {current_user.id}")
         return jsonify({
             'success': True,
             'message': 'Cliente criado com sucesso',
@@ -624,6 +636,7 @@ def criar_cliente():
             }
         })
     except Exception as e:
+        logger.error(f"Erro ao criar cliente: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/clientes/<int:cliente_id>', methods=['PUT'])
@@ -643,6 +656,10 @@ def atualizar_cliente(cliente_id):
         )
         
         cliente = update_cliente(db.session, cliente_id, cliente_data)
+
+        logger.info(f"Cliente {cliente.id} atualizado por usuário {current_user.id}")
+        logger.info(f"Dados do cliente {cliente.id} atualizados: {cliente_data}")
+        
         return jsonify({
             'success': True,
             'message': 'Cliente atualizado com sucesso',
@@ -656,6 +673,7 @@ def atualizar_cliente(cliente_id):
             }
         })
     except Exception as e:
+        logger.error(f"Erro ao atualizar cliente: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/clientes/<int:cliente_id>', methods=['GET'])
@@ -666,7 +684,7 @@ def obter_cliente(cliente_id):
         cliente = get_cliente(db.session, cliente_id)
         if not cliente:
             return jsonify({'success': False, 'message': 'Cliente não encontrado'}), 404
-
+        logger.info(f"Cliente {cliente_id} obtido por usuário {current_user.id}")
         return jsonify({
             'success': True,
             'cliente': {
@@ -680,6 +698,7 @@ def obter_cliente(cliente_id):
             }
         })
     except Exception as e:
+        logger.error(f"Erro ao obter cliente: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/clientes/<int:cliente_id>', methods=['DELETE'])
@@ -688,8 +707,10 @@ def obter_cliente(cliente_id):
 def remover_cliente(cliente_id):
     try:
         delete_cliente(db.session, cliente_id)
+        logger.info(f"Cliente {cliente_id} removido por usuário {current_user.id}")
         return jsonify({'success': True, 'message': 'Cliente removido com sucesso'})
     except Exception as e:
+        logger.error(f"Erro ao remover cliente: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 # ===== Produto Routes =====
@@ -725,6 +746,7 @@ def listar_produtos():
         
         return jsonify({'success': True, 'produtos': result})
     except Exception as e:
+        logger.error(f"Erro ao listar produtos: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/produtos', methods=['POST'])
@@ -813,7 +835,10 @@ def criar_produto():
                 db.session.add(movimentacao)
             
             db.session.commit()
-
+            
+            logger.info(f"Produto existente {produto.id} atualizado por usuário {current_user.id}")
+            logger.info(f"Dados do produto existente {produto.id} atualizados: {produto_update}")
+            
             return jsonify({
                 'success': True,
                 'message': 'Produto existente atualizado com sucesso',
@@ -904,6 +929,9 @@ def criar_produto():
         
         db.session.commit()
 
+        logger.info(f"Produto {produto.nome} criado por usuário {current_user.id}")
+        logger.debug(f"Dados do produto criado: {produto_data}")
+        
         return jsonify({
             'success': True,
             'message': 'Produto criado com sucesso',
@@ -925,6 +953,7 @@ def criar_produto():
         })
     except Exception as e:
         print(e)
+        logger.error(f"Erro ao criar produto: {str(e)}")
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
 
@@ -1057,7 +1086,10 @@ def atualizar_produto(produto_id):
                 'tipo': d.tipo.name
             } for d in produto.descontos]
         }
-
+        
+        logger.info(f"Produto {produto.id} atualizado por usuário {current_user.id}")
+        logger.debug(f"Dados do produto {produto.id} atualizados: {produto_data}")
+        
         return jsonify({
             'success': True,
             'message': 'Produto atualizado com sucesso',
@@ -1065,12 +1097,12 @@ def atualizar_produto(produto_id):
         })
 
     except Exception as e:
+        logger.error(f"Erro ao atualizar produto: {str(e)}")
         db.session.rollback()
         return jsonify({
             'success': False,
             'message': f'Erro ao atualizar produto: {str(e)}'
         }), 400
-        
         
 @admin_bp.route('/produtos/<int:produto_id>', methods=['GET'])
 @login_required
@@ -1140,6 +1172,7 @@ def obter_produto(produto_id):
         })
         print(f'{produto.id} {todos_descontos}')
     except Exception as e:
+        logger.error(f"Erro ao obter produto: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/produtos/<int:produto_id>', methods=['DELETE'])
@@ -1150,6 +1183,7 @@ def remover_produto(produto_id):
         produto = db.session.query( Produto).get(produto_id)
 
         if not produto:
+            logger.error(f"Produto {produto_id} não encontrado para remoção.")
             return jsonify({'success': False, 'message': 'Produto não encontrado'}), 404
 
         estoque_total = (
@@ -1159,6 +1193,7 @@ def remover_produto(produto_id):
         )
 
         if estoque_total != 0:
+            logger.warning(f"Não é possível remover o produto {produto_id}. Saldo em estoque: {estoque_total}")
             return jsonify({
                 'success': False,
                 'message': 'Não é possível remover o produto. Ainda há saldo em estoque (mesmo que negativo).'
@@ -1166,12 +1201,13 @@ def remover_produto(produto_id):
 
         db.session.delete(produto)
         db.session.commit()
-
+        
+        logger.info(f"Produto {produto_id} removido por usuário {current_user.id}")
         return jsonify({'success': True, 'message': 'Produto removido com sucesso'})
-
+        
     except Exception as e:
         db.session.rollback()
-        print(e)
+        logger.error(f"Erro ao remover produto: {str(e)}")
         return jsonify({'success': False, 'message': 'Erro ao remover produto.'}), 500
 
 @admin_bp.route('/produtos/<int:produto_id>/movimentacao', methods=['POST'])
@@ -1182,6 +1218,7 @@ def registrar_movimentacao_produto(produto_id):
         data = request.get_json()
         caixa = get_caixa_aberto(db.session)
         if not caixa:
+            logger.error(f"Nenhum caixa aberto encontrado para movimentação do produto {produto_id}.")
             return jsonify({'success': False, 'message': 'Nenhum caixa aberto encontrado'}), 400
             
         mov_data = MovimentacaoEstoqueCreate(
@@ -1201,6 +1238,8 @@ def registrar_movimentacao_produto(produto_id):
         )
         
         movimentacao = registrar_movimentacao(db.session, mov_data)
+        
+        logger.info(f"Movimentação {movimentacao.id} registrada por usuário {current_user.id}")
         return jsonify({
             'success': True,
             'message': 'Movimentação registrada com sucesso',
@@ -1214,6 +1253,7 @@ def registrar_movimentacao_produto(produto_id):
             }
         })
     except Exception as e:
+        logger.error(f"Erro ao registrar movimentação: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
     
     
@@ -1223,12 +1263,14 @@ def registrar_movimentacao_produto(produto_id):
 @admin_required
 def api_registrar_venda_retroativa():
     if not request.is_json:
+        logger.warning("Requisição inválida: Content-Type não é application/json")
         return jsonify({'success': False, 'message': 'Content-Type deve ser application/json'}), 400
 
     try:
         dados_venda = request.get_json()
         
         if dados_venda is None:
+            logger.warning("Requisição inválida: JSON inválido ou não enviado")
             return jsonify({'success': False, 'message': 'JSON inválido ou não enviado'}), 400
 
         # Função auxiliar para converter e validar decimais
@@ -1241,41 +1283,50 @@ def api_registrar_venda_retroativa():
                     return None
                 decimal_val = Decimal(str_valor).quantize(Decimal('0.01'))
                 if abs(decimal_val.as_tuple().exponent) > decimal_places:
+                    logger.warning(f"Valor inválido para {campo}: mais de {decimal_places} casas decimais")
                     raise ValueError(f"O campo {campo} deve ter no máximo {decimal_places} casas decimais")
                 if len(str(decimal_val).replace('.', '').replace('-', '')) > max_digits:
+                    logger.warning(f"Valor inválido para {campo}: mais de {max_digits} dígitos no total")
                     raise ValueError(f"O campo {campo} deve ter no máximo {max_digits} dígitos no total")
                 return decimal_val
             except (ValueError, InvalidOperation) as e:
-                print(e)
+                logger.error(f"Erro ao validar campo {campo}: {str(e)}")
                 raise ValueError(f"Valor inválido para {campo}: {str(e)}")
 
         # Campos obrigatórios
         required_fields = ['cliente_id', 'itens', 'pagamentos', 'valor_total', 'caixa_id', 'data_emissao']
         for field in required_fields:
             if field not in dados_venda:
+                logger.warning(f"Campo obrigatório faltando: {field}")
                 return jsonify({'success': False, 'message': f'Campo obrigatório faltando: {field}'}), 400
 
         # Validar data de emissão
         try:
             data_emissao = datetime.strptime(dados_venda['data_emissao'], '%Y-%m-%d %H:%M:%S')
             if data_emissao > datetime.now():
+                logger.warning("Data de emissão inválida: não pode ser futura")
                 return jsonify({'success': False, 'message': 'Data de emissão não pode ser futura'}), 400
         except ValueError:
+            logger.warning("Formato de data inválido. Use YYYY-MM-DD HH:MM:SS")
             return jsonify({'success': False, 'message': 'Formato de data inválido. Use YYYY-MM-DD HH:MM:SS'}), 400
 
         # Verificar caixa
         caixa =  Caixa.query.get(dados_venda['caixa_id'])
         if not caixa:
+            logger.warning(f"Caixa não encontrado: ID {dados_venda['caixa_id']}")
             return jsonify({'success': False, 'message': f'Caixa não encontrado: ID {dados_venda["caixa_id"]}'}), 404
         if caixa.status == 'aberto':
+            logger.warning("Para vendas retroativas, o caixa deve estar fechado")
             return jsonify({'success': False, 'message': 'Para vendas retroativas, o caixa deve estar fechado'}), 400
 
         # Validar lista de itens
         if not isinstance(dados_venda['itens'], list) or len(dados_venda['itens']) == 0:
+            logger.warning("Lista de itens inválida ou vazia")
             return jsonify({'success': False, 'message': 'Lista de itens inválida ou vazia'}), 400
 
         # Validar lista de pagamentos
         if not isinstance(dados_venda['pagamentos'], list) or len(dados_venda['pagamentos']) == 0:
+            logger.warning("Lista de pagamentos inválida ou vazia")
             return jsonify({'success': False, 'message': 'Lista de pagamentos inválida ou vazia'}), 400
 
         # Converter e validar valores principais
@@ -1287,9 +1338,10 @@ def api_registrar_venda_retroativa():
             # Validar cliente
             cliente =  Cliente.query.get(cliente_id)
             if not cliente:
+                logger.warning(f"Cliente não encontrado: ID {cliente_id}")
                 return jsonify({'success': False, 'message': f'Cliente não encontrado: ID {cliente_id}'}), 404
         except ValueError as e:
-            print(e)
+            logger.error(f"Erro ao validar cliente: {str(e)}")
             return jsonify({'success': False, 'message': str(e)}), 400
 
         # Validar itens
@@ -1299,6 +1351,7 @@ def api_registrar_venda_retroativa():
                 produto_id = int(item.get('produto_id'))
                 produto =  Produto.query.get(produto_id)
                 if not produto:
+                    logger.warning(f"Produto não encontrado: ID {produto_id}")
                     return jsonify({'success': False, 'message': f'Produto não encontrado: ID {produto_id}'}), 404
 
                 quantidade = validar_decimal(item.get('quantidade'), 'quantidade', decimal_places=3)
@@ -1311,7 +1364,7 @@ def api_registrar_venda_retroativa():
                         'success': False,
                         'message': f'Estoque insuficiente para {produto.nome} (disponível: {produto.estoque_loja}, solicitado: {quantidade})'
                     }), 400
-
+            
                 itens_validados.append({
                     'produto': produto,
                     'quantidade': quantidade,
@@ -1321,6 +1374,7 @@ def api_registrar_venda_retroativa():
                     'tipo_desconto': item.get('desconto_info', {}).get('tipo')
                 })
             except ValueError as e:
+                logger.error(f"Erro ao validar item: {str(e)}")
                 return jsonify({'success': False, 'message': f'Erro no item: {str(e)}'}), 400
 
         # Validar pagamentos
@@ -1343,6 +1397,7 @@ def api_registrar_venda_retroativa():
                     'valor': valor
                 })
             except ValueError as e:
+                logger.error(f"Erro ao validar pagamento: {str(e)}")
                 return jsonify({'success': False, 'message': f'Erro no pagamento: {str(e)}'}), 400
 
         # Verificar soma dos pagamentos
@@ -1467,7 +1522,7 @@ def api_registrar_venda_retroativa():
         }), 201
 
     except SQLAlchemyError as e:
-        print(e)
+        logger.error(f"Erro ao registrar venda retroativa no banco: {str(e)}")
         db.session.rollback()
         return jsonify({
             'success': False,
@@ -1477,7 +1532,7 @@ def api_registrar_venda_retroativa():
         }), 500
         
     except Exception as e:
-        print(e)
+        logger.error(f"Erro inesperado ao registrar venda retroativa: {str(e)}")
         db.session.rollback()
         return jsonify({
             'success': False,
@@ -1508,6 +1563,7 @@ def api_caixas_fechados():
             'caixas': caixas_data
         })
     except Exception as e:
+        logger.error(f"Erro ao buscar caixas fechados: {str(e)}")
         return jsonify({
             'success': False,
             'message': 'Erro ao buscar caixas fechados'
@@ -1533,6 +1589,7 @@ def api_clientes_ativos():
             'clientes': clientes_data
         })
     except Exception as e:
+        logger.error(f"Erro ao buscar clientes ativos: {str(e)}")
         return jsonify({
             'success': False,
             'message': 'Erro ao buscar clientes'
@@ -1561,6 +1618,7 @@ def api_produtos_ativos():
             'produtos': produtos_data
         })
     except Exception as e:
+        logger.error(f"Erro ao buscar produtos ativos: {str(e)}")
         return jsonify({
             'success': False,
             'message': 'Erro ao buscar produtos'
@@ -1593,6 +1651,7 @@ def listar_usuarios():
         
         return jsonify({'success': True, 'usuarios': result})
     except Exception as e:
+        logger.error(f"Erro ao listar usuários: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/usuarios/<int:usuario_id>', methods=['GET'])
@@ -1602,6 +1661,7 @@ def get_usuario(usuario_id):
     try:
         usuario = get_user_by_id(db.session, usuario_id)
         if not usuario:
+            logger.warning(f"Usuário não encontrado: ID {usuario_id}")
             return jsonify({
                 'success': False, 
                 'message': 'Usuário não encontrado',
@@ -1629,6 +1689,7 @@ def get_usuario(usuario_id):
             }
         })
     except Exception as e:
+        logger.error(f"Erro ao carregar dados do usuário: {str(e)}")
         return jsonify({
             'success': False,
             'message': 'Erro interno ao carregar dados do usuário',
@@ -1652,7 +1713,7 @@ def criar_usuario():
         )
 
         novo_usuario = create_user(db.session, usuario_data)
-
+        logger.info(f"Usuário {novo_usuario.id} criado por administrador {current_user.id}")
         return jsonify({
             'success': True,
             'message': 'Usuário criado com sucesso',
@@ -1667,6 +1728,7 @@ def criar_usuario():
         })
 
     except Exception as e:
+        logger.error(f"Erro ao criar usuário: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/usuarios/<int:usuario_id>', methods=['PUT'])
@@ -1689,6 +1751,8 @@ def atualizar_usuario(usuario_id):
         usuario_data = UsuarioUpdate(**update_data)
         
         usuario = update_user(db.session, usuario_id, usuario_data)
+        
+        logger.info(f"Usuário {usuario.id} atualizado por administrador {current_user.id}")
         return jsonify({
             'success': True,
             'message': 'Usuário atualizado com sucesso',
@@ -1703,6 +1767,7 @@ def atualizar_usuario(usuario_id):
         })
     
     except Exception as e:
+        logger.error(f"Erro ao atualizar usuário: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -1713,13 +1778,16 @@ def remover_usuario(usuario_id):
     try:
         usuario = get_user_by_id(db.session, usuario_id)
         if not usuario:
+            logger.warning(f"Usuário não encontrado para remoção: ID {usuario_id}")
             return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
 
         db.session.delete(usuario)
         db.session.commit()
+        logger.info(f"Usuário {usuario_id} removido por administrador {current_user.id}")
         return jsonify({'success': True, 'message': 'Usuário removido com sucesso'})
 
     except IntegrityError:
+        logger.warning(f"Não é possível remover o usuário {usuario_id}. Ele está vinculado a caixas.")
         db.session.rollback()
         return jsonify({
             'success': False,
@@ -1727,6 +1795,7 @@ def remover_usuario(usuario_id):
         }), 400
 
     except Exception as e:
+        logger.error(f"Erro inesperado ao remover usuário: {str(e)}")
         db.session.rollback()
         traceback.print_exc()
         return jsonify({
@@ -1793,6 +1862,7 @@ def listar_financeiro():
             }
         })
     except Exception as e:
+        logger.error(f"Erro ao listar lançamentos financeiros: {str(e)}") 
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/financeiro', methods=['POST'])
@@ -1814,6 +1884,7 @@ def criar_lancamento_financeiro():
         )
         
         lancamento = create_lancamento_financeiro(db.session, lancamento_data)
+        logger.info(f"Lançamento financeiro {lancamento.id} criado por usuário {current_user.id}")
         return jsonify({
             'success': True,
             'message': 'Lançamento financeiro criado com sucesso',
@@ -1826,6 +1897,7 @@ def criar_lancamento_financeiro():
             }
         })
     except Exception as e:
+        logger.error(f"Erro ao criar lançamento financeiro: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/financeiro/<int:lancamento_id>', methods=['PUT'])
@@ -1843,6 +1915,7 @@ def atualizar_lancamento_financeiro(lancamento_id):
         )
         
         lancamento = update_lancamento_financeiro(db.session, lancamento_id, lancamento_data)
+        logger.info(f"Lançamento financeiro {lancamento.id} atualizado por usuário {current_user.id}")
         return jsonify({
             'success': True,
             'message': 'Lançamento financeiro atualizado com sucesso',
@@ -1855,6 +1928,7 @@ def atualizar_lancamento_financeiro(lancamento_id):
             }
         })
     except Exception as e:
+        logger.error(f"Erro ao atualizar lançamento financeiro: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/financeiro/<int:lancamento_id>', methods=['DELETE'])
@@ -1863,8 +1937,10 @@ def atualizar_lancamento_financeiro(lancamento_id):
 def remover_lancamento_financeiro(lancamento_id):
     try:
         delete_lancamento_financeiro(db.session, lancamento_id)
+        logger.info(f"Lançamento financeiro {lancamento_id} removido por usuário {current_user.id}")
         return jsonify({'success': True, 'message': 'Lançamento financeiro removido com sucesso'})
     except Exception as e:
+        logger.error(f"Erro ao remover lançamento financeiro: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 # ===== Nota Fiscal Routes =====
@@ -1890,6 +1966,7 @@ def criar_nota_fiscal():
         }
         
         nota = create_nota_fiscal(db.session, nota_data)
+        logger.info(f"Nota fiscal {nota.id} criada por usuário {current_user.id}")
         return jsonify({
             'success': True,
             'message': 'Nota fiscal criada com sucesso',
@@ -1902,6 +1979,7 @@ def criar_nota_fiscal():
             }
         })
     except Exception as e:
+        logger.error(f"Erro ao criar nota fiscal: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/notas-fiscais', methods=['GET'])
@@ -1922,7 +2000,9 @@ def listar_notas_fiscais():
             })
         
         return jsonify({'success': True, 'notas': result})
+    
     except Exception as e:
+        logger.error(f"Erro ao listar notas fiscais: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/notas-fiscais/<int:nota_id>', methods=['GET'])
@@ -1932,6 +2012,7 @@ def detalhar_nota_fiscal(nota_id):
     try:
         nota = get_nota_fiscal(db.session, nota_id)
         if not nota:
+            logger.warning(f"Nota fiscal não encontrada: ID {nota_id}")
             return jsonify({'success': False, 'message': 'Nota fiscal não encontrada'}), 404
             
         itens = []
@@ -1959,6 +2040,7 @@ def detalhar_nota_fiscal(nota_id):
             }
         })
     except Exception as e:
+        logger.error(f"Erro ao detalhar nota fiscal: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
     
 @admin_bp.route('/transferencias', methods=['POST'])
@@ -1974,6 +2056,7 @@ def criar_transferencia():
         ]
         
         if not all(k in data and data[k] not in [None, ''] for k in required_keys):
+            logger.warning("Dados incompletos para a transferência")
             return jsonify({'success': False, 'message': 'Dados incompletos para a transferência'}), 400
 
         # Validações e conversões
@@ -1986,16 +2069,20 @@ def criar_transferencia():
         converter_unidade = data.get('converter_unidade', False)
         
         if quantidade <= 0:
+            logger.warning("Quantidade inválida para transferência")
             return jsonify({'success': False, 'message': 'Quantidade deve ser maior que zero'}), 400
         
         if estoque_origem == estoque_destino:
+            logger.warning("Estoque de origem e destino são iguais")
             return jsonify({'success': False, 'message': 'Estoque de origem e destino devem ser diferentes'}), 400
 
         # Validar conversão se solicitada
         if converter_unidade:
             if not data.get('unidade_destino'):
+                logger.warning("Unidade de destino não fornecida para conversão")
                 return jsonify({'success': False, 'message': 'Unidade de destino é obrigatória para conversão'}), 400
             if not data.get('quantidade_destino'):
+                logger.warning("Quantidade de destino não fornecida para conversão")
                 return jsonify({'success': False, 'message': 'Quantidade de destino é obrigatória para conversão'}), 400
 
         transferencia_data = {
@@ -2021,7 +2108,7 @@ def criar_transferencia():
         if transferencia.produto_destino_id and transferencia.produto_destino_id != transferencia.produto_id:
             produto_destino = db.session.query(Produto).get(transferencia.produto_destino_id)
             produto_nome = f"{produto_nome} → {produto_destino.nome} ({produto_destino.unidade.value})"
-
+        logger.info(f"Transferência {transferencia.id} registrada por usuário {current_user.id}")
         return jsonify({
             'success': True,
             'message': 'Transferência realizada com sucesso',
@@ -2037,6 +2124,7 @@ def criar_transferencia():
             }
         })
     except Exception as e:
+        logger.error(f"Erro ao registrar transferência: {str(e)}")
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
     
@@ -2061,6 +2149,7 @@ def listar_transferencias():
         
         return jsonify({'success': True, 'transferencias': result})
     except Exception as e:
+        logger.error(f"Erro ao listar transferências: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/produtos/<int:produto_id>/calcular-conversao', methods=['POST'])
@@ -2076,6 +2165,7 @@ def calcular_conversao(produto_id):
         
         produto = db.session.query(Produto).filter(Produto.id == produto_id).first()
         if not produto:
+            logger.warning(f"Produto não encontrado para conversão: ID {produto_id}")
             return jsonify({'success': False, 'message': 'Produto não encontrado'}), 404
         
         # Calcular fator de conversão
@@ -2085,7 +2175,7 @@ def calcular_conversao(produto_id):
             fator_conversao = calcular_fator_conversao(produto, unidade_origem, unidade_destino)
         
         quantidade_destino = quantidade * fator_conversao
-        
+        logger.info(f"Conversão calculada para produto {produto_id} por usuário {current_user.id}")
         return jsonify({
             'success': True,
             'quantidade_destino': float(quantidade_destino),
@@ -2094,6 +2184,7 @@ def calcular_conversao(produto_id):
         })
         
     except Exception as e:
+        logger.error(f"Erro ao calcular conversão: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/descontos', methods=['POST'])
@@ -2105,6 +2196,7 @@ def criar_desconto_route():
     # Validação básica dos dados - mantendo os nomes das variáveis originais
     required_fields = ['identificador', 'quantidade_minima', 'quantidade_maxima', 'valor_unitario_com_desconto']
     if not all(field in dados for field in required_fields):
+        logger.warning("Campos obrigatórios faltando para criar desconto")
         return jsonify({'erro': 'Campos obrigatórios faltando'}), 400
     
     try:
@@ -2122,6 +2214,7 @@ def criar_desconto_route():
         }
         
         desconto = criar_desconto(session, dados_desconto)
+        logger.info(f"Desconto {desconto.id} criado por administrador {current_user.id}")
         return jsonify({
             'success': True,
             'mensagem': 'Desconto criado com sucesso',
@@ -2137,7 +2230,7 @@ def criar_desconto_route():
             }
         }), 201
     except Exception as e:
-        print(f"Erro ao criar desconto: {e}")
+        logger.error(f"Erro ao criar desconto: {str(e)}")
         return jsonify({'success': False, 'erro': str(e)}), 500
     finally:
         session.close()
@@ -2164,6 +2257,7 @@ def buscar_descontos_produto_route(produto_id):
             } for d in descontos]
         }), 200
     except Exception as e:
+        logger.error(f"Erro ao buscar descontos para o produto {produto_id}: {str(e)}")
         return jsonify({'success': False, 'erro': str(e)}), 500
     finally:
         session.close()
@@ -2190,11 +2284,12 @@ def atualizar_desconto_route(desconto_id):
         desconto = atualizar_desconto(session, desconto_id, dados_atualizacao)
 
         if not desconto:
+            logger.warning(f"Desconto não encontrado: ID {desconto_id}")
             return jsonify({
                 'success': False,
                 'erro': 'Desconto não encontrado'
             }), 404
-
+        logger.info(f"Desconto {desconto.id} atualizado por administrador {current_user.id}")
         return jsonify({
             'success': True,
             'mensagem': 'Desconto atualizado com sucesso',
@@ -2211,7 +2306,7 @@ def atualizar_desconto_route(desconto_id):
             }
         }), 200
     except Exception as e:
-        print(f"Erro ao atualizar desconto: {e}")
+        logger.error(f"Erro ao atualizar desconto: {e}")
         return jsonify({
             'success': False,
             'erro': 'Erro interno ao tentar atualizar o desconto. Por favor, tente novamente mais tarde.'
@@ -2229,20 +2324,23 @@ def deletar_desconto_route(desconto_id):
         sucesso = deletar_desconto(session, desconto_id)
         
         if sucesso:
+            logger.info(f"Desconto {desconto_id} deletado por administrador {current_user.id}")
             return jsonify({
                 'success': True,
                 'message': 'Desconto deletado com sucesso'
             }), 200
         else:
+            logger.warning(f"Desconto não encontrado para deleção: ID {desconto_id}")
             return jsonify({
                 'success': False,
                 'message': 'Desconto não encontrado'
             }), 404
             
     except Exception as e:
+        logger.error(f"Erro ao deletar desconto: {str(e)}")
         return jsonify({
             'success': False,
-            'message': str(e)
+            'message': 'Erro interno ao tentar deletar o desconto. Por favor, tente novamente mais tarde.'
         }), 500
     finally:
         session.close()
@@ -2272,7 +2370,8 @@ def listar_descontos_route():
             } for d in descontos]
         }), 200
     except Exception as e:
-        return jsonify({'success': False, 'erro': str(e)}), 500
+        logger.error(f"Erro ao listar descontos: {str(e)}")
+        return jsonify({'success': False, 'erro': 'Erro interno ao tentar listar os descontos. Por favor, tente novamente mais tarde.'}), 500
     finally:
         session.close()
 
@@ -2284,6 +2383,7 @@ def buscar_desconto_por_id(desconto_id):
         desconto = session.query( Desconto).get(desconto_id)
         
         if not desconto:
+            logger.warning(f"Desconto não encontrado: ID {desconto_id}")
             return jsonify({'success': False, 'erro': 'Desconto não encontrado'}), 404
         
         valido_ate_formatado = desconto.valido_ate.strftime('%Y-%m-%d') if desconto.valido_ate else None
@@ -2303,7 +2403,8 @@ def buscar_desconto_por_id(desconto_id):
             }
         }), 200
     except Exception as e:
-        return jsonify({'success': False, 'erro': str(e)}), 500
+        logger.error(f"Erro ao buscar desconto por ID: {str(e)}")
+        return jsonify({'success': False, 'erro': 'Erro interno ao tentar buscar o desconto. Por favor, tente novamente mais tarde.'}), 500
     finally:
         session.close()
         
@@ -2317,6 +2418,7 @@ def buscar_produtos_desconto_route(desconto_id):
         desconto = session.query(Desconto).get(desconto_id)
         
         if not desconto:
+            logger.warning(f"Desconto não encontrado: ID {desconto_id}")
             return jsonify({'success': False, 'erro': 'Desconto não encontrado'}), 404
         
         # Busca os produtos associados a este desconto
@@ -2338,7 +2440,8 @@ def buscar_produtos_desconto_route(desconto_id):
             } for p in produtos]
         }), 200
     except Exception as e:
-        return jsonify({'success': False, 'erro': str(e)}), 500
+        logger.error(f"Erro ao buscar produtos do desconto {desconto_id}: {str(e)}")
+        return jsonify({'success': False, 'erro': 'Erro interno ao tentar buscar os produtos do desconto. Por favor, tente novamente mais tarde.'}), 500
     finally:
         session.close()
         
@@ -2937,9 +3040,9 @@ def gerar_pdf_caixas_detalhado():
         return response
 
     except Exception as e:
+        logging.error(f"Erro ao gerar PDF dos caixas: {str(e)}", exc_info=True)
         session.rollback()
-        print(f"Erro ao gerar PDF dos caixas: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': f'Erro interno do servidor: {str(e)}'}), 500
+        return jsonify({'success': False, 'error': 'Erro interno do servidor: '}), 500
     finally:
         session.close()
 
@@ -2950,10 +3053,12 @@ def atualizar_caixa_route(caixa_id):
     try:
         dados = request.get_json()
         if not dados:
+            logger.warning("Dados não fornecidos para atualização do caixa")
             return jsonify({'success': False, "error": "Dados não fornecidos"}), 400
             
         caixa = db.session.get( Caixa, caixa_id)
         if not caixa:
+            logger.warning(f"Caixa não encontrado: ID {caixa_id}")
             return jsonify({'success': False, "error": "Caixa não encontrado"}), 404
         
         # Atualiza status e datas conforme ação
@@ -2975,7 +3080,7 @@ def atualizar_caixa_route(caixa_id):
             caixa.observacoes_admin = dados['observacoes_admin']
         
         db.session.commit()
-        
+        logger.info(f"Caixa atualizado com sucesso: ID {caixa_id}")
         return jsonify({
             'success': True,
             "message": "Caixa atualizado com sucesso",
@@ -2989,8 +3094,9 @@ def atualizar_caixa_route(caixa_id):
         }), 200
             
     except Exception as e:
+        logger.error(f"Erro ao atualizar caixa ID {caixa_id}: {str(e)}", exc_info=True)
         db.session.rollback()
-        return jsonify({'success': False, "error": f"Erro ao atualizar caixa: {str(e)}"}), 500
+        return jsonify({'success': False, "error": "Erro ao atualizar caixa: "}), 500
 
 @admin_bp.route('/caixas/<int:caixa_id>', methods=['GET', 'PUT'])
 @login_required
@@ -3002,6 +3108,7 @@ def caixa_detail(caixa_id):
             caixa = session.get( Caixa, caixa_id)
             
             if not caixa:
+                logger.warning(f"Caixa não encontrado: ID {caixa_id}")
                 return jsonify({"success": False, "error": "Caixa não encontrado"}), 404
             
             # Convert caixa object to dictionary
@@ -3020,20 +3127,23 @@ def caixa_detail(caixa_id):
                 'observacoes_operador': caixa.observacoes_operador,
                 'observacoes_admin': caixa.observacoes_admin
             }
-
+            logger.info(f"Caixa recuperado com sucesso: ID {caixa_id}")
             return jsonify({"success": True, "data": caixa_data})
             
         except Exception as e:
-            return jsonify({"success": False, "error": str(e)}), 500
-    
+            logger.error(f"Erro ao recuperar caixa ID {caixa_id}: {str(e)}", exc_info=True)
+            return jsonify({"success": False, "error": "Erro ao recuperar caixa: "}), 500
+
     elif request.method == 'PUT':
         try:
             dados = request.get_json()
             if not dados:
+                logger.warning("Dados não fornecidos para atualização do caixa")
                 return jsonify({"success": False, "error": "Dados não fornecidos"}), 400
                 
             caixa = db.session.get( Caixa, caixa_id)
             if not caixa:
+                logger.warning(f"Caixa não encontrado: ID {caixa_id}")
                 return jsonify({"success": False, "error": "Caixa não encontrado"}), 404
             
             # Atualiza status e datas conforme ação
@@ -3052,7 +3162,7 @@ def caixa_detail(caixa_id):
                 caixa.observacoes_admin = dados['observacoes_admin']
             
             db.session.commit()
-            
+            logger.info(f"Caixa atualizado com sucesso: ID {caixa_id} por usuário {current_user.id}")
             return jsonify({
                 "success": True,
                 "message": "Caixa atualizado com sucesso",
@@ -3065,8 +3175,9 @@ def caixa_detail(caixa_id):
             })
                 
         except Exception as e:
+            logger.error(f"Erro ao atualizar caixa ID {caixa_id}: {str(e)}", exc_info=True)
             db.session.rollback()
-            return jsonify({"success": False, "error": f"Erro ao atualizar caixa: {str(e)}"}), 500
+            return jsonify({"success": False, "error": "Erro ao atualizar caixa: "}), 500
 
 @admin_bp.route('/caixa/venda/<int:venda_id>/estornar', methods=['POST'])
 @login_required
@@ -3079,19 +3190,23 @@ def rota_estornar_venda(venda_id):
         dados = request.get_json()
         
         if not dados:
+            logger.warning("Dados não fornecidos para estorno de venda")
             return jsonify({'success': False, 'message': 'Dados não fornecidos'}), 400
             
         motivo_estorno = dados.get('motivo_estorno')
         if not motivo_estorno:
+            logger.warning("Motivo do estorno não fornecido")
             return jsonify({'success': False, 'message': 'Motivo do estorno é obrigatório'}), 400
             
         usuario_id = current_user.id
         
         resultado = estornar_venda(db, venda_id, motivo_estorno, usuario_id)
         
+        logger.info(f"Estorno de venda ID {venda_id} processado: {resultado}")
         return jsonify(resultado), 200 if resultado['success'] else 400
             
     except Exception as e:
+        logger.error(f"Erro ao estornar venda ID {venda_id}: {str(e)}", exc_info=True)
         db.session.rollback()
         print(e)
         return jsonify({
@@ -3108,6 +3223,7 @@ def get_caixa_financeiro(caixa_id):
         # Busca informações do caixa
         caixa = session.query(Caixa).filter_by(id=caixa_id).first()
         if not caixa:
+            logger.warning(f"Caixa não encontrado: ID {caixa_id}")
             return jsonify({'success': False, 'error': 'Caixa não encontrado'}), 404
             
         # Busca todas as movimentações financeiras do caixa
@@ -3256,6 +3372,7 @@ def get_caixa_financeiro(caixa_id):
         
         total_contas_prazo_recebidas = float(total_contas_prazo_recebidas)
         
+        logger.info(f"Dados financeiros do caixa ID {caixa_id} recuperados com sucesso")
         return jsonify({
             'success': True,
             'data': dados,
@@ -3272,6 +3389,7 @@ def get_caixa_financeiro(caixa_id):
         })
         
     except Exception as e:
+        logger.error(f"Erro no financeiro do caixa {caixa_id}: {str(e)}", exc_info=True)
         session.rollback()
         print(f"Erro no financeiro do caixa {caixa_id}: {str(e)}", exc_info=True)
         return jsonify({
@@ -3290,6 +3408,7 @@ def get_caixa_financeiro_pdf(caixa_id):
         # Busca informações do caixa
         caixa = session.query(Caixa).filter_by(id=caixa_id).first()
         if not caixa:
+            logger.warning(f"Caixa não encontrado: ID {caixa_id}")
             return jsonify({'success': False, 'error': 'Caixa não encontrado'}), 404
             
         # Busca todas as movimentações financeiras do caixa
@@ -3365,6 +3484,7 @@ def get_caixa_financeiro_pdf(caixa_id):
         )
         
     except Exception as e:
+        logger.error(f"Erro ao gerar PDF do caixa {caixa_id}: {str(e)}", exc_info=True)
         session.rollback()
         print(f"Erro ao gerar PDF do caixa {caixa_id}: {str(e)}", exc_info=True)
         return jsonify({
@@ -3385,13 +3505,14 @@ def atualizar_forma_pagamentos(venda_id):
     """
     data = request.get_json()
     pagamentos_recebidos = data.get('pagamentos')
-    print(f'DATA: \n {data}\nPAGAMENTOS: \n{pagamentos_recebidos}\n')
     
     if not pagamentos_recebidos or not isinstance(pagamentos_recebidos, list):
+        logger.warning("Lista de pagamentos inválida ou não fornecida")
         return jsonify({'success': False, 'error': 'Informe a lista de pagamentos'}), 400
 
     nova_forma = pagamentos_recebidos[0].get('forma_pagamento')
     if not nova_forma:
+        logger.warning("Forma de pagamento inválida")
         return jsonify({'success': False, 'error': 'Forma de pagamento inválida'}), 400
 
     # Converte para Enum se existir
@@ -3404,6 +3525,7 @@ def atualizar_forma_pagamentos(venda_id):
     try:
         nota_fiscal = session.query(NotaFiscal).get(venda_id)
         if not nota_fiscal:
+            logger.warning(f"Nota fiscal não encontrada: ID {venda_id}")
             return jsonify({'success': False, 'error': 'Nota fiscal não encontrada'}), 404
         
         # Atualiza todos os pagamentos da nota
@@ -3425,6 +3547,8 @@ def atualizar_forma_pagamentos(venda_id):
             mov.forma_pagamento = nova_forma_enum
 
         session.commit()
+        
+        logger.info(f"Formas de pagamento da venda {venda_id} atualizadas para {nova_forma_enum}")
         return jsonify({'success': True, 'mensagem': 'Formas de pagamento de toda a nota atualizadas com sucesso!'})
 
     except Exception as e:
@@ -3441,6 +3565,7 @@ def get_vendas_por_pagamento(caixa_id):
     try:
         forma_pagamento = request.args.get('forma_pagamento')
         if not forma_pagamento:
+            logger.warning("Forma de pagamento não especificada")
             return jsonify({'success': False, 'error': 'Forma de pagamento não especificada'}), 400
 
         # Busca vendas com a forma de pagamento específica
@@ -3470,7 +3595,7 @@ def get_vendas_por_pagamento(caixa_id):
                 'valor_total': float(venda.valor_total),
                 'valor_pago': float(valor_pago)
             })
-
+        logger.info(f"Vendas por pagamento '{forma_pagamento}' no caixa {caixa_id} recuperadas com sucesso")
         return jsonify({
             'success': True,
             'vendas': vendas_data,
@@ -3478,8 +3603,8 @@ def get_vendas_por_pagamento(caixa_id):
         })
 
     except Exception as e:
+        logger.error(f"Erro ao buscar vendas por pagamento: {str(e)}", exc_info=True)
         session.rollback()
-        print(f"Erro ao buscar vendas por pagamento: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': 'Erro interno'}), 500
     finally:
         session.close()
@@ -3492,6 +3617,7 @@ def get_vendas_por_pagamento_pdf(caixa_id):
     try:
         forma_pagamento = request.args.get('forma_pagamento')
         if not forma_pagamento:
+            logger.warning("Forma de pagamento não especificada para PDF")
             return jsonify({'success': False, 'error': 'Forma de pagamento não especificada'}), 400
 
         # Busca vendas
@@ -3562,8 +3688,8 @@ def get_vendas_por_pagamento_pdf(caixa_id):
         return response
 
     except Exception as e:
+        logger.error(f"Erro ao gerar PDF de vendas: {str(e)}", exc_info=True)
         session.rollback()
-        print(f"Erro ao gerar PDF de vendas: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': 'Erro interno ao gerar PDF'}), 500
     finally:
         session.close()
@@ -3585,6 +3711,7 @@ def get_detalhes_venda(venda_id):
             .first()
 
         if not venda:
+            logger.warning(f"Venda não encontrada: ID {venda_id}")
             return jsonify({'success': False, 'error': 'Venda não encontrada'}), 404
 
         venda_data = {
@@ -3616,15 +3743,15 @@ def get_detalhes_venda(venda_id):
                 'desconto_aplicado': float(item.desconto_aplicado) if item.desconto_aplicado else None,
                 'tipo_desconto': item.tipo_desconto.value if item.tipo_desconto else None
             })
-
+        logger.info(f"Detalhes da venda ID {venda_id} recuperados com sucesso")
         return jsonify({
             'success': True,
             'venda': venda_data
         })
 
     except Exception as e:
+        logger.error(f"Erro ao buscar detalhes da venda {venda_id}: {str(e)}", exc_info=True)
         session.rollback()
-        print(f"Erro ao buscar detalhes da venda: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': 'Erro interno'}), 500
     finally:
         session.close()
@@ -3638,6 +3765,7 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         # --- Busca informações do caixa e operador ---
         caixa = session.query(Caixa).filter_by(id=caixa_id).first()
         if not caixa:
+            logger.warning(f"Caixa não encontrado para PDF: ID {caixa_id}")
             raise Exception("Caixa não encontrado")
         operador_nome = caixa.operador.nome if caixa.operador else "Operador não identificado"
         caixa_data = caixa.data_fechamento if caixa.data_fechamento else caixa.data_abertura
@@ -3841,7 +3969,8 @@ def gerar_pdf_caixa_financeiro(caixa_id):
                 elements.append(logo)
                 elements.append(Spacer(0, 6))
             except Exception as e:
-                print(f"Erro ao carregar a logo: {e}")
+                logger.error(f"Erro ao carregar a logo: {e}")
+                logger.warning(f"Erro ao carregar a logo: {e}")
 
         # --- Cabeçalho ---
         elements.append(Paragraph("RELATÓRIO FINANCEIRO", header_style))
@@ -3961,8 +4090,8 @@ def gerar_pdf_caixa_financeiro(caixa_id):
         return response
 
     except Exception as e:
+        logger.error(f"Erro ao gerar PDF do caixa {caixa_id}: {str(e)}", exc_info=True)
         session.rollback()
-        print(f"Erro ao gerar PDF do caixa {caixa_id}: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         session.close()
@@ -3975,6 +4104,7 @@ def aprovar_caixa(caixa_id):
     caixa =  Caixa.query.get_or_404(caixa_id)
     
     if current_user.tipo != 'admin':
+        logger.warning(f"Usuário não autorizado a aprovar caixa: {current_user.id}")
         return jsonify({'success': False, 'error': 'Apenas administradores podem aprovar caixas'}), 403
     
     data = request.get_json()
@@ -3988,6 +4118,7 @@ def aprovar_caixa(caixa_id):
             observacoes_admin=observacoes
         )
         db.session.commit()
+        logger.info(f"Caixa {caixa_id} aprovado com sucesso pelo usuário {current_user.id}")
         return jsonify({
             'success': True,
             'message': 'Caixa aprovado com sucesso',
@@ -3995,10 +4126,10 @@ def aprovar_caixa(caixa_id):
             'valor_confirmado': float(caixa.valor_confirmado) if caixa.valor_confirmado else None
         }), 200
     except ValueError as e:
-        print(e)
+        logger.error(f"Erro ao aprovar caixa {caixa_id}: {str(e)}")
         return jsonify({'error': str(e)}), 400
     except Exception as e:
-        print(e)
+        logger.error(f"Erro ao aprovar caixa {caixa_id}: {str(e)}")
         db.session.rollback()
         return jsonify({'success': False, 'error': f'Erro ao aprovar caixa: {str(e)}'}), 500
 
@@ -4010,6 +4141,7 @@ def recusar_caixa(caixa_id):
     caixa =  Caixa.query.get_or_404(caixa_id)
     
     if current_user.tipo != 'admin':
+        logger.warning(f"Usuário não autorizado a recusar caixa: {current_user.id}")
         return jsonify({'success': False, 'error': 'Apenas administradores podem recusar caixas'}), 403
     
     data = request.get_json()
@@ -4017,6 +4149,7 @@ def recusar_caixa(caixa_id):
     valor_correto = data.get('valor_correto')
     
     if not motivo:
+        logger.warning("Motivo da recusa não fornecido")
         return jsonify({'success': False, 'error': 'Motivo da recusa é obrigatório'}), 400
     
     try:
@@ -4026,6 +4159,7 @@ def recusar_caixa(caixa_id):
             valor_correto=valor_correto
         )
         db.session.commit()
+        logger.info(f"Caixa {caixa_id} recusado com sucesso pelo usuário {current_user.id}")
         return jsonify({
             'success': True,
             'message': 'Caixa recusado com sucesso',
@@ -4033,10 +4167,10 @@ def recusar_caixa(caixa_id):
             'observacoes_admin': caixa.observacoes_admin
         }), 200
     except ValueError as e:
-        print(e)
+        logger.error(f"Erro ao recusar caixa {caixa_id}: {str(e)}")
         return jsonify({'error': str(e)}), 400
     except Exception as e:
-        print(e)
+        logger.error(f"Erro ao recusar caixa {caixa_id}: {str(e)}")
         db.session.rollback()
         return jsonify({'success': False, 'error': f'Erro ao recusar caixa: {str(e)}'}), 500
 
@@ -4058,7 +4192,7 @@ def enviar_para_analise(caixa_id):
         observacoes = data.get('observacoes')
         
         if not valor_fechamento:
-            print("Erro: Valor de fechamento não fornecido")  # Log de depuração
+            logger.warning(f"Valor de fechamento não fornecido para caixa {caixa_id}")
             return jsonify({'error': 'Valor de fechamento é obrigatório'}), 400
         
         # Adicione mais logs para verificar o usuário atual
@@ -4070,8 +4204,7 @@ def enviar_para_analise(caixa_id):
             usuario_id=current_user.id
         )
         db.session.commit()
-        
-        print("Caixa enviado para análise com sucesso")  # Log de depuração
+        logger.info(f"Caixa {caixa_id} enviado para análise com sucesso pelo usuário {current_user.id}")
         return jsonify({
             'success': True,
             'message': 'Caixa enviado para análise com sucesso',
@@ -4080,11 +4213,12 @@ def enviar_para_analise(caixa_id):
         }), 200
         
     except ValueError as e:
-        print(f"Erro de valor: {str(e)}")  # Log de depuração
+        logger.error(f"Erro ao enviar caixa {caixa_id} para análise: {str(e)}")
+        logger.warning(f"Erro de valor: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         db.session.rollback()
-        print(f"Erro interno: {str(e)}")  # Log de depuração
+        logger.error(f"Erro interno: {str(e)}")
         return jsonify({'success': False, 'error': f'Erro ao enviar caixa para análise: {str(e)}'}), 500
 
 @admin_bp.route('/caixas/<int:caixa_id>/reabrir', methods=['POST'])
@@ -4095,6 +4229,7 @@ def reabrir_caixa(caixa_id):
     caixa =  Caixa.query.get_or_404(caixa_id)
     
     if current_user.tipo != 'admin':
+        logger.warning(f"Usuário não autorizado a reabrir caixa: {current_user.id}")
         return jsonify({'success': False, 'error': 'Apenas administradores podem reabrir caixas'}), 403
     
     data = request.get_json()
@@ -4106,16 +4241,18 @@ def reabrir_caixa(caixa_id):
             motivo=motivo
         )
         db.session.commit()
+        logger.info(f"Caixa {caixa_id} reaberto com sucesso pelo usuário {current_user.id}")
         return jsonify({
             'success': True,
             'message': 'Caixa reaberto com sucesso',
             'status': caixa.status.value
         }), 200
     except ValueError as e:
-        print(e)
+        logger.error(f"Erro ao reabrir caixa {caixa_id}: {str(e)}")
+        logger.warning(f"Erro de valor: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
-        print(e)
+        logger.error(f"Erro interno: {str(e)}")
         db.session.rollback()
         return jsonify({'success': False, 'error': f'Erro ao reabrir caixa: {str(e)}'}), 500
     
@@ -4150,6 +4287,7 @@ def relatorio_vendas_produtos():
             data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
             data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
         except ValueError:
+            logger.warning("Formato de data inválido fornecido")
             return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
         
         # Construir a query base para produtos vendidos
@@ -4281,6 +4419,7 @@ def relatorio_vendas_produtos():
         })
         
     except Exception as e:
+        logger.error(f"Erro ao gerar relatório de vendas de produtos: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
     
 @admin_bp.route('/relatorios/vendas-diarias', methods=['GET'])
@@ -4305,6 +4444,7 @@ def relatorio_vendas_diarias():
             data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
             data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
         except ValueError:
+            logger.warning("Formato de data inválido fornecido")
             return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
         
         # Definir a expressão de agrupamento baseada no parâmetro
@@ -4318,6 +4458,7 @@ def relatorio_vendas_diarias():
             group_expr = func.date_trunc('month', NotaFiscal.data_emissao)
             label_format = '%Y-%m'
         else:
+            logger.warning("Agrupamento inválido fornecido")
             return jsonify({'error': 'Agrupamento inválido. Use dia, semana ou mes'}), 400
         
         # Query para obter vendas agrupadas por período
@@ -4385,6 +4526,7 @@ def relatorio_vendas_diarias():
         })
         
     except Exception as e:
+        logger.error(f"Erro ao gerar relatório de vendas diárias: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
     
 @admin_bp.route('/relatorios/vendas-produtos/exportar', methods=['GET'])
@@ -4437,6 +4579,7 @@ def exportar_relatorio_vendas_produtos():
         )
         
     except Exception as e:
+        logger.error(f"Erro ao exportar relatório de vendas de produtos: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
     
 @admin_bp.route('/api/produtos/categorias', methods=['GET'])
@@ -4454,6 +4597,7 @@ def get_produto_categorias():
             'categorias': sorted(categorias_list)  # Return sorted list of categories
         })
     except Exception as e:
+        logger.error(f"Erro ao obter categorias de produtos: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
     
 @admin_bp.route('/relatorios/vendas-produtos/detalhes', methods=['GET'])
@@ -4470,6 +4614,7 @@ def relatorio_vendas_produtos_detalhes():
         
         # Validação básica dos parâmetros
         if not any([produto_id, produto_nome, produto_codigo]):
+            logger.warning("Nenhum filtro de produto fornecido")
             return jsonify({
                 'success': False, 
                 'message': 'É necessário fornecer pelo menos um filtro (ID, nome ou código do produto)'
@@ -4484,6 +4629,7 @@ def relatorio_vendas_produtos_detalhes():
             if data_fim and data_fim.lower() != 'undefined':
                 data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
         except ValueError:
+            logger.warning("Formato de data inválido fornecido")
             return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
         
         # Converter para datetime para filtros
@@ -4529,6 +4675,7 @@ def relatorio_vendas_produtos_detalhes():
         produto_info = produto_query.group_by(Produto.id).first()
         
         if not produto_info:
+            logger.info("Nenhum produto encontrado com os filtros fornecidos")
             return jsonify({'success': False, 'message': 'Nenhum produto encontrado com os filtros fornecidos'}), 404
         
         # Calcular métricas adicionais
@@ -4594,7 +4741,7 @@ def relatorio_vendas_produtos_detalhes():
         })
         
     except Exception as e:
-        print(f"Erro no relatório de vendas detalhado: {str(e)}")
+        logger.error(f"Erro ao gerar relatório de vendas detalhado: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'message': 'Erro interno no servidor'}), 500
 
 
@@ -4606,6 +4753,7 @@ def relatorio_vendas_produtos_pdf():
         # Obter os dados
         relatorio_data = relatorio_vendas_produtos().get_json()
         if 'error' in relatorio_data:
+            logger.error(f"Erro ao obter dados para PDF: {relatorio_data['error']}")
             return jsonify(relatorio_data), 500
         
         data_inicio = datetime.strptime(relatorio_data['meta']['data_inicio'], "%Y-%m-%d")
@@ -4678,6 +4826,7 @@ def relatorio_vendas_produtos_pdf():
             # MODO DETALHADO - Para um produto específico
             detalhes_data = relatorio_vendas_produtos_detalhes().get_json()
             if not detalhes_data.get('success'):
+                logger.error(f"Erro ao obter detalhes para PDF: {detalhes_data.get('message', 'Erro desconhecido')}")
                 return jsonify(detalhes_data), 500
 
             # Título do produto
@@ -4822,6 +4971,7 @@ def relatorio_vendas_produtos_pdf():
         return response
         
     except Exception as e:
+        logger.error(f"Erro ao gerar PDF do relatório de vendas de produtos: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 def formatarMoeda(valor):
@@ -5050,7 +5200,7 @@ def gerar_pdf_conta_receber(id):
             elements.append(logo)
             elements.append(Spacer(0, 6))
         except Exception as e:
-            print(f"Erro ao carregar a logo: {e}")
+            logger.error(f"Erro ao carregar a logo: {e}", exc_info=True)
 
     # Cabeçalho
     elements.append(Paragraph("CONTA A RECEBER", header_style))
@@ -5269,23 +5419,26 @@ def gerar_pdf_conta_receber(id):
 def pagar_conta_receber(id):
     conta = ContaReceber.query.get_or_404(id)
     data = request.get_json()
-    print(f'Dados recebidos para pagamento: {data}')  # Log completo dos dados
 
     try:
         # Validação do valor pago
         valor_pago = Decimal(str(data.get('valor_pago', 0)))
         if valor_pago <= 0:
+            logger.warning(f"Valor de pagamento inválido: {valor_pago}")
             return jsonify({'error': 'Valor deve ser positivo'}), 400
         if valor_pago > conta.valor_aberto:
+            logger.warning(f"Valor de pagamento excede o valor em aberto: {valor_pago} > {conta.valor_aberto}")
             return jsonify({'error': 'Valor excede o valor em aberto'}), 400
 
         # Forma de pagamento
         forma_pagamento_str = data.get('forma_pagamento')
         if not forma_pagamento_str:
+            logger.warning("Forma de pagamento não informada")
             return jsonify({'error': 'Forma de pagamento não informada'}), 400
         try:
             forma_pagamento = FormaPagamento[forma_pagamento_str]
         except KeyError:
+            logger.warning(f"Forma de pagamento inválida: {forma_pagamento_str}")
             return jsonify({'error': f'Forma de pagamento inválida: {forma_pagamento_str}'}), 400
 
         # Caixa
@@ -5294,8 +5447,10 @@ def pagar_conta_receber(id):
             try:
                 caixa_id = int(caixa_id)
                 if not Caixa.query.get(caixa_id):
+                    logger.warning(f"Caixa não encontrado: {caixa_id}")
                     return jsonify({'error': 'Caixa não encontrado'}), 400
             except ValueError:
+                logger.warning(f"ID do caixa inválido: {caixa_id}")
                 return jsonify({'error': 'ID do caixa inválido'}), 400
         else:
             caixa = Caixa.query.filter_by(
@@ -5305,6 +5460,7 @@ def pagar_conta_receber(id):
             if caixa:
                 caixa_id = caixa.id
             else:
+                logger.warning(f"Nenhum caixa aberto encontrado para o usuário {current_user.id}")
                 return jsonify({'error': 'Nenhum caixa aberto encontrado para o usuário'}), 400
 
         # Observações
@@ -5332,8 +5488,9 @@ def pagar_conta_receber(id):
         })
 
     except Exception as e:
+        logger.error(f'Erro ao processar pagamento da conta a receber {id}: {e}', exc_info=True)
         import traceback
         db.session.rollback()
-        print(f'Erro ao processar pagamento: {e}')
-        print(traceback.format_exc())
+        logger.error(f'Erro ao processar pagamento: {e}')
+        logger.error(traceback.format_exc())
         return jsonify({'error': f'Erro interno ao processar pagamento: {str(e)}'}), 500
