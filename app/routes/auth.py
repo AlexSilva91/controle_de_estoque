@@ -13,10 +13,11 @@ from app.crud import (
     update_user
 )
 from app.database import SessionLocal
-from app.models.entities import Caixa, StatusCaixa
+from app.models.entities import Caixa, StatusCaixa, Usuario
 from zoneinfo import ZoneInfo 
 from datetime import datetime
 from app import schemas
+from app.models import db
 import logging
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/')
@@ -76,7 +77,7 @@ def login():
 
             # Verificar caixa aberto apenas para operadores
             if usuario.tipo.value == 'operador':
-                logger.info(f"Verificando caixa para operador {usuario.id}")
+                logger.info(f"Verificando caixa para operador {usuario.nome}")
                 caixa_aberto = get_caixa_aberto(db, operador_id=usuario.id)
                 
                 if not caixa_aberto:
@@ -261,20 +262,16 @@ def abrir_caixa_manual():
 @auth_bp.route('/logout')
 @login_required
 def logout():
-    db = get_session()
-    
     try:
-        # Busca o usuário atual na sessão do banco
-        usuario = db.query(type(current_user)).filter_by(id=current_user.id).first()
+        usuario = Usuario.query.get(current_user.id)
         if usuario:
-            # Atualiza último acesso antes de fazer logout
             usuario.ultimo_acesso = datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
-            db.commit()
-    except SQLAlchemyError as e:
-        logger.error(f"Erro ao atualizar último acesso no logout: {str(e)}")
-        db.rollback()
+            db.session.commit()
+    except Exception as e:
+        logger.exception("Erro ao atualizar último acesso no logout")
+        db.session.rollback()
     finally:
-        db.close()
+        db.session.close()  # garante liberar a sessão
     
     logout_user()
     flash('Logout efetuado com sucesso.', 'success')
