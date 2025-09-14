@@ -390,7 +390,7 @@ def abrir_caixa_route():
             valor_abertura=valor_abertura,
             observacao=observacao
         )
-        logger.info(f"Caixa {caixa.id} aberto por usuário {current_user.id}")
+        logger.info(f"Caixa {caixa.id} aberto por usuário {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Caixa aberto com sucesso',
@@ -419,7 +419,7 @@ def fechar_caixa_route():
             valor_fechamento=valor_fechamento,
             observacao=observacao
         )
-        logger.info(f"Caixa {caixa.id} fechado por usuário {current_user.id}")
+        logger.info(f"Caixa {caixa.id} fechado por usuário {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Caixa fechado com sucesso',
@@ -440,7 +440,7 @@ def get_caixa_status():
     try:
         caixa = get_caixas_abertos(db.session)
         if caixa:
-            logger.info(f"Status do caixa {caixa.id} obtido por usuário {current_user.id}")
+            logger.info(f"Status do caixa {caixa.id} obtido por usuário {current_user.nome}")
             return jsonify({
                 'success': True,
                 'aberto': True,
@@ -621,8 +621,8 @@ def criar_cliente():
         )
         
         cliente = create_cliente(db.session, cliente_data)
-        
-        logger.info(f"Cliente {cliente.nome} criado por usuário {current_user.id}")
+
+        logger.info(f"Cliente {cliente.nome} criado por usuário {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Cliente criado com sucesso',
@@ -657,7 +657,7 @@ def atualizar_cliente(cliente_id):
         
         cliente = update_cliente(db.session, cliente_id, cliente_data)
 
-        logger.info(f"Cliente {cliente.id} atualizado por usuário {current_user.id}")
+        logger.info(f"Cliente {cliente.id} atualizado por usuário {current_user.nome}")
         logger.info(f"Dados do cliente {cliente.id} atualizados: {cliente_data}")
         
         return jsonify({
@@ -684,7 +684,7 @@ def obter_cliente(cliente_id):
         cliente = get_cliente(db.session, cliente_id)
         if not cliente:
             return jsonify({'success': False, 'message': 'Cliente não encontrado'}), 404
-        logger.info(f"Cliente {cliente_id} obtido por usuário {current_user.id}")
+        logger.info(f"Cliente {cliente_id} obtido por usuário {current_user.nome}")
         return jsonify({
             'success': True,
             'cliente': {
@@ -707,7 +707,7 @@ def obter_cliente(cliente_id):
 def remover_cliente(cliente_id):
     try:
         delete_cliente(db.session, cliente_id)
-        logger.info(f"Cliente {cliente_id} removido por usuário {current_user.id}")
+        logger.info(f"Cliente {cliente_id} removido por usuário {current_user.nome}")
         return jsonify({'success': True, 'message': 'Cliente removido com sucesso'})
     except Exception as e:
         logger.error(f"Erro ao remover cliente: {str(e)}")
@@ -836,7 +836,7 @@ def criar_produto():
             
             db.session.commit()
             
-            logger.info(f"Produto existente {produto.id} atualizado por usuário {current_user.id}")
+            logger.info(f"Produto existente {produto.id} atualizado por usuário {current_user.nome}")
             logger.info(f"Dados do produto existente {produto.id} atualizados: {produto_update}")
             
             return jsonify({
@@ -929,7 +929,7 @@ def criar_produto():
         
         db.session.commit()
 
-        logger.info(f"Produto {produto.nome} criado por usuário {current_user.id}")
+        logger.info(f"Produto {produto.nome} criado por usuário {current_user.nome}")
         logger.debug(f"Dados do produto criado: {produto_data}")
         
         return jsonify({
@@ -1087,7 +1087,7 @@ def atualizar_produto(produto_id):
             } for d in produto.descontos]
         }
         
-        logger.info(f"Produto {produto.id} atualizado por usuário {current_user.id}")
+        logger.info(f"Produto {produto.id} atualizado por usuário {current_user.nome}")
         logger.debug(f"Dados do produto {produto.id} atualizados: {produto_data}")
         
         return jsonify({
@@ -1202,7 +1202,7 @@ def remover_produto(produto_id):
         db.session.delete(produto)
         db.session.commit()
         
-        logger.info(f"Produto {produto_id} removido por usuário {current_user.id}")
+        logger.info(f"Produto {produto_id} removido por usuário {current_user.nome}")
         return jsonify({'success': True, 'message': 'Produto removido com sucesso'})
         
     except Exception as e:
@@ -1239,7 +1239,7 @@ def registrar_movimentacao_produto(produto_id):
         
         movimentacao = registrar_movimentacao(db.session, mov_data)
         
-        logger.info(f"Movimentação {movimentacao.id} registrada por usuário {current_user.id}")
+        logger.info(f"Movimentação {movimentacao.id} registrada por usuário {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Movimentação registrada com sucesso',
@@ -1713,7 +1713,7 @@ def criar_usuario():
         )
 
         novo_usuario = create_user(db.session, usuario_data)
-        logger.info(f"Usuário {novo_usuario.id} criado por administrador {current_user.id}")
+        logger.info(f"Usuário {novo_usuario.id} criado por administrador {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Usuário criado com sucesso',
@@ -1751,8 +1751,8 @@ def atualizar_usuario(usuario_id):
         usuario_data = UsuarioUpdate(**update_data)
         
         usuario = update_user(db.session, usuario_id, usuario_data)
-        
-        logger.info(f"Usuário {usuario.id} atualizado por administrador {current_user.id}")
+
+        logger.info(f"Usuário {usuario.id} atualizado por administrador {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Usuário atualizado com sucesso',
@@ -1783,7 +1783,7 @@ def remover_usuario(usuario_id):
 
         db.session.delete(usuario)
         db.session.commit()
-        logger.info(f"Usuário {usuario_id} removido por administrador {current_user.id}")
+        logger.info(f"Usuário {usuario_id} removido por administrador {current_user.nome}")
         return jsonify({'success': True, 'message': 'Usuário removido com sucesso'})
 
     except IntegrityError:
@@ -1884,7 +1884,7 @@ def criar_lancamento_financeiro():
         )
         
         lancamento = create_lancamento_financeiro(db.session, lancamento_data)
-        logger.info(f"Lançamento financeiro {lancamento.id} criado por usuário {current_user.id}")
+        logger.info(f"Lançamento financeiro {lancamento.id} criado por usuário {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Lançamento financeiro criado com sucesso',
@@ -1915,7 +1915,7 @@ def atualizar_lancamento_financeiro(lancamento_id):
         )
         
         lancamento = update_lancamento_financeiro(db.session, lancamento_id, lancamento_data)
-        logger.info(f"Lançamento financeiro {lancamento.id} atualizado por usuário {current_user.id}")
+        logger.info(f"Lançamento financeiro {lancamento.id} atualizado por usuário {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Lançamento financeiro atualizado com sucesso',
@@ -1937,7 +1937,7 @@ def atualizar_lancamento_financeiro(lancamento_id):
 def remover_lancamento_financeiro(lancamento_id):
     try:
         delete_lancamento_financeiro(db.session, lancamento_id)
-        logger.info(f"Lançamento financeiro {lancamento_id} removido por usuário {current_user.id}")
+        logger.info(f"Lançamento financeiro {lancamento_id} removido por usuário {current_user.nome}")
         return jsonify({'success': True, 'message': 'Lançamento financeiro removido com sucesso'})
     except Exception as e:
         logger.error(f"Erro ao remover lançamento financeiro: {str(e)}")
@@ -1966,7 +1966,7 @@ def criar_nota_fiscal():
         }
         
         nota = create_nota_fiscal(db.session, nota_data)
-        logger.info(f"Nota fiscal {nota.id} criada por usuário {current_user.id}")
+        logger.info(f"Nota fiscal {nota.id} criada por usuário {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Nota fiscal criada com sucesso',
@@ -2108,7 +2108,7 @@ def criar_transferencia():
         if transferencia.produto_destino_id and transferencia.produto_destino_id != transferencia.produto_id:
             produto_destino = db.session.query(Produto).get(transferencia.produto_destino_id)
             produto_nome = f"{produto_nome} → {produto_destino.nome} ({produto_destino.unidade.value})"
-        logger.info(f"Transferência {transferencia.id} registrada por usuário {current_user.id}")
+        logger.info(f"Transferência {transferencia.id} registrada por usuário {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Transferência realizada com sucesso',
@@ -2175,7 +2175,7 @@ def calcular_conversao(produto_id):
             fator_conversao = calcular_fator_conversao(produto, unidade_origem, unidade_destino)
         
         quantidade_destino = quantidade * fator_conversao
-        logger.info(f"Conversão calculada para produto {produto_id} por usuário {current_user.id}")
+        logger.info(f"Conversão calculada para produto {produto_id} por usuário {current_user.nome}")
         return jsonify({
             'success': True,
             'quantidade_destino': float(quantidade_destino),
@@ -2214,7 +2214,7 @@ def criar_desconto_route():
         }
         
         desconto = criar_desconto(session, dados_desconto)
-        logger.info(f"Desconto {desconto.id} criado por administrador {current_user.id}")
+        logger.info(f"Desconto {desconto.id} criado por administrador {current_user.nome}")
         return jsonify({
             'success': True,
             'mensagem': 'Desconto criado com sucesso',
@@ -2289,7 +2289,7 @@ def atualizar_desconto_route(desconto_id):
                 'success': False,
                 'erro': 'Desconto não encontrado'
             }), 404
-        logger.info(f"Desconto {desconto.id} atualizado por administrador {current_user.id}")
+        logger.info(f"Desconto {desconto.id} atualizado por administrador {current_user.nome}")
         return jsonify({
             'success': True,
             'mensagem': 'Desconto atualizado com sucesso',
@@ -2324,7 +2324,7 @@ def deletar_desconto_route(desconto_id):
         sucesso = deletar_desconto(session, desconto_id)
         
         if sucesso:
-            logger.info(f"Desconto {desconto_id} deletado por administrador {current_user.id}")
+            logger.info(f"Desconto {desconto_id} deletado por administrador {current_user.nome}")
             return jsonify({
                 'success': True,
                 'message': 'Desconto deletado com sucesso'
@@ -3162,7 +3162,7 @@ def caixa_detail(caixa_id):
                 caixa.observacoes_admin = dados['observacoes_admin']
             
             db.session.commit()
-            logger.info(f"Caixa atualizado com sucesso: ID {caixa_id} por usuário {current_user.id}")
+            logger.info(f"Caixa atualizado com sucesso: ID {caixa_id} por usuário {current_user.nome}")
             return jsonify({
                 "success": True,
                 "message": "Caixa atualizado com sucesso",
@@ -4104,7 +4104,7 @@ def aprovar_caixa(caixa_id):
     caixa =  Caixa.query.get_or_404(caixa_id)
     
     if current_user.tipo != 'admin':
-        logger.warning(f"Usuário não autorizado a aprovar caixa: {current_user.id}")
+        logger.warning(f"Usuário não autorizado a aprovar caixa: {current_user.nome}")
         return jsonify({'success': False, 'error': 'Apenas administradores podem aprovar caixas'}), 403
     
     data = request.get_json()
@@ -4118,7 +4118,7 @@ def aprovar_caixa(caixa_id):
             observacoes_admin=observacoes
         )
         db.session.commit()
-        logger.info(f"Caixa {caixa_id} aprovado com sucesso pelo usuário {current_user.id}")
+        logger.info(f"Caixa {caixa_id} aprovado com sucesso pelo usuário {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Caixa aprovado com sucesso',
@@ -4141,7 +4141,7 @@ def recusar_caixa(caixa_id):
     caixa =  Caixa.query.get_or_404(caixa_id)
     
     if current_user.tipo != 'admin':
-        logger.warning(f"Usuário não autorizado a recusar caixa: {current_user.id}")
+        logger.warning(f"Usuário não autorizado a recusar caixa: {current_user.nome}")
         return jsonify({'success': False, 'error': 'Apenas administradores podem recusar caixas'}), 403
     
     data = request.get_json()
@@ -4159,7 +4159,7 @@ def recusar_caixa(caixa_id):
             valor_correto=valor_correto
         )
         db.session.commit()
-        logger.info(f"Caixa {caixa_id} recusado com sucesso pelo usuário {current_user.id}")
+        logger.info(f"Caixa {caixa_id} recusado com sucesso pelo usuário {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Caixa recusado com sucesso',
@@ -4196,7 +4196,7 @@ def enviar_para_analise(caixa_id):
             return jsonify({'error': 'Valor de fechamento é obrigatório'}), 400
         
         # Adicione mais logs para verificar o usuário atual
-        print(f"Usuário atual: {current_user.id}, Tipo: {current_user.tipo}")
+        print(f"Usuário atual: {current_user.nome}, Tipo: {current_user.tipo}")
         
         caixa.fechar_caixa(
             valor_fechamento=valor_fechamento,
@@ -4204,7 +4204,7 @@ def enviar_para_analise(caixa_id):
             usuario_id=current_user.id
         )
         db.session.commit()
-        logger.info(f"Caixa {caixa_id} enviado para análise com sucesso pelo usuário {current_user.id}")
+        logger.info(f"Caixa {caixa_id} enviado para análise com sucesso pelo usuário {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Caixa enviado para análise com sucesso',
@@ -4229,7 +4229,7 @@ def reabrir_caixa(caixa_id):
     caixa =  Caixa.query.get_or_404(caixa_id)
     
     if current_user.tipo != 'admin':
-        logger.warning(f"Usuário não autorizado a reabrir caixa: {current_user.id}")
+        logger.warning(f"Usuário não autorizado a reabrir caixa: {current_user.nome}")
         return jsonify({'success': False, 'error': 'Apenas administradores podem reabrir caixas'}), 403
     
     data = request.get_json()
@@ -4241,7 +4241,7 @@ def reabrir_caixa(caixa_id):
             motivo=motivo
         )
         db.session.commit()
-        logger.info(f"Caixa {caixa_id} reaberto com sucesso pelo usuário {current_user.id}")
+        logger.info(f"Caixa {caixa_id} reaberto com sucesso pelo usuário {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Caixa reaberto com sucesso',
@@ -5460,7 +5460,7 @@ def pagar_conta_receber(id):
             if caixa:
                 caixa_id = caixa.id
             else:
-                logger.warning(f"Nenhum caixa aberto encontrado para o usuário {current_user.id}")
+                logger.warning(f"Nenhum caixa aberto encontrado para o usuário {current_user.nome}")
                 return jsonify({'error': 'Nenhum caixa aberto encontrado para o usuário'}), 400
 
         # Observações

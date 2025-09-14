@@ -606,7 +606,7 @@ def obter_vendas_hoje():
         if operador_id and operador_id != current_user.id:
             # Verifica se o usuário tem permissão para consultar outros operadores
             if not current_user.tipo ==  TipoUsuario.admin:
-                logger.error(f"Operador {current_user.id} tentou acessar vendas de outro operador sem permissão")
+                logger.error(f"Operador {current_user.nome} tentou acessar vendas de outro operador sem permissão")
                 return jsonify({
                     'success': False,
                     'message': 'Apenas administradores podem filtrar por outros operadores'
@@ -1409,7 +1409,7 @@ def api_get_saldo():
         caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
 
         if not caixa:
-            logger.info(f"Operador {current_user.id} tentou acessar saldo sem caixa aberto")
+            logger.info(f"Operador {current_user.nome} tentou acessar saldo sem caixa aberto")
             return jsonify({
                 'sucess': False,
                 'saldo': 0.00,
@@ -1476,7 +1476,7 @@ def api_get_saldo():
         })
 
     except Exception as e:
-        logger.error(f"Erro ao calcular saldo para operador {current_user.id}: {str(e)}")
+        logger.error(f"Erro ao calcular saldo para operador {current_user.nome}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -1561,7 +1561,7 @@ def registrar_pagamento_cliente():
         ).first()
         
         if not caixa:
-            logger.warning(f"Operador {current_user.id} tentou registrar pagamento sem caixa aberto")
+            logger.warning(f"Operador {current_user.nome} tentou registrar pagamento sem caixa aberto")
             return jsonify({'success': False, 'message': 'Nenhum caixa aberto encontrado'}), 400
         
         # Registra pagamento
@@ -1611,7 +1611,7 @@ def api_abrir_caixa():
         valor = Decimal(str(data.get('valor_abertura', 0)))
         
         if valor <= 0:
-            logger.warning(f"Operador {current_user.id} tentou abrir caixa com valor inválido: {valor}")
+            logger.warning(f"Operador {current_user.nome} tentou abrir caixa com valor inválido: {valor}")
             return jsonify({'error': 'Valor de abertura inválido'}), 400
         
         caixa = abrir_caixa(
@@ -1628,7 +1628,7 @@ def api_abrir_caixa():
         })
     
     except Exception as e:
-        logger.error(f"Erro ao abrir caixa para operador {current_user.id}: {str(e)}", exc_info=True)
+        logger.error(f"Erro ao abrir caixa para operador {current_user.nome}: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 400
 
 # ===== API FECHAMENTO DE CAIXA =====
@@ -1641,17 +1641,17 @@ def api_fechar_caixa():
         
         # Verificação mais robusta do valor
         if 'valor_fechamento' not in data:
-            logger.warning(f"Operador {current_user.id} não forneceu valor_fechamento ao fechar caixa")
+            logger.warning(f"Operador {current_user.nome} não forneceu valor_fechamento ao fechar caixa")
             return jsonify({'error': 'Campo valor_fechamento é obrigatório'}), 400
             
         try:
             valor = Decimal(str(data['valor_fechamento']))
         except (TypeError, ValueError, InvalidOperation):
-            logger.warning(f"Operador {current_user.id} forneceu valor_fechamento inválido: {data['valor_fechamento']}")
+            logger.warning(f"Operador {current_user.nome} forneceu valor_fechamento inválido: {data['valor_fechamento']}")
             return jsonify({'error': 'Valor de fechamento inválido'}), 400
         
         if valor <= 0:
-            logger.warning(f"Operador {current_user.id} tentou fechar caixa com valor_fechamento não positivo: {valor}")
+            logger.warning(f"Operador {current_user.nomem} tentou fechar caixa com valor_fechamento não positivo: {valor}")
             return jsonify({'error': 'Valor de fechamento deve ser positivo'}), 400
         
         # Restante da função permanece igual
@@ -1671,7 +1671,7 @@ def api_fechar_caixa():
         })
     
     except Exception as e:
-        logger.error(f"Erro ao fechar caixa para operador {current_user.id}: {str(e)}", exc_info=True)
+        logger.error(f"Erro ao fechar caixa para operador {current_user.nome}: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 400
 
 # ===== API BUSCAS =====
@@ -1759,7 +1759,7 @@ def registrar_despesa():
     caixa_id = data.get("caixa_id")
 
     if not descricao or not valor or not caixa_id:
-        logger.warning(f"Operador {current_user.id} tentou registrar despesa com dados incompletos: {data}")
+        logger.warning(f"Operador {current_user.nome} tentou registrar despesa com dados incompletos: {data}")
         return jsonify({"erro": "Descrição, valor e caixa_id são obrigatórios"}), 400
 
     try:
@@ -1781,7 +1781,7 @@ def registrar_despesa():
 
         db.session.add(despesa)
         db.session.commit()
-
+        logger.info(f"Despesa registrada pelo operador {current_user.nome}: {descricao} - R$ {valor}")
         return jsonify({"mensagem": "Despesa registrada com sucesso"}), 201
 
     except Exception as e:
@@ -2184,7 +2184,7 @@ def registrar_pagamento_conta(conta_id):
         ).order_by(Caixa.data_abertura.desc()).first()
         
         if not caixa_aberto:
-            logger.warning(f"Operador {current_user.id} tentou registrar pagamento sem caixa aberto para conta {conta_id}")
+            logger.warning(f"Operador {current_user.nome} tentou registrar pagamento sem caixa aberto para conta {conta_id}")
             return jsonify({'success': False, 'message': 'Nenhum caixa aberto encontrado para o operador'}), 400
         
         # Registra o pagamento
@@ -2196,7 +2196,7 @@ def registrar_pagamento_conta(conta_id):
         )
         
         db.session.commit()
-        
+        logger.info(f"Pagamento de R$ {valor_pago} registrado para conta {conta_id} pelo operador {current_user.nome}")
         return jsonify({
             'success': True,
             'message': 'Pagamento registrado com sucesso',
