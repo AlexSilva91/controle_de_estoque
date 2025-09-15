@@ -763,4 +763,17 @@ class Financeiro(Base):
             'caixa_id': self.caixa_id,
             'conta_receber_id': self.conta_receber_id
         }
-        
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tabela = Column(String(100), nullable=False)
+    registro_id = Column(Integer, nullable=False)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    acao = Column(String(50), nullable=False)  # insert, update, delete
+    antes = Column(Text, nullable=True)        # JSON com estado anterior
+    depois = Column(Text, nullable=True)       # JSON com estado posterior
+    criado_em = Column(DateTime, default=datetime.now, nullable=False)
+
+    usuario = relationship("Usuario")

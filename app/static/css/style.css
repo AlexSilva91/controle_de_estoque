@@ -2823,3 +2823,32 @@ canvas {
         padding: var(--space-sm) 0;
     }
 }
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px; /* espaço entre textos e barras */
+  font-size: 14px;
+  color: #555;
+}
+
+.breadcrumb span {
+  white-space: nowrap;
+}
+
+.breadcrumb-link {
+  display: flex;
+  align-items: center;
+  gap: 4px; /* espaço entre ícone e texto */
+  text-decoration: none;
+  color: #007bff; /* cor do link */
+  font-weight: 500;
+}
+
+.breadcrumb-link:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb-link i {
+  /* tamanho do ícone */
+  font-size: 14px;
+}

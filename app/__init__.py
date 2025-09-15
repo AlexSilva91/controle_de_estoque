@@ -104,6 +104,9 @@ def create_app(config_name='development'):
     db.init_app(app)
     Migrate(app, db)
 
+    # Importa eventos de auditoria (ativa os listeners globais)
+    from app.models import audit_events
+
     # Login
     login_manager = LoginManager()
     login_manager.init_app(app)

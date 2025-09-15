@@ -39,9 +39,10 @@ from io import BytesIO
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 from app.models import db
+from app.utils.audit import calcular_diferencas
 from app.utils.format_data_moeda import format_currency, format_number
 from app.models.entities import ( 
-    Cliente, Produto, NotaFiscal, UnidadeMedida, StatusNota,
+    AuditLog, Cliente, Produto, NotaFiscal, UnidadeMedida, StatusNota,
     Financeiro, TipoMovimentacao, CategoriaFinanceira, MovimentacaoEstoque, ContaReceber,
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
@@ -1170,7 +1171,6 @@ def obter_produto(produto_id):
             },
             'todos_descontos': descontos_disponiveis
         })
-        print(f'{produto.id} {todos_descontos}')
     except Exception as e:
         logger.error(f"Erro ao obter produto: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -5494,3 +5494,86 @@ def pagar_conta_receber(id):
         logger.error(f'Erro ao processar pagamento: {e}')
         logger.error(traceback.format_exc())
         return jsonify({'error': f'Erro interno ao processar pagamento: {str(e)}'}), 500
+    
+@admin_bp.route('/auditoria')
+@login_required
+@admin_required
+def auditoria():
+    # Obter lista de usuários para o filtro
+    usuarios = Usuario.query.with_entities(Usuario.id, Usuario.nome).order_by(Usuario.nome).all()
+    
+    # Obter lista de tabelas disponíveis (pode ser hardcoded ou dinâmica)
+    tabelas_disponiveis = [
+        'clientes', 'produtos', 'usuarios', 'transferencias_estoque', 
+        'descontos', 'contas_receber', 'financeiro', 'pagamentos_contas_receber',
+        'notas_fiscais', 'pagamentos_nota_fiscal', 'nota_fiscal_itens',
+        'movimentacoes_estoque', 'caixas'
+    ]
+    
+    return render_template('auditoria.html', 
+                        usuarios=usuarios,
+                        tabelas_disponiveis=tabelas_disponiveis)
+
+@admin_bp.route('/api/auditoria/logs')
+@login_required
+@admin_required
+def api_auditoria_logs():
+    # Obter parâmetros de filtro
+    pagina = request.args.get('pagina', 1, type=int)
+    por_pagina = request.args.get('por_pagina', 50, type=int)
+    tabela = request.args.get('tabela', '')
+    acao = request.args.get('acao', '')
+    usuario_id = request.args.get('usuario_id', '')
+    data_inicio = request.args.get('data_inicio', '')
+    data_fim = request.args.get('data_fim', '')
+    
+    # Construir query base
+    query = AuditLog.query
+    
+    # Aplicar filtros
+    if tabela:
+        query = query.filter(AuditLog.tabela.ilike(f'%{tabela}%'))
+    if acao:
+        query = query.filter(AuditLog.acao == acao)
+    if usuario_id:
+        query = query.filter(AuditLog.usuario_id == usuario_id)
+    if data_inicio:
+        try:
+            data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d')
+            query = query.filter(AuditLog.criado_em >= data_inicio_dt)
+        except ValueError:
+            pass
+    if data_fim:
+        try:
+            data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(AuditLog.criado_em < data_fim_dt)
+        except ValueError:
+            pass
+    
+    # Ordenar e paginar
+    logs = query.order_by(AuditLog.criado_em.desc()).paginate(
+        page=pagina, per_page=por_pagina, error_out=False
+    )
+    
+    # Formatar resposta
+    logs_data = []
+    for log in logs.items:
+        logs_data.append({
+            'id': log.id,
+            'tabela': log.tabela,
+            'registro_id': log.registro_id,
+            'usuario_id': log.usuario_id,
+            'usuario_nome': log.usuario.nome if log.usuario else 'N/A',
+            'acao': log.acao,
+            'antes': log.antes,
+            'depois': log.depois,
+            'criado_em': log.criado_em.isoformat(),
+            'diferencas': calcular_diferencas(log.antes, log.depois) if log.antes and log.depois else []
+        })
+    
+    return jsonify({
+        'logs': logs_data,
+        'total': logs.total,
+        'paginas': logs.pages,
+        'pagina_atual': pagina
+    })

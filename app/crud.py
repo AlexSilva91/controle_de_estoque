@@ -42,8 +42,10 @@ from app.utils.conversor_unidade import converter_quantidade
 from app.models.entities import (
     TipoDesconto, TipoEstoque, TipoMovimentacao, TipoUsuario, CategoriaFinanceira, 
 )
+import logging
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+logger = logging.getLogger(__name__)
 
 # ===== Utilitários =====
 def hash_password(password: str) -> str:
@@ -315,7 +317,7 @@ def delete_user(db: Session, user_id: int):
 
 # ===== Produto =====
 def get_produto(db: Session, produto_id: int):
-    return db.query(entities.Produto).filter(entities.Produto.id == produto_id, entities.Produto.ativo == True).first()
+    return db.query(entities.Produto).filter(entities.Produto.id == produto_id).first()
 
 def get_produtos(db: Session, incluir_inativos: bool = False):
     query = db.query(entities.Produto)
@@ -377,8 +379,7 @@ def create_produto(db: Session, produto: schemas.ProdutoCreate):
 
 def update_produto(db: Session, produto_id: int, produto_data: schemas.ProdutoUpdate):
     produto = db.query(entities.Produto).filter(
-        entities.Produto.id == produto_id,
-        entities.Produto.ativo == True
+        entities.Produto.id == produto_id
     ).first()
     if not produto:
         raise ValueError("Produto não encontrado ou inativo.")
@@ -407,7 +408,7 @@ def update_produto(db: Session, produto_id: int, produto_data: schemas.ProdutoUp
         raise ValueError("Erro ao atualizar produto no banco de dados.")
 
 def delete_produto(db: Session, produto_id: int):
-    produto = db.query(entities.Produto).filter(entities.Produto.id == produto_id, entities.Produto.ativo == True).first()
+    produto = db.query(entities.Produto).filter(entities.Produto.id == produto_id).first()
     if not produto:
         raise ValueError("Produto não encontrado ou já inativo.")
     
@@ -787,6 +788,7 @@ def update_cliente(db: Session, cliente_id: int, cliente_data: schemas.ClienteUp
         db.refresh(cliente)
         return cliente
     except SQLAlchemyError as e:
+        logger.error(f"Erro ao atualizar cliente {cliente_id}: {e}")
         db.rollback()
         raise ValueError("Erro ao atualizar cliente no banco de dados.")
 
@@ -2385,3 +2387,4 @@ def atualizar_caixa(session: Session, caixa_id: int, dados_atualizacao: dict):
         # Faz rollback explícito em caso de erro
         session.rollback()
         return None, f"Erro ao atualizar caixa: {str(e)}"
+    

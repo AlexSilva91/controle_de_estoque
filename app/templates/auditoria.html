@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logs de Auditoria - Sistema de Gestão</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Conteúdo Principal -->
+        <div class="main-content">
+            <header class="main-header">
+                <div class="header-left">
+                    <div class="header-title">
+                        <h1>Logs de Auditoria do Sistema</h1>
+                        <div class="breadcrumb">
+                            <span>Sistema</span>
+                            <span>/</span>
+                            <span>Auditoria</span>
+                            <span>/</span>
+                            <a href="{{ url_for('admin.dashboard') }}" class="breadcrumb-link">
+                                <i class="fas fa-home"></i>
+                                <span>Início</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>            
+
+            <div class="content-wrapper">
+                <!-- Barra de ações e filtros -->
+                <div class="action-bar">
+                    <div class="filter-container">
+                        <div class="filter-group">
+                            <label for="filtroTabela">Tabela:</label>
+                            <select id="filtroTabela" class="form-control">
+                                <option value="">Todas as tabelas</option>
+                                {% for tabela in tabelas_disponiveis %}
+                                <option value="{{ tabela }}">{{ tabela }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filtroAcao">Ação:</label>
+                            <select id="filtroAcao" class="form-control">
+                                <option value="">Todas as ações</option>
+                                <option value="insert">Inserção</option>
+                                <option value="update">Atualização</option>
+                                <option value="delete">Exclusão</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filtroUsuario">Usuário:</label>
+                            <select id="filtroUsuario" class="form-control">
+                                <option value="">Todos os usuários</option>
+                                {% for usuario in usuarios %}
+                                <option value="{{ usuario.id }}">{{ usuario.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filtroDataInicio">Data Início:</label>
+                            <input type="date" id="filtroDataInicio" class="form-control">
+                        </div>
+                        <div class="filter-group">
+                            <label for="filtroDataFim">Data Fim:</label>
+                            <input type="date" id="filtroDataFim" class="form-control">
+                        </div>
+                        <div class="filter-group">
+                            <button id="btnAplicarFiltros" class="btn btn-primary">
+                                <i class="fas fa-filter"></i> Aplicar Filtros
+                            </button>
+                            <button id="btnLimparFiltros" class="btn btn-outline">
+                                <i class="fas fa-times"></i> Limpar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cards de Estatísticas -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-icon">
+                            <i class="fas fa-database"></i>
+                        </div>
+                        <div class="metric-info">
+                            <h3>Total de Registros</h3>
+                            <div class="value" id="totalRegistros">0</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">
+                            <i class="fas fa-plus-circle"></i>
+                        </div>
+                        <div class="metric-info">
+                            <h3>Inserções</h3>
+                            <div class="value" id="totalInserts">0</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">
+                            <i class="fas fa-edit"></i>
+                        </div>
+                        <div class="metric-info">
+                            <h3>Atualizações</h3>
+                            <div class="value" id="totalUpdates">0</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">
+                            <i class="fas fa-trash"></i>
+                        </div>
+                        <div class="metric-info">
+                            <h3>Exclusões</h3>
+                            <div class="value" id="totalDeletes">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabela de Logs -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-history"></i> Registros de Auditoria</h3>
+                        <div class="card-actions">
+                            <button id="btnExportarCSV" class="btn btn-outline">
+                                <i class="fas fa-file-export"></i> Exportar CSV
+                            </button>
+                            <button id="btnAtualizar" class="btn btn-primary">
+                                <i class="fas fa-sync"></i> Atualizar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table id="tabelaAuditoria">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Data/Hora</th>
+                                        <th>Usuário</th>
+                                        <th>Tabela</th>
+                                        <th>Registro ID</th>
+                                        <th>Ação</th>
+                                        <th>Alterações</th>
+                                        <th>Detalhes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Os dados serão carregados via JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="paginacao">
+                            <button id="btnAnterior" class="btn btn-outline" disabled>
+                                <i class="fas fa-chevron-left"></i> Anterior
+                            </button>
+                            <span id="infoPaginacao">Página 1 de 1</span>
+                            <button id="btnProximo" class="btn btn-outline" disabled>
+                                Próximo <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Detalhes do Log -->
+    <div class="modal" id="detalhesLogModal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-info-circle"></i> Detalhes do Log de Auditoria
+                    </h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <label>ID do Log:</label>
+                            <div class="value" id="detalheId"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Data/Hora:</label>
+                            <div class="value" id="detalheData"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Usuário:</label>
+                            <div class="value" id="detalheUsuario"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Tabela:</label>
+                            <div class="value" id="detalheTabela"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>ID do Registro:</label>
+                            <div class="value" id="detalheRegistroId"></div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Ação:</label>
+                            <div class="value" id="detalheAcao"></div>
+                        </div>
+                    </div>
+
+                    <div class="section-title">Alterações Realizadas</div>
+                    <div class="table-responsive">
+                        <table class="compact-table">
+                            <thead>
+                                <tr>
+                                    <th>Campo</th>
+                                    <th>Valor Anterior</th>
+                                    <th>Valor Novo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detalheAlteracoes">
+                                <!-- Conteúdo dinâmico -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="details-grid">
+                        <div class="detail-item full-width">
+                            <label>Estado Anterior (JSON):</label>
+                            <pre class="form-control-static" id="detalheAntes"></pre>
+                        </div>
+                        <div class="detail-item full-width">
+                            <label>Estado Posterior (JSON):</label>
+                            <pre class="form-control-static" id="detalheDepois"></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" id="btnFecharDetalhes">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/auditoria.js') }}"></script>
+</body>
+</html>
