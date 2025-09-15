@@ -3,34 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Erro 500 - Erro Interno do Servidor</title>
+    <title>Erro 500 - Servidor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: #6c5ce7;
+            --primary-dark: #5649c0;
+            --secondary-color: #00cec9;
+            --secondary-dark: #00a8a5;
+            --accent-color: #fd79a8;
+            --warning-color: #fdcb6e;
+            --bg-color: #1a1a2e;
+            --card-bg: #1e293b;
+            --text-primary: #f8f9fa;
+            --text-muted: #94a3b8;
+            --border-color: #2d3748;
+        }
+
         body {
             font-family: 'Montserrat', sans-serif;
-            background-color: #1a1a2e;
-            color: #f8f9fa;
+            background: var(--bg-color);
+            color: var(--text-primary);
+        }
+
+        .fade-in {
+            animation: fadeIn 0.8s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .glow-text {
+            background: linear-gradient(90deg, var(--warning-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+            text-shadow: 0 0 10px rgba(255,255,255,0.2);
+        }
+
+        .animal {
+            position: absolute;
+            bottom: 0;
+            width: 80px;
+            animation: bounce 2s infinite alternate ease-in-out;
+        }
+
+        .cow {
+            left: 20%;
+        }
+
+        .sheep {
+            right: 15%;
+            animation-duration: 2.5s;
+        }
+
+        @keyframes bounce {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-15px); }
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, var(--secondary-color), var(--secondary-dark));
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, var(--secondary-dark), var(--secondary-color));
+            transform: translateY(-2px);
         }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center">
-    <div class="max-w-md w-full p-6 bg-[#1e293b] rounded-lg shadow-lg border border-[#2d3748]">
+<body class="min-h-screen flex items-center justify-center relative overflow-hidden">
+    <!-- Card de Erro -->
+    <div class="max-w-md w-full p-8 bg-[var(--card-bg)] rounded-xl shadow-2xl border border-[var(--border-color)] fade-in relative z-10">
         <div class="text-center mb-6">
-            <h1 class="text-5xl font-bold text-[#fdcb6e] mb-2">500</h1>
-            <h2 class="text-2xl font-semibold text-[#e2e8f0]">Erro Interno do Servidor</h2>
+            <h1 class="text-6xl glow-text mb-2">500</h1>
+            <h2 class="text-2xl font-semibold text-[var(--text-primary)]">Erro Interno do Servidor</h2>
         </div>
         
         <div class="text-center mb-6">
-            <p class="text-[#94a3b8] mb-4">Ocorreu um erro inesperado no servidor.</p>
-            <p class="text-sm text-[#94a3b8]">Nossa equipe técnica já foi notificada e está trabalhando para resolver o problema.</p>
+            <p class="text-[var(--text-muted)] mb-3">Ocorreu um erro inesperado no servidor.</p>
+            <p class="text-sm text-[var(--text-muted)]">Nossa equipe já foi notificada e está trabalhando para resolver o problema.</p>
         </div>
         
-        <div class="flex justify-center mt-8">
-            <a href="/" class="px-6 py-3 bg-[#6c5ce7] hover:bg-[#5649c0] text-white font-medium rounded-md transition duration-300 ease-in-out transform hover:-translate-y-1 mr-3">
+        <div class="flex justify-center mt-8 gap-4">
+            <a href="/" class="px-6 py-3 btn-primary text-white font-medium rounded-md transition duration-300 ease-in-out transform hover:-translate-y-1 shadow-md">
                 Página Inicial
             </a>
-            <button onclick="window.location.reload()" class="px-6 py-3 bg-[#00cec9] hover:bg-[#00a8a5] text-white font-medium rounded-md transition duration-300 ease-in-out transform hover:-translate-y-1">
+            <button onclick="window.location.reload()" class="px-6 py-3 btn-secondary text-white font-medium rounded-md transition duration-300 ease-in-out transform hover:-translate-y-1 shadow-md">
                 Tentar Novamente
             </button>
         </div>

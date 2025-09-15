@@ -9,29 +9,66 @@
     <style>
         body {
             font-family: 'Montserrat', sans-serif;
-            background-color: #1a1a2e;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
             color: #f8f9fa;
+        }
+
+        /* Card com animação de fade-in */
+        .card {
+            backdrop-filter: blur(10px);
+            background-color: rgba(30, 41, 59, 0.85);
+            border: 1px solid #2d3748;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeInUp 1s forwards;
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Animação pulsante para o número 503 */
+        .error-code {
+            display: inline-block;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .button-primary {
+            background: linear-gradient(90deg, #00cec9, #00b894);
+            transition: all 0.3s ease;
+        }
+
+        .button-primary:hover {
+            background: linear-gradient(90deg, #00b894, #00cec9);
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
         }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center">
-    <div class="max-w-md w-full p-6 bg-[#1e293b] rounded-lg shadow-lg border border-[#2d3748]">
-        <div class="text-center mb-6">
-            <h1 class="text-5xl font-bold text-[#0984e3] mb-2">503</h1>
-            <h2 class="text-2xl font-semibold text-[#e2e8f0]">Serviço Indisponível</h2>
+<body class="min-h-screen flex items-center justify-center px-4">
+    <div class="card max-w-md w-full p-8 rounded-xl shadow-xl text-center">
+        <div class="mb-6">
+            <h1 class="error-code text-6xl font-extrabold text-[#0984e3] mb-2">503</h1>
+            <h2 class="text-3xl font-semibold text-[#e2e8f0]">Serviço Indisponível</h2>
         </div>
-        
-        <div class="text-center mb-6">
-            <p class="text-[#94a3b8] mb-4">O servidor está temporariamente indisponível.</p>
+
+        <div class="mb-6">
+            <p class="text-[#94a3b8] mb-2 text-lg">O servidor está temporariamente indisponível.</p>
             <p class="text-sm text-[#94a3b8]">Isso pode ser devido à manutenção programada ou sobrecarga do servidor.</p>
         </div>
-        
-        <div class="text-center mt-8">
-            <div class="inline-flex rounded-md shadow-sm mb-4">
-                <button onclick="window.location.reload()" class="px-6 py-3 bg-[#00cec9] hover:bg-[#00a8a5] text-white font-medium rounded-md transition duration-300 ease-in-out transform hover:-translate-y-1">
-                    Tentar Novamente
-                </button>
-            </div>
+
+        <div class="mt-8">
+            <button onclick="window.location.reload()" class="button-primary px-8 py-3 text-white font-semibold rounded-lg shadow-md">
+                Tentar Novamente
+            </button>
             <p class="text-xs text-[#94a3b8] mt-4">Tente novamente em alguns instantes.</p>
         </div>
     </div>
