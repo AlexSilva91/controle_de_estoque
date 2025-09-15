@@ -1569,6 +1569,50 @@ def api_caixas_fechados():
             'message': 'Erro ao buscar caixas fechados'
         }), 500
 
+@admin_bp.route('/caixas/<int:caixa_id>/fechar', methods=['POST'])
+@login_required
+@admin_required
+def fechar_caixa(caixa_id):
+    try:
+        caixa = Caixa.query.get(caixa_id)
+        if not caixa:
+            return jsonify({'success': False, 'message': 'Caixa não encontrado'}), 404
+
+        if caixa.status != StatusCaixa.aberto:
+            return jsonify({'success': False, 'message': 'Somente caixas abertos podem ser fechados'}), 400
+
+        # Captura o valor de fechamento enviado no corpo da requisição
+        data = request.get_json() or {}
+        valor_fechamento = data.get('valor_fechamento')
+        observacoes = data.get('observacoes', '')
+
+        caixa.valor_fechamento = float(valor_fechamento)
+        caixa.observacoes = observacoes
+        caixa.data_fechamento = datetime.now(ZoneInfo("America/Sao_Paulo"))
+        caixa.status = StatusCaixa.fechado
+        caixa.admin_id = current_user.id  # registra quem fechou
+
+        db.session.commit()
+        logger.info(f"Caixa {caixa.id} fechado por usuário {current_user.nome}")
+
+        return jsonify({
+            'success': True,
+            'message': f'Caixa {caixa.id} fechado com sucesso',
+            'data': {
+                'id': caixa.id,
+                'valor_fechamento': float(caixa.valor_fechamento),
+                'status': caixa.status.value,
+                'data_fechamento': caixa.data_fechamento.isoformat()
+            }
+        })
+    except SQLAlchemyError as e:
+        logger.error(f"Erro ao fechar caixa: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'Erro no banco de dados', 'error': str(e)}), 500
+    except Exception as e:
+        logger.error(f"Erro ao fechar caixa: {str(e)}")
+        return jsonify({'success': False, 'message': 'Erro ao fechar caixa', 'error': str(e)}), 500
+
 @admin_bp.route('/api/clientes/ativos', methods=['GET'])
 @login_required
 @admin_required
@@ -4393,8 +4437,43 @@ def relatorio_vendas_produtos():
                 )
             })
         
-        # Calcular lucro líquido total
-        lucro_liquido_total = lucro_bruto_total - float(total_despesas) - float(total_estornos)
+        # --- APLICAR AJUSTE DE DIFERENÇAS DE CAIXA ---
+        soma_ajuste_caixa = 0.0
+        try:
+            caixas = Caixa.query.filter(
+                Caixa.data_fechamento != None,
+                Caixa.data_fechamento >= datetime.combine(data_inicio, datetime.min.time()),
+                Caixa.data_fechamento <= datetime.combine(data_fim, datetime.max.time())
+            ).all()
+
+            for c in caixas:
+                abertura = float(c.valor_abertura) if c.valor_abertura is not None else 0.0
+
+                # preferir valor_fechamento; se não houver, usar valor_confirmado; se ambos None usar 0
+                if c.valor_fechamento is not None:
+                    fechamento = float(c.valor_fechamento)
+                elif c.valor_confirmado is not None:
+                    fechamento = float(c.valor_confirmado)
+                else:
+                    fechamento = 0.0
+
+                # Ajuste: abertura - fechamento
+                #  - se fechamento > abertura => ajuste negativo (deduzir)
+                #  - se fechamento < abertura => ajuste positivo (somar)
+                ajuste = abertura - fechamento
+                soma_ajuste_caixa += ajuste
+
+        except Exception:
+            logger.exception("Erro ao calcular diferenças de caixa; prosseguindo sem ajuste.")
+            soma_ajuste_caixa = 0.0
+
+        # Aplicar ajuste ao lucro bruto
+        # lucro_bruto_total_ajustado = lucro_bruto_total + soma_ajuste_caixa
+        lucro_bruto_total_ajustado = lucro_bruto_total + float(soma_ajuste_caixa)
+
+        
+        # Calcular lucro líquido total com base no lucro bruto ajustado
+        lucro_liquido_total = lucro_bruto_total_ajustado - float(total_despesas) - float(total_estornos)
         
         # Adicionar totais ao relatório
         total_vendido = sum(item['valor_total_vendido'] for item in relatorio)
@@ -4409,6 +4488,7 @@ def relatorio_vendas_produtos():
             'total_valor_vendido': total_vendido,
             'total_custo': total_custo,
             'lucro_bruto': lucro_bruto_total,
+            'lucro_bruto_ajustado': lucro_bruto_total_ajustado,
             'lucro_liquido': lucro_liquido_total,
             'produtos_estoque_critico': sum(1 for item in relatorio if item['status_estoque'] == 'CRÍTICO')
         }

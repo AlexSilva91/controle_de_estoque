@@ -2503,9 +2503,9 @@ document.addEventListener('DOMContentLoaded', function() {
       const inicioLocal = new Date(inicio.getTime() + inicio.getTimezoneOffset() * 60000);
       const fimLocal = new Date(fim.getTime() + fim.getTimezoneOffset() * 60000);
       
-      document.getElementById('relatorioPeriodoTexto').textContent = 
-          `${inicioLocal.toLocaleDateString('pt-BR')} a ${fimLocal.toLocaleDateString('pt-BR')}`;
-      
+      document.getElementById('relatorioPeriodoTexto').innerHTML = 
+          `${inicioLocal.toLocaleDateString('pt-BR')}<br>${fimLocal.toLocaleDateString('pt-BR')}`;
+            
       // Atualizar totais
       document.getElementById('relatorioTotalProdutos').textContent = meta.total_produtos;
       document.getElementById('relatorioTotalQuantidade').textContent = meta.total_quantidade_vendida;
@@ -2832,17 +2832,11 @@ document.addEventListener('DOMContentLoaded', function() {
                   <button class="btn-icon btn-info visualizar-caixa" data-id="${caixa.id}" title="Visualizar">
                     <i class="fas fa-eye"></i>
                   </button>
-                  <button class="btn-icon btn-primary enviar-analise-caixa" data-id="${caixa.id}" title="Enviar para Análise">
-                    <i class="fas fa-paper-plane"></i>
-                  </button>
-                  <button class="btn-icon btn-success aprovar-caixa" data-id="${caixa.id}" title="Aprovar">
-                    <i class="fas fa-check"></i>
-                  </button>
-                  <button class="btn-icon btn-danger recusar-caixa" data-id="${caixa.id}" title="Recusar">
-                    <i class="fas fa-times"></i>
-                  </button>
-                  <button class="btn-icon btn-warning reabrir-caixa" data-id="${caixa.id}" title="Reabrir">
+                  <button class="btn-icon btn-warning reabrir-caixa" data-id="${caixa.id}" title="Reabrir Caixa">
                     <i class="fas fa-unlock"></i>
+                  </button>
+                  <button class="btn-icon btn-danger fechar-caixa" data-id="${caixa.id}" title="Fechar Caixa">
+                    <i class="fas fa-lock"></i>
                   </button>
                   <button class="btn-icon btn-secondary venda-retroativa-caixa" data-id="${caixa.id}" title="Venda Retroativa">
                     <i class="fas fa-history"></i>
@@ -3053,6 +3047,126 @@ document.addEventListener('DOMContentLoaded', function() {
         abrirModalVendaRetroativa(caixaId);
       });
     });
+    
+    document.querySelectorAll('.fechar-caixa').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const caixaId = this.getAttribute('data-id');
+
+        // Criar modal com CSS inline baseado no style.txt
+        const modalHtml = `
+          <div id="fecharCaixaModal" style="
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.7);
+            z-index: 9999;
+          ">
+            <div style="
+              background-color: #1e293b; /* var(--card-bg) */
+              padding: 24px; /* var(--space-lg) */
+              border-radius: 8px; /* var(--border-radius) */
+              width: 360px;
+              max-width: 90%;
+              box-shadow: 0 10px 15px rgba(0,0,0,0.3); /* var(--shadow-lg) */
+              display: flex;
+              flex-direction: column;
+              gap: 16px; /* var(--space-md) */
+              color: #f8f9fa; /* var(--text-primary) */
+              font-family: 'Montserrat', sans-serif;
+            ">
+              <h3 style="
+                font-size: 18px; /* var(--font-size-lg) */
+                font-weight: 600; /* var(--font-weight-semibold) */
+                background: linear-gradient(135deg, #6c5ce7, #5649c0); /* var(--gradient-primary) */
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                margin-bottom: 16px;
+              ">Fechar Caixa #${caixaId}</h3>
+
+              <input id="valorFechamentoInput" type="number" placeholder="0" min="0" step="0.01" style="
+                width: 100%;
+                padding: 10px;
+                border-radius: 6px;
+                border: 1px solid #2d3748; /* var(--border-color) */
+                background-color: #0f3460; /* var(--bg-tertiary) */
+                color: #f8f9fa; /* var(--text-primary) */
+              " />
+
+              <textarea id="observacoesInput" placeholder="Observações (opcional)" style="
+                width: 100%;
+                padding: 10px;
+                border-radius: 6px;
+                border: 1px solid #2d3748;
+                background-color: #0f3460;
+                color: #f8f9fa;
+                min-height: 80px;
+                resize: vertical;
+              "></textarea>
+
+              <div style="
+                display: flex;
+                justify-content: flex-end;
+                gap: 10px;
+              ">
+                <button id="fecharCaixaConfirm" style="
+                  padding: 8px 16px;
+                  background: linear-gradient(135deg, #6c5ce7, #5649c0); /* var(--gradient-primary) */
+                  color: #fff;
+                  border: none;
+                  border-radius: 6px;
+                  cursor: pointer;
+                  font-weight: 500;
+                ">Fechar</button>
+
+                <button id="fecharCaixaCancel" style="
+                  padding: 8px 16px;
+                  background: linear-gradient(135deg, #d63031, #b02324); /* var(--danger-color/dark) */
+                  color: #fff;
+                  border: none;
+                  border-radius: 6px;
+                  cursor: pointer;
+                  font-weight: 500;
+                ">Cancelar</button>
+              </div>
+            </div>
+          </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        const modal = document.getElementById('fecharCaixaModal');
+        const valorInput = document.getElementById('valorFechamentoInput');
+        const observacoesInput = document.getElementById('observacoesInput');
+        const btnConfirm = document.getElementById('fecharCaixaConfirm');
+        const btnCancel = document.getElementById('fecharCaixaCancel');
+
+        btnCancel.addEventListener('click', () => modal.remove());
+
+        btnConfirm.addEventListener('click', async () => {
+          let valor = parseFloat(valorInput.value);
+          if (isNaN(valor)) valor = 0; // assume zero se vazio
+          const observacoes = observacoesInput.value || '';
+
+          try {
+            const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/fechar`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ valor_fechamento: valor, observacoes })
+            });
+            if (response.success) {
+              showFlashMessage('success', 'Caixa fechado com sucesso');
+              loadCaixasData();
+              modal.remove();
+            }
+          } catch (err) {
+            console.error(err);
+            showFlashMessage('error', 'Erro ao fechar caixa');
+          }
+        });
+      });
+    });
+
+
   }
 
   async function openVisualizarCaixaModal(caixaId) {
