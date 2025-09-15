@@ -68,13 +68,16 @@
                             <label for="filtroDataFim">Data Fim:</label>
                             <input type="date" id="filtroDataFim" class="form-control">
                         </div>
-                        <div class="filter-group">
-                            <button id="btnAplicarFiltros" class="btn btn-primary">
-                                <i class="fas fa-filter"></i> Aplicar Filtros
-                            </button>
-                            <button id="btnLimparFiltros" class="btn btn-outline">
-                                <i class="fas fa-times"></i> Limpar
-                            </button>
+                        <div class="filter-group" style="display: flex; gap: 10px;">
+                            <label>&nbsp;</label> <!-- Espaço vazio para alinhamento -->
+                            <div style="display: flex; gap: 10px;">
+                                <button id="btnAplicarFiltros" class="btn btn-primary">
+                                    <i class="fas fa-filter"></i> Aplicar Filtros
+                                </button>
+                                <button id="btnLimparFiltros" class="btn btn-outline">
+                                    <i class="fas fa-times"></i> Limpar
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
