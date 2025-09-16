@@ -3476,7 +3476,14 @@ def get_caixa_financeiro_pdf(caixa_id):
             'movimentacoes': []
         }
         
+        # Dicionário para agrupar movimentações por nota fiscal
+        notas_processadas = set()
+        
         for mov in movimentacoes:
+            # Pula movimentações de notas fiscais já processadas
+            if mov.nota_fiscal_id and mov.nota_fiscal_id in notas_processadas:
+                continue
+                
             # Busca informações do cliente
             cliente_nome = None
             if mov.cliente_id:
@@ -3485,7 +3492,18 @@ def get_caixa_financeiro_pdf(caixa_id):
             
             # Busca formas de pagamento detalhadas
             formas_pagamento_detalhadas = []
+            valor_total = float(mov.valor)  # Valor padrão é o da movimentação
+            
+            # Para notas fiscais, busca a nota completa e todos os pagamentos
             if mov.nota_fiscal_id:
+                notas_processadas.add(mov.nota_fiscal_id)
+                
+                # Busca a nota fiscal para obter o valor total
+                nota_fiscal = session.query(NotaFiscal).get(mov.nota_fiscal_id)
+                if nota_fiscal:
+                    valor_total = float(nota_fiscal.valor_total)
+                
+                # Busca todos os pagamentos da nota
                 pagamentos = session.query(PagamentoNotaFiscal)\
                     .filter_by(nota_fiscal_id=mov.nota_fiscal_id)\
                     .all()
@@ -3495,7 +3513,13 @@ def get_caixa_financeiro_pdf(caixa_id):
                         'valor': float(p.valor)
                     })
             
-            if mov.conta_receber_id:
+            # Para contas a receber, busca todos os pagamentos da conta
+            elif mov.conta_receber_id:
+                # Busca a conta para obter o valor original
+                conta = session.query(ContaReceber).get(mov.conta_receber_id)
+                if conta:
+                    valor_total = float(conta.valor_original)
+                
                 pagamentos = session.query(PagamentoContaReceber)\
                     .filter_by(conta_id=mov.conta_receber_id)\
                     .all()
@@ -3505,11 +3529,18 @@ def get_caixa_financeiro_pdf(caixa_id):
                         'valor': float(p.valor_pago)
                     })
             
+            # Para outras movimentações, usa o valor da própria movimentação
+            else:
+                formas_pagamento_detalhadas.append({
+                    'forma': 'N/A',
+                    'valor': float(mov.valor)
+                })
+            
             pdf_data['movimentacoes'].append({
                 'data': mov.data.strftime('%d/%m/%Y %H:%M'),
                 'tipo': mov.tipo.value,
                 'categoria': mov.categoria.value if mov.categoria else 'N/A',
-                'valor': float(mov.valor),
+                'valor': valor_total,  # Usa o valor total da nota/conta
                 'descricao': mov.descricao or 'N/A',
                 'cliente_nome': cliente_nome,
                 'formas_pagamento': formas_pagamento_detalhadas,
@@ -3688,8 +3719,21 @@ def get_vendas_por_pagamento_pdf(caixa_id):
         elements.append(Paragraph(f"Relatório de Vendas - {forma_pagamento}", styles['Title']))
         elements.append(Spacer(1, 12))
 
-        # Cabeçalho da tabela
-        data = [["Data", "Nota Fiscal", "Cliente", "Valor Total", "Valor Pago"]]
+        # Verifica se alguma venda teve desconto
+        tem_desconto = any(float(venda.valor_desconto or 0) > 0 for venda in vendas)
+
+        # Cabeçalho da tabela - adiciona coluna de desconto somente se houver desconto
+        cabecalho = ["Data", "Nota Fiscal", "Cliente", "Valor Total"]
+        if tem_desconto:
+            cabecalho.append("Desconto")
+        cabecalho.append("Valor Pago")
+        
+        data = [cabecalho]
+
+        # Variáveis para calcular totais
+        total_valor_total = 0.0
+        total_valor_desconto = 0.0
+        total_valor_pago = 0.0
 
         # Preencher linhas
         for venda in vendas:
@@ -3700,17 +3744,41 @@ def get_vendas_por_pagamento_pdf(caixa_id):
                 )\
                 .scalar() or 0.0
 
-            data.append([
+            # Adiciona aos totais
+            total_valor_total += float(venda.valor_total)
+            total_valor_desconto += float(venda.valor_desconto or 0)
+            total_valor_pago += float(valor_pago)
+
+            # Prepara a linha da venda
+            linha = [
                 venda.data_emissao.strftime("%d/%m/%Y %H:%M"),
                 str(venda.id),
                 venda.cliente.nome if venda.cliente else "Não informado",
-                f"R$ {venda.valor_total:,.2f}",
-                f"R$ {valor_pago:,.2f}"
-            ])
+                f"R$ {venda.valor_total:,.2f}"
+            ]
+            
+            # Adiciona coluna de desconto somente se houver desconto
+            if tem_desconto:
+                linha.append(f"R$ {venda.valor_desconto:,.2f}" if float(venda.valor_desconto or 0) > 0 else "R$ 0,00")
+            
+            linha.append(f"R$ {valor_pago:,.2f}")
+            
+            data.append(linha)
+
+        # Adicionar linha de totais
+        linha_total = ["", "", "TOTAL:", f"R$ {total_valor_total:,.2f}"]
+        
+        if tem_desconto:
+            linha_total.append(f"R$ {total_valor_desconto:,.2f}")
+        
+        linha_total.append(f"R$ {total_valor_pago:,.2f}")
+        data.append(linha_total)
 
         # Criar tabela
         table = Table(data, repeatRows=1)
-        table.setStyle(TableStyle([
+        
+        # Estilo da tabela
+        estilo = [
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#f2f2f2")),
             ('TEXTCOLOR', (0,0), (-1,0), colors.black),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
@@ -3718,7 +3786,20 @@ def get_vendas_por_pagamento_pdf(caixa_id):
             ('FONTSIZE', (0,0), (-1,0), 11),
             ('BOTTOMPADDING', (0,0), (-1,0), 8),
             ('GRID', (0,0), (-1,-1), 0.25, colors.grey),
-        ]))
+            ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor("#e6e6e6")),
+            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,-1), (-1,-1), 11),
+        ]
+        
+        # Se houver desconto, destaca as células com desconto > 0
+        if tem_desconto:
+            for i, venda in enumerate(vendas, start=1):  # start=1 para pular o cabeçalho
+                if float(venda.valor_desconto or 0) > 0:
+                    # Destaca a célula de desconto (coluna 4, considerando 0-based index)
+                    estilo.append(('BACKGROUND', (4, i), (4, i), colors.yellow))
+                    estilo.append(('TEXTCOLOR', (4, i), (4, i), colors.red))
+        
+        table.setStyle(TableStyle(estilo))
         elements.append(table)
 
         # Montar PDF
@@ -3737,7 +3818,6 @@ def get_vendas_por_pagamento_pdf(caixa_id):
         return jsonify({'success': False, 'error': 'Erro interno ao gerar PDF'}), 500
     finally:
         session.close()
-
 
 @admin_bp.route('/vendas/<int:venda_id>/detalhes')
 @login_required
