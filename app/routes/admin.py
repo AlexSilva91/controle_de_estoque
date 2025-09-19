@@ -801,7 +801,8 @@ def criar_produto():
                     tipo=TipoMovimentacao.entrada,
                     estoque_destino=TipoEstoque.loja,
                     quantidade=estoque_loja_add,
-                    valor_unitario=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
+                    valor_unitario = 0,
+                    valor_unitario_compra=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
                     data=datetime.now(ZoneInfo('America/Sao_Paulo')),
                     observacao=f"Entrada de estoque - produto existente"
                 )
@@ -815,7 +816,8 @@ def criar_produto():
                     tipo=TipoMovimentacao.entrada,
                     estoque_destino=TipoEstoque.deposito,
                     quantidade=estoque_deposito_add,
-                    valor_unitario=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
+                    valor_unitario = 0,
+                    valor_unitario_compra=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
                     data=datetime.now(ZoneInfo('America/Sao_Paulo')),
                     observacao=f"Entrada de estoque - produto existente"
                 )
@@ -829,7 +831,8 @@ def criar_produto():
                     tipo=TipoMovimentacao.entrada,
                     estoque_destino=TipoEstoque.fabrica,
                     quantidade=estoque_fabrica_add,
-                    valor_unitario=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
+                    valor_unitario = 0,
+                    valor_unitario_compra=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
                     data=datetime.now(ZoneInfo('America/Sao_Paulo')),
                     observacao=f"Entrada de estoque - produto existente"
                 )
@@ -894,7 +897,8 @@ def criar_produto():
                 tipo=TipoMovimentacao.entrada,
                 estoque_destino=TipoEstoque.loja,
                 quantidade=estoque_loja,
-                valor_unitario=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
+                valor_unitario = 0,
+                valor_unitario_compra=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
                 data=datetime.now(ZoneInfo('America/Sao_Paulo')),
                 observacao=f"Entrada de estoque - novo produto"
             )
@@ -908,7 +912,8 @@ def criar_produto():
                 tipo=TipoMovimentacao.entrada,
                 estoque_destino=TipoEstoque.deposito,
                 quantidade=estoque_deposito,
-                valor_unitario=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
+                valor_unitario = 0,
+                valor_unitario_compra=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
                 data=datetime.now(ZoneInfo('America/Sao_Paulo')),
                 observacao=f"Entrada de estoque - novo produto"
             )
@@ -922,7 +927,8 @@ def criar_produto():
                 tipo=TipoMovimentacao.entrada,
                 estoque_destino=TipoEstoque.fabrica,
                 quantidade=estoque_fabrica,
-                valor_unitario=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
+                valor_unitario = 0,
+                valor_unitario_compra=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
                 data=datetime.now(ZoneInfo('America/Sao_Paulo')),
                 observacao=f"Entrada de estoque - novo produto"
             )
@@ -1153,7 +1159,8 @@ def entrada_estoque(produto_id):
                     tipo=TipoMovimentacao.entrada,
                     estoque_destino=TipoEstoque[destino],
                     quantidade=quantidade,
-                    valor_unitario=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
+                    valor_unitario = 0,
+                    valor_unitario_compra=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
                     data=datetime.now(ZoneInfo('America/Sao_Paulo')),
                     observacao="Entrada manual de estoque via edição de produto"
                 )

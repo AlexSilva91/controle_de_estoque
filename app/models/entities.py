@@ -486,6 +486,7 @@ class MovimentacaoEstoque(Base):
     estoque_destino = Column(Enum(TipoEstoque), nullable=True)
     quantidade = Column(DECIMAL(12, 3), nullable=False)
     valor_unitario = Column(DECIMAL(10, 2), nullable=False)
+    valor_unitario_compra = Column(DECIMAL(10, 2), nullable=True)
     valor_recebido = Column(DECIMAL(12, 2), nullable=True)
     troco = Column(DECIMAL(12, 2), nullable=True)
     forma_pagamento = Column(Enum(FormaPagamento), nullable=True)
