@@ -4910,174 +4910,78 @@ def relatorio_vendas_produtos_detalhes():
 @admin_required
 def relatorio_vendas_produtos_pdf():
     try:
-        # Obter os dados
         relatorio_data = relatorio_vendas_produtos().get_json()
         if 'error' in relatorio_data:
             logger.error(f"Erro ao obter dados para PDF: {relatorio_data['error']}")
             return jsonify(relatorio_data), 500
-        
+
         data_inicio = datetime.strptime(relatorio_data['meta']['data_inicio'], "%Y-%m-%d")
         data_fim = datetime.strptime(relatorio_data['meta']['data_fim'], "%Y-%m-%d")
-
-        # Formatar para DD/MM/YYYY
         data_inicio_fmt = data_inicio.strftime("%d/%m/%Y")
         data_fim_fmt = data_fim.strftime("%d/%m/%Y")
 
-        # Criar buffer para o PDF
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, 
-                              leftMargin=15*mm, rightMargin=15*mm,
-                              topMargin=20*mm, bottomMargin=20*mm)
-        
+        doc = SimpleDocTemplate(
+            buffer, pagesize=A4,
+            leftMargin=15*mm, rightMargin=15*mm,
+            topMargin=10*mm, bottomMargin=20*mm
+        )
         styles = getSampleStyleSheet()
         elements = []
-        
-        # Estilos personalizados
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=16,
-            alignment=TA_CENTER,
-            spaceAfter=12
-        )
-        
-        subtitle_style = ParagraphStyle(
-            'CustomSubtitle',
-            parent=styles['Normal'],
-            fontSize=12,
-            alignment=TA_CENTER,
-            spaceAfter=6
-        )
-        
-        normal_style = styles['Normal']
-        bold_style = ParagraphStyle(
-            'Bold',
-            parent=styles['Normal'],
-            fontName='Helvetica-Bold'
-        )
-        
-        # Título
-        elements.append(Paragraph('Relatório de Vendas de Produtos', title_style))
-        
-        # Informações do relatório
-        elements.append(Paragraph(f"Período: {data_inicio_fmt} a {data_fim_fmt}", subtitle_style))
-        elements.append(Paragraph(f"Total de produtos: {relatorio_data['meta']['total_produtos']}", subtitle_style))
-        elements.append(Paragraph(f"Quantidade total vendida: {relatorio_data['meta']['total_quantidade_vendida']}", subtitle_style))
-        elements.append(Paragraph(f"Valor total vendido: {formatarMoeda(relatorio_data['meta']['total_valor_vendido'])}", subtitle_style))
-        elements.append(Paragraph(f"Custo total: {formatarMoeda(relatorio_data['meta']['total_custo'])}", subtitle_style))
-        elements.append(Paragraph(f"Lucro bruto total: {formatarMoeda(relatorio_data['meta']['lucro_bruto'])}", subtitle_style))
-        
-        # Lucro líquido com destaque
-        lucro_liquido = relatorio_data['meta']['lucro_liquido']
-        lucro_style = ParagraphStyle(
-            'LucroStyle',
-            parent=subtitle_style,
-            fontName='Helvetica-Bold',
-            fontSize=14,
-            textColor=colors.darkgreen if lucro_liquido >= 0 else colors.red
-        )
-        elements.append(Paragraph(f"Lucro líquido total: {formatarMoeda(lucro_liquido)}", lucro_style))
-        
-        elements.append(Spacer(1, 15))
-        
-        # Verificar se é detalhado ou geral
-        produto_id = request.args.get('produto_id')
-        if produto_id:
-            # MODO DETALHADO - Para um produto específico
-            detalhes_data = relatorio_vendas_produtos_detalhes().get_json()
-            if not detalhes_data.get('success'):
-                logger.error(f"Erro ao obter detalhes para PDF: {detalhes_data.get('message', 'Erro desconhecido')}")
-                return jsonify(detalhes_data), 500
 
-            # Título do produto
-            produto_title_style = ParagraphStyle(
-                'ProdutoTitle',
-                parent=styles['Heading2'],
-                fontSize=14,
-                alignment=TA_CENTER,
-                spaceAfter=12
-            )
-            elements.append(Paragraph(f"Detalhes do Produto: {detalhes_data['produto']['produto_nome']}", produto_title_style))
-            
-            # Tabela de informações do produto
-            produto_info_data = [
-                ['Código:', detalhes_data['produto']['produto_id']],
-                ['Nome:', detalhes_data['produto']['produto_nome']],
-                ['Unidade:', detalhes_data['produto']['unidade']],
-                ['Quantidade Vendida:', f"{detalhes_data['produto']['quantidade_vendida']}"],
-                ['Valor Total Vendido:', formatarMoeda(detalhes_data['produto']['valor_total_vendido'])],
-                ['Custo Total:', formatarMoeda(detalhes_data['produto']['custo_total'])],
-                ['Lucro Bruto:', formatarMoeda(detalhes_data['produto']['lucro_bruto'])],
-                ['Estoque Atual:', f"{detalhes_data['produto']['estoque_atual_loja']}"]
+        # -------------------- Cabeçalho --------------------
+        header_style = ParagraphStyle(
+            'Header',
+            parent=styles['Heading1'],
+            fontSize=18,
+            alignment=TA_CENTER,
+            spaceAfter=10
+        )
+        elements.append(Paragraph("📊 Relatório de Vendas de Produtos", header_style))
+        elements.append(Paragraph(f"Período: {data_inicio_fmt} a {data_fim_fmt}", styles["Normal"]))
+        elements.append(Spacer(1, 8))
+        elements.append(Table([["" * 80]], colWidths=[170*mm], style=[('LINEBELOW', (0, 0), (-1, -1), 1, colors.black)]))
+        elements.append(Spacer(1, 12))
+
+        # -------------------- Resumo em tabela --------------------
+        resumo_data = [
+            ["Produtos", "Qtd. Vendida", "Valor Total", "Custo Total", "Lucro Bruto", "Lucro Líquido"],
+            [
+                str(relatorio_data['meta']['total_produtos']),
+                str(relatorio_data['meta']['total_quantidade_vendida']),
+                formatarMoeda(relatorio_data['meta']['total_valor_vendido']),
+                formatarMoeda(relatorio_data['meta']['total_custo']),
+                formatarMoeda(relatorio_data['meta']['lucro_bruto']),
+                formatarMoeda(relatorio_data['meta']['lucro_liquido']),
             ]
-            
-            produto_table = Table(produto_info_data, colWidths=[60*mm, 100*mm])
-            produto_table.setStyle(TableStyle([
-                ('FONT', (0, 0), (-1, -1), 'Helvetica', 10),
-                ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
-                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
-            ]))
-            
-            elements.append(produto_table)
-            elements.append(Spacer(1, 15))
-            
-            # Histórico de vendas
-            elements.append(Paragraph('Histórico de Vendas:', styles['Heading2']))
-            
-            if detalhes_data['historico']:
-                # Cabeçalho da tabela
-                historico_data = [['Data', 'Qtd.', 'Valor Unit.', 'Valor Total', 'Cliente']]
-                
-                # Dados das vendas
-                for venda in detalhes_data['historico']:
-                    data = datetime.fromisoformat(venda['data_emissao']).strftime('%d/%m/%Y')
-                    cliente_nome = venda['cliente_nome'] or 'Consumidor'
-                    if len(cliente_nome) > 30:
-                        cliente_nome = cliente_nome[:27] + '...'
-                    
-                    historico_data.append([
-                        data,
-                        str(venda['quantidade']),
-                        formatarMoeda(venda['valor_unitario']),
-                        formatarMoeda(venda['valor_total']),
-                        cliente_nome
-                    ])
-                
-                # Criar tabela
-                historico_table = Table(historico_data, colWidths=[25*mm, 20*mm, 30*mm, 30*mm, 85*mm])
-                historico_table.setStyle(TableStyle([
-                    ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 10),
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4682B4')),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('ALIGN', (4, 1), (4, -1), 'LEFT'),
-                    ('FONT', (0, 1), (-1, -1), 'Helvetica', 9),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
-                ]))
-                
-                elements.append(historico_table)
-            else:
-                elements.append(Paragraph('Nenhuma venda encontrada para este período.', normal_style))
-                
-        else:
-            # MODO GERAL - Lista de produtos
-            elements.append(Paragraph('Lista de Produtos:', styles['Heading2']))
-            
+        ]
+
+        resumo_table = Table(resumo_data, colWidths=[25*mm, 30*mm, 30*mm, 30*mm, 30*mm, 30*mm])
+        resumo_style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#4682B4")),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 9),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONT', (0, 1), (-1, 1), 'Helvetica', 9),
+        ])
+        resumo_table.setStyle(resumo_style)
+        elements.append(resumo_table)
+        elements.append(Spacer(1, 18))
+
+        # -------------------- Tabela de produtos --------------------
+        produto_id = request.args.get('produto_id')
+        if not produto_id:
+            elements.append(Paragraph("📦 Lista de Produtos", styles['Heading2']))
+            elements.append(Spacer(1, 8))
+
             if relatorio_data['dados']:
-                # Cabeçalho da tabela
                 table_data = [['ID', 'Produto', 'Unid.', 'Qtd.', 'Vendas', 'Custo', 'Lucro', 'Estoque']]
-                
-                # Dados dos produtos
+
                 for produto in relatorio_data['dados']:
-                    # Truncar nome do produto se necessário
                     nome_produto = produto['produto_nome']
                     if len(nome_produto) > 40:
                         nome_produto = nome_produto[:37] + '...'
-                    
                     table_data.append([
                         str(produto['produto_id']),
                         nome_produto,
@@ -5088,48 +4992,69 @@ def relatorio_vendas_produtos_pdf():
                         formatarMoeda(produto['lucro_bruto']),
                         str(round(produto['estoque_atual_loja'], 2))
                     ])
-                
-                # Criar tabela
-                col_widths = [15*mm, 60*mm, 15*mm, 15*mm, 20*mm, 20*mm, 20*mm, 15*mm]
+
+                # Linha de totais
+                table_data.append([
+                    '', 'TOTAL GERAL', '', '',
+                    formatarMoeda(relatorio_data['meta']['total_valor_vendido']),
+                    formatarMoeda(relatorio_data['meta']['total_custo']),
+                    formatarMoeda(relatorio_data['meta']['lucro_bruto']),
+                    ''
+                ])
+
+                col_widths = [15*mm, 60*mm, 15*mm, 15*mm, 25*mm, 25*mm, 25*mm, 15*mm]
                 produto_table = Table(table_data, colWidths=col_widths, repeatRows=1)
-                
-                # Estilo da tabela
+
                 table_style = TableStyle([
                     ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 8),
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4682B4')),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#4682B4")),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                     ('ALIGN', (1, 1), (1, -1), 'LEFT'),
                     ('ALIGN', (3, 1), (-1, -1), 'RIGHT'),
                     ('FONT', (0, 1), (-1, -1), 'Helvetica', 8),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    # Linha total
+                    ('FONT', (0, -1), (-1, -1), 'Helvetica-Bold', 9),
+                    ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
                 ])
-                
-                # Adicionar cores para lucro positivo/negativo
-                for i in range(1, len(table_data)):
-                    lucro = produto['lucro_bruto'] if i == 1 else relatorio_data['dados'][i-1]['lucro_bruto']
+
+                # Linhas zebradas
+                for i in range(1, len(table_data)-1):
+                    if i % 2 == 0:
+                        table_style.add('BACKGROUND', (0, i), (-1, i), colors.whitesmoke)
+
+                # Cores lucro
+                for i, produto in enumerate(relatorio_data['dados'], start=1):
+                    lucro = produto['lucro_bruto']
                     if lucro < 0:
                         table_style.add('TEXTCOLOR', (6, i), (6, i), colors.red)
                     else:
                         table_style.add('TEXTCOLOR', (6, i), (6, i), colors.darkgreen)
-                
+
+                # Lucro total
+                if relatorio_data['meta']['lucro_bruto'] < 0:
+                    table_style.add('TEXTCOLOR', (6, -1), (6, -1), colors.red)
+                else:
+                    table_style.add('TEXTCOLOR', (6, -1), (6, -1), colors.darkgreen)
+
                 produto_table.setStyle(table_style)
                 elements.append(produto_table)
-            else:
-                elements.append(Paragraph('Nenhum produto encontrado para este período.', normal_style))
-        
-        # Gerar PDF
+
+        # -------------------- Rodapé --------------------
+        elements.append(Spacer(1, 15))
+        rodape = datetime.now().strftime("Gerado em %d/%m/%Y às %H:%M")
+        elements.append(Paragraph(rodape, ParagraphStyle('Rodape', fontSize=8, alignment=TA_RIGHT, textColor=colors.grey)))
+
         doc.build(elements)
-        
-        # Preparar resposta
+
         buffer.seek(0)
         response = make_response(buffer.getvalue())
         response.headers['Content-Type'] = 'application/pdf'
         response.headers['Content-Disposition'] = 'inline; filename=relatorio_vendas_produtos.pdf'
-        
         return response
-        
+
     except Exception as e:
         logger.error(f"Erro ao gerar PDF do relatório de vendas de produtos: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
