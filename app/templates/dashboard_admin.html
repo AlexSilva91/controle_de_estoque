@@ -930,10 +930,6 @@
                     <div class="modal-body">
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="produtoCodigo">Código*</label>
-                                <input type="text" id="produtoCodigo" class="form-control" required>
-                            </div>
-                            <div class="form-group">
                                 <label for="produtoMarca">Marca*</label>
                                 <input type="text" id="produtoMarca" class="form-control" required>
                             </div>
@@ -1149,6 +1145,9 @@
                         <!-- Conteúdo será preenchido dinamicamente via JavaScript -->
                     </div>
                     <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="btnEntradaEstoque">
+                            <i class="fas fa-box"></i> Entrada de Estoque
+                        </button>
                         <button type="button" class="btn btn-outline close-modal">Cancelar</button>
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-save"></i>
@@ -1160,6 +1159,46 @@
         </div>
     </div>
 
+    <div id="entradaEstoqueModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-md">
+            <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                <i class="fas fa-box"></i>
+                <span>Entrada de Estoque</span>
+                </h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <form id="entradaEstoqueForm">
+                <div class="modal-body">
+                <div class="form-group">
+                    <label for="entradaLoja">Estoque Loja</label>
+                    <input type="number" id="entradaLoja" class="form-control" step="0.001" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="entradaDeposito">Estoque Depósito</label>
+                    <input type="number" id="entradaDeposito" class="form-control" step="0.001" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="entradaFabrica">Estoque Fábrica</label>
+                    <input type="number" id="entradaFabrica" class="form-control" step="0.001" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="entradaValorCompra">Valor Unitário de Compra</label>
+                    <input type="number" id="entradaValorCompra" class="form-control" step="0.01" min="0">
+                </div>
+                </div>
+                <div class="modal-footer">
+                <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Registrar Entrada
+                </button>
+                </div>
+            </form>
+            </div>
+        </div>
+    </div>
     <!-- Modal Confirmar Exclusão -->
     <div id="confirmarExclusaoModal" class="modal">
         <div class="modal-overlay"></div>

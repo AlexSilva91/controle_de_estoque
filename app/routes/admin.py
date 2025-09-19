@@ -983,7 +983,7 @@ def atualizar_produto(produto_id):
         update_fields = {}
         
         # Campos básicos
-        for campo in ['codigo', 'nome', 'tipo', 'marca', 'unidade', 'ativo']:
+        for campo in ['nome', 'tipo', 'marca', 'unidade', 'ativo']:
             if campo in data:
                 update_fields[campo] = data[campo]
         
@@ -1104,7 +1104,80 @@ def atualizar_produto(produto_id):
             'success': False,
             'message': f'Erro ao atualizar produto: {str(e)}'
         }), 400
+
+@admin_bp.route('/produtos/<int:produto_id>/entrada-estoque', methods=['POST'])
+@login_required
+@admin_required
+def entrada_estoque(produto_id):
+    try:
+        data = request.get_json()
+        usuario_id = current_user.id
         
+        produto = get_produto(db.session, produto_id)
+        if not produto:
+            logger.error(f'Produto de ID: {produto_id} não encontrado!')
+            return jsonify({'success': False, 'message': 'Produto não encontrado'}), 404
+
+        # Quantidades a adicionar
+        estoque_loja_add = Decimal(data.get('estoque_loja', 0))
+        estoque_deposito_add = Decimal(data.get('estoque_deposito', 0))
+        estoque_fabrica_add = Decimal(data.get('estoque_fabrica', 0))
+
+        update_data = {}
+        if estoque_loja_add > 0:
+            update_data['estoque_loja'] = produto.estoque_loja + estoque_loja_add
+        if estoque_deposito_add > 0:
+            update_data['estoque_deposito'] = produto.estoque_deposito + estoque_deposito_add
+        if estoque_fabrica_add > 0:
+            update_data['estoque_fabrica'] = produto.estoque_fabrica + estoque_fabrica_add
+
+        if not update_data:
+            logger.error(f'Nenhuma quantidade válida informada')
+            return jsonify({'success': False, 'message': 'Nenhuma quantidade válida informada'}), 400
+
+        # Atualizar produto
+        produto_update = ProdutoUpdate(**update_data)
+        produto = update_produto(db.session, produto.id, produto_update)
+
+        # Registrar movimentações
+        for destino, quantidade in [
+            ("loja", estoque_loja_add),
+            ("deposito", estoque_deposito_add),
+            ("fabrica", estoque_fabrica_add),
+        ]:
+            if quantidade > 0:
+                movimentacao = MovimentacaoEstoque(
+                    produto_id=produto.id,
+                    usuario_id=usuario_id,
+                    caixa_id=None,
+                    tipo=TipoMovimentacao.entrada,
+                    estoque_destino=TipoEstoque[destino],
+                    quantidade=quantidade,
+                    valor_unitario=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
+                    data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                    observacao="Entrada manual de estoque via edição de produto"
+                )
+                db.session.add(movimentacao)
+
+        db.session.commit()
+        logger.info('Entrada de estoque registrada com sucesso')
+        return jsonify({
+            'success': True,
+            'message': 'Entrada de estoque registrada com sucesso',
+            'produto': {
+                'id': produto.id,
+                'nome': produto.nome,
+                'estoque_loja': str(produto.estoque_loja),
+                'estoque_deposito': str(produto.estoque_deposito),
+                'estoque_fabrica': str(produto.estoque_fabrica),
+            }
+        })
+
+    except Exception as e:
+        logger.exception(f'Erro: {str(e)}')
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro: {str(e)}'}), 400
+ 
 @admin_bp.route('/produtos/<int:produto_id>', methods=['GET'])
 @login_required
 @admin_required

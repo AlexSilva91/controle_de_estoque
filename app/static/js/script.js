@@ -1733,7 +1733,6 @@ document.addEventListener('DOMContentLoaded', function() {
       const estoqueQuantidade = parseFloat(document.getElementById('produtoEstoque')?.value) || 0;
       
       const formData = {
-        codigo: document.getElementById('produtoCodigo')?.value || '',
         nome: document.getElementById('produtoNome')?.value || '',
         tipo: document.getElementById('produtoTipo')?.value || '',
         marca: document.getElementById('produtoMarca')?.value || '',
@@ -1891,6 +1890,44 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   document.getElementById('transferenciaOrigem')?.addEventListener('change', updateEstoqueDisponivel);
+  
+  document.getElementById("btnEntradaEstoque").addEventListener("click", () => {
+    openModal("entradaEstoqueModal");
+  });
+
+  document.getElementById("entradaEstoqueForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const produtoId = document.getElementById("editarProdutoForm").getAttribute("data-produto-id");
+
+    const payload = {
+      estoque_loja: document.getElementById("entradaLoja").value || 0,
+      estoque_deposito: document.getElementById("entradaDeposito").value || 0,
+      estoque_fabrica: document.getElementById("entradaFabrica").value || 0,
+      valor_unitario_compra: document.getElementById("entradaValorCompra").value || null,
+      valor_unitario: document.getElementById("editValor").value, // fallback
+    };
+
+    try {
+      const response = await fetch(`/admin/produtos/${produtoId}/entrada-estoque`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        showFlashMessage("success", result.message);
+        closeModal("entradaEstoqueModal");
+        // Atualiza modal de edição para refletir novos estoques
+        await openEditarProdutoModal(produtoId);
+      } else {
+        showFlashMessage("error", result.message);
+      }
+    } catch (err) {
+      console.error(err);
+      showFlashMessage("error", "Erro ao registrar entrada de estoque");
+    }
+  });
 
   // ===== VENDAS RETROATIVAS =====
   function limparFormularioRetroativa() {
