@@ -643,6 +643,118 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           }
         });
+        // Gráfico de Produtos com Maior Fluxo
+        const produtosFluxoData = await fetchWithErrorHandling('/admin/dashboard/produtos-maior-fluxo');
+        if (produtosFluxoData.success) {
+            const produtosFluxoCtx = document.getElementById('ProdutosMaiorFluxoChart').getContext('2d');
+            
+            // Calcular margem de lucro para cada produto
+            const margensLucro = produtosFluxoData.valores_venda.map((venda, index) => {
+                const compra = produtosFluxoData.valores_compra[index] || 0;
+                return venda - compra;
+            });
+            
+            new Chart(produtosFluxoCtx, {
+                type: 'bar',
+                data: {
+                    labels: produtosFluxoData.produtos,
+                    datasets: [
+                        {
+                            label: 'Valor de Venda (R$)',
+                            data: produtosFluxoData.valores_venda,
+                            backgroundColor: chartColors.green,
+                            borderColor: chartColors.greenBorder,
+                            borderWidth: 2,
+                            order: 1
+                        },
+                        {
+                            label: 'Valor de Compra (R$)',
+                            data: produtosFluxoData.valores_compra,
+                            backgroundColor: chartColors.red,
+                            borderColor: chartColors.redBorder,
+                            borderWidth: 2,
+                            order: 2
+                        },
+                        {
+                            label: 'Margem de Lucro (R$)',
+                            data: margensLucro,
+                            backgroundColor: chartColors.blue,
+                            borderColor: chartColors.blueBorder,
+                            borderWidth: 2,
+                            type: 'line',
+                            order: 0,
+                            pointStyle: 'circle',
+                            pointRadius: 5,
+                            pointHoverRadius: 7
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#e0e0e0'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${formatMoney(context.raw)}`;
+                                },
+                                afterLabel: function(context) {
+                                    if (context.dataset.label === 'Margem de Lucro (R$)') {
+                                        const venda = produtosFluxoData.valores_venda[context.dataIndex];
+                                        const compra = produtosFluxoData.valores_compra[context.dataIndex] || 0;
+                                        const percentual = compra > 0 ? ((venda - compra) / compra * 100).toFixed(2) : '∞';
+                                        return `Margem: ${percentual}%`;
+                                    }
+                                    return null;
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Top 10 Produtos - Últimos 30 Dias',
+                            color: '#e0e0e0',
+                            font: {
+                                size: 16
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return formatMoney(value);
+                                },
+                                color: '#e0e0e0'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Valor (R$)',
+                                color: '#e0e0e0'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#e0e0e0',
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    }
+                }
+            });
+        }
       }
     } catch (error) {
       console.error('Erro ao atualizar gráficos:', error);

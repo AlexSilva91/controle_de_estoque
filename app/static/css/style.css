@@ -2852,3 +2852,33 @@ canvas {
   /* tamanho do ícone */
   font-size: 14px;
 }
+.chart-container.single-chart {
+    flex: 0 0 49%;
+    max-width: 49%;
+}
+
+.chart-container.single-chart .chart-wrapper {
+    height: 60vh;
+    min-height: 400px;
+    max-height: 700px;
+}
+
+@media (max-width: 1200px) {
+    .chart-container.single-chart {
+        flex: 1;
+        max-width: 100%;
+    }
+    .chart-container.single-chart .chart-wrapper {
+        height: 50vh;
+        min-height: 350px;
+        max-height: 500px;
+    }
+}
+
+@media (max-width: 768px) {
+    .chart-container.single-chart .chart-wrapper {
+        height: 45vh;
+        min-height: 300px;
+        max-height: 400px;
+    }
+}

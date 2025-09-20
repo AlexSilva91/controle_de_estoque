@@ -375,6 +375,67 @@ def get_movimentacoes():
         logger.error(f"Erro na consulta de movimentações: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@admin_bp.route('/dashboard/produtos-maior-fluxo')
+@login_required
+@admin_required
+def produtos_maior_fluxo():
+    try:
+        # Data de 30 dias atrás
+        data_inicio = datetime.now() - timedelta(days=30)
+        
+        # Consulta para obter os produtos com maior saída usando NotaFiscalItem
+        produtos_fluxo = db.session.query(
+            Produto.nome,
+            Produto.valor_unitario_compra,
+            func.sum(NotaFiscalItem.quantidade).label('total_saida'),
+            func.sum(NotaFiscalItem.quantidade * NotaFiscalItem.valor_unitario).label('valor_total_venda'),
+            func.sum(NotaFiscalItem.quantidade * Produto.valor_unitario_compra).label('valor_total_compra')
+        ).join(
+            NotaFiscalItem, NotaFiscalItem.produto_id == Produto.id
+        ).join(
+            NotaFiscal, NotaFiscal.id == NotaFiscalItem.nota_id
+        ).filter(
+            NotaFiscal.status == StatusNota.emitida,
+            NotaFiscal.data_emissao >= data_inicio
+        ).group_by(
+            Produto.id, Produto.nome, Produto.valor_unitario_compra
+        ).order_by(
+            func.sum(NotaFiscalItem.quantidade).desc()
+        ).limit(10).all()
+        
+        # Preparar dados para o gráfico
+        produtos = []
+        quantidades = []
+        valores_venda = []
+        valores_compra = []
+        
+        print("Produtos com maior fluxo:", produtos_fluxo)
+        
+        for produto in produtos_fluxo:
+            produtos.append(produto.nome)
+            quantidades.append(float(produto.total_saida))
+            valores_venda.append(float(produto.valor_total_venda))
+            # Usar o valor total de compra calculado na query
+            valor_compra = float(produto.valor_total_compra or 0)
+            valores_compra.append(valor_compra)
+        
+        return jsonify({
+            'success': True,
+            'produtos': produtos,
+            'quantidades': quantidades,
+            'valores_venda': valores_venda,
+            'valores_compra': valores_compra
+        })
+        
+    except Exception as e:
+        print(f"Erro ao buscar produtos com maior fluxo: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': 'Erro ao buscar dados dos produtos'
+        })
+        
 # ===== Caixa Routes =====
 @admin_bp.route('/caixa/abrir', methods=['POST'])
 @login_required
