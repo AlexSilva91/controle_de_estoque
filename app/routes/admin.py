@@ -409,8 +409,6 @@ def produtos_maior_fluxo():
         valores_venda = []
         valores_compra = []
         
-        print("Produtos com maior fluxo:", produtos_fluxo)
-        
         for produto in produtos_fluxo:
             produtos.append(produto.nome)
             quantidades.append(float(produto.total_saida))

@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
   let caixasFechados = [];
   let itensVendaRetroativa = [];
   let pagamentosVendaRetroativa = [];
-  let vendasDespesasChart, formasPagamentoChart, caixasChart, vendasDiariasChart;
+  let vendasDespesasChart, formasPagamentoChart, caixasChart, vendasDiariasChart, produtosMaiorFluxoChart;
   let caixaIdAtual = null;
 
   // ===== CONFIGURAÇÃO DOS GRÁFICOS =====
@@ -369,6 +369,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (formasPagamentoChart) formasPagamentoChart.destroy();
       if (caixasChart) caixasChart.destroy();
       if (vendasDiariasChart) vendasDiariasChart.destroy();
+      if (produtosMaiorFluxoChart) produtosMaiorFluxoChart.destroy();
 
       const vendasMensaisData = await fetchWithErrorHandling('/admin/dashboard/vendas-mensais');
       if (vendasMensaisData.success) {
@@ -654,7 +655,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return venda - compra;
             });
             
-            new Chart(produtosFluxoCtx, {
+            produtosMaiorFluxoChart = new Chart(produtosFluxoCtx, {
                 type: 'bar',
                 data: {
                     labels: produtosFluxoData.produtos,
