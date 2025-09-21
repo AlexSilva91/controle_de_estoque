@@ -654,6 +654,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 const compra = produtosFluxoData.valores_compra[index] || 0;
                 return venda - compra;
             });
+        
+            // Calcular percentual de margem para tooltip
+            const percentuaisMargem = produtosFluxoData.valores_venda.map((venda, index) => {
+                const compra = produtosFluxoData.valores_compra[index] || 0;
+                return compra > 0 ? ((venda - compra) / compra * 100).toFixed(2) : '∞';
+            });
+            
+            // Destruir gráfico anterior se existir
+            if (produtosMaiorFluxoChart) {
+                produtosMaiorFluxoChart.destroy();
+            }
+            
+            // Verificar tamanho da tela para ajustes específicos
+            const isMobile = window.innerWidth <= 768;
+            const isTablet = window.innerWidth > 768 && window.innerWidth <= 1024;
             
             produtosMaiorFluxoChart = new Chart(produtosFluxoCtx, {
                 type: 'bar',
@@ -663,64 +678,115 @@ document.addEventListener('DOMContentLoaded', function() {
                         {
                             label: 'Valor de Venda (R$)',
                             data: produtosFluxoData.valores_venda,
-                            backgroundColor: chartColors.green,
-                            borderColor: chartColors.greenBorder,
-                            borderWidth: 2,
-                            order: 1
+                            backgroundColor: 'rgba(76, 175, 80, 0.8)',
+                            borderColor: 'rgb(76, 175, 80)',
+                            borderWidth: 1,
+                            order: 1,
+                            barPercentage: isMobile ? 0.4 : 0.7,
+                            categoryPercentage: isMobile ? 0.6 : 0.8,
+                            borderRadius: 4,
+                            hoverBackgroundColor: 'rgba(76, 175, 80, 1)'
                         },
                         {
                             label: 'Valor de Compra (R$)',
                             data: produtosFluxoData.valores_compra,
-                            backgroundColor: chartColors.red,
-                            borderColor: chartColors.redBorder,
-                            borderWidth: 2,
-                            order: 2
+                            backgroundColor: 'rgba(244, 67, 54, 0.8)',
+                            borderColor: 'rgb(244, 67, 54)',
+                            borderWidth: 1,
+                            order: 2,
+                            barPercentage: isMobile ? 0.4 : 0.7,
+                            categoryPercentage: isMobile ? 0.6 : 0.8,
+                            borderRadius: 4,
+                            hoverBackgroundColor: 'rgba(244, 67, 54, 1)'
                         },
                         {
                             label: 'Margem de Lucro (R$)',
                             data: margensLucro,
-                            backgroundColor: chartColors.blue,
-                            borderColor: chartColors.blueBorder,
-                            borderWidth: 2,
+                            backgroundColor: 'rgba(33, 150, 243, 0.9)',
+                            borderColor: 'rgb(33, 150, 243)',
+                            borderWidth: 3,
                             type: 'line',
                             order: 0,
                             pointStyle: 'circle',
-                            pointRadius: 5,
-                            pointHoverRadius: 7
+                            pointRadius: isMobile ? 3 : 6,
+                            pointHoverRadius: isMobile ? 5 : 8,
+                            pointBackgroundColor: 'rgb(33, 150, 243)',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2,
+                            tension: 0.3,
+                            fill: false
                         }
                     ]
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
+                    layout: {
+                        padding: {
+                            top: 20,
+                            right: isMobile ? 10 : 20,
+                            bottom: isMobile ? 15 : 25,
+                            left: isMobile ? 10 : 20
+                        }
+                    },
                     plugins: {
                         legend: {
                             position: 'top',
                             labels: {
-                                color: '#e0e0e0'
+                                color: '#e0e0e0',
+                                boxWidth: 16,
+                                padding: 20,
+                                font: {
+                                    size: isMobile ? 10 : 14,
+                                    weight: '500'
+                                },
+                                usePointStyle: true,
+                                pointStyle: 'rectRounded'
                             }
                         },
                         tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(30, 30, 46, 0.95)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#e0e0e0',
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            cornerRadius: 6,
                             callbacks: {
                                 label: function(context) {
                                     return `${context.dataset.label}: ${formatMoney(context.raw)}`;
                                 },
                                 afterLabel: function(context) {
                                     if (context.dataset.label === 'Margem de Lucro (R$)') {
-                                        const venda = produtosFluxoData.valores_venda[context.dataIndex];
-                                        const compra = produtosFluxoData.valores_compra[context.dataIndex] || 0;
-                                        const percentual = compra > 0 ? ((venda - compra) / compra * 100).toFixed(2) : '∞';
-                                        return `Margem: ${percentual}%`;
+                                        return `Margem Percentual: ${percentuaisMargem[context.dataIndex]}%`;
                                     }
                                     return null;
                                 }
-                            }
+                            },
+                            titleFont: {
+                                size: isMobile ? 12 : 14,
+                                weight: 'bold'
+                            },
+                            bodyFont: {
+                                size: isMobile ? 11 : 13
+                            },
+                            padding: 12,
+                            boxWidth: 12,
+                            boxHeight: 12,
+                            displayColors: true
                         },
                         title: {
                             display: true,
-                            text: 'Top 10 Produtos - Últimos 30 Dias',
+                            text: 'Top 10 Produtos - Maior Fluxo (Últimos 30 Dias)',
                             color: '#e0e0e0',
                             font: {
-                                size: 16
+                                size: isMobile ? 14 : 18,
+                                weight: '600'
+                            },
+                            padding: {
+                                top: 5,
+                                bottom: isMobile ? 15 : 25
                             }
                         }
                     },
@@ -728,32 +794,79 @@ document.addEventListener('DOMContentLoaded', function() {
                         y: {
                             beginAtZero: true,
                             grid: {
-                                color: 'rgba(255, 255, 255, 0.1)'
+                                color: 'rgba(255, 255, 255, 0.1)',
+                                drawBorder: false
                             },
                             ticks: {
                                 callback: function(value) {
                                     return formatMoney(value);
                                 },
-                                color: '#e0e0e0'
+                                color: '#e0e0e0',
+                                font: {
+                                    size: isMobile ? 10 : 12
+                                },
+                                maxTicksLimit: isMobile ? 5 : 7,
+                                padding: 10
                             },
                             title: {
                                 display: true,
-                                text: 'Valor (R$)',
-                                color: '#e0e0e0'
+                                text: 'Valores em Reais (R$)',
+                                color: '#e0e0e0',
+                                font: {
+                                    size: isMobile ? 11 : 13,
+                                    weight: '500'
+                                },
+                                padding: {
+                                    top: 10,
+                                    bottom: 10
+                                }
                             }
                         },
                         x: {
                             grid: {
-                                color: 'rgba(255, 255, 255, 0.1)'
+                                display: false,
+                                drawBorder: false
                             },
                             ticks: {
                                 color: '#e0e0e0',
-                                maxRotation: 45,
-                                minRotation: 45
+                                maxRotation: isMobile ? 60 : 45,
+                                minRotation: isMobile ? 60 : 45,
+                                font: {
+                                    size: isMobile ? 10 : 12
+                                },
+                                padding: 8,
+                                callback: function(value, index) {
+                                    const label = this.getLabelForValue(value);
+                                    if (isMobile && label.length > 12) {
+                                        return label.substring(0, 10) + '...';
+                                    }
+                                    return label;
+                                }
                             }
                         }
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    animation: {
+                        duration: 800,
+                        easing: 'easeOutQuart'
                     }
                 }
+            });
+            
+            // Adicionar event listener para redimensionamento da janela - CORRIGIDO
+            let resizeTimeout;
+            window.addEventListener('resize', function() {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(function() {
+                    // Apenas atualizar o gráfico existente, não recriar
+                    if (produtosMaiorFluxoChart) {
+                        produtosMaiorFluxoChart.resize();
+                        produtosMaiorFluxoChart.update();
+                    }
+                }, 250);
             });
         }
       }
