@@ -2701,7 +2701,6 @@ def get_operadores():
             Usuario.status == True
         ).order_by(Usuario.nome).all()
         
-        print(operadores)
         data = []
         for op in operadores:
             data.append({
