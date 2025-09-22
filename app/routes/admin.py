@@ -42,7 +42,7 @@ from app.models import db
 from app.utils.audit import calcular_diferencas
 from app.utils.format_data_moeda import format_currency, format_number
 from app.models.entities import ( 
-    AuditLog, Cliente, Produto, NotaFiscal, UnidadeMedida, StatusNota,
+    AuditLog, Cliente, Produto, NotaFiscal, TipoUsuario, UnidadeMedida, StatusNota,
     Financeiro, TipoMovimentacao, CategoriaFinanceira, MovimentacaoEstoque, ContaReceber,
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
@@ -2635,6 +2635,7 @@ def get_caixas():
     session = Session(db.engine)
 
     status = request.args.get('status')
+    operador_id = request.args.get('operador_id')
     data_inicio = request.args.get('data_inicio')
     data_fim = request.args.get('data_fim')
 
@@ -2646,6 +2647,14 @@ def get_caixas():
             query = query.filter(Caixa.status == status_enum)
         except ValueError:
             pass  # ignora se status inválido
+
+    # NOVO: Filtro por operador
+    if operador_id:
+        try:
+            operador_id_int = int(operador_id)
+            query = query.filter(Caixa.operador_id == operador_id_int)
+        except ValueError:
+            pass  # ignora se operador_id inválido
 
     if data_inicio:
         try:
@@ -2679,6 +2688,33 @@ def get_caixas():
 
     return jsonify({"success": True, "data": data, "count": len(data)})
 
+@admin_bp.route('/usuarios/operadores')
+@login_required
+@admin_required
+def get_operadores():
+    """Retorna lista de operadores para o filtro"""
+    session = Session(db.engine)
+    
+    try:
+        operadores = session.query(Usuario).filter(
+            Usuario.tipo == TipoUsuario.operador,
+            Usuario.status == True
+        ).order_by(Usuario.nome).all()
+        
+        print(operadores)
+        data = []
+        for op in operadores:
+            data.append({
+                "id": op.id,
+                "nome": op.nome,
+                "cpf": op.cpf
+            })
+            
+        return jsonify({"success": True, "data": data})
+        
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @admin_bp.route('/caixas/pdf')
 @login_required
 @admin_required
@@ -2689,6 +2725,8 @@ def gerar_pdf_caixas_detalhado():
         status = request.args.get('status')
         data_inicio = request.args.get('data_inicio')
         data_fim = request.args.get('data_fim')
+        operador_id = request.args.get('operador_id')
+        
 
         # Construir query (mesma lógica da rota get_caixas)
         query = session.query(Caixa).join(Usuario, Caixa.operador_id == Usuario.id)
@@ -2699,7 +2737,14 @@ def gerar_pdf_caixas_detalhado():
                 query = query.filter(Caixa.status == status_enum)
             except ValueError:
                 pass  # ignora se status inválido
-
+            
+        if operador_id:
+            try:
+                operador_id_int = int(operador_id)
+                query = query.filter(Caixa.operador_id == operador_id_int)
+            except ValueError:
+                pass  # ignora se operador_id inválido
+            
         if data_inicio:
             try:
                 dt_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
@@ -2720,145 +2765,51 @@ def gerar_pdf_caixas_detalhado():
         # Criar buffer para PDF
         buffer = BytesIO()
         
-        # Configurar documento com margens otimizadas
-        doc = SimpleDocTemplate(buffer, pagesize=A4, 
+        # Configurar documento com as mesmas margens do primeiro relatório
+        doc = SimpleDocTemplate(buffer, pagesize=A4,
                               leftMargin=15*mm, rightMargin=15*mm,
-                              topMargin=15*mm, bottomMargin=20*mm)
+                              topMargin=10*mm, bottomMargin=20*mm)
         
-        # === PALETA DE CORES PROFISSIONAL ===
-        dark_blue = colors.HexColor("#1e3a8a")         # Azul escuro profissional
-        medium_blue = colors.HexColor("#3b82f6")       # Azul médio
-        light_blue = colors.HexColor("#dbeafe")        # Azul claro para fundos
-        dark_gray = colors.HexColor("#1f2937")         # Cinza escuro para texto
-        medium_gray = colors.HexColor("#6b7280")       # Cinza médio
-        light_gray = colors.HexColor("#f9fafb")        # Cinza muito claro para fundos
-        border_gray = colors.HexColor("#e5e7eb")       # Cinza para bordas
-        success_green = colors.HexColor("#059669")     # Verde para sucesso
-        warning_orange = colors.HexColor("#d97706")    # Laranja para alertas
-        danger_red = colors.HexColor("#dc2626")        # Vermelho para perigo
-        
-        # === ESTILOS TIPOGRÁFICOS PROFISSIONAIS ===
         styles = getSampleStyleSheet()
-        
-        # Título principal
-        main_title_style = ParagraphStyle(
-            'MainTitle',
-            parent=styles['Title'],
-            fontSize=16,
-            textColor=dark_blue,
-            spaceAfter=6,
-            alignment=0,  # Alinhado à esquerda
-            fontName='Helvetica-Bold'
-        )
-        
-        # Subtítulo
-        subtitle_style = ParagraphStyle(
-            'Subtitle',
-            parent=styles['Normal'],
-            fontSize=10,
-            textColor=medium_gray,
-            spaceAfter=12,
-            alignment=0,
-            fontName='Helvetica'
-        )
-        
-        # Cabeçalho de seção
-        section_title_style = ParagraphStyle(
-            'SectionTitle',
-            parent=styles['Heading2'],
-            fontSize=12,
-            textColor=dark_blue,
-            spaceAfter=10,
-            spaceBefore=15,
-            fontName='Helvetica-Bold',
-            leftIndent=0
-        )
-        
-        # Texto corpo
-        body_style = ParagraphStyle(
-            'Body',
-            parent=styles['Normal'],
-            fontSize=9,
-            textColor=dark_gray,
-            spaceAfter=4,
-            fontName='Helvetica',
-            leading=11
-        )
-        
-        # Texto pequeno
-        small_style = ParagraphStyle(
-            'Small',
-            parent=styles['Normal'],
-            fontSize=8,
-            textColor=medium_gray,
-            spaceAfter=3,
-            fontName='Helvetica',
-            leading=10
-        )
-        
-        # Texto destaque
-        highlight_style = ParagraphStyle(
-            'Highlight',
-            parent=styles['Normal'],
-            fontSize=10,
-            textColor=dark_blue,
-            spaceAfter=5,
-            fontName='Helvetica-Bold'
-        )
-        
-        # Texto para valores monetários
-        money_style = ParagraphStyle(
-            'Money',
-            parent=styles['Normal'],
-            fontSize=9,
-            textColor=dark_gray,
-            spaceAfter=4,
-            fontName='Helvetica-Bold',
-            alignment=2  # Direita
-        )
-        
-        # === FUNÇÕES UTILITÁRIAS ===
-        def moeda_br(valor):
-            """Formatar valor monetário em Real brasileiro"""
-            return f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-        
-        # === CONTEÚDO DO PDF ===
         elements = []
+
+        # -------------------- Cabeçalho (mesmo estilo do primeiro relatório) --------------------
+        header_style = ParagraphStyle(
+            'Header',
+            parent=styles['Heading1'],
+            fontSize=18,
+            alignment=TA_CENTER,
+            spaceAfter=10
+        )
         
-        # Cabeçalho profissional
-        header_data = [
-            [
-                Paragraph("RELATÓRIO DE CONTROLE DE CAIXAS", main_title_style),
-                Paragraph(f"Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}", small_style)
-            ]
-        ]
+        # Formatar datas para exibição
+        periodo_text = ""
+        if data_inicio and data_fim:
+            data_inicio_fmt = datetime.strptime(data_inicio, "%Y-%m-%d").strftime("%d/%m/%Y")
+            data_fim_fmt = datetime.strptime(data_fim, "%Y-%m-%d").strftime("%d/%m/%Y")
+            periodo_text = f"Período: {data_inicio_fmt} a {data_fim_fmt}"
+        elif data_inicio:
+            data_inicio_fmt = datetime.strptime(data_inicio, "%Y-%m-%d").strftime("%d/%m/%Y")
+            periodo_text = f"Período: A partir de {data_inicio_fmt}"
+        elif data_fim:
+            data_fim_fmt = datetime.strptime(data_fim, "%Y-%m-%d").strftime("%d/%m/%Y")
+            periodo_text = f"Período: Até {data_fim_fmt}"
+        else:
+            periodo_text = "Período: Todos os caixas"
+
+        elements.append(Paragraph("💰 Relatório de Controle de Caixas", header_style))
+        elements.append(Paragraph(periodo_text, styles["Normal"]))
         
-        header_table = Table(header_data, colWidths=[350, 130])
-        header_table.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-        ]))
-        
-        elements.append(header_table)
-        
-        # Informações de filtro (se aplicável)
-        if status or data_inicio or data_fim:
-            filtros = []
-            if status:
-                status_text = status.upper() if status else "TODOS"
-                filtros.append(f"Status: {status_text}")
-            if data_inicio:
-                filtros.append(f"De: {data_inicio}")
-            if data_fim:
-                filtros.append(f"Até: {data_fim}")
+        # Status filter info
+        if status:
+            status_text = status.upper() if status else "TODOS"
+            elements.append(Paragraph(f"Status: {status_text}", styles["Normal"]))
             
-            filtro_text = " | ".join(filtros)
-            elements.append(Paragraph(f"Filtros: {filtro_text}", small_style))
-        
+        elements.append(Spacer(1, 8))
+        elements.append(Table([[""]], colWidths=[170*mm], style=[('LINEBELOW', (0, 0), (-1, -1), 1, colors.black)]))
         elements.append(Spacer(1, 12))
-        elements.append(HRFlowable(width="100%", thickness=0.8, color=border_gray, spaceAfter=12))
-        
-        # Resumo executivo (se houver caixas)
+
+        # -------------------- Resumo Executivo (mesmo estilo da primeira rota) --------------------
         if caixas:
             # Cálculos para o resumo
             total_caixas = len(caixas)
@@ -2915,64 +2866,43 @@ def gerar_pdf_caixas_detalhado():
                 total_geral_saidas += float(caixa_saidas)
             
             saldo_geral = total_geral_entradas - total_geral_saidas
-            
-            # Tabela de resumo executivo
+
+            # Tabela de resumo no mesmo estilo da primeira rota
             resumo_data = [
-                ['VISÃO GERAL', '', ''],
-                ['Total de Caixas', str(total_caixas), ''],
-                ['Caixas Abertos', str(caixas_abertos), ''],
-                ['Caixas Fechados', str(caixas_fechados), ''],
-                ['', '', ''],
-                ['RESUMO FINANCEIRO', '', ''],
-                ['Total de Entradas', '', moeda_br(total_geral_entradas)],
-                ['Total de Saídas', '', moeda_br(total_geral_saidas)],
-                ['Saldo Líquido', '', moeda_br(saldo_geral)]
+                ["Total Caixas", "Caixas Abertos", "Caixas Fechados", "Total Entradas", "Total Saídas", "Entradas - Saídas"],
+                [
+                    str(total_caixas),
+                    str(caixas_abertos),
+                    str(caixas_fechados),
+                    formatarMoeda(total_geral_entradas),
+                    formatarMoeda(total_geral_saidas),
+                    formatarMoeda(saldo_geral),
+                ]
             ]
-            
-            resumo_table = Table(resumo_data, colWidths=[150, 100, 130])
-            resumo_table.setStyle(TableStyle([
-                # Cabeçalhos de seção
-                ('BACKGROUND', (0, 0), (2, 0), dark_blue),
-                ('BACKGROUND', (0, 5), (2, 5), dark_blue),
-                ('TEXTCOLOR', (0, 0), (2, 0), colors.white),
-                ('TEXTCOLOR', (0, 5), (2, 5), colors.white),
-                ('FONTNAME', (0, 0), (2, 0), 'Helvetica-Bold'),
-                ('FONTNAME', (0, 5), (2, 5), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (2, 0), 10),
-                ('FONTSIZE', (0, 5), (2, 5), 10),
-                
-                # Dados
-                ('FONTNAME', (0, 1), (1, 3), 'Helvetica'),
-                ('FONTNAME', (2, 6), (2, 8), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 1), (2, 8), 9),
-                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-                ('ALIGN', (1, 1), (1, 3), 'RIGHT'),
-                ('ALIGN', (2, 6), (2, 8), 'RIGHT'),
-                
-                # Bordas e preenchimento
-                ('BOX', (0, 0), (-1, -1), 0.5, border_gray),
-                ('LINEBELOW', (0, 4), (-1, 4), 0.5, border_gray),
-                ('BACKGROUND', (0, 1), (2, 3), light_gray),
-                ('BACKGROUND', (0, 6), (2, 8), light_gray),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 8),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ]))
-            
+
+            resumo_table = Table(resumo_data, colWidths=[25*mm, 25*mm, 25*mm, 35*mm, 35*mm, 35*mm])
+            resumo_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#4682B4")),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 9),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('FONT', (0, 1), (-1, 1), 'Helvetica', 9),
+            ])
+            resumo_table.setStyle(resumo_style)
             elements.append(resumo_table)
-            elements.append(Spacer(1, 15))
-        
-        # Detalhamento por caixa
+            elements.append(Spacer(1, 18))
+
+        # -------------------- Detalhamento por Caixa --------------------
         if caixas:
-            elements.append(Paragraph("DETALHAMENTO POR CAIXA", section_title_style))
-            
+            elements.append(Paragraph("📋 Detalhamento por Caixa", styles['Heading2']))
+            elements.append(Spacer(1, 8))
+
             for idx, caixa in enumerate(caixas):
                 # Cálculos exatos como na rota original
                 operador_nome = caixa.operador.nome if caixa.operador else "Operador não identificado"
                 
-                # Busca pagamentos de notas fiscais (EXATA como na API)
+                # Busca pagamentos de notas fiscais
                 pagamentos_notas = session.query(
                     PagamentoNotaFiscal.forma_pagamento,
                     func.sum(PagamentoNotaFiscal.valor).label('total')
@@ -2986,7 +2916,7 @@ def gerar_pdf_caixas_detalhado():
                     PagamentoNotaFiscal.forma_pagamento
                 ).all()
                 
-                # Busca pagamentos de contas a receber (EXATA como na API)
+                # Busca pagamentos de contas a receber
                 pagamentos_contas = session.query(
                     PagamentoContaReceber.forma_pagamento,
                     func.sum(PagamentoContaReceber.valor_pago).label('total')
@@ -2996,7 +2926,7 @@ def gerar_pdf_caixas_detalhado():
                     PagamentoContaReceber.forma_pagamento
                 ).all()
                 
-                # Combina os resultados (EXATA como na API)
+                # Combina os resultados
                 total_entradas = 0.0
                 formas_pagamento = {}
                 
@@ -3010,7 +2940,7 @@ def gerar_pdf_caixas_detalhado():
                     formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor
                     total_entradas += valor
 
-                # Calcula total de saídas - SOMENTE DESPESAS (EXATA como na API)
+                # Calcula total de saídas - SOMENTE DESPESAS
                 total_saidas = session.query(
                     func.sum(Financeiro.valor)
                 ).filter(
@@ -3020,212 +2950,96 @@ def gerar_pdf_caixas_detalhado():
                 ).scalar() or 0.0
                 
                 total_saidas = float(total_saidas)
-
-                # Calcula valores físicos e digitais (EXATA como na API)
-                valor_dinheiro = formas_pagamento.get('dinheiro', 0.0)
-                valor_fisico = valor_dinheiro
-                
-                if caixa.valor_fechamento and caixa.valor_abertura:
-                    valor_abertura = float(caixa.valor_abertura)
-                    valor_fechamento = float(caixa.valor_fechamento)
-                    valor_fisico = max((valor_dinheiro + valor_abertura) - valor_fechamento - total_saidas, 0.0)
-
-                    # Pega parte inteira e parte decimal (EXATA como na API)
-                    import math
-                    parte_inteira = math.floor(valor_fisico)
-                    parte_decimal = valor_fisico - parte_inteira
-
-                    if parte_decimal == 0.5:
-                        valor_fisico = valor_fisico
-                    elif parte_decimal > 0.5:
-                        valor_fisico = math.ceil(valor_fisico)
-                    else:
-                        valor_fisico = math.floor(valor_fisico)
-                    
-                formas_pagamento['dinheiro'] = valor_fisico
-                valor_digital = sum([
-                    formas_pagamento.get('pix_loja', 0.0),
-                    formas_pagamento.get('pix_fabiano', 0.0),
-                    formas_pagamento.get('pix_edfrance', 0.0),
-                    formas_pagamento.get('pix_maquineta', 0.0),
-                    formas_pagamento.get('cartao_debito', 0.0),
-                    formas_pagamento.get('cartao_credito', 0.0)
-                ])
-
-                a_prazo = formas_pagamento.get('a_prazo', 0.0)
-                
-                # Calcula total recebido de contas a prazo (EXATA como na API)
-                total_contas_prazo_recebidas = session.query(
-                    func.sum(PagamentoContaReceber.valor_pago)
-                ).filter(
-                    PagamentoContaReceber.caixa_id == caixa.id
-                ).scalar() or 0.0
-                
-                total_contas_prazo_recebidas = float(total_contas_prazo_recebidas)
                 saldo_caixa = total_entradas - total_saidas
-                
-                # Header do caixa
-                status_color = warning_orange if caixa.status == StatusCaixa.aberto else success_green
-                status_text = f"<font color='{status_color.hexval()}'><b>{caixa.status.value.upper()}</b></font>"
-                
-                caixa_header = [
+
+                # CORREÇÃO: Status como texto simples sem HTML
+                status_text = caixa.status.value.upper()
+
+                # Tabela de informações do caixa
+                caixa_data = [
+                    ['ID', 'Operador', 'Status', 'Data Abertura', 'Data Fechamento', 'Entrada - Saída'],
                     [
-                        Paragraph(f"<b>CAIXA #{caixa.id}</b>", highlight_style),
-                        Paragraph(f"Status: {status_text}", body_style),
-                        Paragraph(f"Saldo: {moeda_br(saldo_caixa)}", money_style)
-                    ],
-                    [
-                        Paragraph(f"Operador: {operador_nome}", small_style),
-                        Paragraph(f"Abertura: {caixa.data_abertura.strftime('%d/%m/%Y %H:%M') if caixa.data_abertura else '-'}", small_style),
-                        Paragraph(f"Fechamento: {caixa.data_fechamento.strftime('%d/%m/%Y %H:%M') if caixa.data_fechamento else 'Em aberto'}", small_style)
+                        str(caixa.id),
+                        operador_nome[:20] + '...' if len(operador_nome) > 20 else operador_nome,
+                        status_text,
+                        caixa.data_abertura.strftime('%d/%m/%Y %H:%M') if caixa.data_abertura else '-',
+                        caixa.data_fechamento.strftime('%d/%m/%Y %H:%M') if caixa.data_fechamento else 'Em aberto',
+                        formatarMoeda(saldo_caixa)
                     ]
                 ]
+
+                caixa_table = Table(caixa_data, colWidths=[15*mm, 40*mm, 25*mm, 30*mm, 30*mm, 30*mm])
                 
-                caixa_header_table = Table(caixa_header, colWidths=[180, 150, 100])
-                caixa_header_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), light_blue),
-                    ('BOX', (0, 0), (-1, -1), 0.5, border_gray),
+                # CORREÇÃO: Aplicar cores diretamente no estilo da tabela
+                caixa_style = TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#4682B4")),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 8),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+                    ('FONT', (0, 1), (-1, -1), 'Helvetica', 8),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 6),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-                    ('TOPPADDING', (0, 0), (-1, 0), 6),
-                    ('TOPPADDING', (0, 1), (-1, 1), 3),
-                ]))
-                
-                elements.append(caixa_header_table)
-                
-                # Dados financeiros do caixa
+                    # CORREÇÃO: Aplicar cor do status diretamente na célula
+                    ('TEXTCOLOR', (2, 1), (2, 1), colors.red if caixa.status == StatusCaixa.aberto else colors.darkgreen),
+                    # Linha zebrada
+                    ('BACKGROUND', (0, 1), (-1, 1), colors.whitesmoke if idx % 2 == 0 else colors.white),
+                ])
+                caixa_table.setStyle(caixa_style)
+                elements.append(caixa_table)
+
+                # Dados financeiros detalhados em uma tabela menor abaixo
                 finance_data = [
-                    ['Descrição', 'Valor'],
-                    ['Valor de Abertura', moeda_br(float(caixa.valor_abertura)) if caixa.valor_abertura else 'N/A'],
-                    ['Valor de Fechamento', moeda_br(float(caixa.valor_fechamento)) if caixa.valor_fechamento else 'N/A'],
-                    ['Total de Entradas', moeda_br(total_entradas)],
-                    ['Total de Saídas', moeda_br(total_saidas)],
-                    ['Valor Físico (Dinheiro)', moeda_br(valor_fisico)],
-                    ['Valor Digital (PIX/Cartão)', moeda_br(valor_digital)]
+                    ['Abertura', 'Fechamento', 'Entradas', 'Saídas'],
+                    [
+                        formatarMoeda(float(caixa.valor_abertura)) if caixa.valor_abertura else 'N/A',
+                        formatarMoeda(float(caixa.valor_fechamento)) if caixa.valor_fechamento else 'N/A',
+                        formatarMoeda(total_entradas),
+                        formatarMoeda(total_saidas)
+                    ]
                 ]
-                
-                finance_table = Table(finance_data, colWidths=[250, 130])
-                finance_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (1, 0), medium_blue),
-                    ('TEXTCOLOR', (0, 0), (1, 0), colors.white),
-                    ('FONTNAME', (0, 0), (1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (1, -1), 9),
-                    ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-                    ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-                    ('BACKGROUND', (0, 1), (1, -1), light_gray),
-                    ('GRID', (0, 0), (1, -1), 0.5, border_gray),
-                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 6),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-                    ('TOPPADDING', (0, 0), (-1, -1), 4),
-                ]))
-                
-                elements.append(Spacer(1, 8))
+
+                finance_table = Table(finance_data, colWidths=[35*mm, 35*mm, 35*mm, 35*mm])
+                finance_style = TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                    ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 8),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONT', (0, 1), (-1, -1), 'Helvetica', 8),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                    ('BACKGROUND', (0, 1), (-1, 1), colors.whitesmoke if idx % 2 == 0 else colors.white),
+                ])
+                finance_table.setStyle(finance_style)
                 elements.append(finance_table)
-                
-                # Formas de pagamento (se houver)
-                if formas_pagamento and any(valor > 0 for valor in formas_pagamento.values()):
-                    formas_data = [['Forma de Pagamento', 'Valor']]
-                    
-                    nomes_formas = {
-                        'dinheiro': 'Dinheiro',
-                        'pix_loja': 'PIX Loja',
-                        'pix_fabiano': 'PIX Fabiano',
-                        'pix_edfrance': 'PIX Edfrance',
-                        'pix_maquineta': 'PIX Maquineta',
-                        'cartao_debito': 'Cartão Débito',
-                        'cartao_credito': 'Cartão Crédito',
-                        'a_prazo': 'A Prazo'
-                    }
-                    
-                    for forma, valor in formas_pagamento.items():
-                        if valor > 0:
-                            nome_forma = nomes_formas.get(forma, forma.replace('_', ' ').title())
-                            formas_data.append([nome_forma, moeda_br(valor)])
-                    
-                    # Adicionar informações sobre contas a prazo se aplicável
-                    if a_prazo > 0 and total_contas_prazo_recebidas > 0:
-                        formas_data.append(['A Prazo (Recebido)', moeda_br(total_contas_prazo_recebidas)])
-                    
-                    formas_table = Table(formas_data, colWidths=[250, 130])
-                    formas_table.setStyle(TableStyle([
-                        ('BACKGROUND', (0, 0), (1, 0), light_blue),
-                        ('FONTNAME', (0, 0), (1, 0), 'Helvetica-Bold'),
-                        ('FONTSIZE', (0, 0), (1, -1), 8),
-                        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-                        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-                        ('GRID', (0, 0), (1, -1), 0.5, border_gray),
-                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                        ('LEFTPADDING', (0, 0), (-1, -1), 6),
-                        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-                        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-                        ('TOPPADDING', (0, 0), (-1, -1), 3),
-                    ]))
-                    
-                    elements.append(Spacer(1, 8))
-                    elements.append(Paragraph("Formas de Pagamento", body_style))
-                    elements.append(formas_table)
-                
-                # Observações (se houver)
-                if caixa.observacoes_operador or caixa.observacoes_admin:
-                    obs_elements = []
-                    
-                    if caixa.observacoes_operador:
-                        obs_elements.append(Paragraph(f"<b>Observações do Operador:</b> {caixa.observacoes_operador}", 
-                                                    ParagraphStyle('Obs', parent=small_style, backColor=light_gray, borderPadding=6)))
-                    
-                    if caixa.observacoes_admin:
-                        obs_elements.append(Paragraph(f"<b>Observações do Administrador:</b> {caixa.observacoes_admin}", 
-                                                    ParagraphStyle('Obs', parent=small_style, backColor=light_gray, borderPadding=6)))
-                    
-                    elements.append(Spacer(1, 8))
-                    for obs in obs_elements:
-                        elements.append(obs)
-                
-                # Separador entre caixas (exceto o último)
-                if idx < len(caixas) - 1:
-                    elements.append(Spacer(1, 12))
-                    elements.append(HRFlowable(width="100%", thickness=0.5, color=border_gray, spaceAfter=12))
-                    elements.append(Spacer(1, 5))
+                elements.append(Spacer(1, 12))
+
         else:
             # Mensagem quando não há caixas
-            elements.append(Paragraph("Nenhum caixa encontrado com os filtros aplicados.", body_style))
-        
-        # Rodapé profissional
+            no_data_style = ParagraphStyle(
+                'NoData',
+                parent=styles['Normal'],
+                fontSize=12,
+                alignment=TA_CENTER,
+                textColor=colors.gray
+            )
+            elements.append(Paragraph("Nenhum caixa encontrado com os filtros aplicados.", no_data_style))
+
+        # -------------------- Rodapé (mesmo estilo da primeira rota) --------------------
         elements.append(Spacer(1, 15))
-        elements.append(HRFlowable(width="100%", thickness=0.8, color=border_gray, spaceAfter=8))
-        
-        footer_text = f"Relatório gerado por Sistema de Gestão - Página 1/1"
-        elements.append(Paragraph(footer_text, small_style))
-        
-        # Construir PDF
+        rodape = datetime.now().strftime("Gerado em %d/%m/%Y às %H:%M")
+        elements.append(Paragraph(rodape, ParagraphStyle('Rodape', fontSize=8, alignment=TA_RIGHT, textColor=colors.grey)))
+
         doc.build(elements)
-        
-        # Preparar resposta
+
         buffer.seek(0)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"relatorio_caixas_{timestamp}.pdf"
-        
-        response = make_response(send_file(
-            buffer,
-            mimetype='application/pdf',
-            as_attachment=False,
-            download_name=filename
-        ))
-        response.headers['Content-Disposition'] = f'inline; filename={filename}'
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-        
+        response = make_response(buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'inline; filename=relatorio_caixas.pdf'
         return response
 
     except Exception as e:
         logging.error(f"Erro ao gerar PDF dos caixas: {str(e)}", exc_info=True)
         session.rollback()
-        return jsonify({'success': False, 'error': 'Erro interno do servidor: '}), 500
+        return jsonify({'success': False, 'error': f'Erro interno do servidor: {str(e)}'}), 500
     finally:
         session.close()
 

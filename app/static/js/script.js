@@ -3032,102 +3032,176 @@ document.addEventListener('DOMContentLoaded', function() {
       }
   });
   // ===== CAIXAS =====
-  async function loadCaixasData() {
-    try {
-      const status = document.getElementById('caixaStatus')?.value || '';
-      const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
-      const dataFim = document.getElementById('caixaDataFim')?.value || '';
-  
-      // Monta query string dinamicamente
-      const params = new URLSearchParams();
-      if (status) params.append('status', status);
-      if (dataInicio) params.append('data_inicio', dataInicio);
-      if (dataFim) params.append('data_fim', dataFim);
-  
-      let url = '/admin/caixas';
-      if ([...params].length > 0) {
-        url += `?${params.toString()}`;
-      }
-  
-      const data = await fetchWithErrorHandling(url);
-  
-      if (data.success) {
-        const caixasTable = document.querySelector('#caixasTable tbody');
-        if (caixasTable) {
-          caixasTable.innerHTML = '';
-  
-          data.data.forEach(caixa => {
-            const row = document.createElement('tr');
-  
-            const dataAbertura = formatDateTime(caixa.data_abertura);
-            const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
-  
-            const valorAbertura = formatarMoeda(caixa.valor_abertura);
-            const valorFechamento = caixa.valor_fechamento ? formatarMoeda(caixa.valor_fechamento) : '-';
-            const valorConfirmado = caixa.valor_confirmado ? formatarMoeda(caixa.valor_confirmado) : '-';
-  
-            let statusClass = '';
-            let statusText = '';
-            if (caixa.status === 'aberto') {
-              statusClass = 'badge-success';
-              statusText = 'Aberto';
-            } else if (caixa.status === 'fechado') {
-              statusClass = 'badge-primary';
-              statusText = 'Fechado';
-            } else if (caixa.status === 'analise' || caixa.status === 'em_analise') {
-              statusClass = 'badge-warning';
-              statusText = 'Em Análise';
-            } else if (caixa.status === 'rejeitado' || caixa.status === 'recusado') {
-              statusClass = 'badge-danger';
-              statusText = 'Rejeitado';
+  // Função para carregar a lista de operadores
+    async function loadOperadores() {
+        try {
+            console.log('Iniciando loadOperadores...');
+            
+            // Aguarda um pouco para garantir que o DOM esteja pronto
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            const select = document.getElementById('caixaOperador');
+            console.log('Elemento caixaOperador:', select);
+            
+            if (!select) {
+                console.error('Elemento caixaOperador não encontrado!');
+                return;
             }
-  
-            row.innerHTML = `
-              <td>${caixa.id}</td>
-              <td>${caixa.operador?.nome || '-'}</td>
-              <td>${dataAbertura}</td>
-              <td>${dataFechamento}</td>
-              <td>${valorAbertura}</td>
-              <td>${valorFechamento}</td>
-              <td><span class="badge ${statusClass}">${statusText}</span></td>
-              <td>
-                <div class="table-actions">
-                  <button class="btn-icon btn-info visualizar-caixa" data-id="${caixa.id}" title="Visualizar">
-                    <i class="fas fa-eye"></i>
-                  </button>
-                  <button class="btn-icon btn-warning reabrir-caixa" data-id="${caixa.id}" title="Reabrir Caixa">
-                    <i class="fas fa-unlock"></i>
-                  </button>
-                  <button class="btn-icon btn-danger fechar-caixa" data-id="${caixa.id}" title="Fechar Caixa">
-                    <i class="fas fa-lock"></i>
-                  </button>
-                  <button class="btn-icon btn-secondary venda-retroativa-caixa" data-id="${caixa.id}" title="Venda Retroativa">
-                    <i class="fas fa-history"></i>
-                  </button>
-                </div>
-              </td>
-            `;
-            caixasTable.appendChild(row);
-          });
-  
-          setupCaixaActions();
+            
+            const response = await fetch('/admin/usuarios/operadores');
+            const data = await response.json();
+            
+            console.log('Dados recebidos da API:', data);
+            
+            if (data.success) {
+                // Limpa opções existentes (exceto a primeira "Todos")
+                select.innerHTML = '<option value="">Todos</option>';
+                
+                // Adiciona os operadores
+                data.data.forEach(operador => {
+                    const option = document.createElement('option');
+                    option.value = operador.id;
+                    option.textContent = operador.nome;
+                    select.appendChild(option);
+                });
+                
+                console.log(`Operadores carregados: ${data.data.length}`);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar operadores:', error);
         }
-      }
-    } catch (error) {
-      console.error('Erro ao carregar caixas:', error);
-      showFlashMessage('error', 'Erro ao carregar lista de caixas');
     }
-  }
-  
+
+    // Modifique a função loadCaixasData para incluir o filtro de operador
+    async function loadCaixasData() {
+        try {
+            const status = document.getElementById('caixaStatus')?.value || '';
+            const operadorId = document.getElementById('caixaOperador')?.value || '';
+            const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
+            const dataFim = document.getElementById('caixaDataFim')?.value || '';
+        
+            console.log('Filtros aplicados:', { status, operadorId, dataInicio, dataFim });
+        
+            // Monta query string dinamicamente
+            const params = new URLSearchParams();
+            if (status) params.append('status', status);
+            if (operadorId) params.append('operador_id', operadorId);
+            if (dataInicio) params.append('data_inicio', dataInicio);
+            if (dataFim) params.append('data_fim', dataFim);
+        
+            let url = '/admin/caixas';
+            if ([...params].length > 0) {
+                url += `?${params.toString()}`;
+            }
+        
+            console.log('URL da requisição:', url);
+        
+            const data = await fetchWithErrorHandling(url);
+        
+            if (data.success) {
+                const caixasTable = document.querySelector('#caixasTable tbody');
+                if (caixasTable) {
+                    caixasTable.innerHTML = '';
+        
+                    data.data.forEach(caixa => {
+                        const row = document.createElement('tr');
+        
+                        const dataAbertura = formatDateTime(caixa.data_abertura);
+                        const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
+        
+                        const valorAbertura = formatarMoeda(caixa.valor_abertura);
+                        const valorFechamento = caixa.valor_fechamento ? formatarMoeda(caixa.valor_fechamento) : '-';
+                        const valorConfirmado = caixa.valor_confirmado ? formatarMoeda(caixa.valor_confirmado) : '-';
+        
+                        let statusClass = '';
+                        let statusText = '';
+                        if (caixa.status === 'aberto') {
+                            statusClass = 'badge-success';
+                            statusText = 'Aberto';
+                        } else if (caixa.status === 'fechado') {
+                            statusClass = 'badge-primary';
+                            statusText = 'Fechado';
+                        } else if (caixa.status === 'analise' || caixa.status === 'em_analise') {
+                            statusClass = 'badge-warning';
+                            statusText = 'Em Análise';
+                        } else if (caixa.status === 'rejeitado' || caixa.status === 'recusado') {
+                            statusClass = 'badge-danger';
+                            statusText = 'Rejeitado';
+                        }
+        
+                        row.innerHTML = `
+                            <td>${caixa.id}</td>
+                            <td>${caixa.operador?.nome || '-'}</td>
+                            <td>${dataAbertura}</td>
+                            <td>${dataFechamento}</td>
+                            <td>${valorAbertura}</td>
+                            <td>${valorFechamento}</td>
+                            <td><span class="badge ${statusClass}">${statusText}</span></td>
+                            <td>
+                                <div class="table-actions">
+                                    <button class="btn-icon btn-info visualizar-caixa" data-id="${caixa.id}" title="Visualizar">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn-icon btn-warning reabrir-caixa" data-id="${caixa.id}" title="Reabrir Caixa">
+                                        <i class="fas fa-unlock"></i>
+                                    </button>
+                                    <button class="btn-icon btn-danger fechar-caixa" data-id="${caixa.id}" title="Fechar Caixa">
+                                        <i class="fas fa-lock"></i>
+                                    </button>
+                                    <button class="btn-icon btn-secondary venda-retroativa-caixa" data-id="${caixa.id}" title="Venda Retroativa">
+                                        <i class="fas fa-history"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        `;
+                        caixasTable.appendChild(row);
+                    });
+        
+                    setupCaixaActions();
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao carregar caixas:', error);
+            showFlashMessage('error', 'Erro ao carregar lista de caixas');
+        }
+    }
+
+    // Atualize o evento de refresh para limpar também o filtro de operador
+    document.getElementById('refreshCaixas')?.addEventListener('click', () => {
+        document.getElementById('caixaStatus').value = '';
+        document.getElementById('caixaOperador').value = '';
+        document.getElementById('caixaDataInicio').value = '';
+        document.getElementById('caixaDataFim').value = '';
+        loadCaixasData();
+    });
+
+    // Função para inicializar tudo quando a página carregar
+    function initializeCaixasPage() {
+        console.log('Inicializando página de caixas...');
+        
+        // Carrega os operadores primeiro
+        loadOperadores().then(() => {
+            // Depois carrega os caixas
+            loadCaixasData();
+        });
+    }
+
+    // Aguarda o DOM estar completamente carregado
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeCaixasPage);
+    } else {
+        initializeCaixasPage();
+    }
   // Eventos de filtro
   document.getElementById('filterCaixas')?.addEventListener('click', () => {
     loadCaixasData();
   });
   
   document.getElementById('refreshCaixas')?.addEventListener('click', () => {
-    document.getElementById('caixaStatus').value = '';
-    document.getElementById('caixaDataInicio').value = '';
-    document.getElementById('caixaDataFim').value = '';
+        document.getElementById('caixaStatus').value = '';
+        document.getElementById('caixaOperador').value = '';
+        document.getElementById('caixaDataInicio').value = '';
+        document.getElementById('caixaDataFim').value = '';
     loadCaixasData();
   });
   
@@ -3141,12 +3215,14 @@ document.addEventListener('DOMContentLoaded', function() {
           const status = document.getElementById('caixaStatus')?.value || '';
           const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
           const dataFim = document.getElementById('caixaDataFim')?.value || '';
+          const operadorId = document.getElementById('caixaOperador')?.value || '';
           
           // Montar query string com os filtros atuais
           const params = new URLSearchParams();
           if (status) params.append('status', status);
           if (dataInicio) params.append('data_inicio', dataInicio);
           if (dataFim) params.append('data_fim', dataFim);
+          if (operadorId) params.append('operador_id', operadorId);
           
           let url = '/admin/caixas/pdf';
           if ([...params].length > 0) {

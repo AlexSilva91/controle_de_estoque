@@ -761,22 +761,35 @@
                                     <option value="recusado">Recusados</option>
                                 </select>
                             </div>
+                            
+                            <!-- NOVO: Filtro de Operador -->
+                            <div class="filter-group">
+                                <label for="caixaOperador">Operador:</label>
+                                <select id="caixaOperador" class="form-control">
+                                    <option value="">Todos</option>
+                                    <!-- Opções serão preenchidas via JavaScript -->
+                                </select>
+                            </div>
+                            
                             <!-- Filtro Data Início -->
                             <div class="filter-group">
                                 <label for="caixaDataInicio">Data Início:</label>
                                 <input type="date" id="caixaDataInicio" class="form-control">
                             </div>
+                            
                             <!-- Filtro Data Fim -->
                             <div class="filter-group">
                                 <label for="caixaDataFim">Data Fim:</label>
                                 <input type="date" id="caixaDataFim" class="form-control">
                             </div>
+                            
                             <!-- Botão Filtrar -->
                             <button class="btn btn-primary" id="filterCaixas">
                                 <i class="fas fa-filter"></i>
                                 <span>Filtrar</span>
                             </button>
                         </div>
+                        
                         <!-- Botões de ação (atualizar) -->
                         <div class="action-buttons">
                             <button class="btn btn-outline" id="refreshCaixas" aria-label="Atualizar">
