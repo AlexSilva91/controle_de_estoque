@@ -1388,69 +1388,97 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // ===== PRODUTOS =====
   async function loadProdutosData() {
-    try {
-      const searchText = document.getElementById('searchProduto')?.value.toLowerCase() || '';
-      const incluirInativos = document.getElementById('mostrarInativos')?.checked ? 'true' : 'false';
-      
-      const data = await fetchWithErrorHandling(`/admin/produtos?incluir_inativos=${incluirInativos}`);
-      
-      if (data.success) {
-        const produtosTable = document.querySelector('#produtosTable tbody');
-        if (produtosTable) {
-          produtosTable.innerHTML = '';
-          
-          data.produtos.forEach(produto => {
-            if (searchText && !produto.nome.toLowerCase().includes(searchText)) return;
+      try {
+        const searchText = document.getElementById('searchProduto')?.value.toLowerCase() || '';
+        const incluirInativos = document.getElementById('mostrarInativos')?.checked ? 'true' : 'false';
+        
+        const data = await fetchWithErrorHandling(`/admin/produtos?incluir_inativos=${incluirInativos}`);
+        
+        if (data.success) {
+          const produtosTable = document.querySelector('#produtosTable tbody');
+          if (produtosTable) {
+            produtosTable.innerHTML = '';
             
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${produto.codigo}</td>
-              <td>${produto.nome} ${!produto.ativo ? '<span class="badge badge-danger">Inativo</span>' : ''}</td>
-              <td>${produto.tipo}</td>
-              <td>${produto.unidade}</td>
-              <td>${produto.valor}</td>
-              <td>${produto.estoque_deposito}</td>
-              <td>${produto.estoque_loja}</td>
-              <td>${produto.estoque_fabrica}</td>
-              <td>
-                <div class="table-actions">
-                  <button class="btn-icon btn-info movimentar-estoque" data-id="${produto.id}" title="Transferir entre estoques">
-                    <i class="fas fa-exchange-alt"></i>
-                  </button>
-                  <button class="btn-icon btn-warning editar-produto" data-id="${produto.id}" title="Editar">
-                    <i class="fas fa-edit"></i>
-                  </button>
-                  <button class="btn-icon btn-danger remover-produto" data-id="${produto.id}" title="Remover">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </div>
-              </td>
-            `;
-            produtosTable.appendChild(row);
-          });
-          
-          setupProdutoActions();
+            data.produtos.forEach(produto => {
+              if (searchText && !produto.nome.toLowerCase().includes(searchText)) return;
+              
+              const row = document.createElement('tr');
+              // Adicione classe e atributo data-id para identificar a linha
+              row.className = 'produto-row clickable-row';
+              row.setAttribute('data-id', produto.id);
+              row.setAttribute('data-produto', JSON.stringify(produto));
+              
+              row.innerHTML = `
+                <td>${produto.codigo}</td>
+                <td>${produto.nome} ${!produto.ativo ? '<span class="badge badge-danger">Inativo</span>' : ''}</td>
+                <td>${produto.unidade}</td>
+                <td>${produto.valor}</td>
+                <td>${produto.estoque_deposito}</td>
+                <td>${produto.estoque_loja}</td>
+                <td>${produto.estoque_fabrica}</td>
+                <td>
+                  <div class="table-actions">
+                    <button class="btn-icon btn-info movimentar-estoque" data-id="${produto.id}" title="Transferir entre estoques">
+                      <i class="fas fa-exchange-alt"></i>
+                    </button>
+                    <button class="btn-icon btn-warning editar-produto" data-id="${produto.id}" title="Editar">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-icon btn-danger remover-produto" data-id="${produto.id}" title="Remover">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              `;
+              produtosTable.appendChild(row);
+            });
+            
+            setupProdutoActions();
+            setupRowClickEvents(); // Nova função para configurar clicks nas linhas
+          }
         }
+      } catch (error) {
+        console.error('Erro ao carregar produtos:', error);
+        showFlashMessage('error', 'Erro ao carregar lista de produtos');
       }
-    } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
-      showFlashMessage('error', 'Erro ao carregar lista de produtos');
     }
-  }
   
   // recarregar lista ao clicar no refresh ou trocar checkbox
   document.getElementById('mostrarInativos').addEventListener('change', loadProdutosData);
 
+  function setupRowClickEvents() {
+  document.querySelectorAll('.produto-row.clickable-row').forEach(row => {
+    row.addEventListener('click', function(e) {
+      // Previne a abertura do modal se o clique foi em um botão de ação
+      if (e.target.closest('.table-actions') || 
+          e.target.tagName === 'BUTTON' || 
+          e.target.closest('button')) {
+        return;
+      }
+      
+      const produtoId = this.getAttribute('data-id');
+      openEditarProdutoModal(produtoId);
+    });
+  });
+  }
+
   function setupProdutoActions() {
+    // Previne a propagação do evento de clique para a linha quando clicar nos botões
+    document.querySelectorAll('.table-actions button').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation(); // Impede que o evento chegue à linha
+      });
+    });
+
     document.querySelectorAll('.editar-produto').forEach(btn => {
-      btn.addEventListener('click', async function() {
+      btn.addEventListener('click', async function(e) {
         const produtoId = this.getAttribute('data-id');
         await openEditarProdutoModal(produtoId);
       });
     });
 
     document.querySelectorAll('.remover-produto').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function(e) {
         const produtoId = this.getAttribute('data-id');
         const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
         const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
@@ -1465,7 +1493,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.querySelectorAll('.movimentar-estoque').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function(e) {
         const produtoId = this.getAttribute('data-id');
         openTransferenciaModal(produtoId);
       });

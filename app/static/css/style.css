@@ -2882,3 +2882,10 @@ canvas {
         max-height: 400px;
     }
 }
+.clickable-row {
+  cursor: pointer;
+}
+
+.table-actions {
+  cursor: default;
+}
