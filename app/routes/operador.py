@@ -1639,7 +1639,6 @@ def api_fechar_caixa():
     try:
         data = request.get_json()
         
-        # Verificação mais robusta do valor
         if 'valor_fechamento' not in data:
             logger.warning(f"Operador {current_user.nome} não forneceu valor_fechamento ao fechar caixa")
             return jsonify({'error': 'Campo valor_fechamento é obrigatório'}), 400
@@ -1651,15 +1650,17 @@ def api_fechar_caixa():
             return jsonify({'error': 'Valor de fechamento inválido'}), 400
         
         if valor <= 0:
-            logger.warning(f"Operador {current_user.nomem} tentou fechar caixa com valor_fechamento não positivo: {valor}")
+            logger.warning(f"Operador {current_user.nome} tentou fechar caixa com valor_fechamento não positivo: {valor}")
             return jsonify({'error': 'Valor de fechamento deve ser positivo'}), 400
         
-        # Restante da função permanece igual
+        observacao = data.get('observacao', '')
+
+        # Fecha o caixa
         caixa = fechar_caixa(
             db.session,
             current_user.id,
             valor,
-            data.get('observacao', '')
+            observacao
         )
         
         threading.Thread(target=enviar_resumo_movimentacao_diaria).start()
@@ -1667,7 +1668,8 @@ def api_fechar_caixa():
         return jsonify({
             'success': True,
             'caixa_id': caixa.id,
-            'valor_fechamento': float(valor)
+            'valor_fechamento': float(valor),
+            'observacao': observacao
         })
     
     except Exception as e:

@@ -110,37 +110,20 @@ def abrir_caixa(db: Session, operador_id: int, valor_abertura: Decimal, observac
 def fechar_caixa(db: Session, operador_id: int, valor_fechamento: Decimal, observacao: str = "") -> entities.Caixa:
     """
     Fecha o caixa atual do operador específico com o valor de fechamento especificado.
-    
-    Args:
-        db (Session): Sessão do banco de dados
-        operador_id (int): ID do operador que está fechando o caixa
-        valor_fechamento (Decimal): Valor de fechamento informado pelo operador
-        observacao (str, optional): Observações do operador sobre o fechamento
-    
-    Returns:
-        entities.Caixa: O caixa fechado
-        
-    Raises:
-        ValueError: Se valor_fechamento <= 0, se nenhum caixa do operador estiver aberto,
-                   ou se houver erro no banco de dados
     """
     if valor_fechamento <= 0:
         raise ValueError("Valor de fechamento deve ser maior que zero")
     
-    # Busca o caixa aberto APENAS do operador específico
     caixa = get_caixa_aberto(db, operador_id)
     if not caixa:
         raise ValueError("Nenhum caixa aberto encontrado para este operador")
-    
-    # Validação adicional: verifica se o caixa realmente pertence ao operador
     if caixa.operador_id != operador_id:
         raise ValueError("Operador não autorizado a fechar este caixa")
     
-    # Atualiza dados do caixa
     caixa.valor_fechamento = valor_fechamento
     caixa.data_fechamento = datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
     caixa.status = StatusCaixa.fechado
-    caixa.observacoes = observacao
+    caixa.observacoes_operador = observacao or None
     caixa.sincronizado = False
     
     try:
@@ -156,7 +139,6 @@ def fechar_caixa(db: Session, operador_id: int, valor_fechamento: Decimal, obser
             "data": datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
         }
         
-        # Cria o objeto FinanceiroCreate a partir do dicionário
         lancamento = schemas.FinanceiroCreate(**lancamento_data)
         create_lancamento_financeiro(db, lancamento)
         
@@ -164,6 +146,7 @@ def fechar_caixa(db: Session, operador_id: int, valor_fechamento: Decimal, obser
     except SQLAlchemyError as e:
         db.rollback()
         raise ValueError("Erro ao fechar caixa no banco de dados")
+
 
 def get_caixa_aberto(db: Session, operador_id: int):
     """

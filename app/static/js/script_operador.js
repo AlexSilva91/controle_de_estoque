@@ -3003,6 +3003,10 @@ async function closeRegister() {
                 <label for="fechamento-valor">Valor de Fechamento:</label>
                 <input type="text" id="fechamento-valor" class="currency-input" placeholder="0,00">
             </div>
+            <div class="form-group">
+                <label for="fechamento-observacao">Observação:</label>
+                <textarea id="fechamento-observacao" rows="3" placeholder="Digite uma observação (opcional)"></textarea>
+            </div>
             <div class="modal-buttons">
                 <button id="confirm-fechamento" class="btn-primary">Confirmar</button>
                 <button id="cancel-fechamento" class="btn-secondary">Cancelar</button>
@@ -3013,7 +3017,7 @@ async function closeRegister() {
     // Adicionar ao corpo do documento
     document.body.appendChild(modal);
     
-    // Adicionar estilos básicos (você pode mover isso para seu CSS)
+    // Adicionar estilos básicos (pode mover para CSS)
     const style = document.createElement('style');
     style.textContent = `
         .custom-modal {
@@ -3044,11 +3048,15 @@ async function closeRegister() {
             margin-bottom: 5px;
             font-weight: bold;
         }
-        .custom-modal input {
+        .custom-modal input,
+        .custom-modal textarea {
             width: 100%;
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
+        }
+        .custom-modal textarea {
+            resize: vertical;
         }
         .custom-modal .modal-buttons {
             display: flex;
@@ -3061,9 +3069,9 @@ async function closeRegister() {
     
     // Configurar máscara para o input de valor
     const valorInput = document.getElementById('fechamento-valor');
+    const observacaoInput = document.getElementById('fechamento-observacao');
     if (valorInput) {
         valorInput.addEventListener('input', function(e) {
-            // Formatação para moeda
             let value = e.target.value.replace(/\D/g, '');
             value = (value/100).toLocaleString('pt-BR', {
                 style: 'decimal',
@@ -3080,6 +3088,7 @@ async function closeRegister() {
         document.getElementById('confirm-fechamento')?.addEventListener('click', async () => {
             const valorText = valorInput?.value.replace(/\./g, '').replace(',', '.');
             const valorNumerico = parseFloat(valorText);
+            const observacao = observacaoInput?.value || "";
             
             if (!valorText || isNaN(valorNumerico) || valorNumerico <= 0) {
                 showMessage('Valor de fechamento inválido', 'error');
@@ -3098,7 +3107,6 @@ async function closeRegister() {
                     throw new Error('Erro ao gerar relatório PDF');
                 }
 
-                // Criar um link para download do PDF
                 const pdfBlob = await pdfResponse.blob();
                 const pdfUrl = URL.createObjectURL(pdfBlob);
                 const a = document.createElement('a');
@@ -3109,12 +3117,15 @@ async function closeRegister() {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(pdfUrl);
 
-                // Depois realizar o fechamento do caixa
+                // Depois realizar o fechamento do caixa com observação
                 const fechamentoResponse = await fetch('/operador/api/fechar-caixa', {
                     ...preventCacheConfig,
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ valor_fechamento: valorNumerico })
+                    body: JSON.stringify({ 
+                        valor_fechamento: valorNumerico,
+                        observacao: observacao
+                    })
                 });
 
                 if (!fechamentoResponse.ok) {
@@ -3126,7 +3137,6 @@ async function closeRegister() {
                 showMessage(`Caixa fechado às ${now.toLocaleTimeString('pt-BR')}`);
                 await checkCaixaStatus();
                 
-                // Remover modal e estilos
                 modal.remove();
                 style.remove();
                 
