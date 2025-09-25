@@ -3451,13 +3451,13 @@ def get_caixa_financeiro(caixa_id):
             parte_inteira = math.floor(valor_fisico)
             parte_decimal = valor_fisico - parte_inteira
 
-            if parte_decimal == 0.5:
-                # Mantém o valor original (sem arredondar)
-                valor_fisico = valor_fisico
-            elif parte_decimal > 0.5:
-                valor_fisico = math.ceil(valor_fisico)  # mais perto do de cima
-            else:
-                valor_fisico = math.floor(valor_fisico)  # mais perto do de baixo
+            # if parte_decimal == 0.5:
+            #     # Mantém o valor original (sem arredondar)
+            #     valor_fisico = valor_fisico
+            # elif parte_decimal > 0.5:
+            #     valor_fisico = math.ceil(valor_fisico)  # mais perto do de cima
+            # else:
+            #     valor_fisico = math.floor(valor_fisico)  # mais perto do de baixo
             
         formas_pagamento['dinheiro'] = valor_fisico
         valor_digital = sum([
@@ -4029,13 +4029,13 @@ def gerar_pdf_caixa_financeiro(caixa_id):
             parte_inteira = math.floor(valor_fisico)
             parte_decimal = valor_fisico - parte_inteira
 
-            if parte_decimal == 0.5:
-                # Mantém o valor original (sem arredondar)
-                valor_fisico = valor_fisico
-            elif parte_decimal > 0.5:
-                valor_fisico = math.ceil(valor_fisico)  # mais perto do de cima
-            else:
-                valor_fisico = math.floor(valor_fisico)  # mais perto do de baixo
+            # if parte_decimal == 0.5:
+            #     # Mantém o valor original (sem arredondar)
+            #     valor_fisico = valor_fisico
+            # elif parte_decimal > 0.5:
+            #     valor_fisico = math.ceil(valor_fisico)  # mais perto do de cima
+            # else:
+            #     valor_fisico = math.floor(valor_fisico)  # mais perto do de baixo
             
         formas_pagamento['dinheiro'] = valor_fisico
         valor_digital = sum([
