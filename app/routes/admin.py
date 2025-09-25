@@ -809,6 +809,118 @@ def listar_produtos():
         logger.error(f"Erro ao listar produtos: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@admin_bp.route('/produtos/pdf', methods=['GET'])
+@login_required
+@admin_required
+def relatorio_produtos_pdf():
+    try:
+        search = request.args.get('search', '').lower()
+        incluir_inativos = request.args.get('incluir_inativos', 'false').lower() == 'true'
+
+        produtos = get_produtos(db.session, incluir_inativos=incluir_inativos)
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer, pagesize=A4,
+            leftMargin=15*mm, rightMargin=15*mm,
+            topMargin=10*mm, bottomMargin=20*mm
+        )
+        styles = getSampleStyleSheet()
+        elements = []
+
+        # -------------------- Cabeçalho --------------------
+        header_style = ParagraphStyle(
+            'Header',
+            parent=styles['Heading1'],
+            fontSize=18,
+            alignment=TA_CENTER,
+            spaceAfter=10
+        )
+        elements.append(Paragraph("📦 Relatório de Produtos em Estoque", header_style))
+        elements.append(Spacer(1, 8))
+        elements.append(Table([["" * 80]], colWidths=[170*mm], 
+                              style=[('LINEBELOW', (0, 0), (-1, -1), 1, colors.black)]))
+        elements.append(Spacer(1, 12))
+
+        # -------------------- Tabela --------------------
+        table_data = [[
+            Paragraph("Código", styles['Normal']),
+            Paragraph("Nome", styles['Normal']),
+            Paragraph("Unidade", styles['Normal']),
+            Paragraph("Valor", styles['Normal']),
+            Paragraph("Depósito", styles['Normal']),
+            Paragraph("Loja", styles['Normal']),
+            Paragraph("Fábrica", styles['Normal'])
+        ]]
+
+        # Estilo para células
+        cell_style = ParagraphStyle(
+            'Cell',
+            fontSize=7,
+            leading=9,
+            alignment=TA_CENTER,
+            wordWrap='CJK'  # força quebra de linha
+        )
+        cell_left = ParagraphStyle(
+            'CellLeft',
+            parent=cell_style,
+            alignment=TA_LEFT
+        )
+
+        for produto in produtos:
+            if search and (search not in produto.nome.lower() and search not in produto.tipo.lower()):
+                continue
+
+            table_data.append([
+                Paragraph(str(produto.codigo or ''), cell_style),
+                Paragraph(produto.nome, cell_left),
+                Paragraph(produto.unidade.value, cell_style),
+                Paragraph(formatarMoeda(produto.valor_unitario), cell_style),
+                Paragraph(f"{produto.estoque_deposito:,.2f}", cell_style),
+                Paragraph(f"{produto.estoque_loja:,.2f}", cell_style),
+                Paragraph(f"{produto.estoque_fabrica:,.2f}", cell_style),
+            ])
+
+        # Larguras proporcionais / automáticas
+        col_widths = [20*mm, 55*mm, 25*mm, 25*mm, 25*mm, 25*mm, 25*mm]
+
+        produto_table = Table(table_data, colWidths=col_widths, repeatRows=1)
+
+        table_style = TableStyle([
+            ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 8),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#4682B4")),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONT', (0, 1), (-1, -1), 'Helvetica', 7),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ])
+
+        # Linhas zebradas
+        for i in range(1, len(table_data)):
+            if i % 2 == 0:
+                table_style.add('BACKGROUND', (0, i), (-1, i), colors.whitesmoke)
+
+        produto_table.setStyle(table_style)
+        elements.append(produto_table)
+
+        # -------------------- Rodapé --------------------
+        elements.append(Spacer(1, 15))
+        rodape = datetime.now().strftime("Gerado em %d/%m/%Y às %H:%M")
+        elements.append(Paragraph(rodape, ParagraphStyle('Rodape', fontSize=8, alignment=TA_RIGHT, textColor=colors.grey)))
+
+        doc.build(elements)
+
+        buffer.seek(0)
+        response = make_response(buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'inline; filename=relatorio_produtos.pdf'
+        return response
+
+    except Exception as e:
+        logger.error(f"Erro ao gerar PDF de produtos: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
 @admin_bp.route('/produtos', methods=['POST'])
 @login_required
 @admin_required

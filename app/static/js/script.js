@@ -1498,6 +1498,13 @@ document.addEventListener('DOMContentLoaded', function() {
         openTransferenciaModal(produtoId);
       });
     });
+    document.getElementById('btnRelatorioProdutos').addEventListener('click', () => {
+      const searchText = document.getElementById('searchProduto')?.value || '';
+      const incluirInativos = document.getElementById('mostrarInativos')?.checked ? 'true' : 'false';
+      
+      const url = `/admin/produtos/pdf?search=${encodeURIComponent(searchText)}&incluir_inativos=${incluirInativos}`;
+      window.open(url, '_blank');
+    });
   }
 
   async function openEditarProdutoModal(produtoId) {
