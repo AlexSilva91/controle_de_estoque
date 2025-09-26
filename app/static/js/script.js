@@ -906,68 +906,75 @@ document.addEventListener('DOMContentLoaded', function() {
         if (metricsData.success) {
             const metricsContainer = document.querySelector('.metrics-grid');
             if (metricsContainer) {
-                metricsContainer.innerHTML = `
-                    <div class="metric-card" data-unidade="kg">
-                        <div class="metric-icon">
-                            <i class="fas fa-weight"></i>
-                        </div>
-                        <div class="metric-info">
-                            <h3>Estoque (Kg)</h3>
-                            <div class="value">${metricsData.metrics.estoque.kg}</div>
-                        </div>
-                    </div>
-                    <div class="metric-card" data-unidade="saco">
-                        <div class="metric-icon">
-                            <i class="fa-solid fa-boxes-packing"></i>
-                        </div>
-                        <div class="metric-info">
-                            <h3>Estoque (Sacos)</h3>
-                            <div class="value">${metricsData.metrics.estoque.sacos}</div>
-                        </div>
-                    </div>
-                    <div class="metric-card" data-unidade="unidade">
-                        <div class="metric-icon">
-                            <i class="fas fa-boxes"></i>
-                        </div>
-                        <div class="metric-info">
-                            <h3>Estoque (Unidades)</h3>
-                            <div class="value">${metricsData.metrics.estoque.unidades}</div>
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-icon">
-                            <i class="fas fa-money-bill-wave"></i>
-                        </div>
-                        <div class="metric-info">
-                            <h3>Entradas (Mês)</h3>
-                            <div class="value">${metricsData.metrics.financeiro.entradas_mes}</div>
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-icon">
-                            <i class="fas fa-receipt"></i>
-                        </div>
-                        <div class="metric-info">
-                            <h3>Despesas (Mês)</h3>
-                            <div class="value">${metricsData.metrics.financeiro.saidas_mes}</div>
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-icon">
-                            <i class="fas fa-piggy-bank"></i>
-                        </div>
-                        <div class="metric-info">
-                            <h3>Saldo (Mês)</h3>
-                            <div class="value">${metricsData.metrics.financeiro.saldo_mes}</div>
-                        </div>
-                    </div>
-                `;
+              metricsContainer.innerHTML = `
+                  <div class="metric-card" data-unidade="kg">
+                      <div class="metric-icon">
+                          <i class="fas fa-weight"></i>
+                      </div>
+                      <div class="metric-info">
+                          <h3>Estoque (Kg)</h3>
+                          <div class="value">${metricsData.metrics.estoque.kg}</div>
+                      </div>
+                  </div>
+                  <div class="metric-card" data-unidade="saco">
+                      <div class="metric-icon">
+                          <i class="fa-solid fa-boxes-packing"></i>
+                      </div>
+                      <div class="metric-info">
+                          <h3>Estoque (Sacos)</h3>
+                          <div class="value">${metricsData.metrics.estoque.sacos}</div>
+                      </div>
+                  </div>
+                  <div class="metric-card" data-unidade="unidade">
+                      <div class="metric-icon">
+                          <i class="fas fa-boxes"></i>
+                      </div>
+                      <div class="metric-info">
+                          <h3>Estoque (Unidades)</h3>
+                          <div class="value">${metricsData.metrics.estoque.unidades}</div>
+                      </div>
+                  </div>
+                  <div class="metric-card" data-tipo-financeiro="entrada">
+                      <div class="metric-icon">
+                          <i class="fas fa-money-bill-wave"></i>
+                      </div>
+                      <div class="metric-info">
+                          <h3>Entradas (Mês)</h3>
+                          <div class="value">${metricsData.metrics.financeiro.entradas_mes}</div>
+                      </div>
+                  </div>
+                  <div class="metric-card" data-tipo-financeiro="saida">
+                      <div class="metric-icon">
+                          <i class="fas fa-receipt"></i>
+                      </div>
+                      <div class="metric-info">
+                          <h3>Despesas (Mês)</h3>
+                          <div class="value">${metricsData.metrics.financeiro.saidas_mes}</div>
+                      </div>
+                  </div>
+                  <div class="metric-card">
+                      <div class="metric-icon">
+                          <i class="fas fa-piggy-bank"></i>
+                      </div>
+                      <div class="metric-info">
+                          <h3>Saldo (Mês)</h3>
+                          <div class="value">${metricsData.metrics.financeiro.saldo_mes}</div>
+                      </div>
+                  </div>
+              `;
 
                 // Adiciona click nos cards de estoque somente
                 document.querySelectorAll('.metric-card[data-unidade]').forEach(card => {
                     card.addEventListener('click', () => {
                         const unidade = card.getAttribute('data-unidade');
                         window.location.href = `/admin/produtos/unidade?unidade=${unidade}`;
+                    });
+                });
+                document.querySelectorAll('.metric-card[data-tipo-financeiro]').forEach(card => {
+                    card.addEventListener('click', () => {
+                        const tipo = card.getAttribute('data-tipo-financeiro');
+                        // Abre em nova guia a página de histórico financeiro passando o tipo
+                        window.open(`/admin/financeiro/historico?tipo=${tipo}`, '_blank');
                     });
                 });
             }

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Histórico Financeiro - {{ tipo_movimentacao|capitalize }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='assets/logo1.ico') }}" type="image/x-icon">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+
+    <style>
+        body {
+            padding: 20px;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+        }
+
+        .pagamentos-list {
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .pagamentos-list li {
+            margin-bottom: 2px;
+        }
+
+        table td,
+        table th {
+            vertical-align: top;
+        }
+
+        .btn-toolbar {
+            margin-bottom: 15px;
+        }
+
+        .btn-toolbar .btn {
+            margin-left: 5px;
+        }
+
+        .filter-dates {
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <h2>Histórico Financeiro - {{ tipo_movimentacao|capitalize }} ({{ mes_ano }})</h2>
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div id="customButtons" class="btn-toolbar">
+                <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">← Dashboard</a>
+                <a href="#" id="btnPdf" class="btn btn-primary" target="_blank">📄 Gerar PDF</a>
+            </div>
+        </div>
+
+        <div class="filter-dates d-flex gap-2 align-items-end">
+            <div>
+                <label for="startDate" class="form-label">Data Inicial:</label>
+                <input type="date" id="startDate" class="form-control">
+            </div>
+            <div>
+                <label for="endDate" class="form-label">Data Final:</label>
+                <input type="date" id="endDate" class="form-control">
+            </div>
+            <div>
+                <button id="btnFiltrar" class="btn btn-primary">Filtrar</button>
+            </div>
+        </div>
+
+
+        <div class="table-responsive">
+            <table id="financeiroTable" class="table table-bordered table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID Financeiro</th>
+                        <th>Categoria</th>
+                        <th>Valor Total</th>
+                        <th>Descrição</th>
+                        <th>Data</th>
+                        <th>Cliente</th>
+                        <th>Caixa</th>
+                        <th>Nota Fiscal / Pagamentos</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+                    {% for f in historico %}
+                    <tr>
+                        <td>{{ f.id_financeiro }}</td>
+                        <td>{{ f.categoria }}</td>
+                        <td>R$ {{ "%.2f"|format(f.valor_total_nota) }}</td>
+                        <td>{{ f.descricao }}</td>
+                        <td>{{ f.data.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td>{{ f.cliente }}</td>
+                        <td>{{ f.caixa }}</td>
+                        <td>
+                            {% if f.nota_fiscal_id %}
+                            <strong>ID Nota:</strong> {{ f.nota_fiscal_id }}<br>
+                            <ul class="pagamentos-list">
+                                {% for p in f.pagamentos %}
+                                <li>{{ p.forma_pagamento.value if p.forma_pagamento else '-' }}: R$ {{
+                                    "%.2f"|format(p.valor) }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}-{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            // Inicializa DataTable uma vez
+            var table = $('#financeiroTable').DataTable({
+                "paging": true,
+                "pageLength": 10,
+                "lengthMenu": [10, 25, 50, 100],
+                "ordering": true,
+                "order": [[4, "desc"]],
+                "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json" }
+            });
+
+            // Função para atualizar a tabela via AJAX
+            function atualizarTabela(start, end) {
+                var tipo = "{{ tipo_movimentacao }}";
+                $.ajax({
+                    url: "{{ url_for('admin.historico_financeiro_json') }}",
+                    data: { tipo: tipo, start: start, end: end },
+                    dataType: "json",
+                    success: function (data) {
+                        table.clear();
+                        data.forEach(function (f) {
+                            var pagamentos_html = '-';
+                            if (f.nota_fiscal_id && f.pagamentos.length) {
+                                pagamentos_html = `<strong>ID Nota:</strong> ${f.nota_fiscal_id}<br><ul class="pagamentos-list">`;
+                                f.pagamentos.forEach(function (p) {
+                                    pagamentos_html += `<li>${p.forma_pagamento}: R$ ${parseFloat(p.valor).toFixed(2)}</li>`;
+                                });
+                                pagamentos_html += '</ul>';
+                            }
+
+                            table.row.add([
+                                f.id_financeiro,
+                                f.categoria,
+                                'R$ ' + parseFloat(f.valor_total_nota).toFixed(2),
+                                f.descricao,
+                                f.data,
+                                f.cliente,
+                                f.caixa,
+                                pagamentos_html
+                            ]);
+                        });
+                        table.draw();
+                    },
+                    error: function (xhr) {
+                        alert("Erro ao buscar dados: " + (xhr.responseJSON?.error || xhr.statusText));
+                    }
+                });
+            }
+
+            // Filtrar por datas
+            $('#btnFiltrar').click(function () {
+                var start = $('#startDate').val();
+                var end = $('#endDate').val();
+                atualizarTabela(start, end);
+            });
+
+            // Botão Gerar PDF
+            $('#btnPdf').click(function (e) {
+                e.preventDefault();
+                var tipo = "{{ tipo_movimentacao }}";
+                var start = $('#startDate').val();
+                var end = $('#endDate').val();
+                var dataMesAno = "{{ mes_ano|replace('/', '-') }}";
+                var url = "{{ url_for('admin.historico_financeiro_pdf') }}" + "?tipo=" + tipo + "&data=" + dataMesAno;
+                if (start) url += "&start=" + start;
+                if (end) url += "&end=" + end;
+                window.open(url, '_blank');
+            });
+        });
+    </script>
+
+</body>
+
+</html>

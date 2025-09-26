@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional
 from decimal import Decimal
 from sqlalchemy.orm import selectinload, joinedload
-from sqlalchemy import func
+from sqlalchemy import func,  extract
 from typing import Dict, Any, List, Union, Tuple
 
 
@@ -2380,4 +2380,150 @@ def buscar_produtos_por_unidade(unidade: str):
         .filter(Produto.unidade == unidade, Produto.ativo == True)
         .all()
     )
+
+def buscar_historico_financeiro(
+    tipo_movimentacao: TipoMovimentacao, 
+    data: datetime = None, 
+    incluir_outros: bool = False
+):
+    """
+    Busca histórico financeiro e de pagamentos de nota fiscal para um tipo de movimentação
+    em um mês específico ou no mês vigente se a data não for informada.
+
+    Args:
+        tipo_movimentacao (TipoMovimentacao): Tipo da movimentação (entrada, saída, etc.)
+        data (datetime, optional): Data para definir o mês/ano da busca. Defaults to None.
+        incluir_outros (bool, optional): Se True, inclui estornos, abertura e fechamento de caixas. Defaults to False.
+
+    Returns:
+        dict: {
+            'financeiros': List[Financeiro],
+            'pagamentos_nota_fiscal': List[PagamentoNotaFiscal]
+        }
+    """
+    if data is None:
+        data = datetime.now(ZoneInfo('America/Sao_Paulo'))
+    
+    mes = data.month
+    ano = data.year
+
+    # -------------------- Financeiro --------------------
+    query_financeiro = Financeiro.query.filter(
+        Financeiro.tipo == tipo_movimentacao,
+        extract('month', Financeiro.data) == mes,
+        extract('year', Financeiro.data) == ano
+    )
+
+    # Se não incluir outros tipos, filtra apenas vendas e saídas
+    if not incluir_outros:
+        query_financeiro = query_financeiro.filter(
+            Financeiro.categoria.notin_([
+                'abertura_caixa', 'fechamento_caixa', 'estorno'
+            ])
+        )
+
+    financeiros = query_financeiro.order_by(Financeiro.data.desc()).all()
+
+    # -------------------- Pagamentos de Nota Fiscal --------------------
+    query_pagamentos = PagamentoNotaFiscal.query.join(Financeiro, isouter=True).filter(
+        PagamentoNotaFiscal.valor > 0,  # apenas pagamentos realizados
+        extract('month', PagamentoNotaFiscal.data) == mes,
+        extract('year', PagamentoNotaFiscal.data) == ano
+    )
+
+    if not incluir_outros:
+        query_pagamentos = query_pagamentos.filter(
+            PagamentoNotaFiscal.nota_fiscal.has(
+                Financeiro.categoria.notin_([
+                    'abertura_caixa', 'fechamento_caixa', 'estorno'
+                ])
+            )
+        )
+
+    pagamentos_nf = query_pagamentos.all()
+
+    return {
+        'financeiros': financeiros,
+        'pagamentos_nota_fiscal': pagamentos_nf
+    }
+
+# ================= FUNÇÃO DE BUSCA =================
+def buscar_historico_financeiro_agrupado(
+        tipo_movimentacao: TipoMovimentacao,
+        data: datetime = None,
+        incluir_outros: bool = False,
+        start_date: datetime = None,
+        end_date: datetime = None
+    ):
+    """
+    Retorna histórico financeiro agrupado por nota fiscal.
+    Filtra por datas específicas e ignora estornos na exibição.
+    """
+    if data is None and not start_date:
+        data = datetime.now(ZoneInfo('America/Sao_Paulo'))
+
+    mes = data.month if data else None
+    ano = data.year if data else None
+
+    # -------------------- Financeiro --------------------
+    query_financeiro = Financeiro.query.filter(Financeiro.tipo == tipo_movimentacao)
+
+    if start_date:
+        query_financeiro = query_financeiro.filter(Financeiro.data >= start_date)
+    elif mes and ano:
+        query_financeiro = query_financeiro.filter(
+            extract('month', Financeiro.data) == mes,
+            extract('year', Financeiro.data) == ano
+        )
+    if end_date:
+        query_financeiro = query_financeiro.filter(Financeiro.data <= end_date)
+
+    if not incluir_outros:
+        query_financeiro = query_financeiro.filter(
+            Financeiro.categoria.notin_(['abertura_caixa', 'fechamento_caixa', 'estorno'])
+        )
+
+    financeiros = query_financeiro.order_by(Financeiro.data.desc()).all()
+
+    # -------------------- Pagamentos --------------------
+    query_pagamentos = PagamentoNotaFiscal.query.join(Financeiro, isouter=True).filter(PagamentoNotaFiscal.valor > 0)
+    if start_date:
+        query_pagamentos = query_pagamentos.filter(PagamentoNotaFiscal.data >= start_date)
+    elif mes and ano:
+        query_pagamentos = query_pagamentos.filter(
+            extract('month', PagamentoNotaFiscal.data) == mes,
+            extract('year', PagamentoNotaFiscal.data) == ano
+        )
+    if end_date:
+        query_pagamentos = query_pagamentos.filter(PagamentoNotaFiscal.data <= end_date)
+    if not incluir_outros:
+        query_pagamentos = query_pagamentos.filter(
+            PagamentoNotaFiscal.nota_fiscal.has(
+                Financeiro.categoria.notin_(['abertura_caixa', 'fechamento_caixa', 'estorno'])
+            )
+        )
+    pagamentos_nf = query_pagamentos.all()
+
+    # Agrupar por nota
+    pagamentos_por_nota = {}
+    for p in pagamentos_nf:
+        pagamentos_por_nota.setdefault(p.nota_fiscal_id, []).append(p)
+
+    resultado = []
+    for f in financeiros:
+        nota_id = f.nota_fiscal.id if f.nota_fiscal else None
+        resultado.append({
+            'id_financeiro': f.id,
+            'categoria': f.categoria.value,
+            'valor': f.valor,
+            'descricao': f.descricao or '-',
+            'data': f.data,
+            'cliente': f.cliente.nome if f.cliente else '-',
+            'caixa': f.caixa_id or '-',
+            'nota_fiscal_id': nota_id,
+            'valor_total_nota': f.nota_fiscal.valor_total if f.nota_fiscal else f.valor,
+            'pagamentos': pagamentos_por_nota.get(nota_id, [])
+        })
+
+    return resultado
 

@@ -3,7 +3,7 @@ from functools import wraps
 import io
 import math
 from zoneinfo import ZoneInfo
-from flask import Blueprint, Response, app, render_template, request, jsonify
+from flask import Blueprint, Response, abort, app, render_template, request, jsonify
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -23,6 +23,7 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
     Table as PlatypusTable
 )
+from sqlalchemy import extract
 from flask import make_response, request, jsonify
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -48,7 +49,7 @@ from app.models.entities import (
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
 from app.crud import (
-    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao,
+    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao,
     criar_desconto, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
     get_transferencias,get_user_by_cpf, get_user_by_id, get_usuarios, create_user, obter_caixas_completo,
     registrar_transferencia, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
@@ -5848,3 +5849,300 @@ def baixar_pdf_produtos():
     except Exception as e:
         logger.error(f"Erro ao gerar PDF de produtos por unidade: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/financeiro/historico', methods=['GET'])
+@login_required
+@admin_required
+def historico_financeiro():
+    tipo = request.args.get('tipo')
+    data_str = request.args.get('data')          # formato MM-YYYY
+    start_str = request.args.get('start')        # data inicial filtro
+    end_str = request.args.get('end')            # data final filtro
+    incluir_outros = request.args.get('incluir_outros', 'false').lower() == 'true'
+
+    if not tipo:
+        return "Tipo de movimentação não informado", 400
+
+    try:
+        tipo_movimentacao = TipoMovimentacao(tipo)
+    except ValueError:
+        return "Tipo de movimentação inválido", 400
+
+    # Data principal (mês/ano)
+    data = None
+    if data_str:
+        try:
+            mes, ano = map(int, data_str.split('-'))
+            data = datetime(ano, mes, 1)
+        except:
+            return "Data inválida. Use MM-YYYY", 400
+
+    # Datas de filtro adicionais
+    start_date = datetime.strptime(start_str, "%Y-%m-%d") if start_str else None
+    end_date = datetime.strptime(end_str, "%Y-%m-%d") if end_str else None
+
+    historico_agrupado = buscar_historico_financeiro_agrupado(
+        tipo_movimentacao, 
+        data=data, 
+        incluir_outros=incluir_outros,
+        start_date=start_date,
+        end_date=end_date
+    )
+
+    return render_template(
+        'financeiro_historico.html',
+        tipo_movimentacao=tipo_movimentacao.value,
+        historico=historico_agrupado,
+        mes_ano=data.strftime('%m/%Y') if data else datetime.now().strftime('%m/%Y')
+    )
+
+@admin_bp.route('/financeiro/historico/json', methods=['GET'])
+@login_required
+@admin_required
+def historico_financeiro_json():
+    tipo = request.args.get('tipo')
+    start_str = request.args.get('start')
+    end_str = request.args.get('end')
+    incluir_outros = request.args.get('incluir_outros', 'false').lower() == 'true'
+
+    if not tipo:
+        return jsonify({"error": "Tipo de movimentação não informado"}), 400
+
+    try:
+        tipo_movimentacao = TipoMovimentacao(tipo)
+    except ValueError:
+        return jsonify({"error": "Tipo de movimentação inválido"}), 400
+
+    start_date = datetime.strptime(start_str, "%Y-%m-%d") if start_str else None
+
+    if end_str:
+        # Ajusta o end_date para incluir o último segundo do dia
+        end_date = datetime.strptime(end_str, "%Y-%m-%d").replace(
+            hour=23, minute=59, second=59, microsecond=999999
+        )
+    else:
+        end_date = None
+
+    historico = buscar_historico_financeiro_agrupado(
+        tipo_movimentacao,
+        start_date=start_date,
+        end_date=end_date,
+        incluir_outros=incluir_outros
+    )
+
+    # Serializar para JSON
+    def serialize(f):
+        return {
+            "id_financeiro": f['id_financeiro'],
+            "categoria": f['categoria'],
+            "valor_total_nota": float(f['valor_total_nota']),
+            "descricao": f['descricao'],
+            "data": f['data'].strftime('%d/%m/%Y %H:%M') if isinstance(f['data'], datetime) else f['data'],
+            "cliente": f['cliente'],
+            "caixa": f['caixa'],
+            "nota_fiscal_id": f['nota_fiscal_id'],
+            "pagamentos": [
+                {"forma_pagamento": p.forma_pagamento.value if p.forma_pagamento else "-",
+                 "valor": float(p.valor)} for p in f['pagamentos']
+            ]
+        }
+
+    return jsonify([serialize(f) for f in historico])
+    
+# ================= ROTA PDF =================
+@admin_bp.route('/financeiro/historico/pdf')
+@login_required
+@admin_required
+def historico_financeiro_pdf():
+    try:
+        tipo = request.args.get('tipo')
+        data_str = request.args.get('data')
+        start_date_str = request.args.get('start')
+        end_date_str = request.args.get('end')
+
+        if not tipo:
+            abort(400, description="Tipo de movimentação não informado")
+
+        try:
+            tipo_movimentacao = TipoMovimentacao(tipo)
+        except ValueError:
+            abort(400, description="Tipo de movimentação inválido")
+
+        data = datetime.now(ZoneInfo('America/Sao_Paulo'))
+        if data_str:
+            mes, ano = map(int, data_str.split('-'))
+            data = datetime(ano, mes, 1)
+
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d") if start_date_str else None
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").replace(
+            hour=23, minute=59, second=59, microsecond=999999
+        ) if end_date_str else None
+
+        # -------------------- BUSCAR HISTÓRICO --------------------
+        financeiros = buscar_historico_financeiro_agrupado(
+            tipo_movimentacao,
+            data=data,
+            start_date=start_date,
+            end_date=end_date,
+            incluir_outros=False
+        )
+
+        # -------------------- BUSCAR ESTORNOS --------------------
+        query_estornos = Financeiro.query.filter(
+            (Financeiro.tipo == TipoMovimentacao.saida_estorno) |
+            (Financeiro.categoria == CategoriaFinanceira.estorno)
+        )
+        if start_date:
+            query_estornos = query_estornos.filter(Financeiro.data >= start_date)
+        elif mes and ano:
+            query_estornos = query_estornos.filter(
+                extract('month', Financeiro.data) == mes,
+                extract('year', Financeiro.data) == ano
+            )
+        if end_date:
+            query_estornos = query_estornos.filter(Financeiro.data <= end_date)
+        estornos = query_estornos.all()
+
+        total_pagamentos = {}
+        total_valor = sum(f['valor'] for f in financeiros)
+
+        for f in financeiros:
+            if f['nota_fiscal_id']:
+                for p in f['pagamentos']:
+                    forma = p.forma_pagamento.value if hasattr(p, 'forma_pagamento') and p.forma_pagamento else "-"
+                    total_pagamentos[forma] = total_pagamentos.get(forma, 0) + p.valor
+
+        # Pagamentos de estorno
+        total_pagamentos_estornos = {}
+        for e in estornos:
+            if e.nota_fiscal:
+                for p in e.nota_fiscal.pagamentos:
+                    forma = p.forma_pagamento.value
+                    total_pagamentos_estornos[forma] = total_pagamentos_estornos.get(forma, 0) + p.valor
+
+        # Corrigir os totais por forma de pagamento
+        for forma, valor in total_pagamentos_estornos.items():
+            total_pagamentos[forma] = total_pagamentos.get(forma, 0) - valor
+
+        # -------------------- GERAR PDF --------------------
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer, pagesize=landscape(A4),
+            leftMargin=15*mm, rightMargin=15*mm,
+            topMargin=10*mm, bottomMargin=20*mm
+        )
+        styles = getSampleStyleSheet()
+        elements = []
+
+        header_style = ParagraphStyle(
+            'Header', parent=styles['Heading1'],
+            fontSize=18, alignment=TA_CENTER, spaceAfter=10
+        )
+        periodo_texto = ""
+        if start_date and end_date:
+            periodo_texto = f"{start_date.strftime('%d/%m/%Y')} até {end_date.strftime('%d/%m/%Y')}"
+        elif start_date:
+            periodo_texto = f"A partir de {start_date.strftime('%d/%m/%Y')}"
+        elif end_date:
+            periodo_texto = f"Até {end_date.strftime('%d/%m/%Y')}"
+        else:
+            periodo_texto = data.strftime('%m/%Y')
+
+        elements.append(Paragraph(
+            f"💰 Histórico Financeiro - {tipo_movimentacao.value} ({periodo_texto})",
+            header_style
+        ))
+        elements.append(Spacer(1, 8))
+
+        # -------------------- TABELA --------------------
+        cell_style_center = ParagraphStyle('CellCenter', fontSize=8, leading=10, alignment=TA_CENTER, wordWrap='CJK')
+        cell_style_left = ParagraphStyle('CellLeft', fontSize=8, leading=10, alignment=TA_LEFT, wordWrap='CJK')
+
+        table_data = [[
+            Paragraph("ID", cell_style_center),
+            Paragraph("Categoria", cell_style_center),
+            Paragraph("Valor", cell_style_center),
+            Paragraph("Descrição", cell_style_center),
+            Paragraph("Data", cell_style_center),
+            Paragraph("Cliente", cell_style_center),
+            Paragraph("Caixa", cell_style_center),
+            Paragraph("Pagamentos", cell_style_center)
+        ]]
+
+        for f in financeiros:
+            pagamentos_texto = ""
+            if f['nota_fiscal_id']:
+                for p in f['pagamentos']:
+                    forma = p.forma_pagamento.value if hasattr(p, 'forma_pagamento') and p.forma_pagamento else "-"
+                    pagamentos_texto += f"{forma}: R$ {p.valor:.2f}\n"
+
+            table_data.append([
+                Paragraph(str(f['id_financeiro']), cell_style_center),
+                Paragraph(f['categoria'], cell_style_center),
+                Paragraph(f"R$ {f['valor']:.2f}", cell_style_center),
+                Paragraph(f['descricao'], cell_style_left),
+                Paragraph(f['data'].strftime('%d/%m/%Y %H:%M'), cell_style_center),
+                Paragraph(f['cliente'], cell_style_center),
+                Paragraph(str(f['caixa']), cell_style_center),
+                Paragraph(pagamentos_texto.strip() or '-', cell_style_left)
+            ])
+
+        col_widths = [20*mm, 25*mm, 25*mm, 50*mm, 25*mm, 25*mm, 20*mm, 50*mm]
+        t = Table(table_data, colWidths=col_widths, hAlign='CENTER', repeatRows=1)
+        t.setStyle(TableStyle([
+            ('FONT', (0,0), (-1,0), 'Helvetica-Bold', 8),
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#4682B4")),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('FONT', (0,1), (-1,-1), 'Helvetica', 7),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 10))
+
+        # ----------------- TOTAL GERAL -----------------
+        import locale
+        locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+
+        totals_data = [["Total", locale.format_string("R$ %.2f", total_valor, grouping=True)]]
+
+        if tipo_movimentacao.value.lower() == "entrada" and total_pagamentos:
+            totals_data.append(["", ""])
+            totals_data.append(["Totais por forma de pagamento", ""])
+            for forma, valor in total_pagamentos.items():
+                totals_data.append([forma, locale.format_string("R$ %.2f", valor, grouping=True)])
+
+        totals_table = Table(totals_data, colWidths=[10*mm, 40*mm], hAlign='LEFT')
+        totals_table.setStyle(TableStyle([
+            ('FONT', (0,0), (-1,-1), 'Helvetica', 9),
+            ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('LEFTPADDING', (0,0), (-1,-1), 5),
+            ('RIGHTPADDING', (0,0), (-1,-1), 5),
+            ('TOPPADDING', (0,0), (-1,-1), 1),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 1),
+            ('LINEABOVE', (0,0), (-1,0), 1, colors.black),
+            ('LINEBELOW', (0,0), (-1,0), 1, colors.black),
+        ]))
+        elements.append(Spacer(1, 10))
+        elements.append(totals_table)
+
+        elements.append(Paragraph(
+            datetime.now().strftime("Gerado em %d/%m/%Y às %H:%M"),
+            ParagraphStyle('Rodape', fontSize=8, alignment=TA_RIGHT, textColor=colors.grey)
+        ))
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f"historico_financeiro_{tipo}_{data.strftime('%m_%Y')}.pdf",
+            mimetype='application/pdf'
+        )
+
+    except Exception as e:
+        logger.error(f"Erro ao gerar PDF do histórico financeiro: {str(e)}", exc_info=True)
+        abort(500, description=str(e))
