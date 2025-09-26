@@ -2287,11 +2287,13 @@ footer {
     font-size: 14px;
     margin-bottom: 5px;
     color: #b0b0b0;
+    cursor: pointer; 
 }
 
 .metric-info .value {
     font-size: 18px;
     font-weight: bold;
+    cursor: pointer; 
 }
 
 /* Cores específicas para os cards */

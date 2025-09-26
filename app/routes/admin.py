@@ -13,6 +13,7 @@ import traceback
 from flask import send_file, make_response, jsonify
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, HRFlowable
 from reportlab.lib import colors
@@ -47,7 +48,7 @@ from app.models.entities import (
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
 from app.crud import (
-    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_todos_os_descontos, calcular_fator_conversao,
+    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao,
     criar_desconto, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
     get_transferencias,get_user_by_cpf, get_user_by_id, get_usuarios, create_user, obter_caixas_completo,
     registrar_transferencia, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
@@ -5726,3 +5727,124 @@ def api_auditoria_logs():
         'paginas': logs.pages,
         'pagina_atual': pagina
     })
+
+@admin_bp.route("/produtos/unidade")
+@login_required
+@admin_required
+def listar_produtos_por_unidade():
+    unidade = request.args.get("unidade")
+
+    if not unidade:
+        return "Unidade de medida não informada", 400
+
+    produtos = buscar_produtos_por_unidade(unidade)
+
+    return render_template("produtos_unidade.html", produtos=produtos, unidade=unidade)
+
+@admin_bp.route('/produtos/unidade/pdf')
+@login_required
+@admin_required
+def baixar_pdf_produtos():
+    try:
+        unidade = request.args.get("unidade")
+        if not unidade:
+            return "Unidade não informada", 400
+
+        produtos = buscar_produtos_por_unidade(unidade)
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer, pagesize=A4,
+            leftMargin=15*mm, rightMargin=15*mm,
+            topMargin=10*mm, bottomMargin=20*mm
+        )
+        styles = getSampleStyleSheet()
+        elements = []
+
+        # -------------------- Cabeçalho --------------------
+        header_style = ParagraphStyle(
+            'Header',
+            parent=styles['Heading1'],
+            fontSize=18,
+            alignment=TA_CENTER,
+            spaceAfter=10
+        )
+        elements.append(Paragraph(f"📦 Produtos da Unidade: {unidade}", header_style))
+        elements.append(Spacer(1, 8))
+        elements.append(Table([["" * 80]], colWidths=[170*mm], 
+                              style=[('LINEBELOW', (0, 0), (-1, -1), 1, colors.black)]))
+        elements.append(Spacer(1, 12))
+
+        # -------------------- Tabela --------------------
+        table_data = [[
+            Paragraph("Nome", styles['Normal']),
+            Paragraph("Estoque Loja", styles['Normal']),
+            Paragraph("Estoque Fábrica", styles['Normal']),
+            Paragraph("Estoque Depósito", styles['Normal']),
+            Paragraph("Preço de Venda", styles['Normal'])
+        ]]
+
+        # Estilo para células
+        cell_style = ParagraphStyle(
+            'Cell',
+            fontSize=8,
+            leading=10,
+            alignment=TA_CENTER,
+            wordWrap='CJK'
+        )
+        cell_left = ParagraphStyle(
+            'CellLeft',
+            parent=cell_style,
+            alignment=TA_LEFT
+        )
+
+        for p in produtos:
+            valor_unitario = f"R$ {p.valor_unitario:,.2f}" if p.valor_unitario else "-"
+            table_data.append([
+                Paragraph(p.nome, cell_left),
+                Paragraph(f"{p.estoque_loja:,.2f}", cell_style),
+                Paragraph(f"{p.estoque_fabrica:,.2f}", cell_style),
+                Paragraph(f"{p.estoque_deposito:,.2f}", cell_style),
+                Paragraph(valor_unitario, cell_style)
+            ])
+
+        col_widths = [60*mm, 25*mm, 25*mm, 25*mm, 25*mm]
+
+        produto_table = Table(table_data, colWidths=col_widths, repeatRows=1)
+
+        table_style = TableStyle([
+            ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 8),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#4682B4")),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONT', (0, 1), (-1, -1), 'Helvetica', 7),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ])
+
+        # Linhas zebradas
+        for i in range(1, len(table_data)):
+            if i % 2 == 0:
+                table_style.add('BACKGROUND', (0, i), (-1, i), colors.whitesmoke)
+
+        produto_table.setStyle(table_style)
+        elements.append(produto_table)
+
+        # -------------------- Rodapé --------------------
+        elements.append(Spacer(1, 15))
+        rodape = datetime.now().strftime("Gerado em %d/%m/%Y às %H:%M")
+        elements.append(Paragraph(rodape, ParagraphStyle('Rodape', fontSize=8, alignment=TA_RIGHT, textColor=colors.grey)))
+
+        doc.build(elements)
+
+        buffer.seek(0)
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f"produtos_{unidade}.pdf",
+            mimetype='application/pdf'
+        )
+
+    except Exception as e:
+        logger.error(f"Erro ao gerar PDF de produtos por unidade: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500

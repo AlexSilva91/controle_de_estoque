@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produtos - {{ unidade }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='assets/logo1.ico') }}" type="image/x-icon">
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            /* Cores principais - Tema Dark Modern */
+            --primary-color: #6c5ce7;
+            --primary-light: #a29bfe;
+            --primary-dark: #5649c0;
+            --secondary-color: #00cec9;
+            --secondary-dark: #00a8a5;
+            --accent-color: #fd79a8;
+            --accent-dark: #e84393;
+            
+            /* Cores de status */
+            --success-color: #00b894;
+            --success-dark: #008c6d;
+            --danger-color: #d63031;
+            --danger-dark: #b02324;
+            --warning-color: #fdcb6e;
+            --warning-dark: #e8a93e;
+            --info-color: #0984e3;
+            --info-dark: #0767b3;
+            
+            /* Cores de fundo */
+            --bg-color: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #0f3460;
+            --sidebar-bg: #0f0f1a;
+            --card-bg: #1e293b;
+            --card-hover: #2c3a50;
+            
+            /* Cores de texto */
+            --text-primary: #f8f9fa;
+            --text-secondary: #e2e8f0;
+            --text-muted: #94a3b8;
+            --text-light: #ffffff;
+            
+            /* Bordas */
+            --border-color: #2d3748;
+            --border-radius: clamp(8px, 1vw, 10px);
+            --border-radius-sm: clamp(4px, 0.6vw, 6px);
+            
+            /* Sombras */
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
+            --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+            
+            /* Espaçamentos */
+            --space-xs: clamp(4px, 0.5vw, 6px);
+            --space-sm: clamp(8px, 1vw, 10px);
+            --space-md: clamp(12px, 1.5vw, 16px);
+            --space-lg: clamp(16px, 2vw, 20px);
+            --space-xl: clamp(20px, 2.5vw, 24px);
+            --space-xxl: clamp(24px, 3vw, 32px);
+            
+            /* Tipografia */
+            --font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            --font-size-xs: clamp(12px, 2vw, 14px);
+            --font-size-sm: clamp(14px, 2.5vw, 16px);
+            --font-size-md: clamp(16px, 3vw, 18px);
+            --font-size-lg: clamp(18px, 3.5vw, 20px);
+            --font-size-xl: clamp(20px, 4vw, 22px);
+            --font-size-xxl: clamp(24px, 5vw, 28px);
+            --font-weight-light: 300;
+            --font-weight-regular: 400;
+            --font-weight-medium: 500;
+            --font-weight-semibold: 600;
+            --font-weight-bold: 700;
+            
+            /* Gradientes */
+            --gradient-primary: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            --gradient-secondary: linear-gradient(135deg, var(--secondary-color), var(--secondary-dark));
+            --gradient-accent: linear-gradient(135deg, var(--accent-color), var(--accent-dark));
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+            min-height: 100vh;
+            padding: var(--space-md);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header e Navegação */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-lg);
+            flex-wrap: wrap;
+            gap: var(--space-md);
+        }
+
+        .page-title {
+            font-size: var(--font-size-xl);
+            font-weight: var(--font-weight-semibold);
+            background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .breadcrumb {
+            font-size: var(--font-size-sm);
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            flex-wrap: wrap;
+        }
+
+        .breadcrumb span {
+            color: var(--text-secondary);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-sm);
+            padding: var(--space-sm) var(--space-md);
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-medium);
+            border-radius: var(--border-radius-sm);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            line-height: 1;
+            position: relative;
+            overflow: hidden;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        /* Card Principal */
+        .card {
+            background-color: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border: 1px solid var(--border-color);
+            margin-bottom: var(--space-lg);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-md) var(--space-lg);
+            border-bottom: 1px solid var(--border-color);
+            background-color: rgba(0, 0, 0, 0.1);
+            flex-wrap: wrap;
+            gap: var(--space-sm);
+        }
+
+        .card-header h3 {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-primary);
+            flex: 1;
+        }
+
+        .card-body {
+            padding: var(--space-lg);
+        }
+
+        /* Tabela */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            width: 100%;
+            max-height: 70vh;
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--font-size-sm);
+            background-color: var(--card-bg);
+            min-width: 600px;
+        }
+
+        th {
+            background-color: var(--bg-tertiary);
+            color: var(--text-muted);
+            padding: var(--space-md);
+            text-align: left;
+            font-weight: var(--font-weight-semibold);
+            text-transform: uppercase;
+            font-size: var(--font-size-xs);
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        th:hover {
+            background-color: rgba(108, 92, 231, 0.1);
+        }
+
+        td {
+            padding: var(--space-md);
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: var(--bg-tertiary);
+        }
+
+        /* Mensagem de lista vazia */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-xl);
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .card-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: var(--space-sm);
+            }
+            
+            th, td {
+                padding: var(--space-sm);
+            }
+            
+            .table-responsive {
+                max-height: 60vh;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: var(--space-sm);
+            }
+            
+            .card-body {
+                padding: var(--space-md);
+            }
+            
+            table {
+                font-size: var(--font-size-xs);
+            }
+            
+            th, td {
+                padding: var(--space-xs) var(--space-sm);
+            }
+        }
+
+        /* Indicador de ordenação */
+        .sort-indicator {
+            display: inline-block;
+            margin-left: var(--space-xs);
+            transition: transform 0.3s ease;
+        }
+
+        .sort-asc .sort-indicator {
+            transform: rotate(0deg);
+        }
+
+        .sort-desc .sort-indicator {
+            transform: rotate(180deg);
+        }
+
+        /* Scrollbar personalizada */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <h1 class="page-title">Produtos da unidade: {{ unidade }}</h1>
+                <div class="breadcrumb">
+                    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-primary">
+                        ← Voltar para Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Principal -->
+        <div class="card">
+            <div class="card-header">
+                <h3>
+                    <i>📦</i> Lista de Produtos
+                </h3>
+                <div class="flex items-center gap-4">
+                    <span class="text-sm text-muted">
+                        Total: {{ produtos|length }} produto(s)
+                    </span>
+                    <a href="{{ url_for('admin.baixar_pdf_produtos', unidade=unidade) }}" 
+                    class="btn btn-primary">
+                    📄 Baixar PDF
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if produtos %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="sort-asc" onclick="sortTable(0)">
+                                        Nome <span class="sort-indicator">▲</span>
+                                    </th>
+                                    <th onclick="sortTable(1, 'num')">
+                                        Estoque Loja <span class="sort-indicator">▲</span>
+                                    </th>
+                                    <th onclick="sortTable(2, 'num')">
+                                        Estoque Fábrica <span class="sort-indicator">▲</span>
+                                    </th>
+                                    <th onclick="sortTable(3, 'num')">
+                                        Estoque Depósito <span class="sort-indicator">▲</span>
+                                    </th>
+                                    <th onclick="sortTable(4, 'num')">
+                                        Preço de Venda <span class="sort-indicator">▲</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in produtos %}
+                                <tr>
+                                    <td>{{ p.nome }}</td>
+                                    <td>{{ "%.2f"|format(p.estoque_loja) }}</td>
+                                    <td>{{ "%.2f"|format(p.estoque_fabrica) }}</td>
+                                    <td>{{ "%.2f"|format(p.estoque_deposito) }}</td>
+                                    <td>
+                                        {% if p.valor_unitario %}
+                                            R$ {{ "%.2f"|format(p.valor_unitario) }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <p>Nenhum produto ativo encontrado para esta unidade.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Script para ordenar colunas -->
+    <script>
+        let currentSortColumn = 0;
+        let currentSortDirection = 'asc';
+        let currentSortType = 'text';
+
+        function sortTable(colIndex, type = 'text') {
+            const table = document.querySelector('table tbody');
+            const rows = Array.from(table.querySelectorAll('tr'));
+            
+            // Atualizar indicadores visuais
+            document.querySelectorAll('th').forEach((th, index) => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (index === colIndex) {
+                    th.classList.add(currentSortDirection === 'asc' ? 'sort-desc' : 'sort-asc');
+                }
+            });
+            
+            // Se clicou na mesma coluna, inverter direção
+            if (colIndex === currentSortColumn) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortColumn = colIndex;
+                currentSortDirection = 'asc';
+                currentSortType = type;
+            }
+            
+            // Ordenar as linhas
+            rows.sort((a, b) => {
+                let cellA = a.children[colIndex].innerText.trim();
+                let cellB = b.children[colIndex].innerText.trim();
+
+                if(currentSortType === 'num') {
+                    cellA = parseFloat(cellA.replace('R$', '').replace(',', '.')) || 0;
+                    cellB = parseFloat(cellB.replace('R$', '').replace(',', '.')) || 0;
+                }
+
+                let comparison = 0;
+                if (cellA < cellB) comparison = -1;
+                if (cellA > cellB) comparison = 1;
+                
+                return currentSortDirection === 'asc' ? comparison : -comparison;
+            });
+
+            // Reinserir as linhas na tabela
+            rows.forEach(row => table.appendChild(row));
+        }
+    </script>
+</body>
+</html>

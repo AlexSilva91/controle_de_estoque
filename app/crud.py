@@ -2371,3 +2371,13 @@ def atualizar_caixa(session: Session, caixa_id: int, dados_atualizacao: dict):
         session.rollback()
         return None, f"Erro ao atualizar caixa: {str(e)}"
     
+def buscar_produtos_por_unidade(unidade: str):
+    """
+    Busca todos os produtos ativos de uma determinada unidade de medida.
+    """
+    return (
+        Produto.query
+        .filter(Produto.unidade == unidade, Produto.ativo == True)
+        .all()
+    )
+
