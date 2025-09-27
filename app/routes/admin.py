@@ -5949,7 +5949,7 @@ def historico_financeiro_json():
 
     return jsonify([serialize(f) for f in historico])
     
-# ================= ROTA PDF =================
+# ================= ROTA PDF CORRIGIDA =================
 @admin_bp.route('/financeiro/historico/pdf')
 @login_required
 @admin_required
@@ -6003,16 +6003,47 @@ def historico_financeiro_pdf():
             query_estornos = query_estornos.filter(Financeiro.data <= end_date)
         estornos = query_estornos.all()
 
-        total_pagamentos = {}
+        # -------------------- BUSCAR PAGAMENTOS DE CONTAS A RECEBER --------------------
+        query_pagamentos_contas = PagamentoContaReceber.query.join(
+            ContaReceber, PagamentoContaReceber.conta_id == ContaReceber.id
+        ).filter(
+            ContaReceber.status.in_([StatusPagamento.parcial, StatusPagamento.quitado])
+        )
+        
+        if start_date:
+            query_pagamentos_contas = query_pagamentos_contas.filter(
+                PagamentoContaReceber.data_pagamento >= start_date
+            )
+        elif mes and ano:
+            query_pagamentos_contas = query_pagamentos_contas.filter(
+                extract('month', PagamentoContaReceber.data_pagamento) == mes,
+                extract('year', PagamentoContaReceber.data_pagamento) == ano
+            )
+        if end_date:
+            query_pagamentos_contas = query_pagamentos_contas.filter(
+                PagamentoContaReceber.data_pagamento <= end_date
+            )
+        
+        pagamentos_contas = query_pagamentos_contas.all()
+
         total_valor = sum(f['valor'] for f in financeiros)
 
+        # Calcular totais por forma de pagamento
+        total_pagamentos = {}
+
+        # 1. Pagamentos de notas fiscais
         for f in financeiros:
             if f['nota_fiscal_id']:
                 for p in f['pagamentos']:
                     forma = p.forma_pagamento.value if hasattr(p, 'forma_pagamento') and p.forma_pagamento else "-"
                     total_pagamentos[forma] = total_pagamentos.get(forma, 0) + p.valor
 
-        # Pagamentos de estorno
+        # 2. Pagamentos de contas a receber
+        for pagamento_conta in pagamentos_contas:
+            forma = pagamento_conta.forma_pagamento.value if pagamento_conta.forma_pagamento else "-"
+            total_pagamentos[forma] = total_pagamentos.get(forma, 0) + pagamento_conta.valor_pago
+
+        # 3. Subtrair estornos
         total_pagamentos_estornos = {}
         for e in estornos:
             if e.nota_fiscal:
@@ -6020,7 +6051,6 @@ def historico_financeiro_pdf():
                     forma = p.forma_pagamento.value
                     total_pagamentos_estornos[forma] = total_pagamentos_estornos.get(forma, 0) + p.valor
 
-        # Corrigir os totais por forma de pagamento
         for forma, valor in total_pagamentos_estornos.items():
             total_pagamentos[forma] = total_pagamentos.get(forma, 0) - valor
 
@@ -6069,6 +6099,7 @@ def historico_financeiro_pdf():
             Paragraph("Pagamentos", cell_style_center)
         ]]
 
+        # Adicionar financeiros normais
         for f in financeiros:
             pagamentos_texto = ""
             if f['nota_fiscal_id']:
@@ -6085,6 +6116,25 @@ def historico_financeiro_pdf():
                 Paragraph(f['cliente'], cell_style_center),
                 Paragraph(str(f['caixa']), cell_style_center),
                 Paragraph(pagamentos_texto.strip() or '-', cell_style_left)
+            ])
+
+        # Adicionar pagamentos de contas a receber
+        for pagamento in pagamentos_contas:
+            descricao = f"Pagamento conta #{pagamento.conta_id}"
+            if pagamento.conta and pagamento.conta.descricao:
+                descricao += f" - {pagamento.conta.descricao}"
+            
+            pagamentos_texto = f"{pagamento.forma_pagamento.value}: R$ {pagamento.valor_pago:.2f}"
+            
+            table_data.append([
+                Paragraph(f"CR-{pagamento.id}", cell_style_center),
+                Paragraph("Recebimento", cell_style_center),
+                Paragraph(f"R$ {pagamento.valor_pago:.2f}", cell_style_center),
+                Paragraph(descricao, cell_style_left),
+                Paragraph(pagamento.data_pagamento.strftime('%d/%m/%Y %H:%M'), cell_style_center),
+                Paragraph(pagamento.conta.cliente.nome if pagamento.conta and pagamento.conta.cliente else '-', cell_style_center),
+                Paragraph(str(pagamento.caixa_id) if pagamento.caixa_id else '-', cell_style_center),
+                Paragraph(pagamentos_texto, cell_style_left)
             ])
 
         col_widths = [20*mm, 25*mm, 25*mm, 50*mm, 25*mm, 25*mm, 20*mm, 50*mm]
@@ -6105,7 +6155,15 @@ def historico_financeiro_pdf():
         import locale
         locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 
-        totals_data = [["Total", locale.format_string("R$ %.2f", total_valor, grouping=True)]]
+        # Calcular valor total incluindo contas a receber
+        valor_total_contas = sum(p.valor_pago for p in pagamentos_contas)
+        valor_total_geral = total_valor + valor_total_contas
+
+        totals_data = [
+            ["Total ", locale.format_string("R$ %.2f", total_valor, grouping=True)],
+            #["Total contas a receber", locale.format_string("R$ %.2f", valor_total_contas, grouping=True)],
+            #["TOTAL GERAL", locale.format_string("R$ %.2f", valor_total_geral, grouping=True)]
+        ]
 
         if tipo_movimentacao.value.lower() == "entrada" and total_pagamentos:
             totals_data.append(["", ""])
@@ -6113,7 +6171,7 @@ def historico_financeiro_pdf():
             for forma, valor in total_pagamentos.items():
                 totals_data.append([forma, locale.format_string("R$ %.2f", valor, grouping=True)])
 
-        totals_table = Table(totals_data, colWidths=[10*mm, 40*mm], hAlign='LEFT')
+        totals_table = Table(totals_data, colWidths=[20*mm, 40*mm], hAlign='LEFT')
         totals_table.setStyle(TableStyle([
             ('FONT', (0,0), (-1,-1), 'Helvetica', 9),
             ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
@@ -6124,6 +6182,7 @@ def historico_financeiro_pdf():
             ('BOTTOMPADDING', (0,0), (-1,-1), 1),
             ('LINEABOVE', (0,0), (-1,0), 1, colors.black),
             ('LINEBELOW', (0,0), (-1,0), 1, colors.black),
+            ('FONT', (0,2), (-1,2), 'Helvetica-Bold'),  # Negrito no total geral
         ]))
         elements.append(Spacer(1, 10))
         elements.append(totals_table)
