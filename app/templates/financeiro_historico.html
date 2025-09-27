@@ -1,110 +1,465 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
     <meta charset="UTF-8">
     <title>Histórico Financeiro - {{ tipo_movimentacao|capitalize }}</title>
     <link rel="icon" href="{{ url_for('static', filename='assets/logo1.ico') }}" type="image/x-icon">
-
+    
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
-        body {
-            padding: 20px;
+        :root {
+            /* Cores principais - Tema escuro elegante */
+            --bg-primary: #0f1422;
+            --bg-secondary: #1a2238;
+            --bg-card: #212b45;
+            --bg-element: #2a3655;
+            
+            --text-primary: #ffffff;
+            --text-secondary: #b4c6f0;
+            --text-muted: #8a9cc9;
+            
+            --accent-primary: #6c5ce7;
+            --accent-secondary: #00cec9;
+            --accent-success: #00b894;
+            --accent-danger: #ff6b6b;
+            --accent-warning: #feca57;
+            
+            --border-color: #34416d;
+            --border-radius: 12px;
+            --shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
         }
-
-        h2 {
-            margin-bottom: 20px;
-        }
-
-        .pagamentos-list {
-            list-style: none;
-            padding-left: 0;
+        
+        * {
             margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-
-        .pagamentos-list li {
-            margin-bottom: 2px;
+        
+        body {
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+            font-weight: 400;
         }
-
-        table td,
-        table th {
+        
+        .glass-card {
+            background: rgba(33, 43, 69, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        
+        .container-main {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* Header Styles */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: var(--bg-card);
+            border-radius: var(--border-radius);
+            border-left: 5px solid var(--accent-primary);
+        }
+        
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 5px;
+        }
+        
+        .page-subtitle {
+            font-size: 16px;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+        
+        .stats-container {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .stat-card {
+            background: var(--bg-element);
+            padding: 20px;
+            border-radius: 10px;
+            min-width: 180px;
+            text-align: center;
+            border-bottom: 3px solid var(--accent-secondary);
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        
+        /* Controls Section */
+        .controls-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .btn-modern {
+            background: linear-gradient(135deg, var(--accent-primary) 0%, #5d4fcf 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3);
+        }
+        
+        .btn-modern:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(108, 92, 231, 0.4);
+            color: white;
+        }
+        
+        .btn-secondary-modern {
+            background: var(--bg-element);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-secondary-modern:hover {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border-color: var(--accent-primary);
+        }
+        
+        .filters-container {
+            display: flex;
+            gap: 15px;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .filter-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        .filter-input {
+            background: var(--bg-element);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 15px;
+            color: var(--text-primary);
+            font-size: 14px;
+            min-width: 180px;
+            transition: all 0.3s ease;
+        }
+        
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.2);
+        }
+        
+        /* Table Styles */
+        .table-container {
+            background: var(--bg-card);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        
+        .table-modern {
+            width: 100%;
+            border-collapse: collapse;
+            color: var(--text-primary);
+        }
+        
+        .table-modern thead {
+            background: linear-gradient(135deg, var(--accent-primary) 0%, #5d4fcf 100%);
+        }
+        
+        .table-modern th {
+            padding: 18px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+            color: white;
+            border: none;
+        }
+        
+        .table-modern td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
             vertical-align: top;
         }
-
-        .btn-toolbar {
-            margin-bottom: 15px;
+        
+        .table-modern tbody tr {
+            transition: all 0.2s ease;
         }
-
-        .btn-toolbar .btn {
-            margin-left: 5px;
+        
+        .table-modern tbody tr:hover {
+            background: rgba(108, 92, 231, 0.1);
+            transform: translateX(5px);
         }
-
-        .filter-dates {
-            margin-bottom: 15px;
+        
+        .table-modern tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        /* Badges and Status */
+        .badge-modern {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge-primary {
+            background: rgba(108, 92, 231, 0.2);
+            color: var(--text-primary);
+            border: 1px solid rgba(108, 92, 231, 0.3);
+        }
+        
+        .value-positive {
+            color: var(--accent-success);
+            font-weight: 700;
+            font-size: 15px;
+        }
+        
+        .value-negative {
+            color: var(--accent-danger);
+            font-weight: 700;
+            font-size: 15px;
+        }
+        
+        /* Payment List */
+        .payment-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .payment-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        
+        .payment-item i {
+            color: var(--accent-secondary);
+            font-size: 12px;
+        }
+        
+        /* DataTables Customization */
+        .dataTables_wrapper {
+            padding: 20px;
+        }
+        
+        .dataTables_length select, 
+        .dataTables_filter input {
+            background: var(--bg-element);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+        }
+        
+        .dataTables_paginate .paginate_button {
+            background: var(--bg-element) !important;
+            border: 1px solid var(--border-color) !important;
+            color: var(--text-primary) !important;
+            border-radius: 6px !important;
+            margin: 0 3px !important;
+            padding: 8px 12px !important;
+        }
+        
+        .dataTables_paginate .paginate_button.current {
+            background: linear-gradient(135deg, var(--accent-primary) 0%, #5d4fcf 100%) !important;
+            border: none !important;
+            color: white !important;
+        }
+        
+        .dataTables_info {
+            color: var(--text-muted) !important;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 992px) {
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 20px;
+            }
+            
+            .stats-container {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .controls-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filters-container {
+                width: 100%;
+            }
+            
+            .filter-group {
+                flex: 1;
+            }
+            
+            .table-modern {
+                font-size: 13px;
+            }
+            
+            .table-modern th, 
+            .table-modern td {
+                padding: 12px 10px;
+            }
+            
+            .stats-container {
+                flex-direction: column;
+            }
+            
+            .stat-card {
+                min-width: auto;
+            }
+        }
+        
+        /* Animation for table rows */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .table-modern tbody tr {
+            animation: fadeIn 0.5s ease forwards;
+        }
+        
+        .table-modern tbody tr:nth-child(odd) {
+            background: rgba(255, 255, 255, 0.02);
         }
     </style>
 </head>
-
 <body>
-    <div class="container-fluid">
-        <h2>Histórico Financeiro - {{ tipo_movimentacao|capitalize }} ({{ mes_ano }})</h2>
-
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <div id="customButtons" class="btn-toolbar">
-                <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">← Dashboard</a>
-                <a href="#" id="btnPdf" class="btn btn-primary" target="_blank">📄 Gerar PDF</a>
+    <div class="container-main">
+        <!-- Page Header -->
+        <div class="page-header glass-card">
+            <div>
+                <h1 class="page-title">
+                    <i class="fas fa-chart-line me-2"></i>
+                    Histórico Financeiro - {{ tipo_movimentacao|capitalize }}
+                </h1>
+                <p class="page-subtitle">Período: {{ mes_ano }} | Visualize e gerencie todas as movimentações financeiras</p>
             </div>
         </div>
-
-        <div class="filter-dates d-flex gap-2 align-items-end">
-            <div>
-                <label for="startDate" class="form-label">Data Inicial:</label>
-                <input type="date" id="startDate" class="form-control">
+        
+        <!-- Controls Section -->
+        <div class="controls-section">
+            <div class="filters-container">
+                <div class="filter-group">
+                    <label class="filter-label" for="startDate">
+                        <i class="fas fa-calendar-alt me-1"></i>Data Inicial
+                    </label>
+                    <input type="date" id="startDate" class="filter-input">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label" for="endDate">
+                        <i class="fas fa-calendar-alt me-1"></i>Data Final
+                    </label>
+                    <input type="date" id="endDate" class="filter-input">
+                </div>
+                <button id="btnFiltrar" class="btn-modern">
+                    <i class="fas fa-filter"></i> Filtrar
+                </button>
             </div>
-            <div>
-                <label for="endDate" class="form-label">Data Final:</label>
-                <input type="date" id="endDate" class="form-control">
-            </div>
-            <div>
-                <button id="btnFiltrar" class="btn btn-primary">Filtrar</button>
+            
+            <div class="buttons-container">
+                <a href="{{ url_for('admin.dashboard') }}" class="btn-modern btn-secondary-modern">
+                    <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+                </a>
+                <a href="#" id="btnPdf" class="btn-modern" target="_blank">
+                    <i class="fas fa-file-pdf"></i> Gerar PDF
+                </a>
             </div>
         </div>
-
-
-        <div class="table-responsive">
-            <table id="financeiroTable" class="table table-bordered table-striped table-hover">
-                <thead class="table-dark">
+        
+        <!-- Table Section -->
+        <div class="table-container glass-card">
+            <table id="financeiroTable" class="table-modern">
+                <thead>
                     <tr>
-                        <th>ID Financeiro</th>
-                        <th>Categoria</th>
-                        <th>Valor Total</th>
-                        <th>Descrição</th>
-                        <th>Data</th>
-                        <th>Cliente</th>
-                        <th>Caixa</th>
-                        <th>Nota Fiscal / Pagamentos</th>
+                        <th><i class="fas fa-hashtag me-1"></i> ID</th>
+                        <th><i class="fas fa-tag me-1"></i> Categoria</th>
+                        <th><i class="fas fa-dollar-sign me-1"></i> Valor</th>
+                        <th><i class="fas fa-align-left me-1"></i> Descrição</th>
+                        <th><i class="fas fa-calendar me-1"></i> Data</th>
+                        <th><i class="fas fa-user me-1"></i> Cliente</th>
+                        <th><i class="fas fa-cash-register me-1"></i> Caixa</th>
+                        <th><i class="fas fa-receipt me-1"></i> Pagamentos</th>
                     </tr>
                 </thead>
                 <tbody>
-
                     {% for f in historico %}
                     <tr>
-                        <td>{{ f.id_financeiro }}</td>
+                        <td><span class="badge-modern badge-primary">#{{ f.id_financeiro }}</span></td>
                         <td>{{ f.categoria }}</td>
-                        <td>R$ {{ "%.2f"|format(f.valor_total_nota) }}</td>
+                        <td class="value-positive">R$ {{ "%.2f"|format(f.valor_total_nota) }}</td>
                         <td>{{ f.descricao }}</td>
                         <td>{{ f.data.strftime('%d/%m/%Y %H:%M') }}</td>
                         <td>{{ f.cliente }}</td>
                         <td>{{ f.caixa }}</td>
                         <td>
                             {% if f.nota_fiscal_id %}
-                            <strong>ID Nota:</strong> {{ f.nota_fiscal_id }}<br>
-                            <ul class="pagamentos-list">
+                            <div><strong>NF: {{ f.nota_fiscal_id }}</strong></div>
+                            <ul class="payment-list">
                                 {% for p in f.pagamentos %}
-                                <li>{{ p.forma_pagamento.value if p.forma_pagamento else '-' }}: R$ {{
-                                    "%.2f"|format(p.valor) }}</li>
+                                <li class="payment-item">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                    {{ p.forma_pagamento.value if p.forma_pagamento else '-' }}: 
+                                    R$ {{ "%.2f"|format(p.valor) }}
+                                </li>
                                 {% endfor %}
                             </ul>
                             {% else %}-{% endif %}
@@ -123,14 +478,28 @@
 
     <script>
         $(document).ready(function () {
-            // Inicializa DataTable uma vez
+            // Inicializa DataTable
             var table = $('#financeiroTable').DataTable({
                 "paging": true,
                 "pageLength": 10,
                 "lengthMenu": [10, 25, 50, 100],
                 "ordering": true,
                 "order": [[4, "desc"]],
-                "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json" }
+                "language": { 
+                    "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json",
+                    "search": "Pesquisar:",
+                    "lengthMenu": "Exibir _MENU_ registros por página",
+                    "zeroRecords": "Nenhum registro encontrado",
+                    "info": "Mostrando página _PAGE_ de _PAGES_",
+                    "infoEmpty": "Nenhum registro disponível",
+                    "infoFiltered": "(filtrado de _MAX_ registros totais)",
+                    "paginate": {
+                        "first": "Primeira",
+                        "last": "Última",
+                        "next": "Próxima",
+                        "previous": "Anterior"
+                    }
+                }
             });
 
             // Função para atualizar a tabela via AJAX
@@ -145,17 +514,17 @@
                         data.forEach(function (f) {
                             var pagamentos_html = '-';
                             if (f.nota_fiscal_id && f.pagamentos.length) {
-                                pagamentos_html = `<strong>ID Nota:</strong> ${f.nota_fiscal_id}<br><ul class="pagamentos-list">`;
+                                pagamentos_html = `<div><strong>NF: ${f.nota_fiscal_id}</strong></div><ul class="payment-list">`;
                                 f.pagamentos.forEach(function (p) {
-                                    pagamentos_html += `<li>${p.forma_pagamento}: R$ ${parseFloat(p.valor).toFixed(2)}</li>`;
+                                    pagamentos_html += `<li class="payment-item"><i class="fas fa-money-bill-wave"></i>${p.forma_pagamento}: R$ ${parseFloat(p.valor).toFixed(2)}</li>`;
                                 });
                                 pagamentos_html += '</ul>';
                             }
 
                             table.row.add([
-                                f.id_financeiro,
+                                `<span class="badge-modern badge-primary">#${f.id_financeiro}</span>`,
                                 f.categoria,
-                                'R$ ' + parseFloat(f.valor_total_nota).toFixed(2),
+                                `<span class="value-positive">R$ ${parseFloat(f.valor_total_nota).toFixed(2)}</span>`,
                                 f.descricao,
                                 f.data,
                                 f.cliente,
@@ -190,9 +559,15 @@
                 if (end) url += "&end=" + end;
                 window.open(url, '_blank');
             });
+
+            // Definir datas padrão (mês atual)
+            var today = new Date();
+            var firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+            var lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            
+            $('#startDate').val(firstDay.toISOString().split('T')[0]);
+            $('#endDate').val(lastDay.toISOString().split('T')[0]);
         });
     </script>
-
 </body>
-
 </html>
