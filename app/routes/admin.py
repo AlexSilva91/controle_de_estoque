@@ -136,25 +136,63 @@ def get_dashboard_metrics():
         inicio_mes = datetime.combine(primeiro_dia_mes, datetime.min.time())
         fim_dia = datetime.combine(hoje, datetime.max.time())
         
-        entradas_mes = db.session.query(
-            func.sum(Financeiro.valor)
+        # CÁLCULO DE ENTRADAS DO MÊS (igual ao do PDF)
+        # 1. Vendas (pagamentos de notas fiscais)
+        vendas_mes = db.session.query(
+            func.sum(PagamentoNotaFiscal.valor)
+        ).join(
+            NotaFiscal,
+            PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+        ).join(
+            Caixa,
+            NotaFiscal.caixa_id == Caixa.id
         ).filter(
-            Financeiro.tipo == TipoMovimentacao.entrada,
-            Financeiro.categoria == CategoriaFinanceira.venda,
-            Financeiro.data >= inicio_mes,
-            Financeiro.data <= fim_dia
+            NotaFiscal.status == StatusNota.emitida,
+            Caixa.data_abertura >= inicio_mes,
+            Caixa.data_abertura <= fim_dia
         ).scalar() or 0
 
-        # Saídas do mês (exceto fechamento de caixa)
+        # 2. Contas recebidas (pagamentos de contas a receber)
+        contas_recebidas_mes = db.session.query(
+            func.sum(PagamentoContaReceber.valor_pago)
+        ).join(
+            Caixa,
+            PagamentoContaReceber.caixa_id == Caixa.id
+        ).filter(
+            Caixa.data_abertura >= inicio_mes,
+            Caixa.data_abertura <= fim_dia
+        ).scalar() or 0
+
+        # 3. Estornos (saida_estorno) para deduzir
+        estornos_mes = db.session.query(
+            func.sum(Financeiro.valor)
+        ).join(
+            Caixa,
+            Financeiro.caixa_id == Caixa.id
+        ).filter(
+            Financeiro.tipo == TipoMovimentacao.saida_estorno,
+            Caixa.data_abertura >= inicio_mes,
+            Caixa.data_abertura <= fim_dia
+        ).scalar() or 0
+
+        # Entradas líquidas = (vendas + contas recebidas) - estornos
+        entradas_brutas_mes = float(vendas_mes) + float(contas_recebidas_mes)
+        entradas_liquidas_mes = entradas_brutas_mes - float(estornos_mes)
+
+        # CÁLCULO DE SAÍDAS DO MÊS (igual ao do PDF) - somente despesas
         saidas_mes = db.session.query(
             func.sum(Financeiro.valor)
+        ).join(
+            Caixa,
+            Financeiro.caixa_id == Caixa.id
         ).filter(
             Financeiro.tipo == TipoMovimentacao.saida,
             Financeiro.categoria == CategoriaFinanceira.despesa,
-            Financeiro.data >= inicio_mes,
-            Financeiro.data <= fim_dia,
-            Financeiro.categoria != CategoriaFinanceira.fechamento_caixa
+            Caixa.data_abertura >= inicio_mes,
+            Caixa.data_abertura <= fim_dia
         ).scalar() or 0
+
+        saldo_mes = entradas_liquidas_mes - float(saidas_mes)
 
         return jsonify({
             'success': True,
@@ -165,9 +203,9 @@ def get_dashboard_metrics():
                     'unidades': f"{format_number(estoque_dict['unidade'], is_weight=True)} un"
                 },
                 'financeiro': {
-                    'entradas_mes': format_currency(entradas_mes),
+                    'entradas_mes': format_currency(entradas_liquidas_mes),
                     'saidas_mes': format_currency(saidas_mes),
-                    'saldo_mes': format_currency(entradas_mes - saidas_mes)
+                    'saldo_mes': format_currency(saldo_mes)
                 }
             }
         })
@@ -315,32 +353,69 @@ def get_vendas_mensais():
                 mes += 12
                 ano -= 1
             
-            primeiro_dia = datetime(ano, mes, 1).date()
-            ultimo_dia = datetime(ano, mes + 1, 1).date() - timedelta(days=1) if mes < 12 else datetime(ano, 12, 31).date()
+            primeiro_dia = datetime(ano, mes, 1)
+            ultimo_dia = datetime(ano, mes + 1, 1) - timedelta(days=1) if mes < 12 else datetime(ano, 12, 31)
+            ultimo_dia = ultimo_dia.replace(hour=23, minute=59, second=59, microsecond=999999)
             
-            # Vendas do mês
-            total_vendas = db.session.query(
-                func.sum(Financeiro.valor)
+            # CÁLCULO DE ENTRADAS DO MÊS (igual ao do /dashboard/metrics)
+            # 1. Vendas (pagamentos de notas fiscais)
+            vendas_mes = db.session.query(
+                func.sum(PagamentoNotaFiscal.valor)
+            ).join(
+                NotaFiscal,
+                PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+            ).join(
+                Caixa,
+                NotaFiscal.caixa_id == Caixa.id
             ).filter(
-                Financeiro.tipo == TipoMovimentacao.entrada,
-                Financeiro.categoria == CategoriaFinanceira.venda,
-                Financeiro.data >= primeiro_dia,
-                Financeiro.data <= ultimo_dia
+                NotaFiscal.status == StatusNota.emitida,
+                Caixa.data_abertura >= primeiro_dia,
+                Caixa.data_abertura <= ultimo_dia
             ).scalar() or 0
-            
-            # Despesas do mês
-            total_despesas = db.session.query(
+
+            # 2. Contas recebidas (pagamentos de contas a receber)
+            contas_recebidas_mes = db.session.query(
+                func.sum(PagamentoContaReceber.valor_pago)
+            ).join(
+                Caixa,
+                PagamentoContaReceber.caixa_id == Caixa.id
+            ).filter(
+                Caixa.data_abertura >= primeiro_dia,
+                Caixa.data_abertura <= ultimo_dia
+            ).scalar() or 0
+
+            # 3. Estornos (saida_estorno) para deduzir
+            estornos_mes = db.session.query(
                 func.sum(Financeiro.valor)
+            ).join(
+                Caixa,
+                Financeiro.caixa_id == Caixa.id
+            ).filter(
+                Financeiro.tipo == TipoMovimentacao.saida_estorno,
+                Caixa.data_abertura >= primeiro_dia,
+                Caixa.data_abertura <= ultimo_dia
+            ).scalar() or 0
+
+            # Entradas líquidas = (vendas + contas recebidas) - estornos
+            entradas_brutas_mes = float(vendas_mes) + float(contas_recebidas_mes)
+            entradas_liquidas_mes = entradas_brutas_mes - float(estornos_mes)
+            
+            # CÁLCULO DE DESPESAS DO MÊS (igual ao do /dashboard/metrics)
+            saidas_mes = db.session.query(
+                func.sum(Financeiro.valor)
+            ).join(
+                Caixa,
+                Financeiro.caixa_id == Caixa.id
             ).filter(
                 Financeiro.tipo == TipoMovimentacao.saida,
                 Financeiro.categoria == CategoriaFinanceira.despesa,
-                Financeiro.data >= primeiro_dia,
-                Financeiro.data <= ultimo_dia
+                Caixa.data_abertura >= primeiro_dia,
+                Caixa.data_abertura <= ultimo_dia
             ).scalar() or 0
             
             meses.append(f"{primeiro_dia.strftime('%m/%Y')}")
-            vendas.append(float(total_vendas))
-            despesas.append(float(total_despesas))
+            vendas.append(entradas_liquidas_mes)  # Usar entradas líquidas como "vendas"
+            despesas.append(float(saidas_mes))
         
         return jsonify({
             'success': True,
@@ -351,7 +426,7 @@ def get_vendas_mensais():
     except Exception as e:
         logger.error(f"Erro na consulta de vendas mensais: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
-
+    
 @admin_bp.route('/dashboard/movimentacoes')
 @login_required
 @admin_required
@@ -2932,9 +3007,12 @@ def gerar_pdf_caixas_detalhado():
             # Calcular totais gerais
             total_geral_entradas = 0
             total_geral_saidas = 0
+            total_geral_estornos = 0
+            total_geral_vendas = 0
+            total_geral_contas_recebidas = 0
             
             for caixa in caixas:
-                # Busca pagamentos de notas fiscais
+                # Busca pagamentos de notas fiscais (VENDAS)
                 pagamentos_notas = session.query(
                     PagamentoNotaFiscal.forma_pagamento,
                     func.sum(PagamentoNotaFiscal.valor).label('total')
@@ -2948,7 +3026,7 @@ def gerar_pdf_caixas_detalhado():
                     PagamentoNotaFiscal.forma_pagamento
                 ).all()
                 
-                # Busca pagamentos de contas a receber
+                # Busca pagamentos de contas a receber (CONTAS RECEBIDAS)
                 pagamentos_contas = session.query(
                     PagamentoContaReceber.forma_pagamento,
                     func.sum(PagamentoContaReceber.valor_pago).label('total')
@@ -2958,16 +3036,37 @@ def gerar_pdf_caixas_detalhado():
                     PagamentoContaReceber.forma_pagamento
                 ).all()
                 
-                # Calcula total de entradas
-                caixa_entradas = 0.0
+                # Calcula total de vendas (notas fiscais)
+                caixa_vendas = 0.0
                 for forma, total in pagamentos_notas:
-                    caixa_entradas += float(total) if total else 0.0
+                    caixa_vendas += float(total) if total else 0.0
+                total_geral_vendas += caixa_vendas
+                
+                # Calcula total de contas recebidas
+                caixa_contas_recebidas = 0.0
                 for forma, total in pagamentos_contas:
-                    caixa_entradas += float(total) if total else 0.0
+                    caixa_contas_recebidas += float(total) if total else 0.0
+                total_geral_contas_recebidas += caixa_contas_recebidas
                 
-                total_geral_entradas += caixa_entradas
+                # Entradas brutas = vendas + contas recebidas
+                caixa_entradas_bruto = caixa_vendas + caixa_contas_recebidas
                 
-                # Calcula total de saídas (somente despesas)
+                # Busca estornos (saida_estorno) para deduzir das entradas
+                estornos = session.query(
+                    func.sum(Financeiro.valor)
+                ).filter(
+                    Financeiro.caixa_id == caixa.id,
+                    Financeiro.tipo == TipoMovimentacao.saida_estorno
+                ).scalar() or 0.0
+                
+                estornos_valor = float(estornos)
+                total_geral_estornos += estornos_valor
+                
+                # Entradas líquidas (entradas brutas - estornos)
+                entradas_liquidas = caixa_entradas_bruto - estornos_valor
+                total_geral_entradas += entradas_liquidas
+                
+                # Calcula total de saídas (somente despesas, excluindo estornos)
                 caixa_saidas = session.query(
                     func.sum(Financeiro.valor)
                 ).filter(
@@ -2982,7 +3081,7 @@ def gerar_pdf_caixas_detalhado():
 
             # Tabela de resumo no mesmo estilo da primeira rota
             resumo_data = [
-                ["Total Caixas", "Caixas Abertos", "Caixas Fechados", "Total Entradas", "Total Saídas", "Entradas - Saídas"],
+                ["Total Caixas", "Caixas Abertos", "Caixas Fechados", "Total Entradas Líq.", "Total Saídas", "Saldo Final"],
                 [
                     str(total_caixas),
                     str(caixas_abertos),
@@ -3004,6 +3103,32 @@ def gerar_pdf_caixas_detalhado():
             ])
             resumo_table.setStyle(resumo_style)
             elements.append(resumo_table)
+            
+            # Detalhamento das entradas
+            detalhes_entradas_data = [
+                ["Detalhamento das Entradas", "Valor"],
+                ["Total de Vendas (Notas Fiscais)", formatarMoeda(total_geral_vendas)],
+                ["Total de Contas Recebidas", formatarMoeda(total_geral_contas_recebidas)],
+                ["Total de Estornos Deduzidos", formatarMoeda(total_geral_estornos)],
+                ["Total Entradas Líquidas", formatarMoeda(total_geral_entradas)]
+            ]
+            
+            detalhes_entradas_table = Table(detalhes_entradas_data, colWidths=[120*mm, 60*mm])
+            detalhes_entradas_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#4682B4")),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 9),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('FONT', (0, 1), (-1, -1), 'Helvetica', 9),
+                ('BACKGROUND', (0, 4), (-1, 4), colors.lightgrey),
+                ('FONT', (0, 4), (-1, 4), 'Helvetica-Bold', 9),
+            ])
+            detalhes_entradas_table.setStyle(detalhes_entradas_style)
+            elements.append(Spacer(1, 8))
+            elements.append(detalhes_entradas_table)
+            
             elements.append(Spacer(1, 18))
 
         # -------------------- Detalhamento por Caixa --------------------
@@ -3015,7 +3140,7 @@ def gerar_pdf_caixas_detalhado():
                 # Cálculos exatos como na rota original
                 operador_nome = caixa.operador.nome if caixa.operador else "Operador não identificado"
                 
-                # Busca pagamentos de notas fiscais
+                # Busca pagamentos de notas fiscais (VENDAS)
                 pagamentos_notas = session.query(
                     PagamentoNotaFiscal.forma_pagamento,
                     func.sum(PagamentoNotaFiscal.valor).label('total')
@@ -3029,7 +3154,7 @@ def gerar_pdf_caixas_detalhado():
                     PagamentoNotaFiscal.forma_pagamento
                 ).all()
                 
-                # Busca pagamentos de contas a receber
+                # Busca pagamentos de contas a receber (CONTAS RECEBIDAS)
                 pagamentos_contas = session.query(
                     PagamentoContaReceber.forma_pagamento,
                     func.sum(PagamentoContaReceber.valor_pago).label('total')
@@ -3039,19 +3164,39 @@ def gerar_pdf_caixas_detalhado():
                     PagamentoContaReceber.forma_pagamento
                 ).all()
                 
-                # Combina os resultados
-                total_entradas = 0.0
-                formas_pagamento = {}
+                # Calcula total de vendas
+                total_vendas = 0.0
+                formas_pagamento_vendas = {}
                 
                 for forma, total in pagamentos_notas:
                     valor = float(total) if total else 0.0
-                    formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor
-                    total_entradas += valor
-                    
+                    formas_pagamento_vendas[forma.value] = formas_pagamento_vendas.get(forma.value, 0) + valor
+                    total_vendas += valor
+                
+                # Calcula total de contas recebidas
+                total_contas_recebidas = 0.0
+                formas_pagamento_contas = {}
+                
                 for forma, total in pagamentos_contas:
                     valor = float(total) if total else 0.0
-                    formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor
-                    total_entradas += valor
+                    formas_pagamento_contas[forma.value] = formas_pagamento_contas.get(forma.value, 0) + valor
+                    total_contas_recebidas += valor
+
+                # Entradas brutas = vendas + contas recebidas
+                total_entradas_bruto = total_vendas + total_contas_recebidas
+
+                # Busca estornos (saida_estorno) para deduzir das entradas
+                estornos = session.query(
+                    func.sum(Financeiro.valor)
+                ).filter(
+                    Financeiro.caixa_id == caixa.id,
+                    Financeiro.tipo == TipoMovimentacao.saida_estorno
+                ).scalar() or 0.0
+                
+                estornos_valor = float(estornos)
+                
+                # Entradas líquidas (entradas brutas - estornos)
+                total_entradas_liquidas = total_entradas_bruto - estornos_valor
 
                 # Calcula total de saídas - SOMENTE DESPESAS
                 total_saidas = session.query(
@@ -3063,14 +3208,14 @@ def gerar_pdf_caixas_detalhado():
                 ).scalar() or 0.0
                 
                 total_saidas = float(total_saidas)
-                saldo_caixa = total_entradas - total_saidas
+                saldo_caixa = total_entradas_liquidas - total_saidas
 
-                # CORREÇÃO: Status como texto simples sem HTML
+                # Status como texto simples sem HTML
                 status_text = caixa.status.value.upper()
 
                 # Tabela de informações do caixa
                 caixa_data = [
-                    ['ID', 'Operador', 'Status', 'Data Abertura', 'Data Fechamento', 'Entrada - Saída'],
+                    ['ID', 'Operador', 'Status', 'Data Abertura', 'Data Fechamento', 'Saldo Final'],
                     [
                         str(caixa.id),
                         operador_nome[:20] + '...' if len(operador_nome) > 20 else operador_nome,
@@ -3083,7 +3228,7 @@ def gerar_pdf_caixas_detalhado():
 
                 caixa_table = Table(caixa_data, colWidths=[15*mm, 40*mm, 25*mm, 30*mm, 30*mm, 30*mm])
                 
-                # CORREÇÃO: Aplicar cores diretamente no estilo da tabela
+                # Aplicar cores diretamente no estilo da tabela
                 caixa_style = TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#4682B4")),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -3093,7 +3238,7 @@ def gerar_pdf_caixas_detalhado():
                     ('FONT', (0, 1), (-1, -1), 'Helvetica', 8),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    # CORREÇÃO: Aplicar cor do status diretamente na célula
+                    # Aplicar cor do status diretamente na célula
                     ('TEXTCOLOR', (2, 1), (2, 1), colors.red if caixa.status == StatusCaixa.aberto else colors.darkgreen),
                     # Linha zebrada
                     ('BACKGROUND', (0, 1), (-1, 1), colors.whitesmoke if idx % 2 == 0 else colors.white),
@@ -3103,21 +3248,24 @@ def gerar_pdf_caixas_detalhado():
 
                 # Dados financeiros detalhados em uma tabela menor abaixo
                 finance_data = [
-                    ['Abertura', 'Fechamento', 'Entradas', 'Saídas'],
+                    ['Abertura', 'Fechamento', 'Vendas', 'Contas Rec.', 'Estornos', 'Entradas Líq.', 'Saídas'],
                     [
                         formatarMoeda(float(caixa.valor_abertura)) if caixa.valor_abertura else 'N/A',
                         formatarMoeda(float(caixa.valor_fechamento)) if caixa.valor_fechamento else 'N/A',
-                        formatarMoeda(total_entradas),
+                        formatarMoeda(total_vendas),
+                        formatarMoeda(total_contas_recebidas),
+                        formatarMoeda(estornos_valor),
+                        formatarMoeda(total_entradas_liquidas),
                         formatarMoeda(total_saidas)
                     ]
                 ]
 
-                finance_table = Table(finance_data, colWidths=[35*mm, 35*mm, 35*mm, 35*mm])
+                finance_table = Table(finance_data, colWidths=[20*mm, 20*mm, 20*mm, 20*mm, 20*mm, 20*mm, 20*mm])
                 finance_style = TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                    ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 8),
+                    ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 6),
                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('FONT', (0, 1), (-1, -1), 'Helvetica', 8),
+                    ('FONT', (0, 1), (-1, -1), 'Helvetica', 6),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                     ('BACKGROUND', (0, 1), (-1, 1), colors.whitesmoke if idx % 2 == 0 else colors.white),
                 ])
@@ -5978,7 +6126,87 @@ def historico_financeiro_pdf():
             hour=23, minute=59, second=59, microsecond=999999
         ) if end_date_str else None
 
-        # -------------------- BUSCAR HISTÓRICO --------------------
+        # -------------------- BUSCAR CAIXAS --------------------
+        query_caixas = Caixa.query
+        if start_date:
+            query_caixas = query_caixas.filter(Caixa.data_abertura >= start_date)
+        if end_date:
+            query_caixas = query_caixas.filter(Caixa.data_abertura <= end_date)
+        caixas = query_caixas.order_by(Caixa.data_abertura.desc()).all()
+
+        # -------------------- CÁLCULOS --------------------
+        total_geral_entradas = 0
+        total_geral_saidas = 0
+        total_geral_estornos = 0
+        total_geral_vendas = 0
+        total_geral_contas_recebidas = 0
+        total_pagamentos_consolidado = {}
+
+        for caixa in caixas:
+            pagamentos_notas = db.session.query(
+                PagamentoNotaFiscal.forma_pagamento,
+                func.sum(PagamentoNotaFiscal.valor).label('total')
+            ).join(
+                NotaFiscal, PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+            ).filter(
+                NotaFiscal.caixa_id == caixa.id,
+                NotaFiscal.status == StatusNota.emitida
+            ).group_by(PagamentoNotaFiscal.forma_pagamento).all()
+
+            pagamentos_contas = []
+            if tipo_movimentacao == TipoMovimentacao.entrada:
+                pagamentos_contas = db.session.query(
+                    PagamentoContaReceber.forma_pagamento,
+                    func.sum(PagamentoContaReceber.valor_pago).label('total')
+                ).filter(
+                    PagamentoContaReceber.caixa_id == caixa.id
+                ).group_by(PagamentoContaReceber.forma_pagamento).all()
+
+            caixa_vendas = 0.0
+            for forma, total in pagamentos_notas:
+                valor = float(total) if total else 0.0
+                if tipo_movimentacao == TipoMovimentacao.entrada:
+                    total_pagamentos_consolidado[forma.value] = total_pagamentos_consolidado.get(forma.value, 0) + valor
+                caixa_vendas += valor
+            total_geral_vendas += caixa_vendas
+
+            caixa_contas_recebidas = 0.0
+            if tipo_movimentacao == TipoMovimentacao.entrada:
+                for forma, total in pagamentos_contas:
+                    valor = float(total) if total else 0.0
+                    total_pagamentos_consolidado[forma.value] = total_pagamentos_consolidado.get(forma.value, 0) + valor
+                    caixa_contas_recebidas += valor
+                total_geral_contas_recebidas += caixa_contas_recebidas
+
+            caixa_entradas_bruto = caixa_vendas + caixa_contas_recebidas
+
+            estornos = 0.0
+            if tipo_movimentacao == TipoMovimentacao.entrada:
+                estornos = db.session.query(
+                    func.sum(Financeiro.valor)
+                ).filter(
+                    Financeiro.caixa_id == caixa.id,
+                    Financeiro.tipo == TipoMovimentacao.saida_estorno
+                ).scalar() or 0.0
+
+            estornos_valor = float(estornos)
+            total_geral_estornos += estornos_valor
+
+            if tipo_movimentacao == TipoMovimentacao.entrada:
+                entradas_liquidas = caixa_entradas_bruto - estornos_valor
+                total_geral_entradas += entradas_liquidas
+
+            if tipo_movimentacao == TipoMovimentacao.saida:
+                caixa_saidas = db.session.query(
+                    func.sum(Financeiro.valor)
+                ).filter(
+                    Financeiro.caixa_id == caixa.id,
+                    Financeiro.tipo == TipoMovimentacao.saida,
+                    Financeiro.categoria == CategoriaFinanceira.despesa
+                ).scalar() or 0.0
+                total_geral_saidas += float(caixa_saidas)
+
+        # -------------------- HISTÓRICO --------------------
         financeiros = buscar_historico_financeiro_agrupado(
             tipo_movimentacao,
             data=data,
@@ -5987,74 +6215,29 @@ def historico_financeiro_pdf():
             incluir_outros=False
         )
 
-        # -------------------- BUSCAR ESTORNOS --------------------
-        query_estornos = Financeiro.query.filter(
-            (Financeiro.tipo == TipoMovimentacao.saida_estorno) |
-            (Financeiro.categoria == CategoriaFinanceira.estorno)
-        )
-        if start_date:
-            query_estornos = query_estornos.filter(Financeiro.data >= start_date)
-        elif mes and ano:
-            query_estornos = query_estornos.filter(
-                extract('month', Financeiro.data) == mes,
-                extract('year', Financeiro.data) == ano
+        pagamentos_contas = []
+        if tipo_movimentacao == TipoMovimentacao.entrada:
+            query_pagamentos_contas = PagamentoContaReceber.query.join(
+                ContaReceber, PagamentoContaReceber.conta_id == ContaReceber.id
+            ).filter(
+                ContaReceber.status.in_([StatusPagamento.parcial, StatusPagamento.quitado])
             )
-        if end_date:
-            query_estornos = query_estornos.filter(Financeiro.data <= end_date)
-        estornos = query_estornos.all()
+            if start_date:
+                query_pagamentos_contas = query_pagamentos_contas.filter(PagamentoContaReceber.data_pagamento >= start_date)
+            if end_date:
+                query_pagamentos_contas = query_pagamentos_contas.filter(PagamentoContaReceber.data_pagamento <= end_date)
+            pagamentos_contas = query_pagamentos_contas.all()
 
-        # -------------------- BUSCAR PAGAMENTOS DE CONTAS A RECEBER --------------------
-        query_pagamentos_contas = PagamentoContaReceber.query.join(
-            ContaReceber, PagamentoContaReceber.conta_id == ContaReceber.id
-        ).filter(
-            ContaReceber.status.in_([StatusPagamento.parcial, StatusPagamento.quitado])
-        )
-        
-        if start_date:
-            query_pagamentos_contas = query_pagamentos_contas.filter(
-                PagamentoContaReceber.data_pagamento >= start_date
-            )
-        elif mes and ano:
-            query_pagamentos_contas = query_pagamentos_contas.filter(
-                extract('month', PagamentoContaReceber.data_pagamento) == mes,
-                extract('year', PagamentoContaReceber.data_pagamento) == ano
-            )
-        if end_date:
-            query_pagamentos_contas = query_pagamentos_contas.filter(
-                PagamentoContaReceber.data_pagamento <= end_date
-            )
-        
-        pagamentos_contas = query_pagamentos_contas.all()
+            # REMOVER DUPLICADOS dos pagamentos de contas
+            pagamentos_contas_unicos = []
+            ids_pagamentos_vistos = set()
+            
+            for pagamento in pagamentos_contas:
+                if pagamento.id not in ids_pagamentos_vistos:
+                    pagamentos_contas_unicos.append(pagamento)
+                    ids_pagamentos_vistos.add(pagamento.id)
 
-        total_valor = sum(f['valor'] for f in financeiros)
-
-        # Calcular totais por forma de pagamento
-        total_pagamentos = {}
-
-        # 1. Pagamentos de notas fiscais
-        for f in financeiros:
-            if f['nota_fiscal_id']:
-                for p in f['pagamentos']:
-                    forma = p.forma_pagamento.value if hasattr(p, 'forma_pagamento') and p.forma_pagamento else "-"
-                    total_pagamentos[forma] = total_pagamentos.get(forma, 0) + p.valor
-
-        # 2. Pagamentos de contas a receber
-        for pagamento_conta in pagamentos_contas:
-            forma = pagamento_conta.forma_pagamento.value if pagamento_conta.forma_pagamento else "-"
-            total_pagamentos[forma] = total_pagamentos.get(forma, 0) + pagamento_conta.valor_pago
-
-        # 3. Subtrair estornos
-        total_pagamentos_estornos = {}
-        for e in estornos:
-            if e.nota_fiscal:
-                for p in e.nota_fiscal.pagamentos:
-                    forma = p.forma_pagamento.value
-                    total_pagamentos_estornos[forma] = total_pagamentos_estornos.get(forma, 0) + p.valor
-
-        for forma, valor in total_pagamentos_estornos.items():
-            total_pagamentos[forma] = total_pagamentos.get(forma, 0) - valor
-
-        # -------------------- GERAR PDF --------------------
+        # -------------------- PDF --------------------
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
             buffer, pagesize=landscape(A4),
@@ -6068,7 +6251,7 @@ def historico_financeiro_pdf():
             'Header', parent=styles['Heading1'],
             fontSize=18, alignment=TA_CENTER, spaceAfter=10
         )
-        periodo_texto = ""
+
         if start_date and end_date:
             periodo_texto = f"{start_date.strftime('%d/%m/%Y')} até {end_date.strftime('%d/%m/%Y')}"
         elif start_date:
@@ -6078,13 +6261,10 @@ def historico_financeiro_pdf():
         else:
             periodo_texto = data.strftime('%m/%Y')
 
-        elements.append(Paragraph(
-            f"💰 Histórico Financeiro - {tipo_movimentacao.value} ({periodo_texto})",
-            header_style
-        ))
+        elements.append(Paragraph(f"💰 Histórico Financeiro - {tipo_movimentacao.value} ({periodo_texto})", header_style))
         elements.append(Spacer(1, 8))
 
-        # -------------------- TABELA --------------------
+        # -------------------- TABELA DETALHADA --------------------
         cell_style_center = ParagraphStyle('CellCenter', fontSize=8, leading=10, alignment=TA_CENTER, wordWrap='CJK')
         cell_style_left = ParagraphStyle('CellLeft', fontSize=8, leading=10, alignment=TA_LEFT, wordWrap='CJK')
 
@@ -6099,10 +6279,11 @@ def historico_financeiro_pdf():
             Paragraph("Pagamentos", cell_style_center)
         ]]
 
-        # Adicionar financeiros normais
         for f in financeiros:
             pagamentos_texto = ""
-            if f['nota_fiscal_id']:
+            valor_total = f['valor_total_nota']  # Usar o valor total da nota fiscal
+            
+            if f['nota_fiscal_id'] and tipo_movimentacao == TipoMovimentacao.entrada:
                 for p in f['pagamentos']:
                     forma = p.forma_pagamento.value if hasattr(p, 'forma_pagamento') and p.forma_pagamento else "-"
                     pagamentos_texto += f"{forma}: R$ {p.valor:.2f}\n"
@@ -6110,7 +6291,7 @@ def historico_financeiro_pdf():
             table_data.append([
                 Paragraph(str(f['id_financeiro']), cell_style_center),
                 Paragraph(f['categoria'], cell_style_center),
-                Paragraph(f"R$ {f['valor']:.2f}", cell_style_center),
+                Paragraph(f"R$ {valor_total:.2f}", cell_style_center),  # Mostrar valor total
                 Paragraph(f['descricao'], cell_style_left),
                 Paragraph(f['data'].strftime('%d/%m/%Y %H:%M'), cell_style_center),
                 Paragraph(f['cliente'], cell_style_center),
@@ -6118,74 +6299,88 @@ def historico_financeiro_pdf():
                 Paragraph(pagamentos_texto.strip() or '-', cell_style_left)
             ])
 
-        # Adicionar pagamentos de contas a receber
-        for pagamento in pagamentos_contas:
-            descricao = f"Pagamento conta #{pagamento.conta_id}"
-            if pagamento.conta and pagamento.conta.descricao:
-                descricao += f" - {pagamento.conta.descricao}"
-            
-            pagamentos_texto = f"{pagamento.forma_pagamento.value}: R$ {pagamento.valor_pago:.2f}"
-            
-            table_data.append([
-                Paragraph(f"CR-{pagamento.id}", cell_style_center),
-                Paragraph("Recebimento", cell_style_center),
-                Paragraph(f"R$ {pagamento.valor_pago:.2f}", cell_style_center),
-                Paragraph(descricao, cell_style_left),
-                Paragraph(pagamento.data_pagamento.strftime('%d/%m/%Y %H:%M'), cell_style_center),
-                Paragraph(pagamento.conta.cliente.nome if pagamento.conta and pagamento.conta.cliente else '-', cell_style_center),
-                Paragraph(str(pagamento.caixa_id) if pagamento.caixa_id else '-', cell_style_center),
-                Paragraph(pagamentos_texto, cell_style_left)
-            ])
+        if tipo_movimentacao == TipoMovimentacao.entrada:
+            for pagamento in pagamentos_contas_unicos:
+                descricao = f"Pagamento conta #{pagamento.conta_id}"
+                if pagamento.conta and pagamento.conta.descricao:
+                    descricao += f" - {pagamento.conta.descricao}"
+                pagamentos_texto = f"{pagamento.forma_pagamento.value}: R$ {pagamento.valor_pago:.2f}"
+                table_data.append([
+                    Paragraph(f"CR-{pagamento.id}", cell_style_center),
+                    Paragraph("Recebimento", cell_style_center),
+                    Paragraph(f"R$ {pagamento.valor_pago:.2f}", cell_style_center),
+                    Paragraph(descricao, cell_style_left),
+                    Paragraph(pagamento.data_pagamento.strftime('%d/%m/%Y %H:%M'), cell_style_center),
+                    Paragraph(pagamento.conta.cliente.nome if pagamento.conta and pagamento.conta.cliente else '-', cell_style_center),
+                    Paragraph(str(pagamento.caixa_id) if pagamento.caixa_id else '-', cell_style_center),
+                    Paragraph(pagamentos_texto, cell_style_left)
+                ])
 
-        col_widths = [20*mm, 25*mm, 25*mm, 50*mm, 25*mm, 25*mm, 20*mm, 50*mm]
-        t = Table(table_data, colWidths=col_widths, hAlign='CENTER', repeatRows=1)
-        t.setStyle(TableStyle([
-            ('FONT', (0,0), (-1,0), 'Helvetica-Bold', 8),
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#4682B4")),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
-            ('FONT', (0,1), (-1,-1), 'Helvetica', 7),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-        ]))
-        elements.append(t)
-        elements.append(Spacer(1, 10))
+        if len(table_data) > 1:
+            col_widths = [20*mm, 25*mm, 25*mm, 50*mm, 25*mm, 25*mm, 20*mm, 50*mm]
+            t = Table(table_data, colWidths=col_widths, hAlign='CENTER', repeatRows=1)
+            t.setStyle(TableStyle([
+                ('FONT', (0,0), (-1,0), 'Helvetica-Bold', 8),
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#4682B4")),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('FONT', (0,1), (-1,-1), 'Helvetica', 7),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+            ]))
+            elements.append(t)
+            elements.append(Spacer(1, 10))
 
-        # ----------------- TOTAL GERAL -----------------
+        # ----------------- TOTAIS -----------------
         import locale
         locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 
-        # Calcular valor total incluindo contas a receber
-        valor_total_contas = sum(p.valor_pago for p in pagamentos_contas)
-        valor_total_geral = total_valor + valor_total_contas
+        if tipo_movimentacao == TipoMovimentacao.entrada and total_pagamentos_consolidado:
+            totals_pagamentos_data = [[Paragraph("<b>Totais por forma de pagamento</b>", styles['Normal']), ""]]
+            formas_ordenadas = sorted(total_pagamentos_consolidado.items(), key=lambda x: x[1], reverse=True)
+            for forma, valor in formas_ordenadas:
+                if valor > 0:
+                    totals_pagamentos_data.append([
+                        Paragraph(forma.replace("_", " ").capitalize(), styles['Normal']),
+                        Paragraph(locale.format_string("R$ %.2f", valor, grouping=True), styles['Normal'])
+                    ])
+            soma_formas = sum(valor for _, valor in formas_ordenadas if valor > 0)
+            totals_pagamentos_data.append([
+                Paragraph("<b>Soma das formas</b>", styles['Normal']),
+                Paragraph(f"<b>{locale.format_string('R$ %.2f', soma_formas, grouping=True)}</b>", styles['Normal'])
+            ])
+            totals_pagamentos_data.append([
+                Paragraph("<b>Total Entradas Líquidas</b>", styles['Normal']),
+                Paragraph(f"<b>{locale.format_string('R$ %.2f', total_geral_entradas, grouping=True)}</b>", styles['Normal'])
+            ])
+            totals_pagamentos_data.append([
+                Paragraph("<font size=8 color='grey'>Observação:</font>", styles['Normal']),
+                Paragraph(f"<font size=8 color='grey'>Valor total de Estornos R$ {total_geral_estornos:,.2f} já deduzido das Entradas Líquidas.</font>", styles['Normal'])
+            ])
 
-        totals_data = [
-            ["Total ", locale.format_string("R$ %.2f", total_valor, grouping=True)],
-            #["Total contas a receber", locale.format_string("R$ %.2f", valor_total_contas, grouping=True)],
-            #["TOTAL GERAL", locale.format_string("R$ %.2f", valor_total_geral, grouping=True)]
-        ]
+            totals_pagamentos_table = Table(totals_pagamentos_data, colWidths=[80*mm, 40*mm], hAlign='LEFT')
+            totals_pagamentos_table.setStyle(TableStyle([
+                ('ALIGN', (1,1), (-1,-1), 'RIGHT'),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('FONT', (0,0), (-1,-1), 'Helvetica', 9),
+                ('TOPPADDING', (0,0), (-1,-1), 3),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+                ('LINEABOVE', (0,-2), (-1,-2), 0.7, colors.black),
+                ('BACKGROUND', (0,-2), (-1,-2), colors.lightgrey),
+                ('FONT', (0,-2), (-1,-2), 'Helvetica-Bold', 9),
+            ]))
+            elements.append(totals_pagamentos_table)
 
-        if tipo_movimentacao.value.lower() == "entrada" and total_pagamentos:
-            totals_data.append(["", ""])
-            totals_data.append(["Totais por forma de pagamento", ""])
-            for forma, valor in total_pagamentos.items():
-                totals_data.append([forma, locale.format_string("R$ %.2f", valor, grouping=True)])
-
-        totals_table = Table(totals_data, colWidths=[20*mm, 40*mm], hAlign='LEFT')
-        totals_table.setStyle(TableStyle([
-            ('FONT', (0,0), (-1,-1), 'Helvetica', 9),
-            ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('LEFTPADDING', (0,0), (-1,-1), 5),
-            ('RIGHTPADDING', (0,0), (-1,-1), 5),
-            ('TOPPADDING', (0,0), (-1,-1), 1),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 1),
-            ('LINEABOVE', (0,0), (-1,0), 1, colors.black),
-            ('LINEBELOW', (0,0), (-1,0), 1, colors.black),
-            ('FONT', (0,2), (-1,2), 'Helvetica-Bold'),  # Negrito no total geral
-        ]))
-        elements.append(Spacer(1, 10))
-        elements.append(totals_table)
+        if tipo_movimentacao == TipoMovimentacao.saida:
+            totals_data = [["TOTAL DE DESPESAS", locale.format_string("R$ %.2f", total_geral_saidas, grouping=True)]]
+            totals_table = Table(totals_data, colWidths=[100*mm, 60*mm], hAlign='LEFT')
+            totals_table.setStyle(TableStyle([
+                ('FONT', (0,0), (-1,-1), 'Helvetica-Bold', 9),
+                ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('BACKGROUND', (0,0), (-1,-1), colors.lightgrey),
+            ]))
+            elements.append(totals_table)
 
         elements.append(Paragraph(
             datetime.now().strftime("Gerado em %d/%m/%Y às %H:%M"),

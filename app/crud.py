@@ -2448,6 +2448,8 @@ def buscar_historico_financeiro(
     }
 
 # ================= FUNÇÃO DE BUSCA =================
+
+
 def buscar_historico_financeiro_agrupado(
         tipo_movimentacao: TipoMovimentacao,
         data: datetime = None,
@@ -2509,21 +2511,50 @@ def buscar_historico_financeiro_agrupado(
     for p in pagamentos_nf:
         pagamentos_por_nota.setdefault(p.nota_fiscal_id, []).append(p)
 
-    resultado = []
+    # CORREÇÃO: AGRUPAR POR NOTA FISCAL PARA EVITAR DUPLICAÇÃO
+    resultado_agrupado = {}
+    
     for f in financeiros:
         nota_id = f.nota_fiscal.id if f.nota_fiscal else None
-        resultado.append({
-            'id_financeiro': f.id,
-            'categoria': f.categoria.value,
-            'valor': f.valor,
-            'descricao': f.descricao or '-',
-            'data': f.data,
-            'cliente': f.cliente.nome if f.cliente else '-',
-            'caixa': f.caixa_id or '-',
-            'nota_fiscal_id': nota_id,
-            'valor_total_nota': f.nota_fiscal.valor_total if f.nota_fiscal else f.valor,
-            'pagamentos': pagamentos_por_nota.get(nota_id, [])
-        })
+        
+        # Se é um registro sem nota fiscal, adiciona diretamente
+        if not nota_id:
+            resultado_agrupado[f.id] = {
+                'id_financeiro': f.id,
+                'categoria': f.categoria.value,
+                'valor': float(f.valor),
+                'descricao': f.descricao or '-',
+                'data': f.data,
+                'cliente': f.cliente.nome if f.cliente else '-',
+                'caixa': f.caixa_id or '-',
+                'nota_fiscal_id': None,
+                'valor_total_nota': float(f.valor),
+                'pagamentos': []
+            }
+        else:
+            # Se já existe uma entrada para esta nota fiscal, usa a existente
+            if nota_id in resultado_agrupado:
+                # Mantém o registro existente (não duplica)
+                continue
+            else:
+                # Cria nova entrada para a nota fiscal
+                resultado_agrupado[nota_id] = {
+                    'id_financeiro': f.id,
+                    'categoria': f.categoria.value,
+                    'valor': float(f.nota_fiscal.valor_total) if f.nota_fiscal else float(f.valor),
+                    'descricao': f.descricao or '-',
+                    'data': f.data,
+                    'cliente': f.cliente.nome if f.cliente else '-',
+                    'caixa': f.caixa_id or '-',
+                    'nota_fiscal_id': nota_id,
+                    'valor_total_nota': float(f.nota_fiscal.valor_total) if f.nota_fiscal else float(f.valor),
+                    'pagamentos': pagamentos_por_nota.get(nota_id, [])
+                }
 
+    # Converter dicionário de volta para lista
+    resultado = list(resultado_agrupado.values())
+    
+    # Ordenar por data (mais recente primeiro)
+    resultado.sort(key=lambda x: x['data'], reverse=True)
+    
     return resultado
-
