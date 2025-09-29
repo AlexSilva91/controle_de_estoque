@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   // ===== VARIÁVEIS GLOBAIS =====
   let produtosVendaRetroativa = [];
   let clientesVendaRetroativa = [];
@@ -57,12 +57,12 @@ document.addEventListener('DOMContentLoaded', function() {
   function showFlashMessage(type, message) {
     const flashContainer = document.querySelector('.flash-messages');
     if (!flashContainer) return;
-    
+
     const flashId = `flash-${Date.now()}`;
     const flashMessage = document.createElement('div');
     flashMessage.className = `flash-message ${type}`;
     flashMessage.id = flashId;
-    
+
     flashMessage.innerHTML = `
       <div>
         <i class="fas 
@@ -75,16 +75,16 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
       <button class="close-flash" aria-label="Fechar">&times;</button>
     `;
-    
+
     flashContainer.appendChild(flashMessage);
-    
+
     const closeBtn = flashMessage.querySelector('.close-flash');
     if (closeBtn) {
       closeBtn.addEventListener('click', () => {
         flashMessage.remove();
       });
     }
-    
+
     setTimeout(() => {
       flashMessage.classList.add('fade-out');
       setTimeout(() => flashMessage.remove(), 500);
@@ -95,11 +95,11 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
       const response = await fetch(url, options);
       const contentType = response.headers.get('content-type');
-      
+
       if (!response.ok) {
         if (contentType && contentType.includes('application/json')) {
           const data = await response.json();
-          
+
           if (Array.isArray(data.message)) {
             data.message.forEach(msg => {
               showFlashMessage('error', msg);
@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', function() {
           } else {
             showFlashMessage('error', `HTTP error! status: ${response.status}`);
           }
-          
+
           throw new Error(data.message || `HTTP error! status: ${response.status}`);
         } else {
           const text = await response.text();
@@ -125,26 +125,26 @@ document.addEventListener('DOMContentLoaded', function() {
           throw new Error(text || `HTTP error! status: ${response.status}`);
         }
       }
-      
+
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
         return text;
       }
-      
+
       const data = await response.json();
       return data;
     } catch (error) {
       console.error('Erro na requisição:', error);
-      
+
       if (error.message && error.message.includes('HTTP error')) {
         throw error;
       }
-      
+
       showFlashMessage('error', error.message || 'Erro ao comunicar com o servidor');
       throw error;
     }
   }
-  
+
   function formatPerfil(perfil) {
     const perfis = {
       'admin': 'Administrador',
@@ -154,9 +154,9 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function formatarMoeda(valor) {
-    return parseFloat(valor || 0).toLocaleString('pt-BR', { 
-      style: 'currency', 
-      currency: 'BRL' 
+    return parseFloat(valor || 0).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
     });
   }
 
@@ -185,30 +185,30 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ===== FUNÇÕES DE MODAL =====
-  document.addEventListener('keydown', function(e) {
+  document.addEventListener('keydown', function (e) {
     // Fechar modal quando a tecla ESC for pressionada
     if (e.key === 'Escape' || e.keyCode === 27) {
       const modaisAbertos = document.querySelectorAll('.modal[style*="display: flex"]');
-      
+
       // Fechar todos os modais abertos
       modaisAbertos.forEach(modal => {
         closeModal(modal.id);
       });
-      
+
       // Prevenir comportamento padrão se necessário
       e.preventDefault();
     }
   });
   function openModal(modalElement) {
-      if (typeof modalElement === 'string') {
-          modalElement = document.getElementById(modalElement);
-      }
-      if (!modalElement) {
-          console.error('Modal não encontrado');
-          return;
-      }
-      modalElement.style.display = 'flex';
-      document.body.style.overflow = 'hidden';
+    if (typeof modalElement === 'string') {
+      modalElement = document.getElementById(modalElement);
+    }
+    if (!modalElement) {
+      console.error('Modal não encontrado');
+      return;
+    }
+    modalElement.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
   }
 
   function closeModal(modalId) {
@@ -221,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function setupModalEvents() {
     document.querySelectorAll('.close-modal').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         const modal = this.closest('.modal');
         if (modal) {
           closeModal(modal.id);
@@ -245,7 +245,7 @@ document.addEventListener('DOMContentLoaded', function() {
           message.remove();
         });
       }
-      
+
       setTimeout(() => {
         message.classList.add('fade-out');
         setTimeout(() => message.remove(), 500);
@@ -266,17 +266,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     document.querySelectorAll('.sidebar-nav li').forEach(item => {
-      item.addEventListener('click', function() {
+      item.addEventListener('click', function () {
         if (window.innerWidth <= 768 && mobileMenuToggle && sidebar) {
           mobileMenuToggle.classList.remove('active');
           sidebar.classList.remove('active');
         }
       });
     });
-    document.querySelector('.sidebar-nav li[data-tab="contas-receber"]').addEventListener('click', function(e) {
-        e.preventDefault();
-        openModal('contasReceberModal');
-        loadContasReceber();
+    document.querySelector('.sidebar-nav li[data-tab="contas-receber"]').addEventListener('click', function (e) {
+      e.preventDefault();
+      openModal('contasReceberModal');
+      loadContasReceber();
     });
     const navItems = document.querySelectorAll('.sidebar-nav li');
     const tabContents = document.querySelectorAll('.tab-content');
@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const breadcrumb = document.querySelector('.breadcrumb');
 
     navItems.forEach(item => {
-      item.addEventListener('click', function() {
+      item.addEventListener('click', function () {
         if (mobileMenuToggle && sidebar && sidebar.classList.contains('active')) {
           mobileMenuToggle.classList.remove('active');
           sidebar.classList.remove('active');
@@ -332,9 +332,9 @@ document.addEventListener('DOMContentLoaded', function() {
   function toggleMovimentacoes() {
     const body = document.getElementById('movimentacoesBody');
     const icon = document.querySelector('#movimentacoesHeader .toggle-icon i');
-    
+
     if (!body || !icon) return;
-    
+
     if (body.style.display === 'none') {
       body.style.display = 'block';
       icon.classList.remove('fa-chevron-down');
@@ -406,7 +406,7 @@ document.addEventListener('DOMContentLoaded', function() {
               },
               tooltip: {
                 callbacks: {
-                  label: function(context) {
+                  label: function (context) {
                     return `${context.dataset.label}: ${formatMoney(context.raw)}`;
                   }
                 }
@@ -419,7 +419,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   color: 'rgba(255, 255, 255, 0.1)'
                 },
                 ticks: {
-                  callback: function(value) {
+                  callback: function (value) {
                     return formatMoney(value);
                   }
                 }
@@ -437,12 +437,12 @@ document.addEventListener('DOMContentLoaded', function() {
       const vendasDiariasData = await fetchWithErrorHandling('/admin/dashboard/vendas-diarias');
       if (vendasDiariasData.success) {
         const formasPagamentoMap = new Map();
-        
+
         vendasDiariasData.dados.forEach(dia => {
           dia.formas_pagamento.forEach(fp => {
             const forma = fp.forma.replace('pix_', '').replace(/_/g, ' ').replace('cartao', 'cartão');
             const total = parseFloat(fp.total.replace(/[^\d,]/g, '').replace(',', '.'));
-            
+
             if (formasPagamentoMap.has(forma)) {
               formasPagamentoMap.set(forma, formasPagamentoMap.get(forma) + total);
             } else {
@@ -494,7 +494,7 @@ document.addEventListener('DOMContentLoaded', function() {
               },
               tooltip: {
                 callbacks: {
-                  label: function(context) {
+                  label: function (context) {
                     const label = context.label || '';
                     const value = context.raw || 0;
                     const total = context.dataset.data.reduce((a, b) => a + b, 0);
@@ -516,7 +516,7 @@ document.addEventListener('DOMContentLoaded', function() {
             labels: vendasDiariasData.vendas_mensais_caixa.map(c => c.data_abertura),
             datasets: [{
               label: 'Valor Total',
-              data: vendasDiariasData.vendas_mensais_caixa.map(c => 
+              data: vendasDiariasData.vendas_mensais_caixa.map(c =>
                 parseFloat(c.total_vendas.replace(/[^\d,]/g, '').replace(',', '.'))
               ),
               backgroundColor: chartColors.blue,
@@ -535,7 +535,7 @@ document.addEventListener('DOMContentLoaded', function() {
               },
               tooltip: {
                 callbacks: {
-                  label: function(context) {
+                  label: function (context) {
                     return formatMoney(context.raw);
                   }
                 }
@@ -548,7 +548,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   color: 'rgba(255, 255, 255, 0.1)'
                 },
                 ticks: {
-                  callback: function(value) {
+                  callback: function (value) {
                     return formatMoney(value);
                   }
                 }
@@ -565,15 +565,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
       if (vendasDiariasData?.success) {
         const vendasDiariasCtx = document.getElementById('vendasDiariasChart').getContext('2d');
-        
+
         const labels = vendasDiariasData.dados.map(item => item.data);
-        const vendas = vendasDiariasData.dados.map(item => 
+        const vendas = vendasDiariasData.dados.map(item =>
           parseFloat(item.total_vendas.replace(/[^\d,]/g, '').replace(',', '.'))
         );
-        const despesas = vendasDiariasData.dados.map(item => 
+        const despesas = vendasDiariasData.dados.map(item =>
           parseFloat(item.total_despesas.replace(/[^\d,]/g, '').replace(',', '.'))
         );
-        
+
         vendasDiariasChart = new Chart(vendasDiariasCtx, {
           type: 'line',
           data: {
@@ -618,7 +618,7 @@ document.addEventListener('DOMContentLoaded', function() {
               },
               tooltip: {
                 callbacks: {
-                  label: function(context) {
+                  label: function (context) {
                     return `${context.dataset.label}: ${formatMoney(context.raw)}`;
                   }
                 }
@@ -631,7 +631,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   color: 'rgba(255, 255, 255, 0.1)'
                 },
                 ticks: {
-                  callback: function(value) {
+                  callback: function (value) {
                     return formatMoney(value);
                   }
                 }
@@ -647,227 +647,227 @@ document.addEventListener('DOMContentLoaded', function() {
         // Gráfico de Produtos com Maior Fluxo
         const produtosFluxoData = await fetchWithErrorHandling('/admin/dashboard/produtos-maior-fluxo');
         if (produtosFluxoData.success) {
-            const produtosFluxoCtx = document.getElementById('ProdutosMaiorFluxoChart').getContext('2d');
-            
-            // Calcular margem de lucro para cada produto
-            const margensLucro = produtosFluxoData.valores_venda.map((venda, index) => {
-                const compra = produtosFluxoData.valores_compra[index] || 0;
-                return venda - compra;
-            });
-        
-            // Calcular percentual de margem para tooltip
-            const percentuaisMargem = produtosFluxoData.valores_venda.map((venda, index) => {
-                const compra = produtosFluxoData.valores_compra[index] || 0;
-                return compra > 0 ? ((venda - compra) / compra * 100).toFixed(2) : '∞';
-            });
-            
-            // Destruir gráfico anterior se existir
-            if (produtosMaiorFluxoChart) {
-                produtosMaiorFluxoChart.destroy();
-            }
-            
-            // Verificar tamanho da tela para ajustes específicos
-            const isMobile = window.innerWidth <= 768;
-            const isTablet = window.innerWidth > 768 && window.innerWidth <= 1024;
-            
-            produtosMaiorFluxoChart = new Chart(produtosFluxoCtx, {
-                type: 'bar',
-                data: {
-                    labels: produtosFluxoData.produtos,
-                    datasets: [
-                        {
-                            label: 'Valor de Venda (R$)',
-                            data: produtosFluxoData.valores_venda,
-                            backgroundColor: 'rgba(76, 175, 80, 0.8)',
-                            borderColor: 'rgb(76, 175, 80)',
-                            borderWidth: 1,
-                            order: 1,
-                            barPercentage: isMobile ? 0.4 : 0.7,
-                            categoryPercentage: isMobile ? 0.6 : 0.8,
-                            borderRadius: 4,
-                            hoverBackgroundColor: 'rgba(76, 175, 80, 1)'
-                        },
-                        {
-                            label: 'Valor de Compra (R$)',
-                            data: produtosFluxoData.valores_compra,
-                            backgroundColor: 'rgba(244, 67, 54, 0.8)',
-                            borderColor: 'rgb(244, 67, 54)',
-                            borderWidth: 1,
-                            order: 2,
-                            barPercentage: isMobile ? 0.4 : 0.7,
-                            categoryPercentage: isMobile ? 0.6 : 0.8,
-                            borderRadius: 4,
-                            hoverBackgroundColor: 'rgba(244, 67, 54, 1)'
-                        },
-                        {
-                            label: 'Margem de Lucro (R$)',
-                            data: margensLucro,
-                            backgroundColor: 'rgba(33, 150, 243, 0.9)',
-                            borderColor: 'rgb(33, 150, 243)',
-                            borderWidth: 3,
-                            type: 'line',
-                            order: 0,
-                            pointStyle: 'circle',
-                            pointRadius: isMobile ? 3 : 6,
-                            pointHoverRadius: isMobile ? 5 : 8,
-                            pointBackgroundColor: 'rgb(33, 150, 243)',
-                            pointBorderColor: '#ffffff',
-                            pointBorderWidth: 2,
-                            tension: 0.3,
-                            fill: false
-                        }
-                    ]
+          const produtosFluxoCtx = document.getElementById('ProdutosMaiorFluxoChart').getContext('2d');
+
+          // Calcular margem de lucro para cada produto
+          const margensLucro = produtosFluxoData.valores_venda.map((venda, index) => {
+            const compra = produtosFluxoData.valores_compra[index] || 0;
+            return venda - compra;
+          });
+
+          // Calcular percentual de margem para tooltip
+          const percentuaisMargem = produtosFluxoData.valores_venda.map((venda, index) => {
+            const compra = produtosFluxoData.valores_compra[index] || 0;
+            return compra > 0 ? ((venda - compra) / compra * 100).toFixed(2) : '∞';
+          });
+
+          // Destruir gráfico anterior se existir
+          if (produtosMaiorFluxoChart) {
+            produtosMaiorFluxoChart.destroy();
+          }
+
+          // Verificar tamanho da tela para ajustes específicos
+          const isMobile = window.innerWidth <= 768;
+          const isTablet = window.innerWidth > 768 && window.innerWidth <= 1024;
+
+          produtosMaiorFluxoChart = new Chart(produtosFluxoCtx, {
+            type: 'bar',
+            data: {
+              labels: produtosFluxoData.produtos,
+              datasets: [
+                {
+                  label: 'Valor de Venda (R$)',
+                  data: produtosFluxoData.valores_venda,
+                  backgroundColor: 'rgba(76, 175, 80, 0.8)',
+                  borderColor: 'rgb(76, 175, 80)',
+                  borderWidth: 1,
+                  order: 1,
+                  barPercentage: isMobile ? 0.4 : 0.7,
+                  categoryPercentage: isMobile ? 0.6 : 0.8,
+                  borderRadius: 4,
+                  hoverBackgroundColor: 'rgba(76, 175, 80, 1)'
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    layout: {
-                        padding: {
-                            top: 20,
-                            right: isMobile ? 10 : 20,
-                            bottom: isMobile ? 15 : 25,
-                            left: isMobile ? 10 : 20
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            labels: {
-                                color: '#e0e0e0',
-                                boxWidth: 16,
-                                padding: 20,
-                                font: {
-                                    size: isMobile ? 10 : 14,
-                                    weight: '500'
-                                },
-                                usePointStyle: true,
-                                pointStyle: 'rectRounded'
-                            }
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                            backgroundColor: 'rgba(30, 30, 46, 0.95)',
-                            titleColor: '#ffffff',
-                            bodyColor: '#e0e0e0',
-                            borderColor: 'rgba(255, 255, 255, 0.1)',
-                            borderWidth: 1,
-                            cornerRadius: 6,
-                            callbacks: {
-                                label: function(context) {
-                                    return `${context.dataset.label}: ${formatMoney(context.raw)}`;
-                                },
-                                afterLabel: function(context) {
-                                    if (context.dataset.label === 'Margem de Lucro (R$)') {
-                                        return `Margem Percentual: ${percentuaisMargem[context.dataIndex]}%`;
-                                    }
-                                    return null;
-                                }
-                            },
-                            titleFont: {
-                                size: isMobile ? 12 : 14,
-                                weight: 'bold'
-                            },
-                            bodyFont: {
-                                size: isMobile ? 11 : 13
-                            },
-                            padding: 12,
-                            boxWidth: 12,
-                            boxHeight: 12,
-                            displayColors: true
-                        },
-                        title: {
-                            display: true,
-                            text: 'Top 10 Produtos - Maior Fluxo (Últimos 30 Dias)',
-                            color: '#e0e0e0',
-                            font: {
-                                size: isMobile ? 14 : 18,
-                                weight: '600'
-                            },
-                            padding: {
-                                top: 5,
-                                bottom: isMobile ? 15 : 25
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: 'rgba(255, 255, 255, 0.1)',
-                                drawBorder: false
-                            },
-                            ticks: {
-                                callback: function(value) {
-                                    return formatMoney(value);
-                                },
-                                color: '#e0e0e0',
-                                font: {
-                                    size: isMobile ? 10 : 12
-                                },
-                                maxTicksLimit: isMobile ? 5 : 7,
-                                padding: 10
-                            },
-                            title: {
-                                display: true,
-                                text: 'Valores em Reais (R$)',
-                                color: '#e0e0e0',
-                                font: {
-                                    size: isMobile ? 11 : 13,
-                                    weight: '500'
-                                },
-                                padding: {
-                                    top: 10,
-                                    bottom: 10
-                                }
-                            }
-                        },
-                        x: {
-                            grid: {
-                                display: false,
-                                drawBorder: false
-                            },
-                            ticks: {
-                                color: '#e0e0e0',
-                                maxRotation: isMobile ? 60 : 45,
-                                minRotation: isMobile ? 60 : 45,
-                                font: {
-                                    size: isMobile ? 10 : 12
-                                },
-                                padding: 8,
-                                callback: function(value, index) {
-                                    const label = this.getLabelForValue(value);
-                                    if (isMobile && label.length > 12) {
-                                        return label.substring(0, 10) + '...';
-                                    }
-                                    return label;
-                                }
-                            }
-                        }
-                    },
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
-                    },
-                    animation: {
-                        duration: 800,
-                        easing: 'easeOutQuart'
-                    }
+                {
+                  label: 'Valor de Compra (R$)',
+                  data: produtosFluxoData.valores_compra,
+                  backgroundColor: 'rgba(244, 67, 54, 0.8)',
+                  borderColor: 'rgb(244, 67, 54)',
+                  borderWidth: 1,
+                  order: 2,
+                  barPercentage: isMobile ? 0.4 : 0.7,
+                  categoryPercentage: isMobile ? 0.6 : 0.8,
+                  borderRadius: 4,
+                  hoverBackgroundColor: 'rgba(244, 67, 54, 1)'
+                },
+                {
+                  label: 'Margem de Lucro (R$)',
+                  data: margensLucro,
+                  backgroundColor: 'rgba(33, 150, 243, 0.9)',
+                  borderColor: 'rgb(33, 150, 243)',
+                  borderWidth: 3,
+                  type: 'line',
+                  order: 0,
+                  pointStyle: 'circle',
+                  pointRadius: isMobile ? 3 : 6,
+                  pointHoverRadius: isMobile ? 5 : 8,
+                  pointBackgroundColor: 'rgb(33, 150, 243)',
+                  pointBorderColor: '#ffffff',
+                  pointBorderWidth: 2,
+                  tension: 0.3,
+                  fill: false
                 }
-            });
-            
-            // Adicionar event listener para redimensionamento da janela - CORRIGIDO
-            let resizeTimeout;
-            window.addEventListener('resize', function() {
-                clearTimeout(resizeTimeout);
-                resizeTimeout = setTimeout(function() {
-                    // Apenas atualizar o gráfico existente, não recriar
-                    if (produtosMaiorFluxoChart) {
-                        produtosMaiorFluxoChart.resize();
-                        produtosMaiorFluxoChart.update();
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              layout: {
+                padding: {
+                  top: 20,
+                  right: isMobile ? 10 : 20,
+                  bottom: isMobile ? 15 : 25,
+                  left: isMobile ? 10 : 20
+                }
+              },
+              plugins: {
+                legend: {
+                  position: 'top',
+                  labels: {
+                    color: '#e0e0e0',
+                    boxWidth: 16,
+                    padding: 20,
+                    font: {
+                      size: isMobile ? 10 : 14,
+                      weight: '500'
+                    },
+                    usePointStyle: true,
+                    pointStyle: 'rectRounded'
+                  }
+                },
+                tooltip: {
+                  mode: 'index',
+                  intersect: false,
+                  backgroundColor: 'rgba(30, 30, 46, 0.95)',
+                  titleColor: '#ffffff',
+                  bodyColor: '#e0e0e0',
+                  borderColor: 'rgba(255, 255, 255, 0.1)',
+                  borderWidth: 1,
+                  cornerRadius: 6,
+                  callbacks: {
+                    label: function (context) {
+                      return `${context.dataset.label}: ${formatMoney(context.raw)}`;
+                    },
+                    afterLabel: function (context) {
+                      if (context.dataset.label === 'Margem de Lucro (R$)') {
+                        return `Margem Percentual: ${percentuaisMargem[context.dataIndex]}%`;
+                      }
+                      return null;
                     }
-                }, 250);
-            });
+                  },
+                  titleFont: {
+                    size: isMobile ? 12 : 14,
+                    weight: 'bold'
+                  },
+                  bodyFont: {
+                    size: isMobile ? 11 : 13
+                  },
+                  padding: 12,
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  displayColors: true
+                },
+                title: {
+                  display: true,
+                  text: 'Top 10 Produtos - Maior Fluxo (Últimos 30 Dias)',
+                  color: '#e0e0e0',
+                  font: {
+                    size: isMobile ? 14 : 18,
+                    weight: '600'
+                  },
+                  padding: {
+                    top: 5,
+                    bottom: isMobile ? 15 : 25
+                  }
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  grid: {
+                    color: 'rgba(255, 255, 255, 0.1)',
+                    drawBorder: false
+                  },
+                  ticks: {
+                    callback: function (value) {
+                      return formatMoney(value);
+                    },
+                    color: '#e0e0e0',
+                    font: {
+                      size: isMobile ? 10 : 12
+                    },
+                    maxTicksLimit: isMobile ? 5 : 7,
+                    padding: 10
+                  },
+                  title: {
+                    display: true,
+                    text: 'Valores em Reais (R$)',
+                    color: '#e0e0e0',
+                    font: {
+                      size: isMobile ? 11 : 13,
+                      weight: '500'
+                    },
+                    padding: {
+                      top: 10,
+                      bottom: 10
+                    }
+                  }
+                },
+                x: {
+                  grid: {
+                    display: false,
+                    drawBorder: false
+                  },
+                  ticks: {
+                    color: '#e0e0e0',
+                    maxRotation: isMobile ? 60 : 45,
+                    minRotation: isMobile ? 60 : 45,
+                    font: {
+                      size: isMobile ? 10 : 12
+                    },
+                    padding: 8,
+                    callback: function (value, index) {
+                      const label = this.getLabelForValue(value);
+                      if (isMobile && label.length > 12) {
+                        return label.substring(0, 10) + '...';
+                      }
+                      return label;
+                    }
+                  }
+                }
+              },
+              interaction: {
+                mode: 'index',
+                intersect: false
+              },
+              animation: {
+                duration: 800,
+                easing: 'easeOutQuart'
+              }
+            }
+          });
+
+          // Adicionar event listener para redimensionamento da janela - CORRIGIDO
+          let resizeTimeout;
+          window.addEventListener('resize', function () {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(function () {
+              // Apenas atualizar o gráfico existente, não recriar
+              if (produtosMaiorFluxoChart) {
+                produtosMaiorFluxoChart.resize();
+                produtosMaiorFluxoChart.update();
+              }
+            }, 250);
+          });
         }
       }
     } catch (error) {
@@ -899,14 +899,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
- async function updateMetrics() {
+  async function updateMetrics() {
     try {
-        const metricsData = await fetchWithErrorHandling('/admin/dashboard/metrics');
+      const metricsData = await fetchWithErrorHandling('/admin/dashboard/metrics');
 
-        if (metricsData.success) {
-            const metricsContainer = document.querySelector('.metrics-grid');
-            if (metricsContainer) {
-              metricsContainer.innerHTML = `
+      if (metricsData.success) {
+        const metricsContainer = document.querySelector('.metrics-grid');
+        if (metricsContainer) {
+          metricsContainer.innerHTML = `
                   <div class="metric-card" data-unidade="kg">
                       <div class="metric-icon">
                           <i class="fas fa-weight"></i>
@@ -963,42 +963,42 @@ document.addEventListener('DOMContentLoaded', function() {
                   </div>
               `;
 
-                // Adiciona click nos cards de estoque somente
-                document.querySelectorAll('.metric-card[data-unidade]').forEach(card => {
-                    card.addEventListener('click', () => {
-                        const unidade = card.getAttribute('data-unidade');
-                        window.location.href = `/admin/produtos/unidade?unidade=${unidade}`;
-                    });
-                });
-                document.querySelectorAll('.metric-card[data-tipo-financeiro]').forEach(card => {
-                    card.addEventListener('click', () => {
-                        const tipo = card.getAttribute('data-tipo-financeiro');
-                        // Abre em nova guia a página de histórico financeiro passando o tipo
-                        window.open(`/admin/financeiro/historico?tipo=${tipo}`, '_blank');
-                    });
-                });
-            }
+          // Adiciona click nos cards de estoque somente
+          document.querySelectorAll('.metric-card[data-unidade]').forEach(card => {
+            card.addEventListener('click', () => {
+              const unidade = card.getAttribute('data-unidade');
+              window.location.href = `/admin/produtos/unidade?unidade=${unidade}`;
+            });
+          });
+          document.querySelectorAll('.metric-card[data-tipo-financeiro]').forEach(card => {
+            card.addEventListener('click', () => {
+              const tipo = card.getAttribute('data-tipo-financeiro');
+              // Abre em nova guia a página de histórico financeiro passando o tipo
+              window.open(`/admin/financeiro/historico?tipo=${tipo}`, '_blank');
+            });
+          });
         }
+      }
     } catch (error) {
-        console.error('Erro ao atualizar métricas:', error);
-        showFlashMessage('error', 'Erro ao atualizar métricas');
+      console.error('Erro ao atualizar métricas:', error);
+      showFlashMessage('error', 'Erro ao atualizar métricas');
     }
-}
+  }
 
   async function loadDashboardData() {
     try {
       const loadingElement = document.getElementById('loadingIndicator');
       if (loadingElement) loadingElement.style.display = 'block';
-      
+
       await updateMetrics();
       await updateCharts();
       await loadMovimentacoes();
-      
+
       if (loadingElement) loadingElement.style.display = 'none';
     } catch (error) {
       console.error('Erro ao carregar dados do dashboard:', error);
       showFlashMessage('error', 'Erro ao carregar dados do dashboard');
-      
+
       const loadingElement = document.getElementById('loadingIndicator');
       if (loadingElement) loadingElement.style.display = 'none';
     }
@@ -1007,7 +1007,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Event Listeners para Dashboard
   const movimentacoesHeader = document.getElementById('movimentacoesHeader');
   if (movimentacoesHeader) {
-    movimentacoesHeader.addEventListener('click', function(e) {
+    movimentacoesHeader.addEventListener('click', function (e) {
       if (!e.target.closest('.btn-icon')) {
         toggleMovimentacoes();
       }
@@ -1073,20 +1073,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   async function openDetalhesClienteModal(clienteId) {
-      const content = document.getElementById('detalhesClienteContent');
-      if (content) content.innerHTML = '<p class="loading-text">Carregando dados...</p>';
+    const content = document.getElementById('detalhesClienteContent');
+    if (content) content.innerHTML = '<p class="loading-text">Carregando dados...</p>';
 
-      try {
-          const response = await fetchWithErrorHandling(`/admin/clientes/${clienteId}/detalhes`);
-          if (!response.success) {
-              showFlashMessage('error', response.message || 'Erro ao carregar detalhes');
-              return;
-          }
+    try {
+      const response = await fetchWithErrorHandling(`/admin/clientes/${clienteId}/detalhes`);
+      if (!response.success) {
+        showFlashMessage('error', response.message || 'Erro ao carregar detalhes');
+        return;
+      }
 
-          const c = response.cliente;
+      const c = response.cliente;
 
-          // HTML com seções retráteis
-          let html = `
+      // HTML com seções retráteis
+      let html = `
               <div class="details-main-info">
                   <h3 class="section-title">Informações do Cliente</h3>
                   <div class="details-grid">
@@ -1242,46 +1242,46 @@ document.addEventListener('DOMContentLoaded', function() {
               </div>
           `;
 
-          content.innerHTML = html;
+      content.innerHTML = html;
 
-          // Ativar colapsáveis
-          document.querySelectorAll('.collapsible').forEach(btn => {
-              btn.addEventListener('click', function() {
-                  this.classList.toggle('active');
-                  const contentDiv = this.nextElementSibling;
-                  const toggleIcon = this.querySelector('.toggle-icon');
-                  
-                  if (contentDiv.style.display === 'block') {
-                      contentDiv.style.display = 'none';
-                      toggleIcon.classList.remove('rotated');
-                  } else {
-                      contentDiv.style.display = 'block';
-                      toggleIcon.classList.add('rotated');
-                  }
-              });
-          });
+      // Ativar colapsáveis
+      document.querySelectorAll('.collapsible').forEach(btn => {
+        btn.addEventListener('click', function () {
+          this.classList.toggle('active');
+          const contentDiv = this.nextElementSibling;
+          const toggleIcon = this.querySelector('.toggle-icon');
 
-          openModal('detalhesClienteModal');
+          if (contentDiv.style.display === 'block') {
+            contentDiv.style.display = 'none';
+            toggleIcon.classList.remove('rotated');
+          } else {
+            contentDiv.style.display = 'block';
+            toggleIcon.classList.add('rotated');
+          }
+        });
+      });
 
-      } catch (err) {
-          console.error(err);
-          showFlashMessage('error', 'Erro ao carregar detalhes do cliente');
-      }
+      openModal('detalhesClienteModal');
+
+    } catch (err) {
+      console.error(err);
+      showFlashMessage('error', 'Erro ao carregar detalhes do cliente');
+    }
   }
 
   async function openEditarClienteModal(clienteId) {
     const clienteForm = document.getElementById('clienteForm');
     if (clienteForm) clienteForm.reset();
-    
+
     const clienteIdField = document.getElementById('clienteId');
     if (clienteIdField) clienteIdField.value = '';
-    
+
     const clienteStatus = document.getElementById('clienteStatus');
     if (clienteStatus) clienteStatus.value = 'true';
 
     const clienteModalTitle = document.getElementById('clienteModalTitle');
     if (clienteModalTitle) clienteModalTitle.textContent = 'Editar Cliente';
-    
+
     const clienteModalSubmitText = document.getElementById('clienteModalSubmitText');
     if (clienteModalSubmitText) clienteModalSubmitText.textContent = 'Atualizar';
 
@@ -1289,7 +1289,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const response = await fetchWithErrorHandling(`/admin/clientes/${clienteId}`);
       if (response.success) {
         const cliente = response.cliente;
-        
+
         if (document.getElementById('clienteId')) document.getElementById('clienteId').value = cliente.id;
         if (document.getElementById('clienteNome')) document.getElementById('clienteNome').value = cliente.nome;
         if (document.getElementById('clienteDocumento')) document.getElementById('clienteDocumento').value = cliente.documento || '';
@@ -1313,25 +1313,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function setupClienteActions() {
     document.querySelectorAll('.detalhes-cliente').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         const clienteId = this.getAttribute('data-id');
         openDetalhesClienteModal(clienteId);
       });
     });
 
     document.querySelectorAll('.editar-cliente').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         const clienteId = this.getAttribute('data-id');
         openEditarClienteModal(clienteId);
       });
     });
 
     document.querySelectorAll('.remover-cliente').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         const clienteId = this.getAttribute('data-id');
         const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
         const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
-        
+
         if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir o cliente ${clienteId}?`;
         if (confirmarExclusaoBtn) {
           confirmarExclusaoBtn.setAttribute('data-id', clienteId);
@@ -1348,13 +1348,13 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('addCliente')?.addEventListener('click', () => {
     const clienteForm = document.getElementById('clienteForm');
     if (clienteForm) clienteForm.reset();
-    
+
     if (document.getElementById('clienteId')) document.getElementById('clienteId').value = '';
     if (document.getElementById('clienteStatus')) document.getElementById('clienteStatus').value = 'true';
-    
+
     const clienteModalTitle = document.getElementById('clienteModalTitle');
     if (clienteModalTitle) clienteModalTitle.textContent = 'Cadastrar Cliente';
-    
+
     const clienteModalSubmitText = document.getElementById('clienteModalSubmitText');
     if (clienteModalSubmitText) clienteModalSubmitText.textContent = 'Cadastrar';
     openModal('clienteModal');
@@ -1362,7 +1362,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   const clienteForm = document.getElementById('clienteForm');
   if (clienteForm) {
-    clienteForm.addEventListener('submit', async function(e) {
+    clienteForm.addEventListener('submit', async function (e) {
       e.preventDefault();
 
       const clienteId = document.getElementById('clienteId')?.value || '';
@@ -1403,27 +1403,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // ===== PRODUTOS =====
   async function loadProdutosData() {
-      try {
-        const searchText = document.getElementById('searchProduto')?.value.toLowerCase() || '';
-        const incluirInativos = document.getElementById('mostrarInativos')?.checked ? 'true' : 'false';
-        
-        const data = await fetchWithErrorHandling(`/admin/produtos?incluir_inativos=${incluirInativos}`);
-        
-        if (data.success) {
-          const produtosTable = document.querySelector('#produtosTable tbody');
-          if (produtosTable) {
-            produtosTable.innerHTML = '';
-            
-            data.produtos.forEach(produto => {
-              if (searchText && !produto.nome.toLowerCase().includes(searchText)) return;
-              
-              const row = document.createElement('tr');
-              // Adicione classe e atributo data-id para identificar a linha
-              row.className = 'produto-row clickable-row';
-              row.setAttribute('data-id', produto.id);
-              row.setAttribute('data-produto', JSON.stringify(produto));
-              
-              row.innerHTML = `
+    try {
+      const searchText = document.getElementById('searchProduto')?.value.toLowerCase() || '';
+      const incluirInativos = document.getElementById('mostrarInativos')?.checked ? 'true' : 'false';
+
+      const data = await fetchWithErrorHandling(`/admin/produtos?incluir_inativos=${incluirInativos}`);
+
+      if (data.success) {
+        const produtosTable = document.querySelector('#produtosTable tbody');
+        if (produtosTable) {
+          produtosTable.innerHTML = '';
+
+          data.produtos.forEach(produto => {
+            if (searchText && !produto.nome.toLowerCase().includes(searchText)) return;
+
+            const row = document.createElement('tr');
+            // Adicione classe e atributo data-id para identificar a linha
+            row.className = 'produto-row clickable-row';
+            row.setAttribute('data-id', produto.id);
+            row.setAttribute('data-produto', JSON.stringify(produto));
+
+            row.innerHTML = `
                 <td>${produto.codigo}</td>
                 <td>${produto.nome} ${!produto.ativo ? '<span class="badge badge-danger">Inativo</span>' : ''}</td>
                 <td>${produto.unidade}</td>
@@ -1445,59 +1445,59 @@ document.addEventListener('DOMContentLoaded', function() {
                   </div>
                 </td>
               `;
-              produtosTable.appendChild(row);
-            });
-            
-            setupProdutoActions();
-            setupRowClickEvents(); // Nova função para configurar clicks nas linhas
-          }
+            produtosTable.appendChild(row);
+          });
+
+          setupProdutoActions();
+          setupRowClickEvents(); // Nova função para configurar clicks nas linhas
         }
-      } catch (error) {
-        console.error('Erro ao carregar produtos:', error);
-        showFlashMessage('error', 'Erro ao carregar lista de produtos');
       }
+    } catch (error) {
+      console.error('Erro ao carregar produtos:', error);
+      showFlashMessage('error', 'Erro ao carregar lista de produtos');
     }
-  
+  }
+
   // recarregar lista ao clicar no refresh ou trocar checkbox
   document.getElementById('mostrarInativos').addEventListener('change', loadProdutosData);
 
   function setupRowClickEvents() {
-  document.querySelectorAll('.produto-row.clickable-row').forEach(row => {
-    row.addEventListener('click', function(e) {
-      // Previne a abertura do modal se o clique foi em um botão de ação
-      if (e.target.closest('.table-actions') || 
-          e.target.tagName === 'BUTTON' || 
+    document.querySelectorAll('.produto-row.clickable-row').forEach(row => {
+      row.addEventListener('click', function (e) {
+        // Previne a abertura do modal se o clique foi em um botão de ação
+        if (e.target.closest('.table-actions') ||
+          e.target.tagName === 'BUTTON' ||
           e.target.closest('button')) {
-        return;
-      }
-      
-      const produtoId = this.getAttribute('data-id');
-      openEditarProdutoModal(produtoId);
+          return;
+        }
+
+        const produtoId = this.getAttribute('data-id');
+        openEditarProdutoModal(produtoId);
+      });
     });
-  });
   }
 
   function setupProdutoActions() {
     // Previne a propagação do evento de clique para a linha quando clicar nos botões
     document.querySelectorAll('.table-actions button').forEach(btn => {
-      btn.addEventListener('click', function(e) {
+      btn.addEventListener('click', function (e) {
         e.stopPropagation(); // Impede que o evento chegue à linha
       });
     });
 
     document.querySelectorAll('.editar-produto').forEach(btn => {
-      btn.addEventListener('click', async function(e) {
+      btn.addEventListener('click', async function (e) {
         const produtoId = this.getAttribute('data-id');
         await openEditarProdutoModal(produtoId);
       });
     });
 
     document.querySelectorAll('.remover-produto').forEach(btn => {
-      btn.addEventListener('click', function(e) {
+      btn.addEventListener('click', function (e) {
         const produtoId = this.getAttribute('data-id');
         const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
         const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
-        
+
         if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir o produto ${produtoId}?`;
         if (confirmarExclusaoBtn) {
           confirmarExclusaoBtn.setAttribute('data-id', produtoId);
@@ -1508,7 +1508,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.querySelectorAll('.movimentar-estoque').forEach(btn => {
-      btn.addEventListener('click', function(e) {
+      btn.addEventListener('click', function (e) {
         const produtoId = this.getAttribute('data-id');
         openTransferenciaModal(produtoId);
       });
@@ -1516,7 +1516,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btnRelatorioProdutos').addEventListener('click', () => {
       const searchText = document.getElementById('searchProduto')?.value || '';
       const incluirInativos = document.getElementById('mostrarInativos')?.checked ? 'true' : 'false';
-      
+
       const url = `/admin/produtos/pdf?search=${encodeURIComponent(searchText)}&incluir_inativos=${incluirInativos}`;
       window.open(url, '_blank');
     });
@@ -1525,27 +1525,27 @@ document.addEventListener('DOMContentLoaded', function() {
   async function openEditarProdutoModal(produtoId) {
     try {
       const produtoResponse = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
-      
+
       if (produtoResponse.success) {
         const produto = produtoResponse.produto;
-        
+
         const descontosResponse = await fetchWithErrorHandling('/admin/descontos');
-        
+
         if (descontosResponse.success) {
           const formBody = document.querySelector('#editarProdutoModal .modal-body');
-          
+
           if (!formBody) return;
-          
+
           let valorUnitario = produto.valor_unitario;
           if (typeof valorUnitario === 'string') {
             valorUnitario = valorUnitario.replace(/[^\d,.-]/g, '').replace(',', '.');
           }
-          
+
           const descontosAtuais = produto.descontos || [];
           const descontosAtuaisIds = descontosAtuais.map(d => d.id);
-          
+
           const todosDescontos = descontosResponse.descontos || [];
-          
+
           formBody.innerHTML = `
             <div class="form-row">
               <div class="form-group">
@@ -1651,8 +1651,8 @@ document.addEventListener('DOMContentLoaded', function() {
                   <select id="selecionarDesconto" class="form-control">
                     <option value="">Selecione um desconto...</option>
                     ${todosDescontos
-                      .filter(d => !descontosAtuaisIds.includes(d.id))
-                      .map(desconto => `
+              .filter(d => !descontosAtuaisIds.includes(d.id))
+              .map(desconto => `
                         <option value="${desconto.id}" 
                           data-quantidade-minima="${desconto.quantidade_minima}"
                           data-quantidade-maxima="${desconto.quantidade_maxima || ''}"
@@ -1672,7 +1672,7 @@ document.addEventListener('DOMContentLoaded', function() {
               </div>
             </div>
           `;
-          
+
           const editarProdutoForm = document.getElementById('editarProdutoForm');
           if (editarProdutoForm) {
             editarProdutoForm.setAttribute('data-produto-id', produtoId);
@@ -1694,26 +1694,26 @@ document.addEventListener('DOMContentLoaded', function() {
   function setupDescontoEvents() {
     const btnAdicionarDesconto = document.getElementById('btnAdicionarDesconto');
     if (btnAdicionarDesconto) {
-      btnAdicionarDesconto.addEventListener('click', function() {
+      btnAdicionarDesconto.addEventListener('click', function () {
         const select = document.getElementById('selecionarDesconto');
         if (!select) return;
-        
+
         const selectedOption = select.options[select.selectedIndex];
-        
+
         if (!selectedOption.value) {
           showFlashMessage('warning', 'Selecione um desconto para adicionar');
           return;
         }
-        
+
         const descontoId = selectedOption.value;
         const container = document.getElementById('descontosContainer');
         if (!container) return;
-        
+
         if (document.querySelector(`.desconto-item[data-id="${descontoId}"]`)) {
           showFlashMessage('warning', 'Este desconto já foi adicionado');
           return;
         }
-        
+
         const item = document.createElement('div');
         item.className = 'desconto-item';
         item.dataset.id = descontoId;
@@ -1725,22 +1725,22 @@ document.addEventListener('DOMContentLoaded', function() {
             <i class="fas fa-times"></i>
           </button>
         `;
-        
+
         container.appendChild(item);
-        
+
         select.value = '';
-        
+
         const removeBtn = item.querySelector('.btn-remover-desconto');
         if (removeBtn) {
-          removeBtn.addEventListener('click', function() {
+          removeBtn.addEventListener('click', function () {
             item.remove();
           });
         }
       });
     }
-    
+
     document.querySelectorAll('.btn-remover-desconto').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         const item = this.closest('.desconto-item');
         if (item) {
           item.remove();
@@ -1751,52 +1751,52 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Função para abrir o modal de transferência
   async function openTransferenciaModal(produtoId) {
-      try {
-          const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
-          if (response.success) {
-              const produto = response.produto;
-              
-              // Preencher campos básicos
-              document.getElementById('transferenciaProdutoId').value = produtoId;
-              document.getElementById('transferenciaProdutoNome').textContent = produto.nome;
-              document.getElementById('transferenciaUnidadeAtual').textContent = produto.unidade;
-              document.getElementById('transferenciaValorUnitarioDestino').value = produto.valor_unitario;
-              
-              // Resetar campos de conversão
-              document.getElementById('transferenciaConverter').checked = false;
-              document.getElementById('camposConversao').style.display = 'none';
-              document.getElementById('transferenciaUnidadeDestino').value = '';
-              document.getElementById('transferenciaQuantidadeDestino').value = '';
-              document.getElementById('transferenciaFatorConversao').value = '';
-              
-              // Atualizar estoque disponível
-              updateEstoqueDisponivel();
-              
-              openModal('transferenciaModal');
-          }
-      } catch (error) {
-          console.error('Erro ao abrir modal de transferência:', error);
-          showFlashMessage('error', 'Erro ao carregar dados do produto');
+    try {
+      const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
+      if (response.success) {
+        const produto = response.produto;
+
+        // Preencher campos básicos
+        document.getElementById('transferenciaProdutoId').value = produtoId;
+        document.getElementById('transferenciaProdutoNome').textContent = produto.nome;
+        document.getElementById('transferenciaUnidadeAtual').textContent = produto.unidade;
+        document.getElementById('transferenciaValorUnitarioDestino').value = produto.valor_unitario;
+
+        // Resetar campos de conversão
+        document.getElementById('transferenciaConverter').checked = false;
+        document.getElementById('camposConversao').style.display = 'none';
+        document.getElementById('transferenciaUnidadeDestino').value = '';
+        document.getElementById('transferenciaQuantidadeDestino').value = '';
+        document.getElementById('transferenciaFatorConversao').value = '';
+
+        // Atualizar estoque disponível
+        updateEstoqueDisponivel();
+
+        openModal('transferenciaModal');
       }
+    } catch (error) {
+      console.error('Erro ao abrir modal de transferência:', error);
+      showFlashMessage('error', 'Erro ao carregar dados do produto');
+    }
   }
 
   // Alternar visibilidade dos campos de conversão
-  document.getElementById('transferenciaConverter').addEventListener('change', function() {
-      const camposConversao = document.getElementById('camposConversao');
-      camposConversao.style.display = this.checked ? 'block' : 'none';
-      
-      if (this.checked) {
-          // Preencher informações de unidade
-          const unidadeOrigem = document.getElementById('transferenciaUnidadeAtual').textContent;
-          document.getElementById('unidadeOrigemTexto').textContent = unidadeOrigem;
-      }
+  document.getElementById('transferenciaConverter').addEventListener('change', function () {
+    const camposConversao = document.getElementById('camposConversao');
+    camposConversao.style.display = this.checked ? 'block' : 'none';
+
+    if (this.checked) {
+      // Preencher informações de unidade
+      const unidadeOrigem = document.getElementById('transferenciaUnidadeAtual').textContent;
+      document.getElementById('unidadeOrigemTexto').textContent = unidadeOrigem;
+    }
   });
 
   // Atualizar informações quando selecionar unidade de destino
-  document.getElementById('transferenciaUnidadeDestino').addEventListener('change', function() {
-      const unidadeDestino = this.value;
-      document.getElementById('unidadeDestinoTexto').textContent = unidadeDestino;
-      calcularConversao();
+  document.getElementById('transferenciaUnidadeDestino').addEventListener('change', function () {
+    const unidadeDestino = this.value;
+    document.getElementById('unidadeDestinoTexto').textContent = unidadeDestino;
+    calcularConversao();
   });
 
   // Calcular conversão quando alterar quantidade ou fator
@@ -1805,168 +1805,168 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Função para calcular a conversão
   function calcularConversao() {
-      const produtoId = document.getElementById('transferenciaProdutoId').value;
-      const quantidadeOrigem = parseFloat(document.getElementById('transferenciaQuantidade').value) || 0;
-      const unidadeOrigem = document.getElementById('transferenciaUnidadeAtual').textContent;
-      const unidadeDestino = document.getElementById('transferenciaUnidadeDestino').value;
-      const fatorPersonalizado = parseFloat(document.getElementById('transferenciaFatorConversao').value);
-      
-      if (!unidadeDestino || quantidadeOrigem <= 0) return;
-      
-      // Buscar informações do produto para obter fatores de conversão padrão
-      fetchWithErrorHandling(`/admin/produtos/${produtoId}`)
-          .then(response => {
-              if (response.success) {
-                  const produto = response.produto;
-                  let fatorConversao = 1;
-                  
-                  // Calcular fator de conversão
-                  if (fatorPersonalizado && fatorPersonalizado > 0) {
-                      fatorConversao = fatorPersonalizado;
-                  } else {
-                      // Usar fatores padrão do produto
-                      fatorConversao = calcularFatorPadrao(produto, unidadeOrigem, unidadeDestino);
-                  }
-                  
-                  // Calcular quantidade de destino
-                  const quantidadeDestino = quantidadeOrigem * fatorConversao;
-                  document.getElementById('transferenciaQuantidadeDestino').value = quantidadeDestino.toFixed(3);
-                  
-                  // Exibir informações da conversão
-                  document.getElementById('infoConversao').textContent = 
-                      `1 ${unidadeOrigem} = ${fatorConversao} ${unidadeDestino}`;
-              }
-          })
-          .catch(error => {
-              console.error('Erro ao calcular conversão:', error);
-          });
+    const produtoId = document.getElementById('transferenciaProdutoId').value;
+    const quantidadeOrigem = parseFloat(document.getElementById('transferenciaQuantidade').value) || 0;
+    const unidadeOrigem = document.getElementById('transferenciaUnidadeAtual').textContent;
+    const unidadeDestino = document.getElementById('transferenciaUnidadeDestino').value;
+    const fatorPersonalizado = parseFloat(document.getElementById('transferenciaFatorConversao').value);
+
+    if (!unidadeDestino || quantidadeOrigem <= 0) return;
+
+    // Buscar informações do produto para obter fatores de conversão padrão
+    fetchWithErrorHandling(`/admin/produtos/${produtoId}`)
+      .then(response => {
+        if (response.success) {
+          const produto = response.produto;
+          let fatorConversao = 1;
+
+          // Calcular fator de conversão
+          if (fatorPersonalizado && fatorPersonalizado > 0) {
+            fatorConversao = fatorPersonalizado;
+          } else {
+            // Usar fatores padrão do produto
+            fatorConversao = calcularFatorPadrao(produto, unidadeOrigem, unidadeDestino);
+          }
+
+          // Calcular quantidade de destino
+          const quantidadeDestino = quantidadeOrigem * fatorConversao;
+          document.getElementById('transferenciaQuantidadeDestino').value = quantidadeDestino.toFixed(3);
+
+          // Exibir informações da conversão
+          document.getElementById('infoConversao').textContent =
+            `1 ${unidadeOrigem} = ${fatorConversao} ${unidadeDestino}`;
+        }
+      })
+      .catch(error => {
+        console.error('Erro ao calcular conversão:', error);
+      });
   }
 
   // Função para calcular fator de conversão padrão baseado nas propriedades do produto
   function calcularFatorPadrao(produto, unidadeOrigem, unidadeDestino) {
-      // Se for a mesma unidade, fator é 1
-      if (unidadeOrigem === unidadeDestino) return 1;
-      
-      // Converter para kg primeiro, depois para a unidade de destino
-      let quantidadeEmKg = 0;
-      
-      // Converter unidade de origem para kg
-      switch(unidadeOrigem) {
-          case 'kg':
-              quantidadeEmKg = 1;
-              break;
-          case 'saco':
-              quantidadeEmKg = produto.peso_kg_por_saco || 50; // Valor padrão 50kg se não definido
-              break;
-          case 'pacote':
-              // Primeiro converter saco para kg, depois dividir por pacotes por saco
-              const kgPorSaco = produto.peso_kg_por_saco || 50;
-              quantidadeEmKg = kgPorSaco / (produto.pacotes_por_saco || 10);
-              break;
-          case 'fardo':
-              // Primeiro converter saco para kg, depois dividir por pacotes por fardo e por pacotes por saco
-              const kgPorSacoFardo = produto.peso_kg_por_saco || 50;
-              const pacotesPorFardo = produto.pacotes_por_fardo || 5;
-              quantidadeEmKg = kgPorSacoFardo / (produto.pacotes_por_saco || 10) / pacotesPorFardo;
-              break;
-          case 'unidade':
-              // Para unidade, assumimos 1kg por unidade (ajustar conforme necessário)
-              quantidadeEmKg = 1;
-              break;
-      }
-      
-      // Converter de kg para unidade de destino
-      switch(unidadeDestino) {
-          case 'kg':
-              return 1 / quantidadeEmKg;
-          case 'saco':
-              return 1 / (quantidadeEmKg * (produto.peso_kg_por_saco || 50));
-          case 'pacote':
-              const kgPorSacoPacote = produto.peso_kg_por_saco || 50;
-              const pacotesPorSaco = produto.pacotes_por_saco || 10;
-              return 1 / (quantidadeEmKg * kgPorSacoPacote / pacotesPorSaco);
-          case 'fardo':
-              const kgPorSacoFardo = produto.peso_kg_por_saco || 50;
-              const pacotesPorSacoFardo = produto.pacotes_por_saco || 10;
-              const pacotesPorFardo = produto.pacotes_por_fardo || 5;
-              return 1 / (quantidadeEmKg * kgPorSacoFardo / pacotesPorSacoFardo / pacotesPorFardo);
-          case 'unidade':
-              return 1 / quantidadeEmKg; // Assumindo 1kg por unidade
-      }
-      
-      return 1; // Fallback
+    // Se for a mesma unidade, fator é 1
+    if (unidadeOrigem === unidadeDestino) return 1;
+
+    // Converter para kg primeiro, depois para a unidade de destino
+    let quantidadeEmKg = 0;
+
+    // Converter unidade de origem para kg
+    switch (unidadeOrigem) {
+      case 'kg':
+        quantidadeEmKg = 1;
+        break;
+      case 'saco':
+        quantidadeEmKg = produto.peso_kg_por_saco || 50; // Valor padrão 50kg se não definido
+        break;
+      case 'pacote':
+        // Primeiro converter saco para kg, depois dividir por pacotes por saco
+        const kgPorSaco = produto.peso_kg_por_saco || 50;
+        quantidadeEmKg = kgPorSaco / (produto.pacotes_por_saco || 10);
+        break;
+      case 'fardo':
+        // Primeiro converter saco para kg, depois dividir por pacotes por fardo e por pacotes por saco
+        const kgPorSacoFardo = produto.peso_kg_por_saco || 50;
+        const pacotesPorFardo = produto.pacotes_por_fardo || 5;
+        quantidadeEmKg = kgPorSacoFardo / (produto.pacotes_por_saco || 10) / pacotesPorFardo;
+        break;
+      case 'unidade':
+        // Para unidade, assumimos 1kg por unidade (ajustar conforme necessário)
+        quantidadeEmKg = 1;
+        break;
+    }
+
+    // Converter de kg para unidade de destino
+    switch (unidadeDestino) {
+      case 'kg':
+        return 1 / quantidadeEmKg;
+      case 'saco':
+        return 1 / (quantidadeEmKg * (produto.peso_kg_por_saco || 50));
+      case 'pacote':
+        const kgPorSacoPacote = produto.peso_kg_por_saco || 50;
+        const pacotesPorSaco = produto.pacotes_por_saco || 10;
+        return 1 / (quantidadeEmKg * kgPorSacoPacote / pacotesPorSaco);
+      case 'fardo':
+        const kgPorSacoFardo = produto.peso_kg_por_saco || 50;
+        const pacotesPorSacoFardo = produto.pacotes_por_saco || 10;
+        const pacotesPorFardo = produto.pacotes_por_fardo || 5;
+        return 1 / (quantidadeEmKg * kgPorSacoFardo / pacotesPorSacoFardo / pacotesPorFardo);
+      case 'unidade':
+        return 1 / quantidadeEmKg; // Assumindo 1kg por unidade
+    }
+
+    return 1; // Fallback
   }
 
   // Enviar formulário de transferência
-  document.getElementById('transferenciaForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const produtoId = document.getElementById('transferenciaProdutoId').value;
-      const converterUnidade = document.getElementById('transferenciaConverter').checked;
-      const dados = {
-          produto_id: produtoId,
-          estoque_origem: document.getElementById('transferenciaOrigem').value,
-          estoque_destino: document.getElementById('transferenciaDestino').value,
-          quantidade: parseFloat(document.getElementById('transferenciaQuantidade').value),
-          valor_unitario_destino: parseFloat(document.getElementById('transferenciaValorUnitarioDestino').value),
-          observacao: document.getElementById('transferenciaObservacao').value,
-          converter_unidade: converterUnidade
-      };
-      
-      // Adicionar dados de conversão se aplicável
-      if (converterUnidade) {
-          dados.unidade_destino = document.getElementById('transferenciaUnidadeDestino').value;
-          dados.quantidade_destino = parseFloat(document.getElementById('transferenciaQuantidadeDestino').value);
-          dados.fator_conversao = parseFloat(document.getElementById('transferenciaFatorConversao').value) || null;
+  document.getElementById('transferenciaForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const produtoId = document.getElementById('transferenciaProdutoId').value;
+    const converterUnidade = document.getElementById('transferenciaConverter').checked;
+    const dados = {
+      produto_id: produtoId,
+      estoque_origem: document.getElementById('transferenciaOrigem').value,
+      estoque_destino: document.getElementById('transferenciaDestino').value,
+      quantidade: parseFloat(document.getElementById('transferenciaQuantidade').value),
+      valor_unitario_destino: parseFloat(document.getElementById('transferenciaValorUnitarioDestino').value),
+      observacao: document.getElementById('transferenciaObservacao').value,
+      converter_unidade: converterUnidade
+    };
+
+    // Adicionar dados de conversão se aplicável
+    if (converterUnidade) {
+      dados.unidade_destino = document.getElementById('transferenciaUnidadeDestino').value;
+      dados.quantidade_destino = parseFloat(document.getElementById('transferenciaQuantidadeDestino').value);
+      dados.fator_conversao = parseFloat(document.getElementById('transferenciaFatorConversao').value) || null;
+    }
+
+    try {
+      const response = await fetchWithErrorHandling('/admin/transferencias', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(dados)
+      });
+
+      if (response.success) {
+        showFlashMessage('success', response.message);
+        closeModal('transferenciaModal');
+        // Recarregar dados da página se necessário
+        if (typeof carregarDados === 'function') {
+          carregarDados();
+        }
+      } else {
+        showFlashMessage('error', response.message);
       }
-      
-      try {
-          const response = await fetchWithErrorHandling('/admin/transferencias', {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(dados)
-          });
-          
-          if (response.success) {
-              showFlashMessage('success', response.message);
-              closeModal('transferenciaModal');
-              // Recarregar dados da página se necessário
-              if (typeof carregarDados === 'function') {
-                  carregarDados();
-              }
-          } else {
-              showFlashMessage('error', response.message);
-          }
-      } catch (error) {
-          console.error('Erro ao realizar transferência:', error);
-          showFlashMessage('error', 'Erro ao realizar transferência');
-      }
+    } catch (error) {
+      console.error('Erro ao realizar transferência:', error);
+      showFlashMessage('error', 'Erro ao realizar transferência');
+    }
   });
 
   function updateEstoqueDisponivel() {
     const produtoId = document.getElementById('transferenciaProdutoId')?.value;
     const origem = document.getElementById('transferenciaOrigem')?.value;
-    
+
     if (!produtoId || !origem) return;
-    
+
     fetchWithErrorHandling(`/admin/produtos/${produtoId}`)
       .then(response => {
         if (response.success) {
           const produto = response.produto;
           let estoque = 0;
-          
+
           if (origem === 'loja') estoque = produto.estoque_loja;
           else if (origem === 'deposito') estoque = produto.estoque_deposito;
           else if (origem === 'fabrica') estoque = produto.estoque_fabrica;
-          
+
           const transferenciaEstoqueDisponivel = document.getElementById('transferenciaEstoqueDisponivel');
           if (transferenciaEstoqueDisponivel) {
-            transferenciaEstoqueDisponivel.textContent = 
+            transferenciaEstoqueDisponivel.textContent =
               `Disponível: ${estoque} ${produto.unidade}`;
           }
-          
+
           const transferenciaQuantidade = document.getElementById('transferenciaQuantidade');
           if (transferenciaQuantidade) {
             transferenciaQuantidade.max = estoque;
@@ -1980,21 +1980,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Event Listeners para Produtos
   document.getElementById('searchProduto')?.addEventListener('input', loadProdutosData);
-  document.addEventListener('DOMContentLoaded', function() {
-      // Registrar eventos após o DOM estar totalmente carregado
-      const refreshButton = document.getElementById('refreshProdutos');
-      if (refreshButton) {
-          refreshButton.addEventListener('click', function(e) {
-              e.preventDefault();
-              console.log('Botão refresh clicado!'); // Debug
-              loadProdutosData();
-          });
-      }
+  document.addEventListener('DOMContentLoaded', function () {
+    // Registrar eventos após o DOM estar totalmente carregado
+    const refreshButton = document.getElementById('refreshProdutos');
+    if (refreshButton) {
+      refreshButton.addEventListener('click', function (e) {
+        e.preventDefault();
+        console.log('Botão refresh clicado!'); // Debug
+        loadProdutosData();
+      });
+    }
   });
   document.getElementById('addProduto')?.addEventListener('click', () => {
     const produtoForm = document.getElementById('produtoForm');
     if (produtoForm) produtoForm.reset();
-    
+
     if (document.getElementById('produtoEstoqueTipo')) document.getElementById('produtoEstoqueTipo').value = 'loja';
     if (document.getElementById('produtoUnidade')) document.getElementById('produtoUnidade').value = 'kg';
     openModal('produtoModal');
@@ -2002,12 +2002,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
   const produtoForm = document.getElementById('produtoForm');
   if (produtoForm) {
-    produtoForm.addEventListener('submit', async function(e) {
+    produtoForm.addEventListener('submit', async function (e) {
       e.preventDefault();
-      
+
       const estoqueTipo = document.getElementById('produtoEstoqueTipo')?.value || 'loja';
       const estoqueQuantidade = parseFloat(document.getElementById('produtoEstoque')?.value) || 0;
-      
+
       const formData = {
         nome: document.getElementById('produtoNome')?.value || '',
         tipo: document.getElementById('produtoTipo')?.value || '',
@@ -2028,7 +2028,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!isNaN(valorTotal)) formData.valor_total_compra = valorTotal;
       if (!isNaN(icms)) formData.imcs = icms;
       if (!isNaN(estoqueMinimo)) formData.estoque_minimo = estoqueMinimo;
-      
+
       try {
         const response = await fetchWithErrorHandling('/admin/produtos', {
           method: 'POST',
@@ -2037,7 +2037,7 @@ document.addEventListener('DOMContentLoaded', function() {
           },
           body: JSON.stringify(formData)
         });
-        
+
         if (response.success) {
           showFlashMessage('success', 'Produto cadastrado com sucesso');
           closeModal('produtoModal');
@@ -2054,17 +2054,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
   const editarProdutoForm = document.getElementById('editarProdutoForm');
   if (editarProdutoForm) {
-    editarProdutoForm.addEventListener('submit', async function(e) {
+    editarProdutoForm.addEventListener('submit', async function (e) {
       e.preventDefault();
-      
+
       const produtoId = this.getAttribute('data-produto-id');
       if (!produtoId) return;
-      
+
       const descontos = [];
       document.querySelectorAll('#descontosContainer .desconto-item').forEach(item => {
         descontos.push(item.dataset.id);
       });
-      
+
       const formData = {
         codigo: document.getElementById('editCodigo')?.value || '',
         nome: document.getElementById('editNome')?.value || '',
@@ -2082,7 +2082,7 @@ document.addEventListener('DOMContentLoaded', function() {
         ativo: document.getElementById('editAtivo')?.value === 'true',
         descontos: descontos
       };
-      
+
       try {
         const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`, {
           method: 'PUT',
@@ -2091,7 +2091,7 @@ document.addEventListener('DOMContentLoaded', function() {
           },
           body: JSON.stringify(formData)
         });
-        
+
         if (response.success) {
           showFlashMessage('success', 'Produto atualizado com sucesso');
           closeModal('editarProdutoModal');
@@ -2108,31 +2108,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
   const transferenciaForm = document.getElementById('transferenciaForm');
   if (transferenciaForm) {
-    transferenciaForm.addEventListener('submit', async function(e) {
+    transferenciaForm.addEventListener('submit', async function (e) {
       e.preventDefault();
-      
+
       const produtoId = document.getElementById('transferenciaProdutoId')?.value;
       const origem = document.getElementById('transferenciaOrigem')?.value;
       const destino = document.getElementById('transferenciaDestino')?.value;
       const quantidade = parseFloat(document.getElementById('transferenciaQuantidade')?.value || 0);
       const valorUnitarioDestino = parseFloat(document.getElementById('transferenciaValorUnitarioDestino')?.value || 0);
       const observacao = document.getElementById('transferenciaObservacao')?.value || '';
-      
+
       if (origem === destino) {
         showFlashMessage('error', 'Origem e destino não podem ser iguais');
         return;
       }
-      
+
       if (quantidade <= 0 || isNaN(quantidade)) {
         showFlashMessage('error', 'Informe uma quantidade válida');
         return;
       }
-      
+
       if (valorUnitarioDestino <= 0 || isNaN(valorUnitarioDestino)) {
         showFlashMessage('error', 'Informe um valor unitário válido');
         return;
       }
-      
+
       try {
         const response = await fetchWithErrorHandling('/admin/transferencias', {
           method: 'POST',
@@ -2149,7 +2149,7 @@ document.addEventListener('DOMContentLoaded', function() {
             converter_unidade: false
           })
         });
-        
+
         if (response.success) {
           showFlashMessage('success', 'Transferência realizada com sucesso');
           closeModal('transferenciaModal');
@@ -2166,7 +2166,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   document.getElementById('transferenciaOrigem')?.addEventListener('change', updateEstoqueDisponivel);
-  
+
   document.getElementById("btnEntradaEstoque").addEventListener("click", () => {
     openModal("entradaEstoqueModal");
   });
@@ -2219,7 +2219,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function atualizarTabelaProdutosRetroativa() {
     const tbody = document.querySelector('#tabelaProdutosRetroativa tbody');
     tbody.innerHTML = '';
-    
+
     itensVendaRetroativa.forEach((item, index) => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -2236,14 +2236,14 @@ document.addEventListener('DOMContentLoaded', function() {
       `;
       tbody.appendChild(tr);
     });
-    
+
     calcularTotaisRetroativa();
   }
 
   function atualizarTabelaPagamentosRetroativa() {
     const tbody = document.querySelector('#tabelaPagamentosRetroativa tbody');
     tbody.innerHTML = '';
-    
+
     pagamentosVendaRetroativa.forEach((pagamento, index) => {
       const formaPagamentoTexto = {
         'dinheiro': 'Dinheiro',
@@ -2269,7 +2269,7 @@ document.addEventListener('DOMContentLoaded', function() {
       `;
       tbody.appendChild(tr);
     });
-    
+
     calcularTotaisRetroativa();
   }
 
@@ -2290,20 +2290,20 @@ document.addEventListener('DOMContentLoaded', function() {
   async function carregarClientesRetroativa() {
     try {
       const response = await fetchWithErrorHandling('/admin/api/clientes/ativos');
-      
+
       if (response.success) {
         clientesVendaRetroativa = response.clientes;
         const select = document.getElementById('clienteRetroativo');
-        
+
         select.innerHTML = '<option value="">Selecione um cliente</option>';
-        
+
         response.clientes.forEach(cliente => {
           const option = document.createElement('option');
           option.value = cliente.id;
           option.textContent = `${cliente.nome} - ${cliente.documento || 'Sem documento'}`;
           select.appendChild(option);
         });
-        
+
       }
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
@@ -2314,13 +2314,13 @@ document.addEventListener('DOMContentLoaded', function() {
   async function carregarProdutosRetroativa() {
     try {
       const response = await fetchWithErrorHandling('/admin/api/produtos/ativos');
-      
+
       if (response.success) {
         produtosVendaRetroativa = response.produtos;
         const select = document.getElementById('produtoRetroativo');
-        
+
         select.innerHTML = '<option value="">Selecione um produto</option>';
-        
+
         response.produtos.forEach(produto => {
           const option = document.createElement('option');
           option.value = produto.id;
@@ -2339,13 +2339,13 @@ document.addEventListener('DOMContentLoaded', function() {
   async function carregarCaixasFechados() {
     try {
       const response = await fetchWithErrorHandling('/admin/api/caixas/fechados');
-      
+
       if (response.success) {
         caixasFechados = response.caixas;
         const select = document.getElementById('caixaRetroativo');
-        
+
         select.innerHTML = '<option value="">Selecione o caixa</option>';
-        
+
         response.caixas.forEach(caixa => {
           const option = document.createElement('option');
           option.value = caixa.id;
@@ -2362,21 +2362,21 @@ document.addEventListener('DOMContentLoaded', function() {
   function adicionarProdutoRetroativa() {
     const produtoSelect = document.getElementById('produtoRetroativo');
     const quantidadeInput = document.getElementById('quantidadeRetroativa');
-    
+
     const produtoId = produtoSelect.value;
     const quantidade = parseFloat(quantidadeInput.value);
-    
+
     if (!produtoId || !quantidade || quantidade <= 0) {
       showFlashMessage('warning', 'Selecione um produto e informe uma quantidade válida');
       return;
     }
-    
+
     const produto = produtosVendaRetroativa.find(p => p.id == produtoId);
     if (!produto) {
       showFlashMessage('error', 'Produto não encontrado');
       return;
     }
-    
+
     const itemExistente = itensVendaRetroativa.find(item => item.produto_id == produtoId);
     if (itemExistente) {
       itemExistente.quantidade += quantidade;
@@ -2392,35 +2392,35 @@ document.addEventListener('DOMContentLoaded', function() {
         unidade: selectedOption.getAttribute('data-unidade')
       });
     }
-    
+
     atualizarTabelaProdutosRetroativa();
-    
+
     produtoSelect.value = '';
     $(produtoSelect).trigger('change');
     quantidadeInput.value = '';
-    
+
     produtoSelect.focus();
   }
 
   function adicionarPagamentoRetroativo() {
     const formaSelect = document.getElementById('formaPagamentoRetroativo');
     const valorInput = document.getElementById('valorPagamentoRetroativo');
-    
+
     const forma = formaSelect.value;
     const valor = parseFloat(valorInput.value);
-    
+
     if (!forma || !valor || valor <= 0) {
       showFlashMessage('warning', 'Selecione uma forma de pagamento e informe um valor válido');
       return;
     }
-    
+
     pagamentosVendaRetroativa.push({
       forma_pagamento: forma,
       valor: valor
     });
-    
+
     atualizarTabelaPagamentosRetroativa();
-    
+
     formaSelect.value = '';
     valorInput.value = '';
     formaSelect.focus();
@@ -2431,35 +2431,35 @@ document.addEventListener('DOMContentLoaded', function() {
     const caixaId = document.getElementById('caixaRetroativo').value;
     const dataEmissao = document.getElementById('dataEmissaoRetroativa').value;
     const observacao = document.getElementById('observacaoRetroativa').value;
-    
+
     if (!clienteId) {
       showFlashMessage('warning', 'Selecione um cliente');
       return;
     }
-    
+
     if (!caixaId) {
       showFlashMessage('warning', 'Selecione um caixa');
       return;
     }
-    
+
     if (!dataEmissao) {
       showFlashMessage('warning', 'Informe a data da venda');
       return;
     }
-    
+
     if (itensVendaRetroativa.length === 0) {
       showFlashMessage('warning', 'Adicione pelo menos um produto');
       return;
     }
-    
+
     if (pagamentosVendaRetroativa.length === 0) {
       showFlashMessage('warning', 'Adicione pelo menos uma forma de pagamento');
       return;
     }
-    
+
     const valorTotal = itensVendaRetroativa.reduce((total, item) => total + item.valor_total, 0);
     const aPrazo = pagamentosVendaRetroativa.some(p => p.forma_pagamento === 'a_prazo');
-    
+
     const dadosVenda = {
       cliente_id: clienteId,
       caixa_id: caixaId,
@@ -2478,7 +2478,7 @@ document.addEventListener('DOMContentLoaded', function() {
       observacao: observacao,
       a_prazo: aPrazo
     };
-    
+
     try {
       const response = await fetchWithErrorHandling('/admin/api/vendas/retroativa', {
         method: 'POST',
@@ -2487,7 +2487,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         body: JSON.stringify(dadosVenda)
       });
-      
+
       if (response.success) {
         showFlashMessage('success', 'Venda retroativa registrada com sucesso!');
         limparFormularioRetroativa();
@@ -2507,11 +2507,11 @@ document.addEventListener('DOMContentLoaded', function() {
     await carregarClientesRetroativa();
     await carregarProdutosRetroativa();
     await carregarCaixasFechados();
-    
+
     if (caixaId) {
       document.getElementById('caixaRetroativo').value = caixaId;
     }
-    
+
     const now = new Date();
     document.getElementById('dataEmissaoRetroativa').value = formatarDataParaInput(now);
     openModal('modalVendaRetroativa');
@@ -2521,28 +2521,28 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btnAdicionarProdutoRetroativo').addEventListener('click', adicionarProdutoRetroativa);
     document.getElementById('btnAdicionarPagamentoRetroativo').addEventListener('click', adicionarPagamentoRetroativo);
     document.getElementById('btnSalvarVendaRetroativa').addEventListener('click', salvarVendaRetroativa);
-    
-    document.getElementById('quantidadeRetroativa').addEventListener('keypress', function(e) {
+
+    document.getElementById('quantidadeRetroativa').addEventListener('keypress', function (e) {
       if (e.key === 'Enter') {
         e.preventDefault();
         adicionarProdutoRetroativa();
       }
     });
-    
-    document.getElementById('valorPagamentoRetroativo').addEventListener('keypress', function(e) {
+
+    document.getElementById('valorPagamentoRetroativo').addEventListener('keypress', function (e) {
       if (e.key === 'Enter') {
         e.preventDefault();
         adicionarPagamentoRetroativo();
       }
     });
-    
-    document.addEventListener('click', function(e) {
+
+    document.addEventListener('click', function (e) {
       if (e.target.closest('.btn-remover-produto')) {
         const index = parseInt(e.target.closest('.btn-remover-produto').getAttribute('data-index'));
         itensVendaRetroativa.splice(index, 1);
         atualizarTabelaProdutosRetroativa();
       }
-      
+
       if (e.target.closest('.btn-remover-pagamento')) {
         const index = parseInt(e.target.closest('.btn-remover-pagamento').getAttribute('data-index'));
         pagamentosVendaRetroativa.splice(index, 1);
@@ -2553,300 +2553,300 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Funções auxiliares para formatação
   function formatarData(dataString) {
-      if (!dataString) return '-';
-      const date = new Date(dataString);
-      return date.toLocaleDateString('pt-BR');
+    if (!dataString) return '-';
+    const date = new Date(dataString);
+    return date.toLocaleDateString('pt-BR');
   }
 
   // Funções auxiliares para formatação
   function formatarStatus(status) {
-      const statusMap = {
-          'pendente': 'Pendente',
-          'atrasado': 'Atrasado',
-          'quitado': 'Quitado',
-          'paid': 'Quitado',       // Para compatibilidade
-          'pending': 'Pendente',   // Para compatibilidade
-          'overdue': 'Atrasado'    // Para compatibilidade
-      };
-      return statusMap[status.toLowerCase()] || status;
+    const statusMap = {
+      'pendente': 'Pendente',
+      'atrasado': 'Atrasado',
+      'quitado': 'Quitado',
+      'paid': 'Quitado',       // Para compatibilidade
+      'pending': 'Pendente',   // Para compatibilidade
+      'overdue': 'Atrasado'    // Para compatibilidade
+    };
+    return statusMap[status.toLowerCase()] || status;
   }
 
   function getStatusBadgeClass(status) {
-      const normalizedStatus = status.toLowerCase();
-      const classMap = {
-          'pendente': 'badge-warning',
-          'pending': 'badge-warning',
-          'atrasado': 'badge-danger',
-          'overdue': 'badge-danger',
-          'quitado': 'badge-success',
-          'paid': 'badge-success'
-      };
-      return classMap[normalizedStatus] || 'badge-secondary';
+    const normalizedStatus = status.toLowerCase();
+    const classMap = {
+      'pendente': 'badge-warning',
+      'pending': 'badge-warning',
+      'atrasado': 'badge-danger',
+      'overdue': 'badge-danger',
+      'quitado': 'badge-success',
+      'paid': 'badge-success'
+    };
+    return classMap[normalizedStatus] || 'badge-secondary';
   }
 
   // Configurar datas padrão (30 dias atrás até hoje)
   function setupContasReceberDates() {
-      const hoje = new Date();
-      const trintaDiasAtras = new Date();
-      trintaDiasAtras.setDate(hoje.getDate() - 30);
-      
-      document.getElementById('contasReceberDataFim').valueAsDate = hoje;
-      document.getElementById('contasReceberDataInicio').valueAsDate = trintaDiasAtras;
+    const hoje = new Date();
+    const trintaDiasAtras = new Date();
+    trintaDiasAtras.setDate(hoje.getDate() - 30);
+
+    document.getElementById('contasReceberDataFim').valueAsDate = hoje;
+    document.getElementById('contasReceberDataInicio').valueAsDate = trintaDiasAtras;
   }
 
   // Event Listeners
-  document.addEventListener('DOMContentLoaded', function() {
-      if (document.getElementById('contas-receber')) {
-          setupContasReceberDates();
-          loadContasReceber();
-      }
+  document.addEventListener('DOMContentLoaded', function () {
+    if (document.getElementById('contas-receber')) {
+      setupContasReceberDates();
+      loadContasReceber();
+    }
   });
 
   document.getElementById('filtrarContasReceber')?.addEventListener('click', loadContasReceber);
 
   // Event listener para abrir modal de detalhes
-  document.addEventListener('click', function(e) {
-      if (e.target.closest('.btn-detalhes-conta')) {
-          const contaId = e.target.closest('.btn-detalhes-conta').getAttribute('data-id');
-          abrirModalDetalhesConta(contaId);
-      }
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('.btn-detalhes-conta')) {
+      const contaId = e.target.closest('.btn-detalhes-conta').getAttribute('data-id');
+      abrirModalDetalhesConta(contaId);
+    }
   });
 
   // Função para abrir modal de detalhes da conta
   async function abrirModalDetalhesConta(contaId) {
-      try {
-          // Fazer a requisição para obter os detalhes da conta
-          const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
-          
-          if (response) {
-              // 1. Preencher informações básicas da conta
-              document.getElementById('detalheClienteNome').textContent = response.cliente || '-';
-              document.getElementById('detalheClienteDocumento').textContent = response.cliente_documento || '-';
-              document.getElementById('detalheDescricao').textContent = response.descricao || '-';
-              document.getElementById('detalheValorTotal').textContent = formatarMoeda(response.valor_original);
-              document.getElementById('detalheValorPendente').textContent = formatarMoeda(response.valor_aberto);
-              
-              // 2. Determinar o status para exibição
-              const hoje = new Date();
-              const dataVencimento = new Date(response.data_vencimento.split('/').reverse().join('-'));
-              let statusExibicao = response.status.toLowerCase();
-              
-              // Se não estiver quitado, verificar se está atrasado
-              if (statusExibicao !== 'quitado') {
-                  statusExibicao = dataVencimento >= hoje ? 'pendente' : 'atrasado';
-              }
-              
-              // Atualizar o elemento de status no modal
-              const statusElement = document.getElementById('detalheStatus');
-              statusElement.textContent = formatarStatus(statusExibicao);
-              statusElement.className = 'value badge ' + getStatusBadgeClass(statusExibicao);
-              
-              // 3. Preencher a lista de pagamentos realizados
-              const pagamentosTbody = document.getElementById('detalhePagamentos');
-              pagamentosTbody.innerHTML = '';
-              
-              if (response.pagamentos && response.pagamentos.length > 0) {
-                  response.pagamentos.forEach(pagamento => {
-                      const tr = document.createElement('tr');
-                      tr.innerHTML = `
+    try {
+      // Fazer a requisição para obter os detalhes da conta
+      const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
+
+      if (response) {
+        // 1. Preencher informações básicas da conta
+        document.getElementById('detalheClienteNome').textContent = response.cliente || '-';
+        document.getElementById('detalheClienteDocumento').textContent = response.cliente_documento || '-';
+        document.getElementById('detalheDescricao').textContent = response.descricao || '-';
+        document.getElementById('detalheValorTotal').textContent = formatarMoeda(response.valor_original);
+        document.getElementById('detalheValorPendente').textContent = formatarMoeda(response.valor_aberto);
+
+        // 2. Determinar o status para exibição
+        const hoje = new Date();
+        const dataVencimento = new Date(response.data_vencimento.split('/').reverse().join('-'));
+        let statusExibicao = response.status.toLowerCase();
+
+        // Se não estiver quitado, verificar se está atrasado
+        if (statusExibicao !== 'quitado') {
+          statusExibicao = dataVencimento >= hoje ? 'pendente' : 'atrasado';
+        }
+
+        // Atualizar o elemento de status no modal
+        const statusElement = document.getElementById('detalheStatus');
+        statusElement.textContent = formatarStatus(statusExibicao);
+        statusElement.className = 'value badge ' + getStatusBadgeClass(statusExibicao);
+
+        // 3. Preencher a lista de pagamentos realizados
+        const pagamentosTbody = document.getElementById('detalhePagamentos');
+        pagamentosTbody.innerHTML = '';
+
+        if (response.pagamentos && response.pagamentos.length > 0) {
+          response.pagamentos.forEach(pagamento => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
                           <td>${pagamento.data_pagamento}</td>
                           <td>${formatarMoeda(pagamento.valor_pago)}</td>
                           <td>${formatarFormaPagamento(pagamento.forma_pagamento)}</td>
                           <td>${pagamento.observacoes || '-'}</td>
                       `;
-                      pagamentosTbody.appendChild(tr);
-                  });
-              } else {
-                  pagamentosTbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
-              }
-              
-              // 4. Preencher o select de caixas disponíveis
-              const caixaSelect = document.getElementById('caixaPagamento');
-              caixaSelect.innerHTML = '<option value="">Selecione</option>';
-              
-              if (response.caixas && response.caixas.length > 0) {
-                  response.caixas.forEach(caixa => {
-                      const option = document.createElement('option');
-                      option.value = caixa.id;
-                      
-                      // Formatando a data de abertura para exibição
-                      const dataAbertura = caixa.data_abertura.split('-').reverse().join('/');
-                      option.textContent = `${dataAbertura} - ${caixa.operador} (${caixa.status})`;
-                      
-                      // Selecionar automaticamente o caixa aberto do usuário atual, se existir
-                      if (caixa.status.toLowerCase() === 'aberto') {
-                          option.selected = true;
-                      }
-                      
-                      caixaSelect.appendChild(option);
-                  });
-              }
-              
-              // 5. Configurar o formulário de pagamento
-              document.getElementById('contaIdPagamento').value = contaId;
-              
-              // Definir data atual como padrão para pagamento
-              const hojeISO = new Date().toISOString().split('T')[0];
-              document.getElementById('dataPagamento').value = hojeISO;
-              
-              // Limpar campos do formulário
-              document.getElementById('valorPagamento').value = '';
-              document.getElementById('observacaoPagamento').value = '';
-              
-              // 6. Habilitar/desabilitar botões conforme o status
-              const btnPagarTotal = document.getElementById('btnPagarTotal');
-              if (response.valor_aberto <= 0 || statusExibicao === 'quitado') {
-                  btnPagarTotal.disabled = true;
-                  btnPagarTotal.classList.add('disabled');
-              } else {
-                  btnPagarTotal.disabled = false;
-                  btnPagarTotal.classList.remove('disabled');
-              }
-              
-              // 7. Abrir o modal
-              openModal('detalhesContaModal');
-          }
-      } catch (error) {
-          console.error('Erro ao abrir detalhes da conta:', error);
-          showFlashMessage('error', 'Erro ao carregar detalhes da conta');
+            pagamentosTbody.appendChild(tr);
+          });
+        } else {
+          pagamentosTbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
+        }
+
+        // 4. Preencher o select de caixas disponíveis
+        const caixaSelect = document.getElementById('caixaPagamento');
+        caixaSelect.innerHTML = '<option value="">Selecione</option>';
+
+        if (response.caixas && response.caixas.length > 0) {
+          response.caixas.forEach(caixa => {
+            const option = document.createElement('option');
+            option.value = caixa.id;
+
+            // Formatando a data de abertura para exibição
+            const dataAbertura = caixa.data_abertura.split('-').reverse().join('/');
+            option.textContent = `${dataAbertura} - ${caixa.operador} (${caixa.status})`;
+
+            // Selecionar automaticamente o caixa aberto do usuário atual, se existir
+            if (caixa.status.toLowerCase() === 'aberto') {
+              option.selected = true;
+            }
+
+            caixaSelect.appendChild(option);
+          });
+        }
+
+        // 5. Configurar o formulário de pagamento
+        document.getElementById('contaIdPagamento').value = contaId;
+
+        // Definir data atual como padrão para pagamento
+        const hojeISO = new Date().toISOString().split('T')[0];
+        document.getElementById('dataPagamento').value = hojeISO;
+
+        // Limpar campos do formulário
+        document.getElementById('valorPagamento').value = '';
+        document.getElementById('observacaoPagamento').value = '';
+
+        // 6. Habilitar/desabilitar botões conforme o status
+        const btnPagarTotal = document.getElementById('btnPagarTotal');
+        if (response.valor_aberto <= 0 || statusExibicao === 'quitado') {
+          btnPagarTotal.disabled = true;
+          btnPagarTotal.classList.add('disabled');
+        } else {
+          btnPagarTotal.disabled = false;
+          btnPagarTotal.classList.remove('disabled');
+        }
+
+        // 7. Abrir o modal
+        openModal('detalhesContaModal');
       }
+    } catch (error) {
+      console.error('Erro ao abrir detalhes da conta:', error);
+      showFlashMessage('error', 'Erro ao carregar detalhes da conta');
+    }
   }
 
   // Event listeners para os botões de pagamento
-  document.getElementById('formPagamentoConta')?.addEventListener('submit', function(e) {
-      e.preventDefault();
-      const contaId = document.getElementById('contaIdPagamento').value;
-      const valor = parseFloat(document.getElementById('valorPagamento').value);
-      
-      if (contaId && valor) {
-          registrarPagamento(contaId, valor);
-      }
+  document.getElementById('formPagamentoConta')?.addEventListener('submit', function (e) {
+    e.preventDefault();
+    const contaId = document.getElementById('contaIdPagamento').value;
+    const valor = parseFloat(document.getElementById('valorPagamento').value);
+
+    if (contaId && valor) {
+      registrarPagamento(contaId, valor);
+    }
   });
 
-  document.getElementById('btnPagarTotal')?.addEventListener('click', function() {
-      const contaId = document.getElementById('contaIdPagamento').value;
-      const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
-      const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
-      
-      if (contaId && valorPendente > 0) {
-          // Preencher o valor total no campo
-          document.getElementById('valorPagamento').value = valorPendente.toFixed(2);
-          
-          // Registrar o pagamento
-          registrarPagamento(contaId, valorPendente, true);
-      }
+  document.getElementById('btnPagarTotal')?.addEventListener('click', function () {
+    const contaId = document.getElementById('contaIdPagamento').value;
+    const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
+    const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+
+    if (contaId && valorPendente > 0) {
+      // Preencher o valor total no campo
+      document.getElementById('valorPagamento').value = valorPendente.toFixed(2);
+
+      // Registrar o pagamento
+      registrarPagamento(contaId, valorPendente, true);
+    }
   });
 
   // Função para atualizar a lista de pagamentos
   async function atualizarListaPagamentos(contaId) {
-      try {
-          const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
-          
-          if (response && response.pagamentos) {
-              const pagamentosTbody = document.getElementById('detalhePagamentos');
-              pagamentosTbody.innerHTML = '';
-              
-              if (response.pagamentos.length > 0) {
-                  response.pagamentos.forEach(pagamento => {
-                      const tr = document.createElement('tr');
-                      tr.innerHTML = `
+    try {
+      const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
+
+      if (response && response.pagamentos) {
+        const pagamentosTbody = document.getElementById('detalhePagamentos');
+        pagamentosTbody.innerHTML = '';
+
+        if (response.pagamentos.length > 0) {
+          response.pagamentos.forEach(pagamento => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
                           <td>${pagamento.data_pagamento}</td>
                           <td>${formatarMoeda(pagamento.valor_pago)}</td>
                           <td>${pagamento.forma_pagamento}</td>
                           <td>${pagamento.observacoes || '-'}</td>
                       `;
-                      pagamentosTbody.appendChild(tr);
-                  });
-              } else {
-                  pagamentosTbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
-              }
-          }
-      } catch (error) {
-          console.error('Erro ao atualizar lista de pagamentos:', error);
+            pagamentosTbody.appendChild(tr);
+          });
+        } else {
+          pagamentosTbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
+        }
       }
+    } catch (error) {
+      console.error('Erro ao atualizar lista de pagamentos:', error);
+    }
   }
   async function loadRelatorioSaidasData() {
-      try {
-          // Mostrar loading
-          const tbody = document.querySelector('#tabelaRelatorio tbody');
-          tbody.innerHTML = '<tr><td colspan="9" class="text-center"><div class="spinner-border" role="status"><span class="sr-only">Carregando...</span></div></td></tr>';
-          
-          // Obter valores dos filtros
-          const dataInicio = document.getElementById('relatorioDataInicio').value;
-          const dataFim = document.getElementById('relatorioDataFim').value;
-          const produtoNome = document.getElementById('relatorioProdutoNome').value;
-          const produtoCodigo = document.getElementById('relatorioProdutoCodigo').value;
-          
-          // Construir parâmetros da URL
-          const params = new URLSearchParams();
-          if (dataInicio) params.append('data_inicio', dataInicio);
-          if (dataFim) params.append('data_fim', dataFim);
-          if (produtoNome) params.append('produto_nome', produtoNome);
-          if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
-          
-          // Limite padrão de 50 itens
-          params.append('limite', 50);
-          
-          // Fazer a requisição
-          const response = await fetchWithErrorHandling(`/admin/relatorios/vendas-produtos?${params.toString()}`);
-          
-          if (response) {
-              // Atualizar metadados
-              atualizarMetadadosRelatorio(response.meta);
-              
-              // Preencher tabela
-              preencherTabelaRelatorio(response.dados);
-          }
-      } catch (error) {
-          console.error('Erro ao carregar relatório:', error);
-          const tbody = document.querySelector('#tabelaRelatorio tbody');
-          tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">Erro ao carregar dados do relatório</td></tr>';
-          showFlashMessage('error', 'Erro ao carregar relatório de saídas');
+    try {
+      // Mostrar loading
+      const tbody = document.querySelector('#tabelaRelatorio tbody');
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center"><div class="spinner-border" role="status"><span class="sr-only">Carregando...</span></div></td></tr>';
+
+      // Obter valores dos filtros
+      const dataInicio = document.getElementById('relatorioDataInicio').value;
+      const dataFim = document.getElementById('relatorioDataFim').value;
+      const produtoNome = document.getElementById('relatorioProdutoNome').value;
+      const produtoCodigo = document.getElementById('relatorioProdutoCodigo').value;
+
+      // Construir parâmetros da URL
+      const params = new URLSearchParams();
+      if (dataInicio) params.append('data_inicio', dataInicio);
+      if (dataFim) params.append('data_fim', dataFim);
+      if (produtoNome) params.append('produto_nome', produtoNome);
+      if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
+
+      // Limite padrão de 50 itens
+      params.append('limite', 50);
+
+      // Fazer a requisição
+      const response = await fetchWithErrorHandling(`/admin/relatorios/vendas-produtos?${params.toString()}`);
+
+      if (response) {
+        // Atualizar metadados
+        atualizarMetadadosRelatorio(response.meta);
+
+        // Preencher tabela
+        preencherTabelaRelatorio(response.dados);
       }
+    } catch (error) {
+      console.error('Erro ao carregar relatório:', error);
+      const tbody = document.querySelector('#tabelaRelatorio tbody');
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">Erro ao carregar dados do relatório</td></tr>';
+      showFlashMessage('error', 'Erro ao carregar relatório de saídas');
+    }
   }
 
   function atualizarMetadadosRelatorio(meta) {
-      if (!meta) return;
-      
-      // Formatar período - CORREÇÃO: Usar UTC para evitar problemas de fuso horário
-      const inicio = new Date(meta.data_inicio + 'T00:00:00Z'); // Adiciona horário e UTC
-      const fim = new Date(meta.data_fim + 'T23:59:59Z'); // Adiciona horário e UTC
-      
-      // Ajusta para o fuso horário local apenas para exibição
-      const inicioLocal = new Date(inicio.getTime() + inicio.getTimezoneOffset() * 60000);
-      const fimLocal = new Date(fim.getTime() + fim.getTimezoneOffset() * 60000);
-      
-      document.getElementById('relatorioPeriodoTexto').innerHTML = 
-          `${inicioLocal.toLocaleDateString('pt-BR')}<br>${fimLocal.toLocaleDateString('pt-BR')}`;
-            
-      // Atualizar totais
-      document.getElementById('relatorioTotalProdutos').textContent = meta.total_produtos;
-      document.getElementById('relatorioTotalQuantidade').textContent = meta.total_quantidade_vendida;
-      document.getElementById('relatorioTotalValor').textContent = formatarMoeda(meta.total_valor_vendido);
-      document.getElementById('relatorioEstoqueCritico').textContent = meta.produtos_estoque_critico;
-      document.getElementById('relatorioCustoTotal').textContent = formatCurrency(meta.total_custo);
-      document.getElementById('relatorioLucroBruto').textContent = formatCurrency(meta.lucro_bruto);
-      document.getElementById('relatorioLucroLiquido').textContent = formatCurrency(meta.lucro_liquido);
+    if (!meta) return;
+
+    // Formatar período - CORREÇÃO: Usar UTC para evitar problemas de fuso horário
+    const inicio = new Date(meta.data_inicio + 'T00:00:00Z'); // Adiciona horário e UTC
+    const fim = new Date(meta.data_fim + 'T23:59:59Z'); // Adiciona horário e UTC
+
+    // Ajusta para o fuso horário local apenas para exibição
+    const inicioLocal = new Date(inicio.getTime() + inicio.getTimezoneOffset() * 60000);
+    const fimLocal = new Date(fim.getTime() + fim.getTimezoneOffset() * 60000);
+
+    document.getElementById('relatorioPeriodoTexto').innerHTML =
+      `${inicioLocal.toLocaleDateString('pt-BR')}<br>${fimLocal.toLocaleDateString('pt-BR')}`;
+
+    // Atualizar totais
+    document.getElementById('relatorioTotalProdutos').textContent = meta.total_produtos;
+    document.getElementById('relatorioTotalQuantidade').textContent = meta.total_quantidade_vendida;
+    document.getElementById('relatorioTotalValor').textContent = formatarMoeda(meta.total_valor_vendido);
+    document.getElementById('relatorioEstoqueCritico').textContent = meta.produtos_estoque_critico;
+    document.getElementById('relatorioCustoTotal').textContent = formatCurrency(meta.total_custo);
+    document.getElementById('relatorioLucroBruto').textContent = formatCurrency(meta.lucro_bruto);
+    document.getElementById('relatorioLucroLiquido').textContent = formatCurrency(meta.lucro_liquido);
   }
 
   function preencherTabelaRelatorio(dados) {
-      const tbody = document.querySelector('#tabelaRelatorio tbody');
-      
-      if (!dados || dados.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="10" class="text-center">Nenhum dado encontrado para os filtros selecionados</td></tr>';
-          return;
+    const tbody = document.querySelector('#tabelaRelatorio tbody');
+
+    if (!dados || dados.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" class="text-center">Nenhum dado encontrado para os filtros selecionados</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '';
+
+    dados.forEach(item => {
+      const tr = document.createElement('tr');
+
+      if (item.status_estoque === 'CRÍTICO') {
+        tr.classList.add('table-warning');
       }
-      
-      tbody.innerHTML = '';
-      
-      dados.forEach(item => {
-          const tr = document.createElement('tr');
-          
-          if (item.status_estoque === 'CRÍTICO') {
-              tr.classList.add('table-warning');
-          }
-          
-          tr.innerHTML = `
+
+      tr.innerHTML = `
               <td>${item.produto_id}</td>
               <td>
                   <strong>${item.produto_nome}</strong><br>
@@ -2882,72 +2882,72 @@ document.addEventListener('DOMContentLoaded', function() {
                   </button>
               </td>
           `;
-          
-          tbody.appendChild(tr);
+
+      tbody.appendChild(tr);
+    });
+
+    // Evento do botão de detalhes
+    document.querySelectorAll('.btn-detalhes').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const produtoId = this.getAttribute('data-produto-id');
+        abrirModalDetalhesProduto(produtoId); // Chama a rota /detalhes
       });
-      
-      // Evento do botão de detalhes
-      document.querySelectorAll('.btn-detalhes').forEach(btn => {
-          btn.addEventListener('click', function() {
-              const produtoId = this.getAttribute('data-produto-id');
-              abrirModalDetalhesProduto(produtoId); // Chama a rota /detalhes
-          });
-      });
+    });
   }
   // Adicione esta função no seu arquivo JavaScript existente
   async function exportarRelatorioPDF() {
-      try {
-          // Obter valores dos filtros atuais
-          const dataInicio = document.getElementById('relatorioDataInicio').value;
-          const dataFim = document.getElementById('relatorioDataFim').value;
-          const produtoNome = document.getElementById('relatorioProdutoNome').value;
-          const produtoCodigo = document.getElementById('relatorioProdutoCodigo').value;
-          
-          // Construir parâmetros
-          const params = new URLSearchParams();
-          if (dataInicio) params.append('data_inicio', dataInicio);
-          if (dataFim) params.append('data_fim', dataFim);
-          if (produtoNome) params.append('produto_nome', produtoNome);
-          if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
-          
-          // Gerar PDF em nova guia
-          window.open(`/admin/relatorios/vendas-produtos/pdf?${params.toString()}`, '_blank');
-          
-      } catch (error) {
-          console.error('Erro ao gerar PDF:', error);
-          showFlashMessage('error', 'Erro ao gerar relatório em PDF');
-      }
+    try {
+      // Obter valores dos filtros atuais
+      const dataInicio = document.getElementById('relatorioDataInicio').value;
+      const dataFim = document.getElementById('relatorioDataFim').value;
+      const produtoNome = document.getElementById('relatorioProdutoNome').value;
+      const produtoCodigo = document.getElementById('relatorioProdutoCodigo').value;
+
+      // Construir parâmetros
+      const params = new URLSearchParams();
+      if (dataInicio) params.append('data_inicio', dataInicio);
+      if (dataFim) params.append('data_fim', dataFim);
+      if (produtoNome) params.append('produto_nome', produtoNome);
+      if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
+
+      // Gerar PDF em nova guia
+      window.open(`/admin/relatorios/vendas-produtos/pdf?${params.toString()}`, '_blank');
+
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      showFlashMessage('error', 'Erro ao gerar relatório em PDF');
+    }
   }
 
   // Adicione este event listener no DOMContentLoaded ou onde você configura os eventos
   document.getElementById('btnExportarPDF')?.addEventListener('click', exportarRelatorioPDF);
   async function abrirModalDetalhesProduto(produtoId) {
-      try {
-          // Obter valores dos filtros atuais
-          const dataInicio = document.getElementById('relatorioDataInicio').value;
-          const dataFim = document.getElementById('relatorioDataFim').value;
-          
-          // Construir parâmetros
-          const params = new URLSearchParams();
-          params.append('produto_id', produtoId);
-          if (dataInicio) params.append('data_inicio', dataInicio);
-          if (dataFim) params.append('data_fim', dataFim);
-          
-          // Mostrar modal de loading
-          const modal = document.getElementById('detalhesSaidaModal');
-          const modalBody = modal.querySelector('.modal-body');
-          modalBody.innerHTML = '<div class="text-center p-4"><div class="spinner-border" role="status"><span class="sr-only">Carregando...</span></div></div>';
-          openModal('detalhesSaidaModal');
-          
-          // Fazer requisição
-          const response = await fetchWithErrorHandling(`/admin/relatorios/vendas-produtos/detalhes?${params.toString()}`);
-          
-          if (response && response.success) {
-              const produto = response.produto;
-              const historico = response.historico;
-              
-              // Preencher modal
-              modalBody.innerHTML = `
+    try {
+      // Obter valores dos filtros atuais
+      const dataInicio = document.getElementById('relatorioDataInicio').value;
+      const dataFim = document.getElementById('relatorioDataFim').value;
+
+      // Construir parâmetros
+      const params = new URLSearchParams();
+      params.append('produto_id', produtoId);
+      if (dataInicio) params.append('data_inicio', dataInicio);
+      if (dataFim) params.append('data_fim', dataFim);
+
+      // Mostrar modal de loading
+      const modal = document.getElementById('detalhesSaidaModal');
+      const modalBody = modal.querySelector('.modal-body');
+      modalBody.innerHTML = '<div class="text-center p-4"><div class="spinner-border" role="status"><span class="sr-only">Carregando...</span></div></div>';
+      openModal('detalhesSaidaModal');
+
+      // Fazer requisição
+      const response = await fetchWithErrorHandling(`/admin/relatorios/vendas-produtos/detalhes?${params.toString()}`);
+
+      if (response && response.success) {
+        const produto = response.produto;
+        const historico = response.historico;
+
+        // Preencher modal
+        modalBody.innerHTML = `
                   <div class="detalhes-produto-header">
                       <h4>${produto.produto_nome}</h4>
                       <p class="text-muted">Código: ${produto.produto_codigo || 'N/A'} | Categoria: ${produto.produto_tipo || 'N/A'}</p>
@@ -3007,65 +3007,65 @@ document.addEventListener('DOMContentLoaded', function() {
                       </div>
                   </div>
               `;
-          } else {
-              modalBody.innerHTML = `<div class="alert alert-danger">${response.message || 'Erro ao carregar detalhes'}</div>`;
-          }
-      } catch (error) {
-          console.error('Erro ao carregar detalhes:', error);
-          const modalBody = document.querySelector('#modalDetalhesProduto .modal-body');
-          modalBody.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+      } else {
+        modalBody.innerHTML = `<div class="alert alert-danger">${response.message || 'Erro ao carregar detalhes'}</div>`;
       }
+    } catch (error) {
+      console.error('Erro ao carregar detalhes:', error);
+      const modalBody = document.querySelector('#modalDetalhesProduto .modal-body');
+      modalBody.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+    }
   }
 
   function exportarRelatorioProduto(produtoId = null) {
-      // Obter valores dos filtros
-      const dataInicio = document.getElementById('relatorioDataInicio').value;
-      const dataFim = document.getElementById('relatorioDataFim').value;
-      const produtoNome = document.getElementById('relatorioProdutoNome').value;
-      const produtoCodigo = document.getElementById('relatorioProdutoCodigo').value;
-      const categoria = document.getElementById('relatorioCategoria').value;
-      
-      // Construir parâmetros
-      const params = new URLSearchParams();
-      if (produtoId) params.append('produto_id', produtoId);
-      if (dataInicio) params.append('data_inicio', dataInicio);
-      if (dataFim) params.append('data_fim', dataFim);
-      if (produtoNome) params.append('produto_nome', produtoNome);
-      if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
-      if (categoria) params.append('categoria', categoria);
-      
-      // Abrir link de download
-      window.open(`/relatorios/vendas-produtos/exportar?${params.toString()}`, '_blank');
+    // Obter valores dos filtros
+    const dataInicio = document.getElementById('relatorioDataInicio').value;
+    const dataFim = document.getElementById('relatorioDataFim').value;
+    const produtoNome = document.getElementById('relatorioProdutoNome').value;
+    const produtoCodigo = document.getElementById('relatorioProdutoCodigo').value;
+    const categoria = document.getElementById('relatorioCategoria').value;
+
+    // Construir parâmetros
+    const params = new URLSearchParams();
+    if (produtoId) params.append('produto_id', produtoId);
+    if (dataInicio) params.append('data_inicio', dataInicio);
+    if (dataFim) params.append('data_fim', dataFim);
+    if (produtoNome) params.append('produto_nome', produtoNome);
+    if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
+    if (categoria) params.append('categoria', categoria);
+
+    // Abrir link de download
+    window.open(`/relatorios/vendas-produtos/exportar?${params.toString()}`, '_blank');
   }
   // Funções auxiliares
   function formatarMoeda(valor) {
-      return new Intl.NumberFormat('pt-BR', { 
-          style: 'currency', 
-          currency: 'BRL' 
-      }).format(valor || 0);
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(valor || 0);
   }
 
   function formatarData(dataString) {
-      if (!dataString) return '-';
-      const date = new Date(dataString);
-      return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    if (!dataString) return '-';
+    const date = new Date(dataString);
+    return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   }
 
   // Event Listeners
-  document.addEventListener('DOMContentLoaded', function() {
-      // Definir datas padrão (últimos 30 dias)
-      const hoje = new Date();
-      const trintaDiasAtras = new Date();
-      trintaDiasAtras.setDate(hoje.getDate() - 30);
-      
-      document.getElementById('relatorioDataFim').valueAsDate = hoje;
-      document.getElementById('relatorioDataInicio').valueAsDate = trintaDiasAtras;
-      
-      // Carregar categorias
-      loadCategoriasProdutos();
-      
-      // Carregar dados iniciais
-      loadRelatorioSaidasData();
+  document.addEventListener('DOMContentLoaded', function () {
+    // Definir datas padrão (últimos 30 dias)
+    const hoje = new Date();
+    const trintaDiasAtras = new Date();
+    trintaDiasAtras.setDate(hoje.getDate() - 30);
+
+    document.getElementById('relatorioDataFim').valueAsDate = hoje;
+    document.getElementById('relatorioDataInicio').valueAsDate = trintaDiasAtras;
+
+    // Carregar categorias
+    loadCategoriasProdutos();
+
+    // Carregar dados iniciais
+    loadRelatorioSaidasData();
   });
 
   document.getElementById('filtrarRelatorio').addEventListener('click', loadRelatorioSaidasData);
@@ -3073,119 +3073,119 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Permitir filtrar com Enter nos campos de texto
   [document.getElementById('relatorioProdutoNome'), document.getElementById('relatorioProdutoCodigo')].forEach(input => {
-      if (input) {
-          input.addEventListener('keypress', function(e) {
-              if (e.key === 'Enter') {
-                  loadRelatorioSaidasData();
-              }
-          });
-      }
+    if (input) {
+      input.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+          loadRelatorioSaidasData();
+        }
+      });
+    }
   });
   // ===== CAIXAS =====
   // Função para carregar a lista de operadores
-    async function loadOperadores() {
-        try {
-            console.log('Iniciando loadOperadores...');
-            
-            // Aguarda um pouco para garantir que o DOM esteja pronto
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            const select = document.getElementById('caixaOperador');
-            console.log('Elemento caixaOperador:', select);
-            
-            if (!select) {
-                console.error('Elemento caixaOperador não encontrado!');
-                return;
-            }
-            
-            const response = await fetch('/admin/usuarios/operadores');
-            const data = await response.json();
-            
-            console.log('Dados recebidos da API:', data);
-            
-            if (data.success) {
-                // Limpa opções existentes (exceto a primeira "Todos")
-                select.innerHTML = '<option value="">Todos</option>';
-                
-                // Adiciona os operadores
-                data.data.forEach(operador => {
-                    const option = document.createElement('option');
-                    option.value = operador.id;
-                    option.textContent = operador.nome;
-                    select.appendChild(option);
-                });
-                
-                console.log(`Operadores carregados: ${data.data.length}`);
-            }
-        } catch (error) {
-            console.error('Erro ao carregar operadores:', error);
-        }
-    }
+  async function loadOperadores() {
+    try {
+      console.log('Iniciando loadOperadores...');
 
-    // Modifique a função loadCaixasData para incluir o filtro de operador
-    async function loadCaixasData() {
-        try {
-            const status = document.getElementById('caixaStatus')?.value || '';
-            const operadorId = document.getElementById('caixaOperador')?.value || '';
-            const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
-            const dataFim = document.getElementById('caixaDataFim')?.value || '';
-        
-            console.log('Filtros aplicados:', { status, operadorId, dataInicio, dataFim });
-        
-            // Monta query string dinamicamente
-            const params = new URLSearchParams();
-            if (status) params.append('status', status);
-            if (operadorId) params.append('operador_id', operadorId);
-            if (dataInicio) params.append('data_inicio', dataInicio);
-            if (dataFim) params.append('data_fim', dataFim);
-        
-            let url = '/admin/caixas';
-            if ([...params].length > 0) {
-                url += `?${params.toString()}`;
+      // Aguarda um pouco para garantir que o DOM esteja pronto
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const select = document.getElementById('caixaOperador');
+      console.log('Elemento caixaOperador:', select);
+
+      if (!select) {
+        console.error('Elemento caixaOperador não encontrado!');
+        return;
+      }
+
+      const response = await fetch('/admin/usuarios/operadores');
+      const data = await response.json();
+
+      console.log('Dados recebidos da API:', data);
+
+      if (data.success) {
+        // Limpa opções existentes (exceto a primeira "Todos")
+        select.innerHTML = '<option value="">Todos</option>';
+
+        // Adiciona os operadores
+        data.data.forEach(operador => {
+          const option = document.createElement('option');
+          option.value = operador.id;
+          option.textContent = operador.nome;
+          select.appendChild(option);
+        });
+
+        console.log(`Operadores carregados: ${data.data.length}`);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar operadores:', error);
+    }
+  }
+
+  // Modifique a função loadCaixasData para incluir o filtro de operador
+  async function loadCaixasData() {
+    try {
+      const status = document.getElementById('caixaStatus')?.value || '';
+      const operadorId = document.getElementById('caixaOperador')?.value || '';
+      const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
+      const dataFim = document.getElementById('caixaDataFim')?.value || '';
+
+      console.log('Filtros aplicados:', { status, operadorId, dataInicio, dataFim });
+
+      // Monta query string dinamicamente
+      const params = new URLSearchParams();
+      if (status) params.append('status', status);
+      if (operadorId) params.append('operador_id', operadorId);
+      if (dataInicio) params.append('data_inicio', dataInicio);
+      if (dataFim) params.append('data_fim', dataFim);
+
+      let url = '/admin/caixas';
+      if ([...params].length > 0) {
+        url += `?${params.toString()}`;
+      }
+
+      console.log('URL da requisição:', url);
+
+      const data = await fetchWithErrorHandling(url);
+
+      if (data.success) {
+        const caixasTable = document.querySelector('#caixasTable tbody');
+        if (caixasTable) {
+          caixasTable.innerHTML = '';
+
+          data.data.forEach(caixa => {
+            const row = document.createElement('tr');
+
+            const dataAbertura = formatDateTime(caixa.data_abertura);
+            const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
+
+            const valorEntradas = formatarMoeda(caixa.total_vendas);
+            const valorSaidas = formatarMoeda(caixa.total_despesas);
+            const valorConfirmado = caixa.valor_confirmado ? formatarMoeda(caixa.valor_confirmado) : '-';
+
+            let statusClass = '';
+            let statusText = '';
+            if (caixa.status === 'aberto') {
+              statusClass = 'badge-success';
+              statusText = 'Aberto';
+            } else if (caixa.status === 'fechado') {
+              statusClass = 'badge-primary';
+              statusText = 'Fechado';
+            } else if (caixa.status === 'analise' || caixa.status === 'em_analise') {
+              statusClass = 'badge-warning';
+              statusText = 'Em Análise';
+            } else if (caixa.status === 'rejeitado' || caixa.status === 'recusado') {
+              statusClass = 'badge-danger';
+              statusText = 'Rejeitado';
             }
-        
-            console.log('URL da requisição:', url);
-        
-            const data = await fetchWithErrorHandling(url);
-        
-            if (data.success) {
-                const caixasTable = document.querySelector('#caixasTable tbody');
-                if (caixasTable) {
-                    caixasTable.innerHTML = '';
-        
-                    data.data.forEach(caixa => {
-                        const row = document.createElement('tr');
-        
-                        const dataAbertura = formatDateTime(caixa.data_abertura);
-                        const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
-        
-                        const valorAbertura = formatarMoeda(caixa.valor_abertura);
-                        const valorFechamento = caixa.valor_fechamento ? formatarMoeda(caixa.valor_fechamento) : '-';
-                        const valorConfirmado = caixa.valor_confirmado ? formatarMoeda(caixa.valor_confirmado) : '-';
-        
-                        let statusClass = '';
-                        let statusText = '';
-                        if (caixa.status === 'aberto') {
-                            statusClass = 'badge-success';
-                            statusText = 'Aberto';
-                        } else if (caixa.status === 'fechado') {
-                            statusClass = 'badge-primary';
-                            statusText = 'Fechado';
-                        } else if (caixa.status === 'analise' || caixa.status === 'em_analise') {
-                            statusClass = 'badge-warning';
-                            statusText = 'Em Análise';
-                        } else if (caixa.status === 'rejeitado' || caixa.status === 'recusado') {
-                            statusClass = 'badge-danger';
-                            statusText = 'Rejeitado';
-                        }
-        
-                        row.innerHTML = `
+
+            row.innerHTML = `
                             <td>${caixa.id}</td>
                             <td>${caixa.operador?.nome || '-'}</td>
                             <td>${dataAbertura}</td>
                             <td>${dataFechamento}</td>
-                            <td>${valorAbertura}</td>
-                            <td>${valorFechamento}</td>
+                            <td>${valorEntradas}</td>
+                            <td>${valorSaidas}</td>
                             <td><span class="badge ${statusClass}">${statusText}</span></td>
                             <td>
                                 <div class="table-actions">
@@ -3204,122 +3204,122 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </div>
                             </td>
                         `;
-                        caixasTable.appendChild(row);
-                    });
-        
-                    setupCaixaActions();
-                }
-            }
-        } catch (error) {
-            console.error('Erro ao carregar caixas:', error);
-            showFlashMessage('error', 'Erro ao carregar lista de caixas');
+            caixasTable.appendChild(row);
+          });
+
+          setupCaixaActions();
         }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar caixas:', error);
+      showFlashMessage('error', 'Erro ao carregar lista de caixas');
     }
+  }
 
-    // Atualize o evento de refresh para limpar também o filtro de operador
-    document.getElementById('refreshCaixas')?.addEventListener('click', () => {
-        document.getElementById('caixaStatus').value = '';
-        document.getElementById('caixaOperador').value = '';
-        document.getElementById('caixaDataInicio').value = '';
-        document.getElementById('caixaDataFim').value = '';
-        loadCaixasData();
+  // Atualize o evento de refresh para limpar também o filtro de operador
+  document.getElementById('refreshCaixas')?.addEventListener('click', () => {
+    document.getElementById('caixaStatus').value = '';
+    document.getElementById('caixaOperador').value = '';
+    document.getElementById('caixaDataInicio').value = '';
+    document.getElementById('caixaDataFim').value = '';
+    loadCaixasData();
+  });
+
+  // Função para inicializar tudo quando a página carregar
+  function initializeCaixasPage() {
+    console.log('Inicializando página de caixas...');
+
+    // Carrega os operadores primeiro
+    loadOperadores().then(() => {
+      // Depois carrega os caixas
+      loadCaixasData();
     });
+  }
 
-    // Função para inicializar tudo quando a página carregar
-    function initializeCaixasPage() {
-        console.log('Inicializando página de caixas...');
-        
-        // Carrega os operadores primeiro
-        loadOperadores().then(() => {
-            // Depois carrega os caixas
-            loadCaixasData();
-        });
-    }
-
-    // Aguarda o DOM estar completamente carregado
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeCaixasPage);
-    } else {
-        initializeCaixasPage();
-    }
+  // Aguarda o DOM estar completamente carregado
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeCaixasPage);
+  } else {
+    initializeCaixasPage();
+  }
   // Eventos de filtro
   document.getElementById('filterCaixas')?.addEventListener('click', () => {
     loadCaixasData();
   });
-  
+
   document.getElementById('refreshCaixas')?.addEventListener('click', () => {
-        document.getElementById('caixaStatus').value = '';
-        document.getElementById('caixaOperador').value = '';
-        document.getElementById('caixaDataInicio').value = '';
-        document.getElementById('caixaDataFim').value = '';
+    document.getElementById('caixaStatus').value = '';
+    document.getElementById('caixaOperador').value = '';
+    document.getElementById('caixaDataInicio').value = '';
+    document.getElementById('caixaDataFim').value = '';
     loadCaixasData();
   });
-  
+
   // Evento para gerar PDF
   document.getElementById('gerarPdfCaixas')?.addEventListener('click', () => {
-      gerarPdfCaixas();
+    gerarPdfCaixas();
   });
-  
+
   async function gerarPdfCaixas() {
-      try {
-          const status = document.getElementById('caixaStatus')?.value || '';
-          const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
-          const dataFim = document.getElementById('caixaDataFim')?.value || '';
-          const operadorId = document.getElementById('caixaOperador')?.value || '';
-          
-          // Montar query string com os filtros atuais
-          const params = new URLSearchParams();
-          if (status) params.append('status', status);
-          if (dataInicio) params.append('data_inicio', dataInicio);
-          if (dataFim) params.append('data_fim', dataFim);
-          if (operadorId) params.append('operador_id', operadorId);
-          
-          let url = '/admin/caixas/pdf';
-          if ([...params].length > 0) {
-              url += `?${params.toString()}`;
-          }
-          
-          // Abrir PDF em nova aba
-          window.open(url, '_blank');
-          
-      } catch (error) {
-          console.error('Erro ao gerar PDF:', error);
-          showFlashMessage('error', 'Erro ao gerar PDF');
+    try {
+      const status = document.getElementById('caixaStatus')?.value || '';
+      const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
+      const dataFim = document.getElementById('caixaDataFim')?.value || '';
+      const operadorId = document.getElementById('caixaOperador')?.value || '';
+
+      // Montar query string com os filtros atuais
+      const params = new URLSearchParams();
+      if (status) params.append('status', status);
+      if (dataInicio) params.append('data_inicio', dataInicio);
+      if (dataFim) params.append('data_fim', dataFim);
+      if (operadorId) params.append('operador_id', operadorId);
+
+      let url = '/admin/caixas/pdf';
+      if ([...params].length > 0) {
+        url += `?${params.toString()}`;
       }
+
+      // Abrir PDF em nova aba
+      window.open(url, '_blank');
+
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      showFlashMessage('error', 'Erro ao gerar PDF');
+    }
   }
-  
+
   function setupCaixaActions() {
     document.querySelectorAll('.visualizar-caixa').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         const caixaId = this.getAttribute('data-id');
         openVisualizarCaixaModal(caixaId);
       });
     });
 
     document.querySelectorAll('.enviar-analise-caixa').forEach(btn => {
-      btn.addEventListener('click', async function() {
+      btn.addEventListener('click', async function () {
         const caixaId = this.getAttribute('data-id');
-        
+
         try {
           const valorFechamento = prompt('Informe o valor de fechamento para análise:');
           if (!valorFechamento) return;
-          
+
           if (isNaN(valorFechamento) || parseFloat(valorFechamento) <= 0) {
             showFlashMessage('error', 'Digite um valor válido!');
             return;
           }
-          
+
           const observacoes = prompt('Observações (opcional):') || '';
-          
+
           const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/enviar_analise`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
               valor_fechamento: parseFloat(valorFechamento),
               observacoes: observacoes
             })
           });
-          
+
           if (response.success) {
             showFlashMessage('success', 'Caixa enviado para análise com sucesso');
             loadCaixasData();
@@ -3332,29 +3332,29 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.querySelectorAll('.aprovar-caixa').forEach(btn => {
-      btn.addEventListener('click', async function() {
+      btn.addEventListener('click', async function () {
         const caixaId = this.getAttribute('data-id');
-        
+
         try {
           const valorConfirmado = prompt('Valor confirmado (opcional):');
           const observacoes = prompt('Observações (opcional):') || '';
-          
+
           if (valorConfirmado === null && observacoes === null) return;
-          
+
           if (valorConfirmado && (isNaN(valorConfirmado) || parseFloat(valorConfirmado) <= 0)) {
             showFlashMessage('error', 'Digite um valor válido ou deixe em branco!');
             return;
           }
-          
+
           const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/aprovar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
               valor_confirmado: valorConfirmado ? parseFloat(valorConfirmado) : null,
               observacoes: observacoes
             })
           });
-          
+
           if (response.success) {
             showFlashMessage('success', 'Caixa aprovado com sucesso');
             loadCaixasData();
@@ -3367,32 +3367,32 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.querySelectorAll('.recusar-caixa').forEach(btn => {
-      btn.addEventListener('click', async function() {
+      btn.addEventListener('click', async function () {
         const caixaId = this.getAttribute('data-id');
-        
+
         try {
           const motivo = prompt('Motivo da recusa (obrigatório):');
           if (!motivo) {
             showFlashMessage('warning', 'O motivo é obrigatório');
             return;
           }
-          
+
           const valorCorreto = prompt('Valor correto (opcional):');
-          
+
           if (valorCorreto && (isNaN(valorCorreto) || parseFloat(valorCorreto) <= 0)) {
             showFlashMessage('error', 'Digite um valor válido ou deixe em branco!');
             return;
           }
-          
+
           const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/recusar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
               motivo: motivo,
               valor_correto: valorCorreto ? parseFloat(valorCorreto) : null
             })
           });
-          
+
           if (response.success) {
             showFlashMessage('success', 'Caixa recusado com sucesso');
             loadCaixasData();
@@ -3405,19 +3405,19 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.querySelectorAll('.reabrir-caixa').forEach(btn => {
-      btn.addEventListener('click', async function() {
+      btn.addEventListener('click', async function () {
         const caixaId = this.getAttribute('data-id');
-        
+
         try {
           const motivo = prompt('Motivo da reabertura (opcional):') || '';
-          
+
           if (confirm('Tem certeza que deseja reabrir este caixa?')) {
             const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/reabrir`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ motivo: motivo })
             });
-            
+
             if (response.success) {
               showFlashMessage('success', 'Caixa reaberto com sucesso');
               loadCaixasData();
@@ -3431,14 +3431,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.querySelectorAll('.venda-retroativa-caixa').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         const caixaId = this.getAttribute('data-id');
         abrirModalVendaRetroativa(caixaId);
       });
     });
-    
+
     document.querySelectorAll('.fechar-caixa').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         const caixaId = this.getAttribute('data-id');
 
         // Criar modal com CSS inline baseado no style.txt
@@ -3561,20 +3561,20 @@ document.addEventListener('DOMContentLoaded', function() {
   async function openVisualizarCaixaModal(caixaId) {
     try {
       const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}`);
-      
+
       if (response.success) {
         const caixa = response.data;
-        
+
         if (document.getElementById('visualizarCaixaId')) document.getElementById('visualizarCaixaId').textContent = caixa.id;
         if (document.getElementById('visualizarCaixaOperador')) document.getElementById('visualizarCaixaOperador').textContent = caixa.operador?.nome || '-';
         if (document.getElementById('visualizarCaixaDataAbertura')) document.getElementById('visualizarCaixaDataAbertura').textContent = formatDateTime(caixa.data_abertura);
         if (document.getElementById('visualizarCaixaValorAbertura')) document.getElementById('visualizarCaixaValorAbertura').textContent = formatarMoeda(caixa.valor_abertura);
-        
+
         const statusElement = document.getElementById('visualizarCaixaStatus');
         if (statusElement) {
           let statusText = '';
           let statusClass = '';
-          
+
           if (caixa.status === 'aberto') {
             statusText = 'Aberto';
             statusClass = 'badge-success';
@@ -3588,26 +3588,26 @@ document.addEventListener('DOMContentLoaded', function() {
             statusText = 'Rejeitado';
             statusClass = 'badge-danger';
           }
-          
+
           statusElement.textContent = statusText;
           statusElement.className = 'badge ' + statusClass;
         }
-        
+
         if (['fechado', 'analise', 'rejeitado'].includes(caixa.status)) {
           if (document.getElementById('visualizarCaixaDataFechamento')) document.getElementById('visualizarCaixaDataFechamento').textContent = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
           if (document.getElementById('visualizarCaixaValorFechamento')) document.getElementById('visualizarCaixaValorFechamento').textContent = caixa.valor_fechamento ? formatarMoeda(caixa.valor_fechamento) : '-';
           if (document.getElementById('visualizarCaixaValorConfirmado')) document.getElementById('visualizarCaixaValorConfirmado').textContent = caixa.valor_confirmado ? formatarMoeda(caixa.valor_confirmado) : '-';
-          
+
           const caixaFechamentoInfo = document.getElementById('caixaFechamentoInfo');
           if (caixaFechamentoInfo) caixaFechamentoInfo.style.display = 'block';
         } else {
           const caixaFechamentoInfo = document.getElementById('caixaFechamentoInfo');
           if (caixaFechamentoInfo) caixaFechamentoInfo.style.display = 'none';
         }
-        
+
         if (document.getElementById('visualizarCaixaObsOperador')) document.getElementById('visualizarCaixaObsOperador').textContent = caixa.observacoes_operador || 'Nenhuma observação';
         if (document.getElementById('visualizarCaixaObsAdmin')) document.getElementById('visualizarCaixaObsAdmin').textContent = caixa.observacoes_admin || 'Nenhuma observação';
-        
+
         await loadCaixaFinanceiro(caixaId);
         openModal(document.getElementById('visualizarCaixaModal'));
       }
@@ -3617,85 +3617,85 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-function openEstornarVendaModal(vendaId, valor, data, cliente, descricao) {
+  function openEstornarVendaModal(vendaId, valor, data, cliente, descricao) {
     // Preencher os dados da venda no modal
     document.getElementById('estornoVendaId').value = vendaId;
     document.getElementById('estornoVendaValor').textContent = formatarMoeda(valor);
     document.getElementById('estornoVendaData').textContent = formatDateTime(data);
     document.getElementById('estornoVendaCliente').textContent = cliente || 'Não informado';
     document.getElementById('estornoVendaDescricao').textContent = descricao || 'Não informado';
-    
+
     // Limpar o campo de motivo
     document.getElementById('motivoEstorno').value = '';
-    
+
     // Abrir o modal
     openModal(document.getElementById('estornarVendaModal'));
-}
+  }
 
-// Função para processar o estorno
-async function processarEstorno() {
+  // Função para processar o estorno
+  async function processarEstorno() {
     const vendaId = document.getElementById('estornoVendaId').value;
     const motivoEstorno = document.getElementById('motivoEstorno').value.trim();
-    
+
     if (!motivoEstorno) {
-        showFlashMessage('error', 'Por favor, informe o motivo do estorno');
-        return;
+      showFlashMessage('error', 'Por favor, informe o motivo do estorno');
+      return;
     }
-    
+
     try {
-        showLoading(true);
-        const response = await fetchWithErrorHandling(`/admin/caixa/venda/${vendaId}/estornar`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                motivo_estorno: motivoEstorno
-            })
-        });
-        
-        if (response.success) {
-            showFlashMessage('success', response.message || 'Venda estornada com sucesso');
-            closeModal(document.getElementById('estornarVendaModal'));
-            
-            // Recarregar os dados do caixa
-            if (caixaIdAtual) {
-                await loadCaixaFinanceiro(caixaIdAtual);
-            }
-        } else {
-            showFlashMessage('error', response.message || 'Erro ao estornar venda');
+      showLoading(true);
+      const response = await fetchWithErrorHandling(`/admin/caixa/venda/${vendaId}/estornar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          motivo_estorno: motivoEstorno
+        })
+      });
+
+      if (response.success) {
+        showFlashMessage('success', response.message || 'Venda estornada com sucesso');
+        closeModal(document.getElementById('estornarVendaModal'));
+
+        // Recarregar os dados do caixa
+        if (caixaIdAtual) {
+          await loadCaixaFinanceiro(caixaIdAtual);
         }
+      } else {
+        showFlashMessage('error', response.message || 'Erro ao estornar venda');
+      }
     } catch (error) {
-        console.error('Erro ao estornar venda:', error);
-        showFlashMessage('error', 'Erro ao processar estorno');
+      console.error('Erro ao estornar venda:', error);
+      showFlashMessage('error', 'Erro ao processar estorno');
     } finally {
-        showLoading(false);
+      showLoading(false);
     }
-}
+  }
 
-async function loadCaixaFinanceiro(caixaId) {
+  async function loadCaixaFinanceiro(caixaId) {
     try {
-        const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
-        caixaIdAtual = caixaId;
+      const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
+      caixaIdAtual = caixaId;
 
-        if (response.success) {
-            const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
-            if (tableBody) {
-                tableBody.innerHTML = '';
-                
-                response.data.forEach(item => {
-                    const row = document.createElement('tr');
-                    const valor = parseFloat(item.valor);
+      if (response.success) {
+        const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
+        if (tableBody) {
+          tableBody.innerHTML = '';
 
-                    // Verificar se é uma venda que pode ser estornada
-                    const isVendaEstornavel = item.tipo === 'entrada' && item.nota_fiscal_id;
-                    
-                    // Format payment methods as tags
-                    const paymentTags = item.formas_pagamento && item.formas_pagamento.length > 0 
-                        ? item.formas_pagamento.map(p => `<span class="badge badge-info">${p}</span>`).join(' ') 
-                        : '-';
+          response.data.forEach(item => {
+            const row = document.createElement('tr');
+            const valor = parseFloat(item.valor);
 
-                    row.innerHTML = `
+            // Verificar se é uma venda que pode ser estornada
+            const isVendaEstornavel = item.tipo === 'entrada' && item.nota_fiscal_id;
+
+            // Format payment methods as tags
+            const paymentTags = item.formas_pagamento && item.formas_pagamento.length > 0
+              ? item.formas_pagamento.map(p => `<span class="badge badge-info">${p}</span>`).join(' ')
+              : '-';
+
+            row.innerHTML = `
                         <td>${formatDateTime(item.data)}</td>
                         <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
                         <td>${item.categoria || '-'}</td>
@@ -3720,163 +3720,163 @@ async function loadCaixaFinanceiro(caixaId) {
                             ` : ''}
                         </td>
                     `;
-                    
-                    // Adicionar eventos aos botões de editar pagamento
-                    row.querySelectorAll('.btn-editar-pagamento').forEach(btn => {
-                        btn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            const vendaId = btn.getAttribute('data-venda-id');
-                            openEditarFormasPagamentoModal(vendaId);
-                        });
-                    });
-                    
-                    // Adicionar eventos aos botões de estornar
-                    row.querySelectorAll('.btn-estornar-venda').forEach(btn => {
-                        btn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            const vendaId = btn.getAttribute('data-venda-id');
-                            const valor = btn.getAttribute('data-valor');
-                            const data = btn.getAttribute('data-data');
-                            const cliente = btn.getAttribute('data-cliente');
-                            const descricao = btn.getAttribute('data-descricao');
-                            openEstornarVendaModal(vendaId, valor, data, cliente, descricao);
-                        });
-                    });
-                    
-                    // Adiciona evento de clique para abrir detalhes da venda
-                    if (item.nota_fiscal_id) {
-                        row.style.cursor = 'pointer';
-                        row.classList.add('clickable-row');
-                        row.addEventListener('click', () => {
-                            openDetalhesVendaModal(item.nota_fiscal_id);
-                        });
-                    }
-                    
-                    tableBody.appendChild(row);
-                });
 
-                // USE OS TOTAIS DO BACKEND (response.totais) EM VEZ DE CALCULAR NOVAMENTE
-                if (document.getElementById('caixaTotalEntradas')) {
-                    document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(response.totais.entradas);
-                }
-                if (document.getElementById('caixaTotalSaidas')) {
-                    document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(response.totais.saidas);
-                }
-                if (document.getElementById('caixaSaldo')) {
-                    document.getElementById('caixaSaldo').textContent = formatarMoeda(response.totais.saldo);
-                }
-                if (document.getElementById('caixaValorFisico')) {
-                    document.getElementById('caixaValorFisico').textContent = formatarMoeda(response.totais.valor_fisico || 0);
-                }
-                if (document.getElementById('caixaValorDigital')) {
-                    document.getElementById('caixaValorDigital').textContent = formatarMoeda(response.totais.valor_digital || 0);
-                }
-                if (document.getElementById('caixaAPrazo')) {
-                    document.getElementById('caixaAPrazo').textContent = formatarMoeda(response.totais.a_prazo || 0);
-                }
-                if(document.getElementById('totalAPrazoRecebido')){
-                    document.getElementById('totalAPrazoRecebido').textContent = formatarMoeda(response.totais.contas_prazo_recebidas || 0);
-                }
-                
-                const formasPagamento = response.vendas_por_forma_pagamento || {};
+            // Adicionar eventos aos botões de editar pagamento
+            row.querySelectorAll('.btn-editar-pagamento').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const vendaId = btn.getAttribute('data-venda-id');
+                openEditarFormasPagamentoModal(vendaId);
+              });
+            });
 
-                document.getElementById('totalPixFabiano').textContent = formatarMoeda(formasPagamento.pix_fabiano || 0);
-                document.getElementById('totalPixMaquineta').textContent = formatarMoeda(formasPagamento.pix_maquineta || 0);
-                document.getElementById('totalPixEdFrance').textContent = formatarMoeda(formasPagamento.pix_edfrance || 0);
-                document.getElementById('totalPixLoja').textContent = formatarMoeda(formasPagamento.pix_loja || 0);
-                document.getElementById('totalDinheiro').textContent = formatarMoeda(formasPagamento.dinheiro || 0);
-                document.getElementById('totalCartaoCredito').textContent = formatarMoeda(formasPagamento.cartao_credito || 0);
-                document.getElementById('totalCartaoDebito').textContent = formatarMoeda(formasPagamento.cartao_debito || 0);
-                document.getElementById('totalAPrazo').textContent = formatarMoeda(formasPagamento.a_prazo || 0);
+            // Adicionar eventos aos botões de estornar
+            row.querySelectorAll('.btn-estornar-venda').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const vendaId = btn.getAttribute('data-venda-id');
+                const valor = btn.getAttribute('data-valor');
+                const data = btn.getAttribute('data-data');
+                const cliente = btn.getAttribute('data-cliente');
+                const descricao = btn.getAttribute('data-descricao');
+                openEstornarVendaModal(vendaId, valor, data, cliente, descricao);
+              });
+            });
 
-                // Adiciona eventos de clique para os cards de formas de pagamento
-                addFormaPagamentoClickEvents(caixaId);
+            // Adiciona evento de clique para abrir detalhes da venda
+            if (item.nota_fiscal_id) {
+              row.style.cursor = 'pointer';
+              row.classList.add('clickable-row');
+              row.addEventListener('click', () => {
+                openDetalhesVendaModal(item.nota_fiscal_id);
+              });
             }
+
+            tableBody.appendChild(row);
+          });
+
+          // USE OS TOTAIS DO BACKEND (response.totais) EM VEZ DE CALCULAR NOVAMENTE
+          if (document.getElementById('caixaTotalEntradas')) {
+            document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(response.totais.entradas);
+          }
+          if (document.getElementById('caixaTotalSaidas')) {
+            document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(response.totais.saidas);
+          }
+          if (document.getElementById('caixaSaldo')) {
+            document.getElementById('caixaSaldo').textContent = formatarMoeda(response.totais.saldo);
+          }
+          if (document.getElementById('caixaValorFisico')) {
+            document.getElementById('caixaValorFisico').textContent = formatarMoeda(response.totais.valor_fisico || 0);
+          }
+          if (document.getElementById('caixaValorDigital')) {
+            document.getElementById('caixaValorDigital').textContent = formatarMoeda(response.totais.valor_digital || 0);
+          }
+          if (document.getElementById('caixaAPrazo')) {
+            document.getElementById('caixaAPrazo').textContent = formatarMoeda(response.totais.a_prazo || 0);
+          }
+          if (document.getElementById('totalAPrazoRecebido')) {
+            document.getElementById('totalAPrazoRecebido').textContent = formatarMoeda(response.totais.contas_prazo_recebidas || 0);
+          }
+
+          const formasPagamento = response.vendas_por_forma_pagamento || {};
+
+          document.getElementById('totalPixFabiano').textContent = formatarMoeda(formasPagamento.pix_fabiano || 0);
+          document.getElementById('totalPixMaquineta').textContent = formatarMoeda(formasPagamento.pix_maquineta || 0);
+          document.getElementById('totalPixEdFrance').textContent = formatarMoeda(formasPagamento.pix_edfrance || 0);
+          document.getElementById('totalPixLoja').textContent = formatarMoeda(formasPagamento.pix_loja || 0);
+          document.getElementById('totalDinheiro').textContent = formatarMoeda(formasPagamento.dinheiro || 0);
+          document.getElementById('totalCartaoCredito').textContent = formatarMoeda(formasPagamento.cartao_credito || 0);
+          document.getElementById('totalCartaoDebito').textContent = formatarMoeda(formasPagamento.cartao_debito || 0);
+          document.getElementById('totalAPrazo').textContent = formatarMoeda(formasPagamento.a_prazo || 0);
+
+          // Adiciona eventos de clique para os cards de formas de pagamento
+          addFormaPagamentoClickEvents(caixaId);
         }
+      }
     } catch (error) {
-        console.error('Erro ao carregar financeiro do caixa:', error);
-        showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
+      console.error('Erro ao carregar financeiro do caixa:', error);
+      showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
     }
-}
-function showLoading(show) {
+  }
+  function showLoading(show) {
     const loadingElement = document.getElementById('loadingOverlay');
     if (loadingElement) {
-        loadingElement.style.display = show ? 'flex' : 'none';
+      loadingElement.style.display = show ? 'flex' : 'none';
     }
-}
-window.addEventListener('load', function() {
+  }
+  window.addEventListener('load', function () {
     // Adicionar event listener para o botão de confirmar estorno no modal
     const btnConfirmarEstorno = document.getElementById('btnConfirmarEstorno');
     if (btnConfirmarEstorno) {
-        btnConfirmarEstorno.addEventListener('click', processarEstorno);
+      btnConfirmarEstorno.addEventListener('click', processarEstorno);
     }
-    
+
     // Adicionar event listener para o campo de motivo (submeter com Enter)
     const motivoEstornoInput = document.getElementById('motivoEstorno');
     if (motivoEstornoInput) {
-        motivoEstornoInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                processarEstorno();
-            }
-        });
+      motivoEstornoInput.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+          processarEstorno();
+        }
+      });
     }
-});
-// Função para adicionar eventos de clique aos cards de formas de pagamento
-function addFormaPagamentoClickEvents(caixaId) {
+  });
+  // Função para adicionar eventos de clique aos cards de formas de pagamento
+  function addFormaPagamentoClickEvents(caixaId) {
     const formasPagamentoIds = [
-        'totalPixFabiano', 'totalPixMaquineta', 'totalPixEdFrance', 
-        'totalPixLoja', 'totalDinheiro', 'totalCartaoCredito', 
-        'totalCartaoDebito', 'totalAPrazo'
+      'totalPixFabiano', 'totalPixMaquineta', 'totalPixEdFrance',
+      'totalPixLoja', 'totalDinheiro', 'totalCartaoCredito',
+      'totalCartaoDebito', 'totalAPrazo'
     ];
 
     const formaPagamentoMap = {
-        'totalPixFabiano': 'pix_fabiano',
-        'totalPixMaquineta': 'pix_maquineta',
-        'totalPixEdFrance': 'pix_edfrance',
-        'totalPixLoja': 'pix_loja',
-        'totalDinheiro': 'dinheiro',
-        'totalCartaoCredito': 'cartao_credito',
-        'totalCartaoDebito': 'cartao_debito',
-        'totalAPrazo': 'a_prazo'
+      'totalPixFabiano': 'pix_fabiano',
+      'totalPixMaquineta': 'pix_maquineta',
+      'totalPixEdFrance': 'pix_edfrance',
+      'totalPixLoja': 'pix_loja',
+      'totalDinheiro': 'dinheiro',
+      'totalCartaoCredito': 'cartao_credito',
+      'totalCartaoDebito': 'cartao_debito',
+      'totalAPrazo': 'a_prazo'
     };
 
     formasPagamentoIds.forEach(id => {
-        const element = document.getElementById(id);
-        if (element) {
-            // Encontra o elemento pai (total-item) para tornar clicável
-            const card = element.closest('.total-item');
-            if (card) {
-                card.style.cursor = 'pointer';
-                card.classList.add('clickable-card');
-                card.addEventListener('click', () => {
-                    const formaPagamento = formaPagamentoMap[id];
-                    openVendasFormaPagamentoModal(caixaId, formaPagamento);
-                });
-            }
+      const element = document.getElementById(id);
+      if (element) {
+        // Encontra o elemento pai (total-item) para tornar clicável
+        const card = element.closest('.total-item');
+        if (card) {
+          card.style.cursor = 'pointer';
+          card.classList.add('clickable-card');
+          card.addEventListener('click', () => {
+            const formaPagamento = formaPagamentoMap[id];
+            openVendasFormaPagamentoModal(caixaId, formaPagamento);
+          });
         }
+      }
     });
-}
+  }
 
-// Função para abrir modal de vendas por forma de pagamento
-async function openVendasFormaPagamentoModal(caixaId, formaPagamento) {
+  // Função para abrir modal de vendas por forma de pagamento
+  async function openVendasFormaPagamentoModal(caixaId, formaPagamento) {
     try {
-        const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/vendas-por-pagamento?forma_pagamento=${formaPagamento}`);
-        
-        if (response.success) {
-            const modal = document.getElementById('vendasFormaPagamentoModal');
-            const tableBody = document.querySelector('#vendasFormaPagamentoTable tbody');
-            const titulo = document.getElementById('vendasFormaPagamentoTitulo');
-            
-            // Atualiza título do modal
-            titulo.textContent = `Vendas - ${formatFormaPagamento(formaPagamento)}`;
-            
-            // Limpa tabela
-            tableBody.innerHTML = '';
-            
-            // Preenche tabela com vendas
-            response.vendas.forEach(venda => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
+      const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/vendas-por-pagamento?forma_pagamento=${formaPagamento}`);
+
+      if (response.success) {
+        const modal = document.getElementById('vendasFormaPagamentoModal');
+        const tableBody = document.querySelector('#vendasFormaPagamentoTable tbody');
+        const titulo = document.getElementById('vendasFormaPagamentoTitulo');
+
+        // Atualiza título do modal
+        titulo.textContent = `Vendas - ${formatFormaPagamento(formaPagamento)}`;
+
+        // Limpa tabela
+        tableBody.innerHTML = '';
+
+        // Preenche tabela com vendas
+        response.vendas.forEach(venda => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
                     <td>${formatDateTime(venda.data_emissao)}</td>
                     <td>${venda.id}</td>
                     <td>${venda.cliente_nome || 'Não informado'}</td>
@@ -3888,81 +3888,81 @@ async function openVendasFormaPagamentoModal(caixaId, formaPagamento) {
                         </button>
                     </td>
                 `;
-                tableBody.appendChild(row);
-            });
-            
-            // Adiciona eventos de clique para os botões de visualização
-            document.querySelectorAll('.btn-view-venda').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const vendaId = btn.getAttribute('data-venda-id');
-                    openDetalhesVendaModal(vendaId);
-                });
-            });
-            // botão PDF
-            const btnExportarPdf = document.getElementById('btnExportarPdf');
-            btnExportarPdf.onclick = () => {
-                const url = `/admin/caixas/${caixaId}/vendas-por-pagamento/pdf?forma_pagamento=${formaPagamento}`;
-                window.open(url, '_blank');
-            };
+          tableBody.appendChild(row);
+        });
 
-            // Abre o modal
-            openModal(modal);
-        } else {
-            showFlashMessage('error', response.error || 'Erro ao carregar vendas');
-        }
+        // Adiciona eventos de clique para os botões de visualização
+        document.querySelectorAll('.btn-view-venda').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const vendaId = btn.getAttribute('data-venda-id');
+            openDetalhesVendaModal(vendaId);
+          });
+        });
+        // botão PDF
+        const btnExportarPdf = document.getElementById('btnExportarPdf');
+        btnExportarPdf.onclick = () => {
+          const url = `/admin/caixas/${caixaId}/vendas-por-pagamento/pdf?forma_pagamento=${formaPagamento}`;
+          window.open(url, '_blank');
+        };
+
+        // Abre o modal
+        openModal(modal);
+      } else {
+        showFlashMessage('error', response.error || 'Erro ao carregar vendas');
+      }
     } catch (error) {
-        console.error('Erro ao abrir modal de vendas:', error);
-        showFlashMessage('error', 'Erro ao carregar vendas');
+      console.error('Erro ao abrir modal de vendas:', error);
+      showFlashMessage('error', 'Erro ao carregar vendas');
     }
-}
-// Configurar botão de PDF de movimentações
-document.getElementById('abrirPdfMovimentacoes')?.addEventListener('click', function() {
+  }
+  // Configurar botão de PDF de movimentações
+  document.getElementById('abrirPdfMovimentacoes')?.addEventListener('click', function () {
     if (caixaIdAtual) {
-        const url = `/admin/caixas/${caixaIdAtual}/financeiro/movimentacoes/pdf`;
-        window.open(url, '_blank');
+      const url = `/admin/caixas/${caixaIdAtual}/financeiro/movimentacoes/pdf`;
+      window.open(url, '_blank');
     } else {
-        showFlashMessage('error', 'Nenhum caixa selecionado');
+      showFlashMessage('error', 'Nenhum caixa selecionado');
     }
-});
-// Função para abrir modal de detalhes da venda
-async function openDetalhesVendaModal(vendaId) {
+  });
+  // Função para abrir modal de detalhes da venda
+  async function openDetalhesVendaModal(vendaId) {
     try {
-        const response = await fetchWithErrorHandling(`/admin/vendas/${vendaId}/detalhes`);
-        
-        if (response.success) {
-            const modal = document.getElementById('detalhesVendaModal');
-            const venda = response.venda;
-            
-            // Preenche informações básicas
-            document.getElementById('detalheNotaFiscalId').textContent = venda.id;
-            document.getElementById('detalheDataVenda').textContent = formatDateTime(venda.data_emissao);
-            document.getElementById('detalheCliente').textContent = venda.cliente_nome || 'Não informado';
-            document.getElementById('detalheValorTotal').textContent = formatarMoeda(venda.valor_total);
-            
-            // Preence informações de desconto
-            const desconto = venda.valor_desconto > 0 
-                ? `${formatarMoeda(venda.valor_desconto)} (${venda.tipo_desconto || 'N/A'})`
-                : 'Nenhum';
-            document.getElementById('detalheDesconto').textContent = desconto;
-            
-            // Preenche formas de pagamento
-            const formasPagamento = venda.pagamentos.map(p => 
-                `${p.forma_pagamento}: ${formatarMoeda(p.valor)}`
-            ).join(', ');
-            document.getElementById('detalheFormasPagamento').textContent = formasPagamento || 'Nenhuma';
-            
-            // Preenche tabela de produtos
-            const produtosTable = document.querySelector('#detalhesProdutosTable tbody');
-            produtosTable.innerHTML = '';
-            
-            venda.itens.forEach(item => {
-                const row = document.createElement('tr');
-                const descontoInfo = item.desconto_aplicado > 0 
-                    ? `${formatarMoeda(item.desconto_aplicado)} (${item.tipo_desconto || 'N/A'})`
-                    : 'Nenhum';
-                
-                row.innerHTML = `
+      const response = await fetchWithErrorHandling(`/admin/vendas/${vendaId}/detalhes`);
+
+      if (response.success) {
+        const modal = document.getElementById('detalhesVendaModal');
+        const venda = response.venda;
+
+        // Preenche informações básicas
+        document.getElementById('detalheNotaFiscalId').textContent = venda.id;
+        document.getElementById('detalheDataVenda').textContent = formatDateTime(venda.data_emissao);
+        document.getElementById('detalheCliente').textContent = venda.cliente_nome || 'Não informado';
+        document.getElementById('detalheValorTotal').textContent = formatarMoeda(venda.valor_total);
+
+        // Preence informações de desconto
+        const desconto = venda.valor_desconto > 0
+          ? `${formatarMoeda(venda.valor_desconto)} (${venda.tipo_desconto || 'N/A'})`
+          : 'Nenhum';
+        document.getElementById('detalheDesconto').textContent = desconto;
+
+        // Preenche formas de pagamento
+        const formasPagamento = venda.pagamentos.map(p =>
+          `${p.forma_pagamento}: ${formatarMoeda(p.valor)}`
+        ).join(', ');
+        document.getElementById('detalheFormasPagamento').textContent = formasPagamento || 'Nenhuma';
+
+        // Preenche tabela de produtos
+        const produtosTable = document.querySelector('#detalhesProdutosTable tbody');
+        produtosTable.innerHTML = '';
+
+        venda.itens.forEach(item => {
+          const row = document.createElement('tr');
+          const descontoInfo = item.desconto_aplicado > 0
+            ? `${formatarMoeda(item.desconto_aplicado)} (${item.tipo_desconto || 'N/A'})`
+            : 'Nenhum';
+
+          row.innerHTML = `
                     <td>${item.produto_nome}</td>
                     <td>${item.quantidade}</td>
                     <td>${item.unidade_medida}</td>
@@ -3970,51 +3970,51 @@ async function openDetalhesVendaModal(vendaId) {
                     <td>${descontoInfo}</td>
                     <td>${formatarMoeda(item.valor_total)}</td>
                 `;
-                produtosTable.appendChild(row);
-            });
-            
-            // Atualiza título do modal
-            document.getElementById('detalhesVendaTitulo').textContent = `Detalhes da Venda #${venda.id}`;
-            
-            // Abre o modal
-            openModal(modal);
-        } else {
-            showFlashMessage('error', response.error || 'Erro ao carregar detalhes da venda');
-        }
+          produtosTable.appendChild(row);
+        });
+
+        // Atualiza título do modal
+        document.getElementById('detalhesVendaTitulo').textContent = `Detalhes da Venda #${venda.id}`;
+
+        // Abre o modal
+        openModal(modal);
+      } else {
+        showFlashMessage('error', response.error || 'Erro ao carregar detalhes da venda');
+      }
     } catch (error) {
-        console.error('Erro ao abrir modal de detalhes:', error);
-        showFlashMessage('error', 'Erro ao carregar detalhes da venda');
+      console.error('Erro ao abrir modal de detalhes:', error);
+      showFlashMessage('error', 'Erro ao carregar detalhes da venda');
     }
-}
+  }
 
-// Função auxiliar para formatar o nome da forma de pagamento
-function formatFormaPagamento(forma) {
+  // Função auxiliar para formatar o nome da forma de pagamento
+  function formatFormaPagamento(forma) {
     const formatMap = {
-        'pix_fabiano': 'PIX Fabiano',
-        'pix_maquineta': 'PIX Maquineta',
-        'pix_edfrance': 'PIX Edfranci',
-        'pix_loja': 'PIX Loja',
-        'dinheiro': 'Dinheiro',
-        'cartao_credito': 'Cartão Crédito',
-        'cartao_debito': 'Cartão Débito',
-        'a_prazo': 'A Prazo'
+      'pix_fabiano': 'PIX Fabiano',
+      'pix_maquineta': 'PIX Maquineta',
+      'pix_edfrance': 'PIX Edfranci',
+      'pix_loja': 'PIX Loja',
+      'dinheiro': 'Dinheiro',
+      'cartao_credito': 'Cartão Crédito',
+      'cartao_debito': 'Cartão Débito',
+      'a_prazo': 'A Prazo'
     };
-    
+
     return formatMap[forma] || forma;
-}
+  }
 
-document.getElementById('abrirPdfCaixa').addEventListener('click', () => {
+  document.getElementById('abrirPdfCaixa').addEventListener('click', () => {
     if (caixaIdAtual) {
-        const url = `/admin/caixas/${caixaIdAtual}/financeiro/pdf`;
-        window.open(url, '_blank');
+      const url = `/admin/caixas/${caixaIdAtual}/financeiro/pdf`;
+      window.open(url, '_blank');
     } else {
-        alert('Nenhum caixa selecionado');
+      alert('Nenhum caixa selecionado');
     }
-});
+  });
 
-// Adiciona estilos CSS para indicar elementos clicáveis
-const style = document.createElement('style');
-style.textContent = `
+  // Adiciona estilos CSS para indicar elementos clicáveis
+  const style = document.createElement('style');
+  style.textContent = `
     .clickable-row:hover {
         background-color: #f8f9fa !important;
         box-shadow: 0 0 5px rgba(0,0,0,0.1);
@@ -4040,217 +4040,217 @@ style.textContent = `
         background: #0056b3;
     }
 `;
-document.head.appendChild(style);
+  document.head.appendChild(style);
 
-let vendaEmEdicao = null;
-let formasPagamentoEditadas = [];
+  let vendaEmEdicao = null;
+  let formasPagamentoEditadas = [];
 
-// ===== FUNÇÕES PARA EDIÇÃO DE FORMAS DE PAGAMENTO =====
+  // ===== FUNÇÕES PARA EDIÇÃO DE FORMAS DE PAGAMENTO =====
 
-// Função para abrir o modal de edição de formas de pagamento
-async function openEditarFormasPagamentoModal(vendaId) {
+  // Função para abrir o modal de edição de formas de pagamento
+  async function openEditarFormasPagamentoModal(vendaId) {
     try {
-        // Busca os detalhes da venda
-        const response = await fetchWithErrorHandling(`/admin/vendas/${vendaId}/detalhes`);
-        
-        if (response.success) {
-            vendaEmEdicao = response.venda;
-            formasPagamentoEditadas = [...vendaEmEdicao.pagamentos];
-            
-            // Atualiza o modal
-            document.getElementById('editarPagamentoVendaId').textContent = vendaId;
-            document.getElementById('totalVendaValor').textContent = formatarMoeda(vendaEmEdicao.valor_total);
-            
-            // Renderiza as formas de pagamento atuais
-            renderFormasPagamento();
-            
-            // Calcula totais
-            calcularTotaisPagamentos();
-            
-            // Abre o modal
-            const modal = document.getElementById('editarFormasPagamentoModal');
-            openModal(modal);
-        } else {
-            showFlashMessage('error', response.error || 'Erro ao carregar detalhes da venda');
-        }
-    } catch (error) {
-        console.error('Erro ao abrir modal de edição:', error);
-        showFlashMessage('error', 'Erro ao carregar detalhes da venda');
-    }
-}
+      // Busca os detalhes da venda
+      const response = await fetchWithErrorHandling(`/admin/vendas/${vendaId}/detalhes`);
 
-// Função para renderizar as formas de pagamento
-function renderFormasPagamento() {
+      if (response.success) {
+        vendaEmEdicao = response.venda;
+        formasPagamentoEditadas = [...vendaEmEdicao.pagamentos];
+
+        // Atualiza o modal
+        document.getElementById('editarPagamentoVendaId').textContent = vendaId;
+        document.getElementById('totalVendaValor').textContent = formatarMoeda(vendaEmEdicao.valor_total);
+
+        // Renderiza as formas de pagamento atuais
+        renderFormasPagamento();
+
+        // Calcula totais
+        calcularTotaisPagamentos();
+
+        // Abre o modal
+        const modal = document.getElementById('editarFormasPagamentoModal');
+        openModal(modal);
+      } else {
+        showFlashMessage('error', response.error || 'Erro ao carregar detalhes da venda');
+      }
+    } catch (error) {
+      console.error('Erro ao abrir modal de edição:', error);
+      showFlashMessage('error', 'Erro ao carregar detalhes da venda');
+    }
+  }
+
+  // Função para renderizar as formas de pagamento
+  function renderFormasPagamento() {
     const container = document.getElementById('formasPagamentoAtuais');
     container.innerHTML = '';
-    
+
     formasPagamentoEditadas.forEach((pagamento, index) => {
-        const item = document.createElement('div');
-        item.className = 'forma-pagamento-item';
-        item.innerHTML = `
+      const item = document.createElement('div');
+      item.className = 'forma-pagamento-item';
+      item.innerHTML = `
             <span class="badge badge-info">${formatFormaPagamento(pagamento.forma_pagamento)}</span>
             <span class="forma-pagamento-valor">${formatarMoeda(pagamento.valor)}</span>
             <button class="btn-remover-forma" data-index="${index}">
                 <i class="fas fa-times"></i>
             </button>
         `;
-        container.appendChild(item);
+      container.appendChild(item);
     });
-    
+
     // Adiciona eventos de clique para os botões de remover
     document.querySelectorAll('.btn-remover-forma').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const index = parseInt(e.currentTarget.getAttribute('data-index'));
-            formasPagamentoEditadas.splice(index, 1);
-            renderFormasPagamento();
-            calcularTotaisPagamentos();
-        });
+      btn.addEventListener('click', (e) => {
+        const index = parseInt(e.currentTarget.getAttribute('data-index'));
+        formasPagamentoEditadas.splice(index, 1);
+        renderFormasPagamento();
+        calcularTotaisPagamentos();
+      });
     });
-}
+  }
 
-// Função para calcular totais dos pagamentos
-function calcularTotaisPagamentos() {
+  // Função para calcular totais dos pagamentos
+  function calcularTotaisPagamentos() {
     const totalPagamentos = formasPagamentoEditadas.reduce((sum, pagamento) => sum + pagamento.valor, 0);
     const totalVenda = vendaEmEdicao.valor_total;
-    
+
     document.getElementById('totalPagamentosValor').textContent = formatarMoeda(totalPagamentos);
-    
+
     // Verifica se há diferença
     const diferencaContainer = document.getElementById('diferencaContainer');
     const diferencaValor = document.getElementById('diferencaValor');
-    
-    if (Math.abs(totalPagamentos - totalVenda) > 0.01) {
-        const diferenca = totalVenda - totalPagamentos;
-        diferencaValor.textContent = formatarMoeda(diferenca);
-        diferencaValor.className = `total-value ${diferenca < 0 ? 'negative' : 'positive'}`;
-        diferencaContainer.style.display = 'block';
-    } else {
-        diferencaContainer.style.display = 'none';
-    }
-}
 
-// Função para adicionar nova forma de pagamento
-function adicionarNovaFormaPagamento() {
+    if (Math.abs(totalPagamentos - totalVenda) > 0.01) {
+      const diferenca = totalVenda - totalPagamentos;
+      diferencaValor.textContent = formatarMoeda(diferenca);
+      diferencaValor.className = `total-value ${diferenca < 0 ? 'negative' : 'positive'}`;
+      diferencaContainer.style.display = 'block';
+    } else {
+      diferencaContainer.style.display = 'none';
+    }
+  }
+
+  // Função para adicionar nova forma de pagamento
+  function adicionarNovaFormaPagamento() {
     const formaSelect = document.getElementById('novaFormaPagamento');
     const valorInput = document.getElementById('novoValorPagamento');
-    
+
     const forma = formaSelect.value;
     let valor = parseFloat(valorInput.value) || 0;
-    
+
     if (!forma) {
-        showFlashMessage('error', 'Selecione uma forma de pagamento');
-        return;
+      showFlashMessage('error', 'Selecione uma forma de pagamento');
+      return;
     }
-    
+
     // Se não foi informado valor, calcula automaticamente para distribuir igualmente
     if (valor <= 0) {
-        const totalAtual = formasPagamentoEditadas.reduce((sum, p) => sum + p.valor, 0);
-        const restante = vendaEmEdicao.valor_total - totalAtual;
-        
-        if (restante <= 0) {
-            showFlashMessage('error', 'O valor total já foi distribuído entre as formas de pagamento');
-            return;
-        }
-        
-        valor = restante;
+      const totalAtual = formasPagamentoEditadas.reduce((sum, p) => sum + p.valor, 0);
+      const restante = vendaEmEdicao.valor_total - totalAtual;
+
+      if (restante <= 0) {
+        showFlashMessage('error', 'O valor total já foi distribuído entre as formas de pagamento');
+        return;
+      }
+
+      valor = restante;
     }
-    
+
     // Adiciona a nova forma de pagamento
     formasPagamentoEditadas.push({
-        forma_pagamento: forma,
-        valor: valor
+      forma_pagamento: forma,
+      valor: valor
     });
-    
+
     // Limpa os campos
     formaSelect.value = '';
     valorInput.value = '';
-    
+
     // Atualiza a interface
     renderFormasPagamento();
     calcularTotaisPagamentos();
-}
+  }
 
-// Função para salvar as alterações
-async function salvarFormasPagamento() {
+  // Função para salvar as alterações
+  async function salvarFormasPagamento() {
     try {
-        // Verifica se a soma dos pagamentos corresponde ao valor total
-        const totalPagamentos = formasPagamentoEditadas.reduce((sum, pagamento) => sum + pagamento.valor, 0);
-        
-        if (Math.abs(totalPagamentos - vendaEmEdicao.valor_total) > 0.01) {
-            if (!confirm('A soma dos pagamentos não corresponde ao valor total da venda. Deseja continuar mesmo assim?')) {
-                return;
-            }
+      // Verifica se a soma dos pagamentos corresponde ao valor total
+      const totalPagamentos = formasPagamentoEditadas.reduce((sum, pagamento) => sum + pagamento.valor, 0);
+
+      if (Math.abs(totalPagamentos - vendaEmEdicao.valor_total) > 0.01) {
+        if (!confirm('A soma dos pagamentos não corresponde ao valor total da venda. Deseja continuar mesmo assim?')) {
+          return;
         }
-        
-        // Envia as alterações para o servidor
-        const response = await fetchWithErrorHandling(`/admin/vendas/${vendaEmEdicao.id}/atualizar-pagamentos`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                pagamentos: formasPagamentoEditadas
-            })
-        });
-        
-        if (response.success) {
-            showFlashMessage('success', 'Formas de pagamento atualizadas com sucesso!');
-            
-            // Fecha o modal
-            closeModal(document.getElementById('editarFormasPagamentoModal'));
-            
-            // Recarrega os dados do caixa
-            if (caixaIdAtual) {
-                await loadCaixaFinanceiro(caixaIdAtual);
-            }
-        } else {
-            showFlashMessage('error', response.error || 'Erro ao atualizar formas de pagamento');
+      }
+
+      // Envia as alterações para o servidor
+      const response = await fetchWithErrorHandling(`/admin/vendas/${vendaEmEdicao.id}/atualizar-pagamentos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          pagamentos: formasPagamentoEditadas
+        })
+      });
+
+      if (response.success) {
+        showFlashMessage('success', 'Formas de pagamento atualizadas com sucesso!');
+
+        // Fecha o modal
+        closeModal(document.getElementById('editarFormasPagamentoModal'));
+
+        // Recarrega os dados do caixa
+        if (caixaIdAtual) {
+          await loadCaixaFinanceiro(caixaIdAtual);
         }
+      } else {
+        showFlashMessage('error', response.error || 'Erro ao atualizar formas de pagamento');
+      }
     } catch (error) {
-        console.error('Erro ao salvar formas de pagamento:', error);
-        showFlashMessage('error', 'Erro ao atualizar formas de pagamento');
+      console.error('Erro ao salvar formas de pagamento:', error);
+      showFlashMessage('error', 'Erro ao atualizar formas de pagamento');
     }
-}
+  }
 
-// Função auxiliar para formatar o nome da forma de pagamento
-function formatFormaPagamento(forma) {
+  // Função auxiliar para formatar o nome da forma de pagamento
+  function formatFormaPagamento(forma) {
     const formatMap = {
-        'pix_fabiano': 'PIX Fabiano',
-        'pix_maquineta': 'PIX Maquineta',
-        'pix_edfrance': 'PIX Edfranci',
-        'pix_loja': 'PIX Loja',
-        'dinheiro': 'Dinheiro',
-        'cartao_credito': 'Cartão Crédito',
-        'cartao_debito': 'Cartão Débito',
-        'a_prazo': 'A Prazo'
+      'pix_fabiano': 'PIX Fabiano',
+      'pix_maquineta': 'PIX Maquineta',
+      'pix_edfrance': 'PIX Edfranci',
+      'pix_loja': 'PIX Loja',
+      'dinheiro': 'Dinheiro',
+      'cartao_credito': 'Cartão Crédito',
+      'cartao_debito': 'Cartão Débito',
+      'a_prazo': 'A Prazo'
     };
-    
-    return formatMap[forma] || forma;
-}
 
-function setupFormasPagamentoEvents() {
+    return formatMap[forma] || forma;
+  }
+
+  function setupFormasPagamentoEvents() {
     // Adiciona eventos aos botões do modal
     const adicionarBtn = document.getElementById('adicionarFormaPagamento');
     const salvarBtn = document.getElementById('salvarFormasPagamento');
     const valorInput = document.getElementById('novoValorPagamento');
-    
+
     if (adicionarBtn) {
-        adicionarBtn.addEventListener('click', adicionarNovaFormaPagamento);
+      adicionarBtn.addEventListener('click', adicionarNovaFormaPagamento);
     }
-    
+
     if (salvarBtn) {
-        salvarBtn.addEventListener('click', salvarFormasPagamento);
+      salvarBtn.addEventListener('click', salvarFormasPagamento);
     }
-    
+
     // Permite pressionar Enter no campo de valor
     if (valorInput) {
-        valorInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                adicionarNovaFormaPagamento();
-            }
-        });
+      valorInput.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+          adicionarNovaFormaPagamento();
+        }
+      });
     }
-}
+  }
 
   // Event Listeners para Caixas
   document.getElementById('refreshData')?.addEventListener('click', loadDashboardData);
@@ -4260,131 +4260,131 @@ function setupFormasPagamentoEvents() {
 
   // Função para abrir o modal de contas a receber
   function openContasReceberModal() {
-      loadContasReceber();
-      carregarCaixasAbertos();
-      openModal('contasReceberModal');
+    loadContasReceber();
+    carregarCaixasAbertos();
+    openModal('contasReceberModal');
   }
 
   // Função para carregar as contas a receber
   async function loadContasReceber() {
-      try {
-          const dataInicio = document.getElementById('contasReceberDataInicio')?.value || '';
-          const dataFim = document.getElementById('contasReceberDataFim')?.value || '';
-          const status = document.getElementById('contasReceberStatus')?.value || '';
-          
-          const params = new URLSearchParams();
-          if (dataInicio) params.append('data_emissao_inicio', dataInicio);
-          if (dataFim) params.append('data_emissao_fim', dataFim);
-          if (status) params.append('status', status);
-          
-          const response = await fetch(`/admin/contas-receber?${params.toString()}`);
-          
-          if (!response.ok) {
-              throw new Error('Erro na requisição');
-          }
-          
-          const data = await response.json();
-          
-          if (data && data.contas && data.contas.length > 0) {
-              contasReceberData = data.contas;
-              atualizarTabelaContasReceber();
-          } else {
-              contasReceberData = [];
-              atualizarTabelaContasReceber();
-              showFlashMessage('warning', 'Nenhuma conta encontrada com os filtros aplicados');
-          }
-      } catch (error) {
-          console.error('Erro ao carregar contas a receber:', error);
-          showFlashMessage('error', 'Erro ao carregar contas a receber');
+    try {
+      const dataInicio = document.getElementById('contasReceberDataInicio')?.value || '';
+      const dataFim = document.getElementById('contasReceberDataFim')?.value || '';
+      const status = document.getElementById('contasReceberStatus')?.value || '';
+
+      const params = new URLSearchParams();
+      if (dataInicio) params.append('data_emissao_inicio', dataInicio);
+      if (dataFim) params.append('data_emissao_fim', dataFim);
+      if (status) params.append('status', status);
+
+      const response = await fetch(`/admin/contas-receber?${params.toString()}`);
+
+      if (!response.ok) {
+        throw new Error('Erro na requisição');
       }
+
+      const data = await response.json();
+
+      if (data && data.contas && data.contas.length > 0) {
+        contasReceberData = data.contas;
+        atualizarTabelaContasReceber();
+      } else {
+        contasReceberData = [];
+        atualizarTabelaContasReceber();
+        showFlashMessage('warning', 'Nenhuma conta encontrada com os filtros aplicados');
+      }
+    } catch (error) {
+      console.error('Erro ao carregar contas a receber:', error);
+      showFlashMessage('error', 'Erro ao carregar contas a receber');
+    }
   }
 
-  document.addEventListener('DOMContentLoaded', function() {
-      const btnFiltrar = document.getElementById('filtrarContasReceber');
-      if (btnFiltrar) {
-          btnFiltrar.addEventListener('click', loadContasReceber);
-      }
+  document.addEventListener('DOMContentLoaded', function () {
+    const btnFiltrar = document.getElementById('filtrarContasReceber');
+    if (btnFiltrar) {
+      btnFiltrar.addEventListener('click', loadContasReceber);
+    }
   });
 
   // Função para gerar PDF da conta
   async function gerarPDFConta(contaId) {
-      try {
-          // Mostrar indicador de carregamento (opcional)
-          const btnPDF = document.querySelector(`button[data-pdf-id="${contaId}"]`);
-          if (btnPDF) {
-              const originalHTML = btnPDF.innerHTML;
-              btnPDF.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-              btnPDF.disabled = true;
-              
-              // Restaurar botão após um tempo
-              setTimeout(() => {
-                  btnPDF.innerHTML = originalHTML;
-                  btnPDF.disabled = false;
-              }, 3000);
-          }
-          
-          // Fazer requisição para gerar o PDF
-          const response = await fetch(`/admin/contas-receber/${contaId}/pdf`);
-          
-          if (!response.ok) {
-              throw new Error('Erro ao gerar PDF');
-          }
-          
-          // Criar blob com o PDF
-          const pdfBlob = await response.blob();
-          
-          // Criar URL temporária para o blob
-          const pdfUrl = window.URL.createObjectURL(pdfBlob);
-          
-          // Abrir em nova guia
-          window.open(pdfUrl, '_blank');
-          
-          // Limpar URL temporária após um tempo
-          setTimeout(() => {
-              window.URL.revokeObjectURL(pdfUrl);
-          }, 1000);
-          
-      } catch (error) {
-          console.error('Erro ao gerar PDF:', error);
-          showFlashMessage('error', 'Erro ao gerar PDF da conta');
+    try {
+      // Mostrar indicador de carregamento (opcional)
+      const btnPDF = document.querySelector(`button[data-pdf-id="${contaId}"]`);
+      if (btnPDF) {
+        const originalHTML = btnPDF.innerHTML;
+        btnPDF.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btnPDF.disabled = true;
+
+        // Restaurar botão após um tempo
+        setTimeout(() => {
+          btnPDF.innerHTML = originalHTML;
+          btnPDF.disabled = false;
+        }, 3000);
       }
+
+      // Fazer requisição para gerar o PDF
+      const response = await fetch(`/admin/contas-receber/${contaId}/pdf`);
+
+      if (!response.ok) {
+        throw new Error('Erro ao gerar PDF');
+      }
+
+      // Criar blob com o PDF
+      const pdfBlob = await response.blob();
+
+      // Criar URL temporária para o blob
+      const pdfUrl = window.URL.createObjectURL(pdfBlob);
+
+      // Abrir em nova guia
+      window.open(pdfUrl, '_blank');
+
+      // Limpar URL temporária após um tempo
+      setTimeout(() => {
+        window.URL.revokeObjectURL(pdfUrl);
+      }, 1000);
+
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      showFlashMessage('error', 'Erro ao gerar PDF da conta');
+    }
   }
 
   // Função para atualizar a tabela de contas a receber
   function atualizarTabelaContasReceber() {
-      const tbody = document.querySelector('#tabelaContasReceber tbody');
-      if (!tbody) return;
-      
-      tbody.innerHTML = '';
-      
-      if (contasReceberData.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="11" class="text-center">Nenhuma conta encontrada</td></tr>';
-          return;
+    const tbody = document.querySelector('#tabelaContasReceber tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (contasReceberData.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="11" class="text-center">Nenhuma conta encontrada</td></tr>';
+      return;
+    }
+
+    contasReceberData.forEach(conta => {
+      const tr = document.createElement('tr');
+
+      // Determinar status e classe CSS
+      let statusClass, statusText;
+      const hoje = new Date();
+      const vencimento = new Date(conta.data_vencimento);
+
+      if (conta.status === 'quitado') {
+        statusClass = 'badge-success';
+        statusText = 'Quitado';
+      } else if (conta.status === 'parcial') {
+        statusClass = 'badge-info';
+        statusText = 'Parcial';
+      } else if (vencimento < hoje) {
+        statusClass = 'badge-danger';
+        statusText = 'Atrasado';
+      } else {
+        statusClass = 'badge-warning';
+        statusText = 'Pendente';
       }
-      
-      contasReceberData.forEach(conta => {
-          const tr = document.createElement('tr');
-          
-          // Determinar status e classe CSS
-          let statusClass, statusText;
-          const hoje = new Date();
-          const vencimento = new Date(conta.data_vencimento);
-          
-          if (conta.status === 'quitado') {
-              statusClass = 'badge-success';
-              statusText = 'Quitado';
-          } else if (conta.status === 'parcial') {
-              statusClass = 'badge-info';
-              statusText = 'Parcial';
-          } else if (vencimento < hoje) {
-              statusClass = 'badge-danger';
-              statusText = 'Atrasado';
-          } else {
-              statusClass = 'badge-warning';
-              statusText = 'Pendente';
-          }
-          
-          tr.innerHTML = `
+
+      tr.innerHTML = `
               <td>${conta.id}</td>
               <td>${conta.cliente.nome}</td>
               <td>${conta.cliente.documento || ''}</td>
@@ -4403,456 +4403,456 @@ function setupFormasPagamentoEvents() {
                   </button>
               </td>
           `;
-          
-          tbody.appendChild(tr);
+
+      tbody.appendChild(tr);
+    });
+
+    // Adicionar eventos aos botões de detalhes
+    document.querySelectorAll('.btn-detalhes-conta').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const contaId = this.getAttribute('data-id');
+        abrirModalDetalhesConta(contaId);
       });
-      
-      // Adicionar eventos aos botões de detalhes
-      document.querySelectorAll('.btn-detalhes-conta').forEach(btn => {
-          btn.addEventListener('click', function() {
-              const contaId = this.getAttribute('data-id');
-              abrirModalDetalhesConta(contaId);
-          });
+    });
+
+    // Adicionar eventos aos botões de PDF
+    document.querySelectorAll('.btn-pdf-conta').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const contaId = this.getAttribute('data-pdf-id');
+        gerarPDFConta(contaId);
       });
-      
-      // Adicionar eventos aos botões de PDF
-      document.querySelectorAll('.btn-pdf-conta').forEach(btn => {
-          btn.addEventListener('click', function() {
-              const contaId = this.getAttribute('data-pdf-id');
-              gerarPDFConta(contaId);
-          });
-      });
+    });
   }
   // Função para formatar data (dd/mm/aaaa)
   function formatarData(dataString) {
-      if (!dataString) return '-';
-      const date = new Date(dataString);
-      return date.toLocaleDateString('pt-BR');
+    if (!dataString) return '-';
+    const date = new Date(dataString);
+    return date.toLocaleDateString('pt-BR');
   }
 
   async function abrirModalDetalhesConta(contaId) {
-      try {
-          const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
-          
-          if (response) {
-              const conta = response;
-              
-              // Preencher detalhes básicos
-              document.getElementById('contaIdPagamento').value = conta.id;
-              document.getElementById('detalheClienteNome').textContent = conta.cliente;
-              document.getElementById('detalheClienteDocumento').textContent = conta.cliente_documento || 'Não informado';
-              document.getElementById('detalheDescricao').textContent = conta.descricao || 'Sem descrição';
-              document.getElementById('detalheValorTotal').textContent = formatarMoeda(conta.valor_original);
-              document.getElementById('detalheValorPendente').textContent = formatarMoeda(conta.valor_aberto);
-              
-              // Status
-              const statusElement = document.getElementById('detalheStatus');
-              if (statusElement) {
-                  if (conta.status === 'quitado') {
-                      statusElement.textContent = 'Quitado';
-                      statusElement.className = 'value badge badge-success';
+    try {
+      const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
 
-                      // Ocultar área de pagamento
-                      const pagamentoSection = document.getElementById('areaPagamento');
-                      if (pagamentoSection) pagamentoSection.style.display = 'none';
+      if (response) {
+        const conta = response;
 
-                  } else if (conta.status === 'parcial') {
-                      statusElement.textContent = 'Parcial';
-                      statusElement.className = 'value badge badge-info';
+        // Preencher detalhes básicos
+        document.getElementById('contaIdPagamento').value = conta.id;
+        document.getElementById('detalheClienteNome').textContent = conta.cliente;
+        document.getElementById('detalheClienteDocumento').textContent = conta.cliente_documento || 'Não informado';
+        document.getElementById('detalheDescricao').textContent = conta.descricao || 'Sem descrição';
+        document.getElementById('detalheValorTotal').textContent = formatarMoeda(conta.valor_original);
+        document.getElementById('detalheValorPendente').textContent = formatarMoeda(conta.valor_aberto);
 
-                      // Mostrar área de pagamento
-                      const pagamentoSection = document.getElementById('areaPagamento');
-                      if (pagamentoSection) pagamentoSection.style.display = '';
+        // Status
+        const statusElement = document.getElementById('detalheStatus');
+        if (statusElement) {
+          if (conta.status === 'quitado') {
+            statusElement.textContent = 'Quitado';
+            statusElement.className = 'value badge badge-success';
 
-                  } else {
-                      const hoje = new Date();
-                      const vencimento = new Date(conta.data_vencimento);
-                      
-                      if (vencimento < hoje) {
-                          statusElement.textContent = 'Atrasado';
-                          statusElement.className = 'value badge badge-danger';
-                      } else {
-                          statusElement.textContent = 'Pendente';
-                          statusElement.className = 'value badge badge-warning';
-                      }
+            // Ocultar área de pagamento
+            const pagamentoSection = document.getElementById('areaPagamento');
+            if (pagamentoSection) pagamentoSection.style.display = 'none';
 
-                      // Mostrar área de pagamento
-                      const pagamentoSection = document.getElementById('areaPagamento');
-                      if (pagamentoSection) pagamentoSection.style.display = '';
-                  }
-              }
-              
-              // Preencher pagamentos
-              const pagamentosTbody = document.getElementById('detalhePagamentos');
-              if (pagamentosTbody) {
-                  pagamentosTbody.innerHTML = '';
-                  
-                  if (conta.pagamentos && conta.pagamentos.length > 0) {
-                      conta.pagamentos.forEach(pag => {
-                          const tr = document.createElement('tr');
-                          tr.innerHTML = `
+          } else if (conta.status === 'parcial') {
+            statusElement.textContent = 'Parcial';
+            statusElement.className = 'value badge badge-info';
+
+            // Mostrar área de pagamento
+            const pagamentoSection = document.getElementById('areaPagamento');
+            if (pagamentoSection) pagamentoSection.style.display = '';
+
+          } else {
+            const hoje = new Date();
+            const vencimento = new Date(conta.data_vencimento);
+
+            if (vencimento < hoje) {
+              statusElement.textContent = 'Atrasado';
+              statusElement.className = 'value badge badge-danger';
+            } else {
+              statusElement.textContent = 'Pendente';
+              statusElement.className = 'value badge badge-warning';
+            }
+
+            // Mostrar área de pagamento
+            const pagamentoSection = document.getElementById('areaPagamento');
+            if (pagamentoSection) pagamentoSection.style.display = '';
+          }
+        }
+
+        // Preencher pagamentos
+        const pagamentosTbody = document.getElementById('detalhePagamentos');
+        if (pagamentosTbody) {
+          pagamentosTbody.innerHTML = '';
+
+          if (conta.pagamentos && conta.pagamentos.length > 0) {
+            conta.pagamentos.forEach(pag => {
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
                               <td>${pag.data_pagamento}</td>
                               <td>${formatarMoeda(pag.valor_pago)}</td>
                               <td>${formatarFormaPagamento(pag.forma_pagamento)}</td>
                               <td>${pag.observacoes || '-'}</td>
                           `;
-                          pagamentosTbody.appendChild(tr);
-                      });
-                  } else {
-                      pagamentosTbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
-                  }
-              } else {
-                  console.error('Elemento detalhePagamentos não encontrado');
-              }
-
-              // Preencher select de caixas
-              const selectCaixa = document.getElementById('caixaPagamento');
-              if (selectCaixa) {
-                  selectCaixa.innerHTML = '<option value="">Selecione</option>';
-
-                  if (conta.caixas && conta.caixas.length > 0) {
-                      conta.caixas.forEach(caixa => {
-                          const option = document.createElement('option');
-                          option.value = caixa.id;
-                          option.textContent = `Caixa ${caixa.id} - ${caixa.operador} - ${formatarData(caixa.data_abertura)} (${caixa.status})`;
-                          selectCaixa.appendChild(option);
-                      });
-                  } else {
-                      const option = document.createElement('option');
-                      option.value = '';
-                      option.textContent = 'Nenhum caixa disponível';
-                      selectCaixa.appendChild(option);
-                  }
-              }
-              
-              // Definir data atual como padrão
-              const hoje = new Date();
-              const dataPagamentoInput = document.getElementById('dataPagamento');
-              if (dataPagamentoInput) {
-                  dataPagamentoInput.value = hoje.toISOString().split('T')[0];
-              }
-              
-              // Definir valor pendente como valor padrão
-              const valorPagamentoInput = document.getElementById('valorPagamento');
-              if (valorPagamentoInput) {
-                  valorPagamentoInput.value = conta.valor_aberto;
-              }
-              setupPagamentoButtons();
-              openModal('detalhesContaModal');
+              pagamentosTbody.appendChild(tr);
+            });
+          } else {
+            pagamentosTbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
           }
-      } catch (error) {
-          console.error('Erro ao carregar detalhes da conta:', error);
-          showFlashMessage('error', 'Erro ao carregar detalhes da conta');
+        } else {
+          console.error('Elemento detalhePagamentos não encontrado');
+        }
+
+        // Preencher select de caixas
+        const selectCaixa = document.getElementById('caixaPagamento');
+        if (selectCaixa) {
+          selectCaixa.innerHTML = '<option value="">Selecione</option>';
+
+          if (conta.caixas && conta.caixas.length > 0) {
+            conta.caixas.forEach(caixa => {
+              const option = document.createElement('option');
+              option.value = caixa.id;
+              option.textContent = `Caixa ${caixa.id} - ${caixa.operador} - ${formatarData(caixa.data_abertura)} (${caixa.status})`;
+              selectCaixa.appendChild(option);
+            });
+          } else {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Nenhum caixa disponível';
+            selectCaixa.appendChild(option);
+          }
+        }
+
+        // Definir data atual como padrão
+        const hoje = new Date();
+        const dataPagamentoInput = document.getElementById('dataPagamento');
+        if (dataPagamentoInput) {
+          dataPagamentoInput.value = hoje.toISOString().split('T')[0];
+        }
+
+        // Definir valor pendente como valor padrão
+        const valorPagamentoInput = document.getElementById('valorPagamento');
+        if (valorPagamentoInput) {
+          valorPagamentoInput.value = conta.valor_aberto;
+        }
+        setupPagamentoButtons();
+        openModal('detalhesContaModal');
       }
+    } catch (error) {
+      console.error('Erro ao carregar detalhes da conta:', error);
+      showFlashMessage('error', 'Erro ao carregar detalhes da conta');
+    }
   }
 
   // Função para formatar forma de pagamento
   function formatarFormaPagamento(forma) {
-      const formas = {
-          'dinheiro': 'Dinheiro',
-          'pix_loja': 'PIX Loja',
-          'pix_fabiano': 'PIX Fabiano',
-          'pix_maquineta': 'PIX Maquineta',
-          'pix_edfrance': 'PIX Edfranci',
-          'cartao_credito': 'Cartão Crédito',
-          'cartao_debito': 'Cartão Débito',
-          'a_prazo': 'A Prazo'
-      };
-      
-      return formas[forma] || forma;
+    const formas = {
+      'dinheiro': 'Dinheiro',
+      'pix_loja': 'PIX Loja',
+      'pix_fabiano': 'PIX Fabiano',
+      'pix_maquineta': 'PIX Maquineta',
+      'pix_edfrance': 'PIX Edfranci',
+      'cartao_credito': 'Cartão Crédito',
+      'cartao_debito': 'Cartão Débito',
+      'a_prazo': 'A Prazo'
+    };
+
+    return formas[forma] || forma;
   }
 
   // Função para carregar caixas abertos no select
   async function carregarCaixasAbertos() {
-      try {
-          const response = await fetchWithErrorHandling('/admin/api/caixas/abertos');
-          
-          if (response && response.caixas) {
-              caixasAbertos = response.caixas;
-              const select = document.getElementById('caixaPagamento');
-              
-              if (select) {
-                  select.innerHTML = '<option value="">Selecione</option>';
-                  
-                  caixasAbertos.forEach(caixa => {
-                      const option = document.createElement('option');
-                      option.value = caixa.id;
-                      option.textContent = `Caixa #${caixa.id} - ${caixa.operador} (${formatarData(caixa.data_abertura)})`;
-                      select.appendChild(option);
-                  });
-              }
-          }
-      } catch (error) {
-          console.error('Erro ao carregar caixas abertos:', error);
+    try {
+      const response = await fetchWithErrorHandling('/admin/api/caixas/abertos');
+
+      if (response && response.caixas) {
+        caixasAbertos = response.caixas;
+        const select = document.getElementById('caixaPagamento');
+
+        if (select) {
+          select.innerHTML = '<option value="">Selecione</option>';
+
+          caixasAbertos.forEach(caixa => {
+            const option = document.createElement('option');
+            option.value = caixa.id;
+            option.textContent = `Caixa #${caixa.id} - ${caixa.operador} (${formatarData(caixa.data_abertura)})`;
+            select.appendChild(option);
+          });
+        }
       }
+    } catch (error) {
+      console.error('Erro ao carregar caixas abertos:', error);
+    }
   }
 
   // Função para registrar pagamento
   let pagamentoEmProcesso = false;
 
   async function registrarPagamento(contaId, valor, pagarTotal = false) {
-      if (pagamentoEmProcesso) return; // impede execução duplicada
-      pagamentoEmProcesso = true;
+    if (pagamentoEmProcesso) return; // impede execução duplicada
+    pagamentoEmProcesso = true;
 
-      try {
-          const dataPagamento = document.getElementById('dataPagamento').value;
-          const formaPagamento = document.getElementById('formaPagamento').value;
-          const caixaPagamento = document.getElementById('caixaPagamento').value;
-          const observacaoPagamento = document.getElementById('observacaoPagamento').value;
+    try {
+      const dataPagamento = document.getElementById('dataPagamento').value;
+      const formaPagamento = document.getElementById('formaPagamento').value;
+      const caixaPagamento = document.getElementById('caixaPagamento').value;
+      const observacaoPagamento = document.getElementById('observacaoPagamento').value;
 
-          // Validações
-          if (!dataPagamento) {
-              showFlashMessage('error', 'Informe a data do pagamento');
-              pagamentoEmProcesso = false;
-              return;
-          }
-          if (!formaPagamento) {
-              showFlashMessage('error', 'Selecione a forma de pagamento');
-              pagamentoEmProcesso = false;
-              return;
-          }
-          if (valor <= 0 || isNaN(valor)) {
-              showFlashMessage('error', 'Informe um valor válido');
-              pagamentoEmProcesso = false;
-              return;
-          }
-
-          const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/pagar`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                  valor_pago: valor,
-                  forma_pagamento: formaPagamento,
-                  caixa_id: caixaPagamento || null,
-                  observacoes: observacaoPagamento || '',
-                  data_pagamento: dataPagamento
-              })
-          });
-
-          if (response && response.success) {
-              showFlashMessage('success', 'Pagamento registrado com sucesso');
-
-              document.getElementById('detalheValorPendente').textContent = formatarMoeda(response.valor_aberto);
-
-              const statusElement = document.getElementById('detalheStatus');
-              if (statusElement) {
-                  statusElement.textContent = response.status === 'quitado' ? 'Quitado' : 'Pendente';
-                  statusElement.className = 'value badge ' + (response.status === 'quitado' ? 'badge-success' : 'badge-warning');
-              }
-
-              await atualizarListaPagamentos(contaId);
-
-              if (pagarTotal) {
-                  closeModal('detalhesContaModal');
-                  loadContasReceber();
-              }
-          }
-      } catch (error) {
-          console.error('Erro ao registrar pagamento:', error);
-          showFlashMessage('error', error.message || 'Erro ao registrar pagamento');
-      } finally {
-          pagamentoEmProcesso = false;
+      // Validações
+      if (!dataPagamento) {
+        showFlashMessage('error', 'Informe a data do pagamento');
+        pagamentoEmProcesso = false;
+        return;
       }
+      if (!formaPagamento) {
+        showFlashMessage('error', 'Selecione a forma de pagamento');
+        pagamentoEmProcesso = false;
+        return;
+      }
+      if (valor <= 0 || isNaN(valor)) {
+        showFlashMessage('error', 'Informe um valor válido');
+        pagamentoEmProcesso = false;
+        return;
+      }
+
+      const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/pagar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          valor_pago: valor,
+          forma_pagamento: formaPagamento,
+          caixa_id: caixaPagamento || null,
+          observacoes: observacaoPagamento || '',
+          data_pagamento: dataPagamento
+        })
+      });
+
+      if (response && response.success) {
+        showFlashMessage('success', 'Pagamento registrado com sucesso');
+
+        document.getElementById('detalheValorPendente').textContent = formatarMoeda(response.valor_aberto);
+
+        const statusElement = document.getElementById('detalheStatus');
+        if (statusElement) {
+          statusElement.textContent = response.status === 'quitado' ? 'Quitado' : 'Pendente';
+          statusElement.className = 'value badge ' + (response.status === 'quitado' ? 'badge-success' : 'badge-warning');
+        }
+
+        await atualizarListaPagamentos(contaId);
+
+        if (pagarTotal) {
+          closeModal('detalhesContaModal');
+          loadContasReceber();
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao registrar pagamento:', error);
+      showFlashMessage('error', error.message || 'Erro ao registrar pagamento');
+    } finally {
+      pagamentoEmProcesso = false;
+    }
   }
 
   // Evento submit do formulário de pagamento
-  document.getElementById('formPagamentoConta')?.addEventListener('submit', function(e) {
-      e.preventDefault();
-      const contaId = document.getElementById('contaIdPagamento').value;
-      const valor = parseFloat(document.getElementById('valorPagamento').value);
-      if (contaId && valor) {
-          registrarPagamento(contaId, valor);
-      }
+  document.getElementById('formPagamentoConta')?.addEventListener('submit', function (e) {
+    e.preventDefault();
+    const contaId = document.getElementById('contaIdPagamento').value;
+    const valor = parseFloat(document.getElementById('valorPagamento').value);
+    if (contaId && valor) {
+      registrarPagamento(contaId, valor);
+    }
   });
 
   // Corrigido: prevenir submit duplo quando clicar em "Pagar Total"
-  document.getElementById('btnPagarTotal')?.addEventListener('click', function(e) {
-      e.preventDefault(); // impede que o botão envie o form automaticamente
-      const contaId = document.getElementById('contaIdPagamento').value;
-      const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
-      const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
-      
-      if (contaId && valorPendente > 0) {
-          document.getElementById('valorPagamento').value = valorPendente.toFixed(2);
-          registrarPagamento(contaId, valorPendente, true);
-      }
+  document.getElementById('btnPagarTotal')?.addEventListener('click', function (e) {
+    e.preventDefault(); // impede que o botão envie o form automaticamente
+    const contaId = document.getElementById('contaIdPagamento').value;
+    const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
+    const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+
+    if (contaId && valorPendente > 0) {
+      document.getElementById('valorPagamento').value = valorPendente.toFixed(2);
+      registrarPagamento(contaId, valorPendente, true);
+    }
   });
 
 
   // Função para atualizar a lista de pagamentos
   async function atualizarListaPagamentos(contaId) {
-      try {
-          const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
-          
-          if (response && response.pagamentos) {
-              const tbody = document.getElementById('detalhePagamentos');
-              if (tbody) {
-                  tbody.innerHTML = '';
-                  
-                  response.pagamentos.forEach(pag => {
-                      const tr = document.createElement('tr');
-                      tr.innerHTML = `
+    try {
+      const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
+
+      if (response && response.pagamentos) {
+        const tbody = document.getElementById('detalhePagamentos');
+        if (tbody) {
+          tbody.innerHTML = '';
+
+          response.pagamentos.forEach(pag => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
                           <td>${pag.data_pagamento}</td>
                           <td>${formatarMoeda(pag.valor_pago)}</td>
                           <td>${formatarFormaPagamento(pag.forma_pagamento)}</td>
                           <td>${pag.observacoes || '-'}</td>
                       `;
-                      tbody.appendChild(tr);
-                  });
-              }
-          }
-      } catch (error) {
-          console.error('Erro ao atualizar lista de pagamentos:', error);
+            tbody.appendChild(tr);
+          });
+        }
       }
+    } catch (error) {
+      console.error('Erro ao atualizar lista de pagamentos:', error);
+    }
   }
 
   // Event Listeners
-  document.addEventListener('DOMContentLoaded', function() {
-      // Adicionar item ao menu sidebar
-      const financeiroNavItem = document.querySelector('.sidebar-nav li[data-tab="financeiro"]');
-      if (financeiroNavItem) {
-          const contasReceberItem = document.createElement('li');
-          contasReceberItem.innerHTML = `
+  document.addEventListener('DOMContentLoaded', function () {
+    // Adicionar item ao menu sidebar
+    const financeiroNavItem = document.querySelector('.sidebar-nav li[data-tab="financeiro"]');
+    if (financeiroNavItem) {
+      const contasReceberItem = document.createElement('li');
+      contasReceberItem.innerHTML = `
               <a href="#contas-receber" class="nav-link">
                   <i class="fas fa-hand-holding-usd"></i>
                   <span class="nav-text">Contas a Receber</span>
               </a>
           `;
-          financeiroNavItem.parentNode.insertBefore(contasReceberItem, financeiroNavItem.nextSibling);
-          
-          // Adicionar evento de clique
-          contasReceberItem.addEventListener('click', function(e) {
-              e.preventDefault();
-              openContasReceberModal();
-          });
+      financeiroNavItem.parentNode.insertBefore(contasReceberItem, financeiroNavItem.nextSibling);
+
+      // Adicionar evento de clique
+      contasReceberItem.addEventListener('click', function (e) {
+        e.preventDefault();
+        openContasReceberModal();
+      });
+    }
+
+    // Filtro
+    document.getElementById('btnFiltrarContas')?.addEventListener('click', loadContasReceber);
+
+    // Formulário de pagamento
+    document.getElementById('formPagamentoConta')?.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const contaId = document.getElementById('contaIdPagamento').value;
+      const valor = parseFloat(document.getElementById('valorPagamento').value);
+      registrarPagamento(contaId, valor);
+    });
+
+    // Botão pagar total
+    document.getElementById('btnPagarTotal')?.addEventListener('click', function () {
+      const contaId = document.getElementById('contaIdPagamento').value;
+      const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
+      const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+
+      if (confirm(`Confirmar pagamento total de ${valorPendenteText}?`)) {
+        document.getElementById('valorPagamento').value = valorPendente;
+        registrarPagamento(contaId, valorPendente, true);
       }
-      
-      // Filtro
-      document.getElementById('btnFiltrarContas')?.addEventListener('click', loadContasReceber);
-      
+    });
+
+    // Permitir filtrar com Enter nos campos de texto
+    document.getElementById('filtroClienteNome')?.addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') {
+        loadContasReceber();
+      }
+    });
+
+    document.getElementById('filtroClienteDocumento')?.addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') {
+        loadContasReceber();
+      }
+    });
+    // Adicione isso no final do arquivo, dentro do DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', function () {
       // Formulário de pagamento
-      document.getElementById('formPagamentoConta')?.addEventListener('submit', function(e) {
+      const formPagamento = document.getElementById('formPagamentoConta');
+      if (formPagamento) {
+        formPagamento.addEventListener('submit', function (e) {
           e.preventDefault();
           const contaId = document.getElementById('contaIdPagamento').value;
           const valor = parseFloat(document.getElementById('valorPagamento').value);
+
+          if (isNaN(valor) || valor <= 0) {
+            showFlashMessage('error', 'Informe um valor válido');
+            return;
+          }
+
+          const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
+          const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+
+          if (valor > valorPendente) {
+            showFlashMessage('error', 'Valor informado é maior que o valor pendente');
+            return;
+          }
+
           registrarPagamento(contaId, valor);
-      });
-      
-      // Botão pagar total
-      document.getElementById('btnPagarTotal')?.addEventListener('click', function() {
+        });
+      }
+
+      // Botão de pagar total
+      const btnPagarTotal = document.getElementById('btnPagarTotal');
+      if (btnPagarTotal) {
+        btnPagarTotal.addEventListener('click', function () {
           const contaId = document.getElementById('contaIdPagamento').value;
           const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
           const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
-          
+
           if (confirm(`Confirmar pagamento total de ${valorPendenteText}?`)) {
-              document.getElementById('valorPagamento').value = valorPendente;
-              registrarPagamento(contaId, valorPendente, true);
+            document.getElementById('valorPagamento').value = valorPendente;
+            registrarPagamento(contaId, valorPendente, true);
           }
-      });
-      
-      // Permitir filtrar com Enter nos campos de texto
-      document.getElementById('filtroClienteNome')?.addEventListener('keypress', function(e) {
-          if (e.key === 'Enter') {
-              loadContasReceber();
-          }
-      });
-      
-      document.getElementById('filtroClienteDocumento')?.addEventListener('keypress', function(e) {
-          if (e.key === 'Enter') {
-              loadContasReceber();
-          }
-      });
-      // Adicione isso no final do arquivo, dentro do DOMContentLoaded
-      document.addEventListener('DOMContentLoaded', function() {
-          // Formulário de pagamento
-          const formPagamento = document.getElementById('formPagamentoConta');
-          if (formPagamento) {
-              formPagamento.addEventListener('submit', function(e) {
-                  e.preventDefault();
-                  const contaId = document.getElementById('contaIdPagamento').value;
-                  const valor = parseFloat(document.getElementById('valorPagamento').value);
-                  
-                  if (isNaN(valor) || valor <= 0) {
-                      showFlashMessage('error', 'Informe um valor válido');
-                      return;
-                  }
-                  
-                  const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
-                  const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
-                  
-                  if (valor > valorPendente) {
-                      showFlashMessage('error', 'Valor informado é maior que o valor pendente');
-                      return;
-                  }
-                  
-                  registrarPagamento(contaId, valor);
-              });
-          }
-          
-          // Botão de pagar total
-          const btnPagarTotal = document.getElementById('btnPagarTotal');
-          if (btnPagarTotal) {
-              btnPagarTotal.addEventListener('click', function() {
-                  const contaId = document.getElementById('contaIdPagamento').value;
-                  const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
-                  const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
-                  
-                  if (confirm(`Confirmar pagamento total de ${valorPendenteText}?`)) {
-                      document.getElementById('valorPagamento').value = valorPendente;
-                      registrarPagamento(contaId, valorPendente, true);
-                  }
-              });
-          }
-      });
+        });
+      }
+    });
   });
   // Adicione esta função para configurar os eventos dos botões de pagamento
   function setupPagamentoButtons() {
-      // Botão Pagamento Parcial
-      const btnParcial = document.querySelector('#formPagamentoConta button[type="submit"]');
-      if (btnParcial) {
-          btnParcial.addEventListener('click', function(e) {
-              e.preventDefault();
-              openModal('modalPagamentoParcial');
-          });
-      }
+    // Botão Pagamento Parcial
+    const btnParcial = document.querySelector('#formPagamentoConta button[type="submit"]');
+    if (btnParcial) {
+      btnParcial.addEventListener('click', function (e) {
+        e.preventDefault();
+        openModal('modalPagamentoParcial');
+      });
+    }
 
-      // Confirmar pagamento parcial
-      const btnConfirmarParcial = document.getElementById('btnConfirmarParcial');
-      if (btnConfirmarParcial) {
-          btnConfirmarParcial.addEventListener('click', function() {
-              const contaId = document.getElementById('contaIdPagamento').value;
-              const valor = parseFloat(document.getElementById('valorParcialInput').value);
-              const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
-              const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+    // Confirmar pagamento parcial
+    const btnConfirmarParcial = document.getElementById('btnConfirmarParcial');
+    if (btnConfirmarParcial) {
+      btnConfirmarParcial.addEventListener('click', function () {
+        const contaId = document.getElementById('contaIdPagamento').value;
+        const valor = parseFloat(document.getElementById('valorParcialInput').value);
+        const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
+        const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
 
-              if (isNaN(valor) || valor <= 0) {
-                  showFlashMessage('error', 'Informe um valor válido');
-                  return;
-              }
-              if (valor > valorPendente) {
-                  showFlashMessage('error', 'Valor informado é maior que o pendente');
-                  return;
-              }
+        if (isNaN(valor) || valor <= 0) {
+          showFlashMessage('error', 'Informe um valor válido');
+          return;
+        }
+        if (valor > valorPendente) {
+          showFlashMessage('error', 'Valor informado é maior que o pendente');
+          return;
+        }
 
-              closeModal('modalPagamentoParcial');
-              registrarPagamento(contaId, valor);
-          });
-      }
+        closeModal('modalPagamentoParcial');
+        registrarPagamento(contaId, valor);
+      });
+    }
 
-      // Botão Pagar Total (sem alterações)
-      const btnPagarTotal = document.getElementById('btnPagarTotal');
-      if (btnPagarTotal) {
-          btnPagarTotal.addEventListener('click', function() {
-              const contaId = document.getElementById('contaIdPagamento').value;
-              const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
-              const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+    // Botão Pagar Total (sem alterações)
+    const btnPagarTotal = document.getElementById('btnPagarTotal');
+    if (btnPagarTotal) {
+      btnPagarTotal.addEventListener('click', function () {
+        const contaId = document.getElementById('contaIdPagamento').value;
+        const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
+        const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
 
-              if (confirm(`Confirmar pagamento total de ${valorPendenteText}?`)) {
-                  document.getElementById('valorPagamento').value = valorPendente;
-                  registrarPagamento(contaId, valorPendente, true);
-              }
-          });
-      }
+        if (confirm(`Confirmar pagamento total de ${valorPendenteText}?`)) {
+          document.getElementById('valorPagamento').value = valorPendente;
+          registrarPagamento(contaId, valorPendente, true);
+        }
+      });
+    }
   }
 
   // ===== MOVIMENTAÇÕES =====
@@ -4861,25 +4861,25 @@ function setupFormasPagamentoEvents() {
       const dateInicio = document.getElementById('movimentacaoDateInicio')?.value;
       const dateFim = document.getElementById('movimentacaoDateFim')?.value;
       const tipo = document.getElementById('movimentacaoTipo')?.value;
-      
+
       let url = '/admin/transferencias';
       const params = new URLSearchParams();
-      
+
       if (dateInicio) params.append('data_inicio', dateInicio);
       if (dateFim) params.append('data_fim', dateFim);
       if (tipo) params.append('tipo', tipo);
-      
+
       if (params.toString()) {
         url += `?${params.toString()}`;
       }
-      
+
       const data = await fetchWithErrorHandling(url);
-      
+
       if (data.success) {
         const table = document.querySelector('#movimentacoesEstoqueTable tbody');
         if (table) {
           table.innerHTML = '';
-          
+
           data.transferencias.forEach(transf => {
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -4909,20 +4909,20 @@ function setupFormasPagamentoEvents() {
     try {
       const searchText = document.getElementById('searchUsuario')?.value.toLowerCase() || '';
       const data = await fetchWithErrorHandling('/admin/usuarios');
-      
+
       if (data.success) {
         const usuariosTable = document.querySelector('#usuariosTable tbody');
         if (usuariosTable) {
           usuariosTable.innerHTML = '';
-          
+
           data.usuarios.forEach(usuario => {
             if (searchText && !usuario.nome.toLowerCase().includes(searchText)) {
               return;
             }
-            
+
             const statusBool = usuario.status === true || usuario.status === 'true' || usuario.status === 'Ativo';
             const status = statusBool ? 'Ativo' : 'Inativo';
-            
+
             const row = document.createElement('tr');
             row.innerHTML = `
               <td>${usuario.id}</td>
@@ -4952,7 +4952,7 @@ function setupFormasPagamentoEvents() {
             `;
             usuariosTable.appendChild(row);
           });
-          
+
           setupUsuarioActions();
         }
       }
@@ -4964,17 +4964,17 @@ function setupFormasPagamentoEvents() {
 
   async function openEditarUsuarioModal(usuarioId = null) {
     const isEdit = usuarioId !== null;
-    
+
     const usuarioModalTitle = document.getElementById('usuarioModalTitle');
     if (usuarioModalTitle) {
       usuarioModalTitle.textContent = isEdit ? 'Editar Usuário' : 'Cadastrar Usuário';
     }
-    
+
     const usuarioModalSubmitText = document.getElementById('usuarioModalSubmitText');
     if (usuarioModalSubmitText) {
       usuarioModalSubmitText.textContent = isEdit ? 'Atualizar' : 'Cadastrar';
     }
-    
+
     const senhaInput = document.getElementById('usuarioSenha');
     const confirmaSenhaInput = document.getElementById('usuarioConfirmaSenha');
 
@@ -4997,32 +4997,32 @@ function setupFormasPagamentoEvents() {
         confirmaSenhaInput.placeholder = "";
       }
     }
-    
+
     if (!isEdit) {
       const usuarioForm = document.getElementById('usuarioForm');
       if (usuarioForm) usuarioForm.reset();
-      
+
       const usuarioIdField = document.getElementById('usuarioId');
       if (usuarioIdField) usuarioIdField.value = '';
     }
-    
+
     if (isEdit) {
       try {
         const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`);
-        
+
         if (!response.success) {
           throw new Error(response.message || 'Erro ao carregar usuário');
         }
 
         const usuario = response.usuario;
-        
+
         if (document.getElementById('usuarioId')) document.getElementById('usuarioId').value = usuario.id;
         if (document.getElementById('usuarioNome')) document.getElementById('usuarioNome').value = usuario.nome;
         if (document.getElementById('usuarioCpf')) document.getElementById('usuarioCpf').value = usuario.cpf;
         if (document.getElementById('usuarioPerfil')) document.getElementById('usuarioPerfil').value = usuario.tipo.toLowerCase();
         if (document.getElementById('usuarioStatus')) document.getElementById('usuarioStatus').value = usuario.status ? 'true' : 'false';
         if (document.getElementById('usuarioObservacoes')) document.getElementById('usuarioObservacoes').value = usuario.observacoes || '';
-        
+
         if (document.getElementById('usuarioSenha')) document.getElementById('usuarioSenha').value = '';
         if (document.getElementById('usuarioConfirmaSenha')) document.getElementById('usuarioConfirmaSenha').value = '';
       } catch (error) {
@@ -5031,30 +5031,30 @@ function setupFormasPagamentoEvents() {
         return;
       }
     }
-    
+
     openModal('usuarioModal');
   }
 
   async function openVisualizarUsuarioModal(usuarioId) {
     try {
       const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`);
-      
+
       if (response.success) {
         const usuario = response.usuario;
-        
+
         if (document.getElementById('visualizarUsuarioNome')) document.getElementById('visualizarUsuarioNome').textContent = usuario.nome;
         if (document.getElementById('visualizarUsuarioCPF')) document.getElementById('visualizarUsuarioCPF').textContent = usuario.cpf;
         if (document.getElementById('visualizarUsuarioUltimoAcesso')) document.getElementById('visualizarUsuarioUltimoAcesso').textContent = usuario.ultimo_acesso || 'Nunca acessou';
         if (document.getElementById('visualizarUsuarioDataCadastro')) document.getElementById('visualizarUsuarioDataCadastro').textContent = usuario.data_cadastro || 'Data não disponível';
         if (document.getElementById('visualizarUsuarioObservacoes')) document.getElementById('visualizarUsuarioObservacoes').textContent = usuario.observacoes || 'Nenhuma observação';
-        
+
         const perfilBadge = document.getElementById('visualizarUsuarioPerfil');
         if (perfilBadge) {
           perfilBadge.textContent = formatPerfil(usuario.tipo);
           perfilBadge.className = 'badge';
           perfilBadge.classList.add(`badge-${usuario.tipo.toLowerCase()}`);
         }
-        
+
         const statusBadge = document.getElementById('visualizarUsuarioStatus');
         if (statusBadge) {
           statusBadge.textContent = usuario.status ? 'Ativo' : 'Inativo';
@@ -5072,25 +5072,25 @@ function setupFormasPagamentoEvents() {
 
   function setupUsuarioActions() {
     document.querySelectorAll('.visualizar-usuario').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         const usuarioId = this.getAttribute('data-id');
         openVisualizarUsuarioModal(usuarioId);
       });
     });
 
     document.querySelectorAll('.editar-usuario').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         const usuarioId = this.getAttribute('data-id');
         openEditarUsuarioModal(usuarioId);
       });
     });
 
     document.querySelectorAll('.alterar-status-usuario').forEach(btn => {
-      btn.addEventListener('click', async function() {
+      btn.addEventListener('click', async function () {
         const usuarioId = this.getAttribute('data-id');
         const currentStatus = this.getAttribute('data-status') === 'Ativo';
         const newStatus = !currentStatus;
-        
+
         if (confirm(`Tem certeza que deseja ${currentStatus ? 'desativar' : 'ativar'} este usuário?`)) {
           try {
             const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`, {
@@ -5098,11 +5098,11 @@ function setupFormasPagamentoEvents() {
               headers: {
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify({ 
+              body: JSON.stringify({
                 status: newStatus
               })
             });
-            
+
             if (response.success) {
               showFlashMessage('success', `Usuário ${newStatus ? 'ativado' : 'desativado'} com sucesso`);
               loadUsuariosData();
@@ -5118,11 +5118,11 @@ function setupFormasPagamentoEvents() {
     });
 
     document.querySelectorAll('.remover-usuario').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         const usuarioId = this.getAttribute('data-id');
         const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
         const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
-        
+
         if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir permanentemente o usuário ${usuarioId}?`;
         if (confirmarExclusaoBtn) {
           confirmarExclusaoBtn.setAttribute('data-id', usuarioId);
@@ -5140,12 +5140,12 @@ function setupFormasPagamentoEvents() {
 
   const usuarioForm = document.getElementById('usuarioForm');
   if (usuarioForm) {
-    usuarioForm.addEventListener('submit', async function(e) {
+    usuarioForm.addEventListener('submit', async function (e) {
       e.preventDefault();
-      
+
       const isEdit = document.getElementById('usuarioId')?.value !== '';
       const usuarioId = document.getElementById('usuarioId')?.value || '';
-      
+
       const formData = {
         nome: document.getElementById('usuarioNome')?.value || '',
         cpf: document.getElementById('usuarioCpf')?.value || '',
@@ -5153,10 +5153,10 @@ function setupFormasPagamentoEvents() {
         status: document.getElementById('usuarioStatus')?.value === 'true',
         observacoes: document.getElementById('usuarioObservacoes')?.value || ''
       };
-      
+
       const senha = document.getElementById('usuarioSenha')?.value || '';
       const confirmaSenha = document.getElementById('usuarioConfirmaSenha')?.value || '';
-      
+
       if (senha || confirmaSenha) {
         if (senha !== confirmaSenha) {
           showFlashMessage('error', 'As senhas não coincidem');
@@ -5167,11 +5167,11 @@ function setupFormasPagamentoEvents() {
           formData.confirma_senha = confirmaSenha;
         }
       }
-      
+
       try {
         const url = isEdit ? `/admin/usuarios/${usuarioId}` : '/admin/usuarios';
         const method = isEdit ? 'PUT' : 'POST';
-        
+
         const response = await fetchWithErrorHandling(url, {
           method: method,
           headers: {
@@ -5179,7 +5179,7 @@ function setupFormasPagamentoEvents() {
           },
           body: JSON.stringify(formData)
         });
-        
+
         if (response.success) {
           showFlashMessage('success', `Usuário ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
           closeModal('usuarioModal');
@@ -5199,17 +5199,17 @@ function setupFormasPagamentoEvents() {
     try {
       const searchText = document.getElementById('searchDesconto')?.value.toLowerCase() || '';
       const data = await fetchWithErrorHandling('/admin/descontos');
-      
+
       if (data.success) {
         const descontosTable = document.querySelector('#descontosTable tbody');
         if (descontosTable) {
           descontosTable.innerHTML = '';
-          
+
           data.descontos.forEach(desconto => {
             if (searchText && !(desconto.identificador || '').toLowerCase().includes(searchText)) {
               return;
             }
-            
+
             const row = document.createElement('tr');
             row.classList.add('desconto-row');
             row.setAttribute('data-id', desconto.id);
@@ -5234,12 +5234,12 @@ function setupFormasPagamentoEvents() {
             `;
             descontosTable.appendChild(row);
           });
-          
+
           setupDescontoActions();
-          
+
           // Adiciona evento de clique nas linhas da tabela
           document.querySelectorAll('.desconto-row').forEach(row => {
-            row.addEventListener('click', function(e) {
+            row.addEventListener('click', function (e) {
               // Evita abrir o modal se o clique foi em um botão de ação
               if (!e.target.closest('.table-actions')) {
                 const descontoId = this.getAttribute('data-id');
@@ -5259,25 +5259,25 @@ function setupFormasPagamentoEvents() {
     try {
       // Busca os dados do desconto
       const responseDesconto = await fetchWithErrorHandling(`/admin/descontos/${descontoId}`);
-      
+
       if (responseDesconto.success) {
         const desconto = responseDesconto.desconto;
-        
+
         // Preenche as informações do desconto
         document.getElementById('descontoInfoIdentificador').textContent = desconto.identificador || '-';
         document.getElementById('descontoInfoDescricao').textContent = desconto.descricao || '-';
         document.getElementById('descontoInfoValidade').textContent = desconto.valido_ate || '-';
-        
+
         const statusElement = document.getElementById('descontoInfoStatus');
         statusElement.textContent = desconto.ativo ? 'Ativo' : 'Inativo';
         statusElement.className = desconto.ativo ? 'badge badge-success' : 'badge badge-danger';
-        
+
         // Busca os produtos associados a este desconto
         const responseProdutos = await fetchWithErrorHandling(`/admin/descontos/${descontoId}/produtos`);
-        
+
         const tableBody = document.querySelector('#produtosDescontoTable tbody');
         tableBody.innerHTML = '';
-        
+
         if (responseProdutos.success && responseProdutos.produtos && responseProdutos.produtos.length > 0) {
           responseProdutos.produtos.forEach(produto => {
             const row = document.createElement('tr');
@@ -5292,10 +5292,10 @@ function setupFormasPagamentoEvents() {
         } else {
           tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum produto associado a este desconto</td></tr>';
         }
-        
+
         // Atualiza o título do modal
         document.getElementById('produtosDescontoModalTitle').textContent = `Produtos do Desconto: ${desconto.identificador}`;
-        
+
         // Abre o modal
         openModal('produtosDescontoModal');
       } else {
@@ -5350,18 +5350,18 @@ function setupFormasPagamentoEvents() {
 
   function setupDescontoActions() {
     document.querySelectorAll('.editar-desconto').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         const descontoId = this.getAttribute('data-id');
         openEditarDescontoModal(descontoId);
       });
     });
 
     document.querySelectorAll('.remover-desconto').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         const descontoId = this.getAttribute('data-id');
         const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
         const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
-        
+
         if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir este desconto?`;
         if (confirmarExclusaoBtn) {
           confirmarExclusaoBtn.setAttribute('data-id', descontoId);
@@ -5378,10 +5378,10 @@ function setupFormasPagamentoEvents() {
   document.getElementById('addDesconto')?.addEventListener('click', () => {
     const descontoForm = document.getElementById('descontoForm');
     if (descontoForm) descontoForm.reset();
-    
+
     if (document.getElementById('descontoId')) document.getElementById('descontoId').value = '';
     if (document.getElementById('descontoAtivo')) document.getElementById('descontoAtivo').value = 'true';
-    
+
     const descontoModalTitle = document.getElementById('descontoModalTitle');
     if (descontoModalTitle) descontoModalTitle.textContent = 'Cadastrar Desconto';
     openModal('descontoModal');
@@ -5389,12 +5389,12 @@ function setupFormasPagamentoEvents() {
 
   const descontoForm = document.getElementById('descontoForm');
   if (descontoForm) {
-    descontoForm.addEventListener('submit', async function(e) {
+    descontoForm.addEventListener('submit', async function (e) {
       e.preventDefault();
-      
+
       const descontoId = document.getElementById('descontoId')?.value || '';
       const isEdit = descontoId !== '';
-      
+
       const formData = {
         identificador: document.getElementById('descontoIdentificador')?.value || '',
         quantidade_minima: document.getElementById('descontoQuantidadeMinima')?.value || 0,
@@ -5404,17 +5404,17 @@ function setupFormasPagamentoEvents() {
         descricao: document.getElementById('descontoDescricao')?.value || '',
         ativo: document.getElementById('descontoAtivo')?.value === 'true'
       };
-      
+
       const url = isEdit ? `/admin/descontos/${descontoId}` : '/admin/descontos';
       const method = isEdit ? 'PUT' : 'POST';
-      
+
       try {
         const response = await fetchWithErrorHandling(url, {
           method: method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
         });
-        
+
         if (response.success) {
           showFlashMessage('success', `Desconto ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
           closeModal('descontoModal');
@@ -5432,17 +5432,17 @@ function setupFormasPagamentoEvents() {
   // ===== INICIALIZAÇÃO =====
   updateDateTime();
   setInterval(updateDateTime, 60000);
-  
+
   setupModalEvents();
   setupNavigation();
   setupVendaRetroativaModal();
   setupClienteActions();
   setupFormasPagamentoEvents();
-  
-  document.getElementById('confirmarExclusaoBtn')?.addEventListener('click', async function() {
+
+  document.getElementById('confirmarExclusaoBtn')?.addEventListener('click', async function () {
     const id = this.getAttribute('data-id');
     const type = this.getAttribute('data-type');
-    
+
     try {
       let url;
       if (type === 'produto') {
@@ -5456,17 +5456,17 @@ function setupFormasPagamentoEvents() {
       } else if (type === 'caixa') {
         url = `/admin/caixas/${id}`;
       }
-      
+
       if (!url) return;
-      
+
       const response = await fetchWithErrorHandling(url, {
         method: 'DELETE'
       });
-      
+
       if (response.success) {
         showFlashMessage('success', `${type.charAt(0).toUpperCase() + type.slice(1)} excluído com sucesso`);
         closeModal('confirmarExclusaoModal');
-        
+
         if (type === 'produto') loadProdutosData();
         if (type === 'cliente') loadClientesData();
         if (type === 'usuario') loadUsuariosData();
@@ -5480,13 +5480,13 @@ function setupFormasPagamentoEvents() {
       showFlashMessage('error', `Erro ao excluir ${type}`);
     }
   });
-  
+
   async function loadInitialData() {
     try {
       await Promise.all([
         loadDashboardData()
       ]);
-      
+
       const activeTab = document.querySelector('.sidebar-nav li.active');
       if (activeTab) {
         const tabId = activeTab.getAttribute('data-tab');

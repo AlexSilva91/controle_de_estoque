@@ -2864,6 +2864,112 @@ def get_caixas():
 
     data = []
     for c in caixas:
+        # 1. CALCULA TOTAL DE ENTRADAS - SOMA TODAS AS FORMAS DE PAGAMENTO (igual à outra rota)
+        pagamentos_notas = session.query(
+            func.sum(PagamentoNotaFiscal.valor)
+        ).join(
+            NotaFiscal,
+            PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+        ).filter(
+            NotaFiscal.caixa_id == c.id,
+            NotaFiscal.status == StatusNota.emitida
+        ).scalar() or 0.0
+        
+        # Busca pagamentos de contas a receber
+        pagamentos_contas = session.query(
+            func.sum(PagamentoContaReceber.valor_pago)
+        ).filter(
+            PagamentoContaReceber.caixa_id == c.id
+        ).scalar() or 0.0
+        
+        total_entradas = float(pagamentos_notas) + float(pagamentos_contas)
+
+        # 2. CALCULA TOTAL DE SAÍDAS - SOMENTE DESPESAS (igual à outra rota)
+        total_saidas = session.query(
+            func.sum(Financeiro.valor)
+        ).filter(
+            Financeiro.caixa_id == c.id,
+            Financeiro.tipo == TipoMovimentacao.saida,
+            Financeiro.categoria == CategoriaFinanceira.despesa
+        ).scalar() or 0.0
+        
+        total_despesas = float(total_saidas)
+
+        # 3. CALCULA VALOR FÍSICO (dinheiro) seguindo a mesma lógica
+        pagamentos_dinheiro_notas = session.query(
+            func.sum(PagamentoNotaFiscal.valor)
+        ).join(
+            NotaFiscal,
+            PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+        ).filter(
+            NotaFiscal.caixa_id == c.id,
+            NotaFiscal.status == StatusNota.emitida,
+            PagamentoNotaFiscal.forma_pagamento == FormaPagamento.dinheiro
+        ).scalar() or 0.0
+        
+        pagamentos_dinheiro_contas = session.query(
+            func.sum(PagamentoContaReceber.valor_pago)
+        ).filter(
+            PagamentoContaReceber.caixa_id == c.id,
+            PagamentoContaReceber.forma_pagamento == FormaPagamento.dinheiro
+        ).scalar() or 0.0
+        
+        valor_dinheiro = float(pagamentos_dinheiro_notas) + float(pagamentos_dinheiro_contas)
+        
+        # Aplica a mesma lógica de cálculo do valor físico
+        valor_fisico = valor_dinheiro
+        if c.valor_fechamento and c.valor_abertura:
+            valor_abertura = float(c.valor_abertura)
+            valor_fechamento = float(c.valor_fechamento)
+            valor_fisico = max((valor_dinheiro + valor_abertura) - valor_fechamento - total_despesas, 0.0)
+
+        # 4. CALCULA VALOR DIGITAL (igual à outra rota)
+        formas_digitais = [
+            FormaPagamento.pix_loja,
+            FormaPagamento.pix_fabiano,
+            FormaPagamento.pix_edfrance,
+            FormaPagamento.pix_maquineta,
+            FormaPagamento.cartao_debito,
+            FormaPagamento.cartao_credito
+        ]
+        
+        pagamentos_digitais_notas = session.query(
+            func.sum(PagamentoNotaFiscal.valor)
+        ).join(
+            NotaFiscal,
+            PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+        ).filter(
+            NotaFiscal.caixa_id == c.id,
+            NotaFiscal.status == StatusNota.emitida,
+            PagamentoNotaFiscal.forma_pagamento.in_(formas_digitais)
+        ).scalar() or 0.0
+        
+        pagamentos_digitais_contas = session.query(
+            func.sum(PagamentoContaReceber.valor_pago)
+        ).filter(
+            PagamentoContaReceber.caixa_id == c.id,
+            PagamentoContaReceber.forma_pagamento.in_(formas_digitais)
+        ).scalar() or 0.0
+        
+        valor_digital = float(pagamentos_digitais_notas) + float(pagamentos_digitais_contas)
+
+        # 5. CALCULA A PRAZO (igual à outra rota)
+        pagamentos_prazo_notas = session.query(
+            func.sum(PagamentoNotaFiscal.valor)
+        ).join(
+            NotaFiscal,
+            PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+        ).filter(
+            NotaFiscal.caixa_id == c.id,
+            NotaFiscal.status == StatusNota.emitida,
+            PagamentoNotaFiscal.forma_pagamento == FormaPagamento.a_prazo
+        ).scalar() or 0.0
+        
+        a_prazo = float(pagamentos_prazo_notas)
+
+        # 6. TOTAL DE CONTAS A RECEBER PAGAS (igual à outra rota)
+        total_contas_recebidas = float(pagamentos_contas)
+
         data.append({
             "id": c.id,
             "operador": {"id": c.operador.id, "nome": c.operador.nome} if c.operador else None,
@@ -2872,7 +2978,14 @@ def get_caixas():
             "valor_abertura": float(c.valor_abertura) if c.valor_abertura else None,
             "valor_fechamento": float(c.valor_fechamento) if c.valor_fechamento else None,
             "valor_confirmado": float(c.valor_confirmado) if c.valor_confirmado else None,
-            "status": c.status.value if c.status else None
+            "status": c.status.value if c.status else None,
+            # Novos campos calculados com a mesma lógica
+            "total_vendas": total_entradas,  # Total de todas as entradas
+            "total_contas_recebidas": total_contas_recebidas,
+            "total_despesas": total_despesas,
+            "valor_fisico": valor_fisico,
+            "valor_digital": valor_digital,
+            "a_prazo": a_prazo
         })
 
     return jsonify({"success": True, "data": data, "count": len(data)})
@@ -3010,7 +3123,8 @@ def gerar_pdf_caixas_detalhado():
             total_geral_estornos = 0
             total_geral_vendas = 0
             total_geral_contas_recebidas = 0
-            
+            total_pagamentos_consolidado = {}  # NOVO: Para consolidar formas de pagamento
+
             for caixa in caixas:
                 # Busca pagamentos de notas fiscais (VENDAS)
                 pagamentos_notas = session.query(
@@ -3036,16 +3150,20 @@ def gerar_pdf_caixas_detalhado():
                     PagamentoContaReceber.forma_pagamento
                 ).all()
                 
-                # Calcula total de vendas (notas fiscais)
+                # Calcula total de vendas (notas fiscais) e consolida formas de pagamento
                 caixa_vendas = 0.0
                 for forma, total in pagamentos_notas:
-                    caixa_vendas += float(total) if total else 0.0
+                    valor = float(total) if total else 0.0
+                    total_pagamentos_consolidado[forma.value] = total_pagamentos_consolidado.get(forma.value, 0) + valor
+                    caixa_vendas += valor
                 total_geral_vendas += caixa_vendas
                 
-                # Calcula total de contas recebidas
+                # Calcula total de contas recebidas e consolida formas de pagamento
                 caixa_contas_recebidas = 0.0
                 for forma, total in pagamentos_contas:
-                    caixa_contas_recebidas += float(total) if total else 0.0
+                    valor = float(total) if total else 0.0
+                    total_pagamentos_consolidado[forma.value] = total_pagamentos_consolidado.get(forma.value, 0) + valor
+                    caixa_contas_recebidas += valor
                 total_geral_contas_recebidas += caixa_contas_recebidas
                 
                 # Entradas brutas = vendas + contas recebidas
@@ -3079,7 +3197,7 @@ def gerar_pdf_caixas_detalhado():
             
             saldo_geral = total_geral_entradas - total_geral_saidas
 
-            # Tabela de resumo no mesmo estilo da primeira rota
+            # Tabela de resumo com fontes maiores
             resumo_data = [
                 ["Total Caixas", "Caixas Abertos", "Caixas Fechados", "Total Entradas Líq.", "Total Saídas", "Saldo Final"],
                 [
@@ -3096,20 +3214,19 @@ def gerar_pdf_caixas_detalhado():
             resumo_style = TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#4682B4")),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 9),
+                ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 10),  # Aumentado de 9 para 10
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('FONT', (0, 1), (-1, 1), 'Helvetica', 9),
+                ('FONT', (0, 1), (-1, 1), 'Helvetica', 10),  # Aumentado de 9 para 10
             ])
             resumo_table.setStyle(resumo_style)
             elements.append(resumo_table)
             
-            # Detalhamento das entradas
+            # Detalhamento das entradas com fontes maiores
             detalhes_entradas_data = [
                 ["Detalhamento das Entradas", "Valor"],
                 ["Total de Vendas (Notas Fiscais)", formatarMoeda(total_geral_vendas)],
                 ["Total de Contas Recebidas", formatarMoeda(total_geral_contas_recebidas)],
-                ["Total de Estornos Deduzidos", formatarMoeda(total_geral_estornos)],
                 ["Total Entradas Líquidas", formatarMoeda(total_geral_entradas)]
             ]
             
@@ -3117,17 +3234,77 @@ def gerar_pdf_caixas_detalhado():
             detalhes_entradas_style = TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#4682B4")),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 9),
+                ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 10),  # Aumentado de 9 para 10
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                 ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('FONT', (0, 1), (-1, -1), 'Helvetica', 9),
-                ('BACKGROUND', (0, 4), (-1, 4), colors.lightgrey),
-                ('FONT', (0, 4), (-1, 4), 'Helvetica-Bold', 9),
+                ('FONT', (0, 1), (-1, -1), 'Helvetica', 10),  # Aumentado de 9 para 10
+                ('BACKGROUND', (0, 3), (-1, 3), colors.lightgrey),
+                ('FONT', (0, 3), (-1, 3), 'Helvetica-Bold', 10),  # Aumentado de 9 para 10
             ])
             detalhes_entradas_table.setStyle(detalhes_entradas_style)
             elements.append(Spacer(1, 8))
             elements.append(detalhes_entradas_table)
+
+            # NOVO: Totais por forma de pagamento (igual à outra rota)
+            if total_pagamentos_consolidado:
+                elements.append(Spacer(1, 12))
+                
+                # Título
+                titulo_pagamentos = Paragraph("💳 Totais por Forma de Pagamento", styles['Heading2'])
+                elements.append(titulo_pagamentos)
+                elements.append(Spacer(1, 8))
+                
+                # Tabela de formas de pagamento
+                formas_pagamento_data = [["Forma de Pagamento", "Valor Total"]]
+                
+                # Ordenar por valor (maior para menor)
+                formas_ordenadas = sorted(total_pagamentos_consolidado.items(), key=lambda x: x[1], reverse=True)
+                
+                for forma, valor in formas_ordenadas:
+                    if valor > 0:
+                        forma_nome = forma.replace("_", " ").title()
+                        formas_pagamento_data.append([
+                            forma_nome,
+                            formatarMoeda(valor)
+                        ])
+                
+                # Soma total das formas de pagamento
+                soma_formas = sum(valor for _, valor in formas_ordenadas if valor > 0)
+                formas_pagamento_data.append([
+                    "Soma das Formas de Pagamento",
+                    formatarMoeda(soma_formas)
+                ])
+                
+                formas_pagamento_table = Table(formas_pagamento_data, colWidths=[100*mm, 60*mm])
+                formas_pagamento_style = TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#4682B4")),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 10),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                    ('FONT', (0, 1), (-1, -1), 'Helvetica', 10),
+                    ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+                    ('FONT', (0, -1), (-1, -1), 'Helvetica-Bold', 10),
+                    ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+                ])
+                formas_pagamento_table.setStyle(formas_pagamento_style)
+                elements.append(formas_pagamento_table)
+                
+                # Observação sobre estornos
+                observacao_style = ParagraphStyle(
+                    'Observacao',
+                    parent=styles['Normal'],
+                    fontSize=9,
+                    textColor=colors.grey,
+                    leftIndent=10
+                )
+                elements.append(Spacer(1, 8))
+                elements.append(Paragraph(
+                    f"* Observação: Valor total de Estornos R$ {total_geral_estornos:,.2f} já deduzido das Entradas Líquidas.",
+                    observacao_style
+                ))
             
             elements.append(Spacer(1, 18))
 
@@ -3213,7 +3390,7 @@ def gerar_pdf_caixas_detalhado():
                 # Status como texto simples sem HTML
                 status_text = caixa.status.value.upper()
 
-                # Tabela de informações do caixa
+                # Tabela de informações do caixa com fontes maiores
                 caixa_data = [
                     ['ID', 'Operador', 'Status', 'Data Abertura', 'Data Fechamento', 'Saldo Final'],
                     [
@@ -3228,14 +3405,14 @@ def gerar_pdf_caixas_detalhado():
 
                 caixa_table = Table(caixa_data, colWidths=[15*mm, 40*mm, 25*mm, 30*mm, 30*mm, 30*mm])
                 
-                # Aplicar cores diretamente no estilo da tabela
+                # Aplicar cores diretamente no estilo da tabela com fontes maiores
                 caixa_style = TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#4682B4")),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                    ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 8),
+                    ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 10),  # Aumentado de 8 para 9
                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                     ('ALIGN', (1, 1), (1, -1), 'LEFT'),
-                    ('FONT', (0, 1), (-1, -1), 'Helvetica', 8),
+                    ('FONT', (0, 1), (-1, -1), 'Helvetica', 10),  # Aumentado de 8 para 9
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     # Aplicar cor do status diretamente na célula
@@ -3246,7 +3423,7 @@ def gerar_pdf_caixas_detalhado():
                 caixa_table.setStyle(caixa_style)
                 elements.append(caixa_table)
 
-                # Dados financeiros detalhados em uma tabela menor abaixo
+                # Dados financeiros detalhados em uma tabela menor abaixo com fontes maiores
                 finance_data = [
                     ['Abertura', 'Fechamento', 'Vendas', 'Contas Rec.', 'Estornos', 'Entradas Líq.', 'Saídas'],
                     [
@@ -3260,12 +3437,12 @@ def gerar_pdf_caixas_detalhado():
                     ]
                 ]
 
-                finance_table = Table(finance_data, colWidths=[20*mm, 20*mm, 20*mm, 20*mm, 20*mm, 20*mm, 20*mm])
+                finance_table = Table(finance_data, colWidths=[20*mm, 25*mm, 25*mm, 25*mm, 25*mm, 25*mm, 25*mm])
                 finance_style = TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                    ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 6),
+                    ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 10),  # Aumentado de 6 para 7
                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('FONT', (0, 1), (-1, -1), 'Helvetica', 6),
+                    ('FONT', (0, 1), (-1, -1), 'Helvetica', 10),  # Aumentado de 6 para 7
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                     ('BACKGROUND', (0, 1), (-1, 1), colors.whitesmoke if idx % 2 == 0 else colors.white),
                 ])

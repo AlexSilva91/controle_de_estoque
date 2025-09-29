@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,7 +8,8 @@
     <link rel="icon" href="{{ url_for('static', filename='assets/logo1.ico') }}" type="image/x-icon">
     <!-- Links de recursos externos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
@@ -25,22 +27,22 @@
         <!-- Mensagens flash (posicionadas no topo para maior visibilidade) -->
         <div class="flash-messages">
             {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="flash-message {{ category }}" id="flash-{{ loop.index }}">
-                            <div class="flash-content">
-                                <i class="fas 
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="flash-message {{ category }}" id="flash-{{ loop.index }}">
+                <div class="flash-content">
+                    <i class="fas 
                                     {% if category == 'success' %}fa-check-circle
                                     {% elif category == 'error' %}fa-exclamation-circle
                                     {% elif category == 'warning' %}fa-exclamation-triangle
                                     {% elif category == 'info' %}fa-info-circle{% endif %}">
-                                </i>
-                                <span>{{ message }}</span>
-                            </div>
-                            <button class="close-flash" aria-label="Fechar">&times;</button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
+                    </i>
+                    <span>{{ message }}</span>
+                </div>
+                <button class="close-flash" aria-label="Fechar">&times;</button>
+            </div>
+            {% endfor %}
+            {% endif %}
             {% endwith %}
         </div>
 
@@ -53,7 +55,7 @@
                 </div>
                 <button class="close-sidebar-mobile" id="closeSidebarMobile" aria-label="Fechar menu"></button>
             </div>
-            
+
             <!-- Navegação principal -->
             <nav class="sidebar-nav">
                 <ul>
@@ -119,7 +121,7 @@
                     </li>
                 </ul>
             </nav>
-            
+
             <!-- Rodapé da sidebar -->
             <div class="sidebar-footer">
                 <div class="user-info-mobile">
@@ -143,13 +145,14 @@
             <!-- Cabeçalho -->
             <header class="main-header">
                 <div class="header-left">
-                    <button class="mobile-menu-toggle-in-header" id="mobileMenuToggleInHeader" aria-label="Menu"></button>
+                    <button class="mobile-menu-toggle-in-header" id="mobileMenuToggleInHeader"
+                        aria-label="Menu"></button>
                     <div class="header-title">
                         <h1 id="page-title">Dashboard</h1>
                         <div class="breadcrumb">Home / Dashboard</div>
                     </div>
                 </div>
-                
+
                 <div class="user-actions">
                     <div class="user-info">
                         <div class="user-avatar">
@@ -190,7 +193,7 @@
                                     <canvas id="vendasDespesasChart"></canvas>
                                 </div>
                             </div>
-                            
+
                             <!-- Gráfico 2 - Formas de Pagamento -->
                             <div class="chart-container">
                                 <div class="chart-header">
@@ -201,7 +204,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="chart-row">
                             <!-- Gráfico 3 - Totais por Caixa -->
                             <div class="chart-container">
@@ -212,7 +215,7 @@
                                     <canvas id="caixasChart"></canvas>
                                 </div>
                             </div>
-                            
+
                             <!-- Gráfico 4 - Vendas Diárias -->
                             <div class="chart-container">
                                 <div class="chart-header">
@@ -314,7 +317,8 @@
                         <div class="modal-content details-content">
                             <div class="modal-header">
                                 <h2 class="modal-title"><i class="fas fa-user-circle"></i> Detalhes do Cliente</h2>
-                                <button class="close-modal" onclick="closeModal('detalhesClienteModal')">&times;</button>
+                                <button class="close-modal"
+                                    onclick="closeModal('detalhesClienteModal')">&times;</button>
                             </div>
                             <div class="modal-body details-body">
                                 <div id="detalhesClienteContent">
@@ -412,20 +416,22 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div id="relatorio-saidas" class="tab-content">
                     <div class="card">
                         <div class="card-header">
                             <h3><i class="fas fa-boxes"></i> Relatório de Saída de Produtos</h3>
                             <div class="card-actions">
-                                <button class="btn-icon" title="Atualizar" aria-label="Atualizar" id="atualizarRelatorio">
+                                <button class="btn-icon" title="Atualizar" aria-label="Atualizar"
+                                    id="atualizarRelatorio">
                                     <i class="fas fa-sync-alt"></i>
                                 </button>
                             </div>
                         </div>
                         <div class="card-body">
                             <!-- Adicionando os filtros aqui -->
-                            <div class="filtros-relatorio" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;">
+                            <div class="filtros-relatorio"
+                                style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;">
                                 <div class="form-group">
                                     <label for="relatorioDataInicio">Data Início</label>
                                     <input type="date" id="relatorioDataInicio" class="form-control">
@@ -436,11 +442,13 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="relatorioProdutoNome">Nome do Produto</label>
-                                    <input type="text" id="relatorioProdutoNome" class="form-control" placeholder="Filtrar por nome">
+                                    <input type="text" id="relatorioProdutoNome" class="form-control"
+                                        placeholder="Filtrar por nome">
                                 </div>
                                 <div class="form-group">
                                     <label for="relatorioProdutoCodigo">Código do Produto</label>
-                                    <input type="text" id="relatorioProdutoCodigo" class="form-control" placeholder="Filtrar por código">
+                                    <input type="text" id="relatorioProdutoCodigo" class="form-control"
+                                        placeholder="Filtrar por código">
                                 </div>
                                 <div class="form-group" style="display: flex; gap: 5px;">
                                     <button class="btn btn-primary" id="filtrarRelatorio">
@@ -451,7 +459,7 @@
                                     </button>
                                 </div>
                             </div>
-                            
+
                             <div class="relatorio-meta">
                                 <div class="meta-item">
                                     <span class="meta-label">Período:</span>
@@ -486,7 +494,7 @@
                                     <span id="relatorioLucroLiquido">R$ 0,00</span>
                                 </div>
                             </div>
-                            
+
                             <div class="table-responsive">
                                 <table id="tabelaRelatorio">
                                     <thead>
@@ -515,29 +523,29 @@
                 <!-- Contas a Receber -->
                 <div id="contas-receber" class="tab-content">
                     <div class="action-bar">
-                      <div class="filter-container">
-                        <div class="filter-group">
-                            <label for="contasReceberDataInicio">De:</label>
-                            <input type="date" id="contasReceberDataInicio" class="form-control">
+                        <div class="filter-container">
+                            <div class="filter-group">
+                                <label for="contasReceberDataInicio">De:</label>
+                                <input type="date" id="contasReceberDataInicio" class="form-control">
+                            </div>
+                            <div class="filter-group">
+                                <label for="contasReceberDataFim">Até:</label>
+                                <input type="date" id="contasReceberDataFim" class="form-control">
+                            </div>
+                            <div class="filter-group">
+                                <label for="contasReceberStatus">Status:</label>
+                                <select id="contasReceberStatus" class="form-control">
+                                    <option value="">Todos</option>
+                                    <option value="pendente">Pendentes</option>
+                                    <option value="quitado">Quitados</option>
+                                    <option value="parcial">Parciais</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" id="filtrarContasReceber">
+                                <i class="fas fa-filter"></i>
+                                <span>Filtrar</span>
+                            </button>
                         </div>
-                        <div class="filter-group">
-                            <label for="contasReceberDataFim">Até:</label>
-                            <input type="date" id="contasReceberDataFim" class="form-control">
-                        </div>
-                        <div class="filter-group">
-                            <label for="contasReceberStatus">Status:</label>
-                            <select id="contasReceberStatus" class="form-control">
-                                <option value="">Todos</option>
-                                <option value="pendente">Pendentes</option>
-                                <option value="quitado">Quitados</option>
-                                <option value="parcial">Parciais</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-primary" id="filtrarContasReceber">
-                            <i class="fas fa-filter"></i>
-                            <span>Filtrar</span>
-                        </button>
-                    </div>
                     </div>
 
                     <div class="card">
@@ -632,14 +640,15 @@
                                 </div>
 
                                 <h4 class="mb-3">Registrar Pagamento</h4>
-                                <div id="areaPagamento"> 
+                                <div id="areaPagamento">
                                     <form id="formPagamentoConta">
                                         <input type="hidden" id="contaIdPagamento">
                                         <div class="row">
                                             <div class="col-md-3">
                                                 <div class="form-group">
                                                     <label for="valorPagamento">Valor*</label>
-                                                    <input type="number" id="valorPagamento" class="form-control" step="0.01" min="0.01" required>
+                                                    <input type="number" id="valorPagamento" class="form-control"
+                                                        step="0.01" min="0.01" required>
                                                 </div>
                                             </div>
                                             <div class="col-md-3">
@@ -685,7 +694,7 @@
                                             </button>
                                         </div>
                                     </form>
-                                </div> 
+                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-outline close-modal">Fechar</button>
@@ -764,7 +773,7 @@
                                     <option value="recusado">Recusados</option>
                                 </select>
                             </div>
-                            
+
                             <!-- NOVO: Filtro de Operador -->
                             <div class="filter-group">
                                 <label for="caixaOperador">Operador:</label>
@@ -773,26 +782,26 @@
                                     <!-- Opções serão preenchidas via JavaScript -->
                                 </select>
                             </div>
-                            
+
                             <!-- Filtro Data Início -->
                             <div class="filter-group">
                                 <label for="caixaDataInicio">Data Início:</label>
                                 <input type="date" id="caixaDataInicio" class="form-control">
                             </div>
-                            
+
                             <!-- Filtro Data Fim -->
                             <div class="filter-group">
                                 <label for="caixaDataFim">Data Fim:</label>
                                 <input type="date" id="caixaDataFim" class="form-control">
                             </div>
-                            
+
                             <!-- Botão Filtrar -->
                             <button class="btn btn-primary" id="filterCaixas">
                                 <i class="fas fa-filter"></i>
                                 <span>Filtrar</span>
                             </button>
                         </div>
-                        
+
                         <!-- Botões de ação (atualizar) -->
                         <div class="action-buttons">
                             <button class="btn btn-outline" id="refreshCaixas" aria-label="Atualizar">
@@ -812,8 +821,8 @@
                                     <th>Operador</th>
                                     <th>Abertura</th>
                                     <th>Fechamento</th>
-                                    <th>Valor Abertura</th>
-                                    <th>Valor Fechamento</th>
+                                    <th>Entradas</th>
+                                    <th>Saídas</th>
                                     <th>Status</th>
                                     <th>Ações</th>
                                 </tr>
@@ -823,14 +832,15 @@
                             </tbody>
                         </table>
                     </div>
-                </div>                 
+                </div>
 
                 <!-- Descontos -->
                 <div id="descontos" class="tab-content">
                     <div class="action-bar">
                         <div class="search-container">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="searchDesconto" class="form-control" placeholder="Buscar desconto...">
+                            <input type="text" id="searchDesconto" class="form-control"
+                                placeholder="Buscar desconto...">
                         </div>
                         <div class="action-buttons">
                             <button class="btn btn-primary" id="addDesconto">
@@ -905,7 +915,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                
+
                                 <div class="details-table-section">
                                     <h4 class="section-title">Produtos Associados</h4>
                                     <div class="details-table-container">
@@ -941,7 +951,7 @@
     </div>
 
     <!-- MODAIS -->
-    
+
     <!-- Modal Produto -->
     <div id="produtoModal" class="modal">
         <div class="modal-overlay"></div>
@@ -985,7 +995,8 @@
                             </div>
                             <div class="form-group">
                                 <label for="produtoValor">Valor Unitário*</label>
-                                <input type="number" id="produtoValor" class="form-control" step="0.01" min="0" required>
+                                <input type="number" id="produtoValor" class="form-control" step="0.01" min="0"
+                                    required>
                             </div>
                         </div>
                         <div class="form-row">
@@ -999,7 +1010,8 @@
                             </div>
                             <div class="form-group">
                                 <label for="produtoEstoque">Quantidade em Estoque*</label>
-                                <input type="number" id="produtoEstoque" class="form-control" step="0.001" min="0" required>
+                                <input type="number" id="produtoEstoque" class="form-control" step="0.001" min="0"
+                                    required>
                             </div>
                         </div>
                         <div class="form-row">
@@ -1009,7 +1021,8 @@
                             </div>
                             <div class="form-group">
                                 <label for="produtoValorTotalCompra">Valor Total de Compra</label>
-                                <input type="number" id="produtoValorTotalCompra" class="form-control" step="0.01" min="0">
+                                <input type="number" id="produtoValorTotalCompra" class="form-control" step="0.01"
+                                    min="0">
                             </div>
                         </div>
                         <div class="form-row">
@@ -1019,7 +1032,8 @@
                             </div>
                             <div class="form-group">
                                 <label for="produtoEstoqueMinimo">Estoque Mínimo</label>
-                                <input type="number" id="produtoEstoqueMinimo" class="form-control" step="0.001" min="0">
+                                <input type="number" id="produtoEstoqueMinimo" class="form-control" step="0.001"
+                                    min="0">
                             </div>
                         </div>
                     </div>
@@ -1060,7 +1074,7 @@
                                 <div class="form-control-static" id="transferenciaUnidadeAtual"></div>
                             </div>
                         </div>
-                        
+
                         <!-- Opção de conversão -->
                         <div class="form-group">
                             <div class="form-check">
@@ -1070,7 +1084,7 @@
                                 </label>
                             </div>
                         </div>
-                        
+
                         <!-- Campos de conversão (inicialmente ocultos) -->
                         <div id="camposConversao" style="display: none;">
                             <div class="form-row">
@@ -1087,19 +1101,23 @@
                                 </div>
                                 <div class="form-group col-md-6">
                                     <label for="transferenciaQuantidadeDestino">Quantidade na Unidade de Destino</label>
-                                    <input type="number" id="transferenciaQuantidadeDestino" class="form-control" step="0.001" min="0.001">
+                                    <input type="number" id="transferenciaQuantidadeDestino" class="form-control"
+                                        step="0.001" min="0.001">
                                     <small class="text-muted" id="infoConversao"></small>
                                 </div>
                             </div>
-                            
+
                             <div class="form-row">
                                 <div class="form-group col-md-12">
-                                    <label for="transferenciaFatorConversao">Fator de Conversão Personalizado (opcional)</label>
+                                    <label for="transferenciaFatorConversao">Fator de Conversão Personalizado
+                                        (opcional)</label>
                                     <div class="input-group">
                                         <div class="input-group-prepend">
-                                            <span class="input-group-text">1 <span id="unidadeOrigemTexto"></span> = </span>
+                                            <span class="input-group-text">1 <span id="unidadeOrigemTexto"></span> =
+                                            </span>
                                         </div>
-                                        <input type="number" id="transferenciaFatorConversao" class="form-control" step="0.001" min="0.001" placeholder="Usar fator padrão do produto">
+                                        <input type="number" id="transferenciaFatorConversao" class="form-control"
+                                            step="0.001" min="0.001" placeholder="Usar fator padrão do produto">
                                         <div class="input-group-append">
                                             <span class="input-group-text" id="unidadeDestinoTexto"></span>
                                         </div>
@@ -1107,7 +1125,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="form-row">
                             <div class="form-group col-md-6">
                                 <label for="transferenciaOrigem">Origem*</label>
@@ -1126,19 +1144,21 @@
                                 </select>
                             </div>
                         </div>
-                        
+
                         <div class="form-row">
                             <div class="form-group col-md-6">
                                 <label for="transferenciaQuantidade">Quantidade de Origem*</label>
-                                <input type="number" id="transferenciaQuantidade" class="form-control" step="0.001" min="0.001" required>
+                                <input type="number" id="transferenciaQuantidade" class="form-control" step="0.001"
+                                    min="0.001" required>
                                 <small class="text-muted" id="transferenciaEstoqueDisponivel"></small>
                             </div>
                             <div class="form-group col-md-6">
                                 <label for="transferenciaValorUnitarioDestino">Valor Unitário no Destino*</label>
-                                <input type="number" id="transferenciaValorUnitarioDestino" class="form-control" step="0.01" min="0.01" required>
+                                <input type="number" id="transferenciaValorUnitarioDestino" class="form-control"
+                                    step="0.01" min="0.01" required>
                             </div>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="transferenciaObservacao">Observação</label>
                             <textarea id="transferenciaObservacao" class="form-control" rows="2"></textarea>
@@ -1191,39 +1211,39 @@
         <div class="modal-overlay"></div>
         <div class="modal-dialog modal-md">
             <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">
-                <i class="fas fa-box"></i>
-                <span>Entrada de Estoque</span>
-                </h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <form id="entradaEstoqueForm">
-                <div class="modal-body">
-                <div class="form-group">
-                    <label for="entradaLoja">Estoque Loja</label>
-                    <input type="number" id="entradaLoja" class="form-control" step="0.001" min="0">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-box"></i>
+                        <span>Entrada de Estoque</span>
+                    </h3>
+                    <button class="close-modal">&times;</button>
                 </div>
-                <div class="form-group">
-                    <label for="entradaDeposito">Estoque Depósito</label>
-                    <input type="number" id="entradaDeposito" class="form-control" step="0.001" min="0">
-                </div>
-                <div class="form-group">
-                    <label for="entradaFabrica">Estoque Fábrica</label>
-                    <input type="number" id="entradaFabrica" class="form-control" step="0.001" min="0">
-                </div>
-                <div class="form-group">
-                    <label for="entradaValorCompra">Valor Unitário de Compra</label>
-                    <input type="number" id="entradaValorCompra" class="form-control" step="0.01" min="0">
-                </div>
-                </div>
-                <div class="modal-footer">
-                <button type="button" class="btn btn-outline close-modal">Cancelar</button>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-save"></i> Registrar Entrada
-                </button>
-                </div>
-            </form>
+                <form id="entradaEstoqueForm">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="entradaLoja">Estoque Loja</label>
+                            <input type="number" id="entradaLoja" class="form-control" step="0.001" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="entradaDeposito">Estoque Depósito</label>
+                            <input type="number" id="entradaDeposito" class="form-control" step="0.001" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="entradaFabrica">Estoque Fábrica</label>
+                            <input type="number" id="entradaFabrica" class="form-control" step="0.001" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="entradaValorCompra">Valor Unitário de Compra</label>
+                            <input type="number" id="entradaValorCompra" class="form-control" step="0.01" min="0">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Registrar Entrada
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -1271,7 +1291,8 @@
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="dataEmissaoRetroativa">Data da Venda</label>
-                                    <input type="datetime-local" class="form-control" id="dataEmissaoRetroativa" required>
+                                    <input type="datetime-local" class="form-control" id="dataEmissaoRetroativa"
+                                        required>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -1306,10 +1327,12 @@
                                         </select>
                                     </div>
                                     <div class="col-md-2">
-                                        <input type="number" class="form-control" id="quantidadeRetroativa" placeholder="Qtd" min="0.001" step="0.001">
+                                        <input type="number" class="form-control" id="quantidadeRetroativa"
+                                            placeholder="Qtd" min="0.001" step="0.001">
                                     </div>
                                     <div class="col-md-2">
-                                        <button type="button" class="btn btn-primary btn-block" id="btnAdicionarProdutoRetroativo">
+                                        <button type="button" class="btn btn-primary btn-block"
+                                            id="btnAdicionarProdutoRetroativo">
                                             <i class="fas fa-plus"></i> Add
                                         </button>
                                     </div>
@@ -1362,10 +1385,12 @@
                                         </select>
                                     </div>
                                     <div class="col-md-4">
-                                        <input type="number" class="form-control" id="valorPagamentoRetroativo" placeholder="Valor" min="0.01" step="0.01">
+                                        <input type="number" class="form-control" id="valorPagamentoRetroativo"
+                                            placeholder="Valor" min="0.01" step="0.01">
                                     </div>
                                     <div class="col-md-2">
-                                        <button type="button" class="btn btn-primary btn-block" id="btnAdicionarPagamentoRetroativo">
+                                        <button type="button" class="btn btn-primary btn-block"
+                                            id="btnAdicionarPagamentoRetroativo">
                                             <i class="fas fa-plus"></i> Add
                                         </button>
                                     </div>
@@ -1447,7 +1472,8 @@
                             </div>
                             <div class="form-group" id="usuarioConfirmaSenhaGroup">
                                 <label for="usuarioConfirmaSenha">Confirmar Senha*</label>
-                                <input type="password" id="usuarioConfirmaSenha" name="confirma_senha" class="form-control" required>
+                                <input type="password" id="usuarioConfirmaSenha" name="confirma_senha"
+                                    class="form-control" required>
                             </div>
                         </div>
                         <div class="form-row">
@@ -1488,7 +1514,7 @@
             </div>
         </div>
     </div>
-        <!-- Modal Cliente -->
+    <!-- Modal Cliente -->
     <div id="clienteModal" class="modal">
         <div class="modal-overlay"></div>
         <div class="modal-dialog">
@@ -1544,7 +1570,7 @@
             </div>
         </div>
     </div>
-        <!-- Modal Detalhes Saída de Estoque -->
+    <!-- Modal Detalhes Saída de Estoque -->
     <div id="detalhesSaidaModal" class="modal">
         <div class="modal-overlay"></div>
         <div class="modal-dialog modal-lg">
@@ -1599,7 +1625,7 @@
                             <div class="value" id="detalhesDiasRestantes"></div>
                         </div>
                     </div>
-                    
+
                     <h4 class="mt-4">Histórico de Vendas</h4>
                     <div class="table-responsive">
                         <table class="table compact-table" id="historicoVendasTable">
@@ -1720,17 +1746,20 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="descontoQuantidadeMinima">Quantidade Mínima*</label>
-                                <input type="number" id="descontoQuantidadeMinima" class="form-control" step="0.001" min="0.001" required>
+                                <input type="number" id="descontoQuantidadeMinima" class="form-control" step="0.001"
+                                    min="0.001" required>
                             </div>
                             <div class="form-group">
                                 <label for="descontoQuantidadeMaxima">Quantidade Máxima*</label>
-                                <input type="number" id="descontoQuantidadeMaxima" class="form-control" step="0.001" min="0.001" required>
+                                <input type="number" id="descontoQuantidadeMaxima" class="form-control" step="0.001"
+                                    min="0.001" required>
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="descontoValorUnitario">Valor Unitário com Desconto*</label>
-                                <input type="number" id="descontoValorUnitario" class="form-control" step="0.01" min="0" required>
+                                <input type="number" id="descontoValorUnitario" class="form-control" step="0.01" min="0"
+                                    required>
                             </div>
                             <div class="form-group">
                                 <label for="descontoValidoAte">Válido até</label>
@@ -1809,7 +1838,7 @@
                             </div>
                         </div>
                     </div>
-                                        
+
                     <div class="details-totals">
                         <div class="total-item">
                             <label>Total Entradas:</label>
@@ -1823,7 +1852,7 @@
                             <label>Saldo:</label>
                             <span id="caixaSaldo" class="total-value">R$ 0,00</span>
                         </div>
-                        
+
                         <!-- Totais por forma de pagamento -->
                         <div class="total-item">
                             <label>PIX Fabiano:</label>
@@ -1864,7 +1893,7 @@
                     </div>
                     <div class="details-table-section">
                         <h4 class="toggle-table-header" style="cursor: pointer;">
-                            <i class="fas fa-file-invoice-dollar"></i> 
+                            <i class="fas fa-file-invoice-dollar"></i>
                             <span>Movimentações Financeiras</span>
                             <i class="fas fa-chevron-down toggle-icon"></i>
                         </h4>
@@ -1883,283 +1912,288 @@
                             </table>
                         </div>
                     </div>
-                <div class="modal-footer">
-                    <button id="abrirPdfMovimentacoes" type="button" class="btn btn-primary">
-                        <i class="fas fa-file-pdf"></i> PDF Movimentações
-                    </button>
-                    <button id="abrirPdfCaixa" type="button">Abrir PDF do Caixa</button>
-                    <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                    <div class="modal-footer">
+                        <button id="abrirPdfMovimentacoes" type="button" class="btn btn-primary">
+                            <i class="fas fa-file-pdf"></i> PDF Movimentações
+                        </button>
+                        <button id="abrirPdfCaixa" type="button">Abrir PDF do Caixa</button>
+                        <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    <!-- Modal para Edição de Formas de Pagamento -->
-    <div id="editarFormasPagamentoModal" class="modal">
-        <div class="modal-overlay"></div>
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">
-                        <i class="fas fa-credit-card"></i>
-                        <span>Editar Formas de Pagamento - Venda #<span id="editarPagamentoVendaId"></span></span>
-                    </h3>
-                    <button class="close-modal" aria-label="Fechar">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label>Formas de Pagamento Atuais:</label>
-                        <div id="formasPagamentoAtuais" class="formas-pagamento-container"></div>
+        <!-- Modal para Edição de Formas de Pagamento -->
+        <div id="editarFormasPagamentoModal" class="modal">
+            <div class="modal-overlay"></div>
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="modal-title">
+                            <i class="fas fa-credit-card"></i>
+                            <span>Editar Formas de Pagamento - Venda #<span id="editarPagamentoVendaId"></span></span>
+                        </h3>
+                        <button class="close-modal" aria-label="Fechar">&times;</button>
                     </div>
-                    
-                    <div class="form-group">
-                        <label>Adicionar Nova Forma de Pagamento:</label>
-                        <div class="form-row">
-                            <div class="form-col">
-                                <select id="novaFormaPagamento" class="form-control">
-                                    <option value="">Selecione uma forma</option>
-                                    <option value="pix_fabiano">PIX Fabiano</option>
-                                    <option value="pix_maquineta">PIX Maquineta</option>
-                                    <option value="pix_edfrance">PIX Edfranci</option>
-                                    <option value="pix_loja">PIX Loja</option>
-                                    <option value="dinheiro">Dinheiro</option>
-                                    <option value="cartao_credito">Cartão Crédito</option>
-                                    <option value="cartao_debito">Cartão Débito</option>
-                                    <option value="a_prazo">A Prazo</option>
-                                </select>
-                            </div>
-                            <div class="form-col">
-                                <input type="number" id="novoValorPagamento" step="0.01" min="0" placeholder="Valor (opcional)" class="form-control">
-                            </div>
-                            <div class="form-col">
-                                <button id="adicionarFormaPagamento" class="btn btn-primary">Adicionar</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Total da Venda:</label>
-                        <div id="totalVendaValor" class="total-value">R$ 0,00</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Total dos Pagamentos:</label>
-                        <div id="totalPagamentosValor" class="total-value">R$ 0,00</div>
-                    </div>
-                    
-                    <div class="form-group" id="diferencaContainer" style="display: none;">
-                        <label>Diferença:</label>
-                        <div id="diferencaValor" class="total-value negative">R$ 0,00</div>
-                        <small class="text-danger">A soma dos pagamentos não corresponde ao valor total da venda.</small>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button id="salvarFormasPagamento" class="btn btn-success">Salvar Alterações</button>
-                    <button type="button" class="btn btn-outline close-modal">Cancelar</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- Modal de Vendas por Forma de Pagamento -->
-    <div id="vendasFormaPagamentoModal" class="modal">
-        <div class="modal-overlay"></div>
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">
-                        <i class="fas fa-credit-card"></i>
-                        <span id="vendasFormaPagamentoTitulo">Vendas por Forma de Pagamento</span>
-                    </h3>
-                    <button class="close-modal" aria-label="Fechar">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="table-responsive">
-                        <table id="vendasFormaPagamentoTable" class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Data</th>
-                                    <th>Nota Fiscal</th>
-                                    <th>Cliente</th>
-                                    <th>Valor Total</th>
-                                    <th>Valor Pago</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline close-modal">Fechar</button>
-                    <button id="btnExportarPdf" type="button" class="btn btnExportarPdf">
-                        <i class="fas fa-file-pdf"></i> Exportar PDF
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal de Detalhes da Venda -->
-    <div id="detalhesVendaModal" class="modal">
-        <div class="modal-overlay"></div>
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">
-                        <i class="fas fa-shopping-cart"></i>
-                        <span id="detalhesVendaTitulo">Detalhes da Venda</span>
-                    </h3>
-                    <button class="close-modal" aria-label="Fechar">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="details-grid mb-3">
-                        <div class="detail-item">
-                            <label>Nota Fiscal:</label>
-                            <div class="value" id="detalheNotaFiscalId"></div>
-                        </div>
-                        <div class="detail-item">
-                            <label>Data:</label>
-                            <div class="value" id="detalheDataVenda"></div>
-                        </div>
-                        <div class="detail-item">
-                            <label>Cliente:</label>
-                            <div class="value" id="detalheCliente"></div>
-                        </div>
-                        <div class="detail-item">
-                            <label>Valor Total:</label>
-                            <div class="value" id="detalheValorTotal"></div>
-                        </div>
-                        <div class="detail-item">
-                            <label>Desconto:</label>
-                            <div class="value" id="detalheDesconto"></div>
-                        </div>
-                        <div class="detail-item">
-                            <label>Formas de Pagamento:</label>
-                            <div class="value" id="detalheFormasPagamento"></div>
-                        </div>
-                    </div>
-                    
-                    <h4>Produtos Vendidos</h4>
-                    <div class="table-responsive">
-                        <table id="detalhesProdutosTable" class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Produto</th>
-                                    <th>Quantidade</th>
-                                    <th>Unidade</th>
-                                    <th>Valor Unitário</th>
-                                    <th>Desconto</th>
-                                    <th>Valor Total</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline close-modal">Fechar</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Modal de Edição do Caixa -->
-    <div id="editarCaixaModal" class="modal">
-        <div class="modal-overlay"></div>
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">
-                        <i class="fas fa-edit"></i>
-                        <span id="editarCaixaModalTitle">Editar Caixa</span>
-                    </h3>
-                    <button class="close-modal" aria-label="Fechar">&times;</button>
-                </div>
-                <form id="editarCaixaForm">
-                    <input type="hidden" id="editarCaixaId">
                     <div class="modal-body">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="editarCaixaValorAbertura">Valor de Abertura*</label>
-                                <input type="number" id="editarCaixaValorAbertura" class="form-control" step="0.01" min="0" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="editarCaixaStatus">Status*</label>
-                                <select id="editarCaixaStatus" class="form-control" required>
-                                    <option value="aberto">Aberto</option>
-                                    <option value="fechado">Fechado</option>
-                                    <option value="analise">Em análise</option>
-                                </select>
+                        <div class="form-group">
+                            <label>Formas de Pagamento Atuais:</label>
+                            <div id="formasPagamentoAtuais" class="formas-pagamento-container"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Adicionar Nova Forma de Pagamento:</label>
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <select id="novaFormaPagamento" class="form-control">
+                                        <option value="">Selecione uma forma</option>
+                                        <option value="pix_fabiano">PIX Fabiano</option>
+                                        <option value="pix_maquineta">PIX Maquineta</option>
+                                        <option value="pix_edfrance">PIX Edfranci</option>
+                                        <option value="pix_loja">PIX Loja</option>
+                                        <option value="dinheiro">Dinheiro</option>
+                                        <option value="cartao_credito">Cartão Crédito</option>
+                                        <option value="cartao_debito">Cartão Débito</option>
+                                        <option value="a_prazo">A Prazo</option>
+                                    </select>
+                                </div>
+                                <div class="form-col">
+                                    <input type="number" id="novoValorPagamento" step="0.01" min="0"
+                                        placeholder="Valor (opcional)" class="form-control">
+                                </div>
+                                <div class="form-col">
+                                    <button id="adicionarFormaPagamento" class="btn btn-primary">Adicionar</button>
+                                </div>
                             </div>
                         </div>
+
                         <div class="form-group">
-                            <label for="editarCaixaObservacoes">Observações</label>
-                            <textarea id="editarCaixaObservacoes" class="form-control" rows="3"></textarea>
+                            <label>Total da Venda:</label>
+                            <div id="totalVendaValor" class="total-value">R$ 0,00</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Total dos Pagamentos:</label>
+                            <div id="totalPagamentosValor" class="total-value">R$ 0,00</div>
+                        </div>
+
+                        <div class="form-group" id="diferencaContainer" style="display: none;">
+                            <label>Diferença:</label>
+                            <div id="diferencaValor" class="total-value negative">R$ 0,00</div>
+                            <small class="text-danger">A soma dos pagamentos não corresponde ao valor total da
+                                venda.</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="salvarFormasPagamento" class="btn btn-success">Salvar Alterações</button>
+                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Modal de Vendas por Forma de Pagamento -->
+        <div id="vendasFormaPagamentoModal" class="modal">
+            <div class="modal-overlay"></div>
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="modal-title">
+                            <i class="fas fa-credit-card"></i>
+                            <span id="vendasFormaPagamentoTitulo">Vendas por Forma de Pagamento</span>
+                        </h3>
+                        <button class="close-modal" aria-label="Fechar">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="table-responsive">
+                            <table id="vendasFormaPagamentoTable" class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Nota Fiscal</th>
+                                        <th>Cliente</th>
+                                        <th>Valor Total</th>
+                                        <th>Valor Pago</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                        <button id="btnExportarPdf" type="button" class="btn btnExportarPdf">
+                            <i class="fas fa-file-pdf"></i> Exportar PDF
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Detalhes da Venda -->
+        <div id="detalhesVendaModal" class="modal">
+            <div class="modal-overlay"></div>
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="modal-title">
+                            <i class="fas fa-shopping-cart"></i>
+                            <span id="detalhesVendaTitulo">Detalhes da Venda</span>
+                        </h3>
+                        <button class="close-modal" aria-label="Fechar">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="details-grid mb-3">
+                            <div class="detail-item">
+                                <label>Nota Fiscal:</label>
+                                <div class="value" id="detalheNotaFiscalId"></div>
+                            </div>
+                            <div class="detail-item">
+                                <label>Data:</label>
+                                <div class="value" id="detalheDataVenda"></div>
+                            </div>
+                            <div class="detail-item">
+                                <label>Cliente:</label>
+                                <div class="value" id="detalheCliente"></div>
+                            </div>
+                            <div class="detail-item">
+                                <label>Valor Total:</label>
+                                <div class="value" id="detalheValorTotal"></div>
+                            </div>
+                            <div class="detail-item">
+                                <label>Desconto:</label>
+                                <div class="value" id="detalheDesconto"></div>
+                            </div>
+                            <div class="detail-item">
+                                <label>Formas de Pagamento:</label>
+                                <div class="value" id="detalheFormasPagamento"></div>
+                            </div>
+                        </div>
+
+                        <h4>Produtos Vendidos</h4>
+                        <div class="table-responsive">
+                            <table id="detalhesProdutosTable" class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Produto</th>
+                                        <th>Quantidade</th>
+                                        <th>Unidade</th>
+                                        <th>Valor Unitário</th>
+                                        <th>Desconto</th>
+                                        <th>Valor Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Edição do Caixa -->
+        <div id="editarCaixaModal" class="modal">
+            <div class="modal-overlay"></div>
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="modal-title">
+                            <i class="fas fa-edit"></i>
+                            <span id="editarCaixaModalTitle">Editar Caixa</span>
+                        </h3>
+                        <button class="close-modal" aria-label="Fechar">&times;</button>
+                    </div>
+                    <form id="editarCaixaForm">
+                        <input type="hidden" id="editarCaixaId">
+                        <div class="modal-body">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="editarCaixaValorAbertura">Valor de Abertura*</label>
+                                    <input type="number" id="editarCaixaValorAbertura" class="form-control" step="0.01"
+                                        min="0" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="editarCaixaStatus">Status*</label>
+                                    <select id="editarCaixaStatus" class="form-control" required>
+                                        <option value="aberto">Aberto</option>
+                                        <option value="fechado">Fechado</option>
+                                        <option value="analise">Em análise</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="editarCaixaObservacoes">Observações</label>
+                                <textarea id="editarCaixaObservacoes" class="form-control" rows="3"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i>
+                                <span>Salvar Alterações</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <!-- Modal para estornar venda -->
+        <div id="estornarVendaModal" class="modal">
+            <div class="modal-overlay"></div>
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="modal-title">
+                            <i class="fas fa-undo"></i>
+                            <span>Estornar Venda</span>
+                        </h3>
+                        <button class="close-modal" aria-label="Fechar">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="estornoVendaId">
+
+                        <div class="form-group">
+                            <label>Valor da Venda:</label>
+                            <p id="estornoVendaValor" class="form-control-static"></p>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Data da Venda:</label>
+                            <p id="estornoVendaData" class="form-control-static"></p>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Cliente:</label>
+                            <p id="estornoVendaCliente" class="form-control-static"></p>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Descrição:</label>
+                            <p id="estornoVendaDescricao" class="form-control-static"></p>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="motivoEstorno">Motivo do Estorno *</label>
+                            <textarea id="motivoEstorno" class="form-control" rows="3"
+                                placeholder="Informe o motivo do estorno" required></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline close-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i>
-                            <span>Salvar Alterações</span>
+                        <button type="button" class="btn btn-danger" id="btnConfirmarEstorno">
+                            <i class="fas fa-undo"></i>
+                            <span>Confirmar Estorno</span>
                         </button>
                     </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    <!-- Modal para estornar venda -->
-    <div id="estornarVendaModal" class="modal">
-        <div class="modal-overlay"></div>
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">
-                        <i class="fas fa-undo"></i>
-                        <span>Estornar Venda</span>
-                    </h3>
-                    <button class="close-modal" aria-label="Fechar">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="estornoVendaId">
-                    
-                    <div class="form-group">
-                        <label>Valor da Venda:</label>
-                        <p id="estornoVendaValor" class="form-control-static"></p>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Data da Venda:</label>
-                        <p id="estornoVendaData" class="form-control-static"></p>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Cliente:</label>
-                        <p id="estornoVendaCliente" class="form-control-static"></p>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Descrição:</label>
-                        <p id="estornoVendaDescricao" class="form-control-static"></p>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="motivoEstorno">Motivo do Estorno *</label>
-                        <textarea id="motivoEstorno" class="form-control" rows="3" placeholder="Informe o motivo do estorno" required></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline close-modal">Cancelar</button>
-                    <button type="button" class="btn btn-danger" id="btnConfirmarEstorno">
-                        <i class="fas fa-undo"></i>
-                        <span>Confirmar Estorno</span>
-                    </button>
                 </div>
             </div>
         </div>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+        <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
+
 </html>
