@@ -3446,6 +3446,11 @@ def gerar_pdf_caixas_detalhado():
                             formas_colunas.append(forma_nome)
                             valores_colunas.append(formatarMoeda(valor))
                     
+                    # Adicionar coluna de TOTAL
+                    formas_colunas.append("TOTAL")
+                    total_entradas = sum(valor for _, valor in formas_ordenadas if valor > 0)
+                    valores_colunas.append(formatarMoeda(total_entradas))
+                    
                     # Adicionar coluna de SAÍDAS
                     formas_colunas.append("SAÍDAS")
                     valores_colunas.append(formatarMoeda(total_saidas))
@@ -3453,11 +3458,6 @@ def gerar_pdf_caixas_detalhado():
                     # Adicionar coluna de ESTORNOS
                     formas_colunas.append("Estornos")
                     valores_colunas.append(formatarMoeda(estornos_valor))
-                    
-                    # Adicionar coluna de TOTAL
-                    formas_colunas.append("TOTAL")
-                    total_entradas = sum(valor for _, valor in formas_ordenadas if valor > 0)
-                    valores_colunas.append(formatarMoeda(total_entradas))
                     
                     # Criar tabela com formas de pagamento como colunas
                     formas_data = [formas_colunas, valores_colunas]
@@ -3471,6 +3471,7 @@ def gerar_pdf_caixas_detalhado():
                     # Encontrar os índices das colunas SAÍDAS e ESTORNOS
                     indice_saidas = formas_colunas.index("SAÍDAS")
                     indice_estornos = formas_colunas.index("Estornos")
+                    indice_total = formas_colunas.index("TOTAL")
                     
                     formas_style = TableStyle([
                         ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
@@ -3483,6 +3484,7 @@ def gerar_pdf_caixas_detalhado():
                         ('TEXTCOLOR', (indice_saidas, 1), (indice_saidas, 1), colors.red),
                         # COR VERMELHA APENAS PARA OS VALORES DE ESTORNOS (linha 1)
                         ('TEXTCOLOR', (indice_estornos, 1), (indice_estornos, 1), colors.red),
+                        ('TEXTCOLOR', (indice_total, 1), (indice_total, 1), colors.green),
                     ])
                     formas_table.setStyle(formas_style)
                     elements.append(Spacer(1, 6))
@@ -3505,10 +3507,7 @@ def gerar_pdf_caixas_detalhado():
                 if caixa.valor_fechamento:
                     observacoes.append(f"Fechamento: R$ {float(caixa.valor_fechamento):,.2f}")
                 
-                # Adicionar totais das operações
-                observacoes.append(f"Vendas: R$ {total_vendas:,.2f}")
                 observacoes.append(f"Contas Recebidas: R$ {total_contas_recebidas:,.2f}")
-                observacoes.append(f"Entradas Líquidas: R$ {total_entradas_liquidas:,.2f}")
                 
                 # Juntar todas as observações em uma string
                 texto_observacoes = " | ".join(observacoes)
