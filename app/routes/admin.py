@@ -3316,6 +3316,9 @@ def gerar_pdf_caixas_detalhado():
             elements.append(Paragraph("📋 Detalhamento por Caixa", styles['Heading2']))
             elements.append(Spacer(1, 8))
 
+            # Variável para verificar se a soma dos caixas bate com o resumo
+            soma_total_saidas_caixas = 0.0
+
             for idx, caixa in enumerate(caixas):
                 # Cálculos exatos como na rota original
                 operador_nome = caixa.operador.nome if caixa.operador else "Operador não identificado"
@@ -3395,7 +3398,13 @@ def gerar_pdf_caixas_detalhado():
                 ).scalar() or 0.0
                 
                 total_saidas = float(total_saidas)
+                
+                # *** CORREÇÃO: CALCULAR TOTAL - SAÍDAS CONSISTENTE COM O RESUMO ***
+                # Total - Saídas = Entradas Líquidas - Saídas (mesma lógica do resumo)
                 saldo_caixa = total_entradas_liquidas - total_saidas
+                
+                # Acumula para verificação
+                soma_total_saidas_caixas += saldo_caixa
 
                 # Status como texto simples sem HTML
                 status_text = caixa.status.value.upper()
@@ -3494,8 +3503,8 @@ def gerar_pdf_caixas_detalhado():
                 observacao_style = ParagraphStyle(
                     'Observacao',
                     parent=styles['Normal'],
-                    fontSize=8,
-                    textColor=colors.grey,
+                    fontSize=10,
+                    textColor=colors.darkgrey,
                     leftIndent=0
                 )
                 
@@ -3515,6 +3524,11 @@ def gerar_pdf_caixas_detalhado():
                 elements.append(Paragraph(f"Observações: {texto_observacoes}", observacao_style))
                 
                 elements.append(Spacer(1, 12))
+
+            # Verificação de consistência (para debug - pode ser removida em produção)
+            diferenca = abs(soma_total_saidas_caixas - saldo_geral)
+            if diferenca > 0.01:  # Tolerância de 1 centavo
+                logging.warning(f"Diferença encontrada na soma dos caixas: {diferenca:.2f}")
 
         else:
             # Mensagem quando não há caixas
