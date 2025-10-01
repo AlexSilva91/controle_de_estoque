@@ -3061,7 +3061,7 @@ def gerar_pdf_caixas_detalhado():
             except ValueError:
                 pass
 
-        caixas = query.order_by(Caixa.data_abertura.desc()).all()
+        caixas = query.order_by(Caixa.data_abertura.asc()).all()
 
         # Criar buffer para PDF
         buffer = BytesIO()
