@@ -256,8 +256,6 @@ def api_registrar_venda():
                 'message': 'JSON inválido ou não enviado'
             }), 400
 
-        logger.info(f"Dados recebidos: {dados_venda}")
-
         # Campos obrigatórios
         required_fields = ['cliente_id', 'itens', 'pagamentos', 'valor_total']
         for field in required_fields:
@@ -1891,7 +1889,6 @@ def get_contas_receber_cliente(cliente_id):
             }
             contas_data.append(conta_data)
 
-        logger.info(f"Contas a receber do cliente {cliente_id}: {contas_data}")
         return jsonify(contas_data)
 
     except Exception as e:
@@ -2045,7 +2042,7 @@ def gerar_comprovante_conta(conta_id):
                 produto_text = f"{item.produto.nome if item.produto else 'Produto'}"
                 y_position = add_text(produto_text, margin, y_position, width - 2*margin, 8)
                 
-                detalhes = f"{item.quantidade} {item.produto.unidade.value if item.produto else 'un'} x R$ {item.valor_unitario:.2f}"
+                detalhes = f"{item.quantidade:.2f} {item.produto.unidade.value if item.produto else 'un'} x R$ {item.valor_unitario:.2f}"
                 if item.desconto_aplicado and item.desconto_aplicado > 0:
                     detalhes += f" (-R$ {item.desconto_aplicado:.2f})"
                 
