@@ -1669,7 +1669,9 @@ def registrar_venda_completa(db: Session, dados: dict, operador_id: int, caixa_i
 
 def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
     """
-    Estorna uma venda vinculando ao caixa original da nota fiscal e devolve os produtos ao estoque
+    Estorna uma venda
+    - Para vendas a prazo: desfaz EXATAMENTE o que foi feito na rota de vendas
+    - Para outras vendas: mantém o comportamento original com nota fiscal de estorno
     """
     try:
         # Busca a nota fiscal original
@@ -1680,111 +1682,185 @@ def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
         if nota_original.status == StatusNota.cancelada:
             return {'success': False, 'message': 'Esta nota já foi cancelada anteriormente'}
         
-        # Usa o mesmo caixa da nota original em vez de buscar caixa aberto
-        caixa_id = nota_original.caixa_id
+        # Verifica se é uma venda a prazo
+        is_venda_a_prazo = nota_original.a_prazo
         
-        # Cria uma nova nota fiscal de estorno (com valores negativos)
-        nota_estorno = NotaFiscal(
-            cliente_id=nota_original.cliente_id,
-            operador_id=usuario_id,
-            caixa_id=caixa_id,  # Usa o mesmo caixa da nota original
-            data_emissao=datetime.now(ZoneInfo('America/Sao_Paulo')),
-            valor_total=-nota_original.valor_total,
-            valor_desconto=-nota_original.valor_desconto if nota_original.valor_desconto else 0.00,
-            tipo_desconto=nota_original.tipo_desconto,
-            status=StatusNota.emitida,
-            observacao=f"ESTORNO da nota #{nota_original.id}. Motivo: {motivo_estorno}",
-            forma_pagamento=nota_original.forma_pagamento,
-            a_prazo=nota_original.a_prazo,
-            sincronizado=False
-        )
+        # TRATAMENTO ESPECÍFICO PARA VENDAS A PRAZO - DESFAZER EXATAMENTE O QUE FOI FEITO NA VENDA
+        if is_venda_a_prazo:
+            # 1. REMOVER CONTA A RECEBER (se existir)
+            for conta in nota_original.contas_receber:
+                # Remove registros financeiros relacionados aos pagamentos das contas
+                financeiros_pagamentos = Financeiro.query.filter_by(
+                    conta_receber_id=conta.id
+                ).all()
+                for financeiro in financeiros_pagamentos:
+                    db.session.delete(financeiro)
+                
+                # Remove pagamentos da conta
+                for pagamento in conta.pagamentos:
+                    db.session.delete(pagamento)
+                
+                # Remove a conta a receber
+                db.session.delete(conta)
+            
+            # 2. DEVOLVER PRODUTOS AO ESTOQUE (reverte a baixa de estoque)
+            for item in nota_original.itens:
+                produto = Produto.query.get(item.produto_id)
+                if produto:
+                    # Devolve a quantidade ao estoque de origem (reverte o -= da venda)
+                    produto.estoque_loja += item.quantidade
+                    produto.sincronizado = False
+                
+                # Cria movimentação de estoque de devolução
+                movimentacao = MovimentacaoEstoque(
+                    produto_id=item.produto_id,
+                    usuario_id=usuario_id,
+                    cliente_id=nota_original.cliente_id,
+                    caixa_id=nota_original.caixa_id,
+                    tipo=TipoMovimentacao.entrada,
+                    estoque_origem=item.estoque_origem,
+                    quantidade=item.quantidade,
+                    valor_unitario=item.valor_unitario,
+                    valor_recebido=0,
+                    forma_pagamento=None,
+                    observacao=f"Estorno venda a prazo - {motivo_estorno}",
+                    data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                    sincronizado=False
+                )
+                db.session.add(movimentacao)
+            
+            # 3. REMOVER PAGAMENTOS A PRAZO DA NOTA FISCAL (se existirem)
+            pagamentos_a_prazo = PagamentoNotaFiscal.query.filter_by(
+                nota_fiscal_id=nota_original.id,
+                forma_pagamento=FormaPagamento.a_prazo
+            ).all()
+            
+            for pagamento in pagamentos_a_prazo:
+                db.session.delete(pagamento)
+            
+            # 4. ATUALIZAR STATUS DA NOTA ORIGINAL PARA CANCELADA
+            nota_original.status = StatusNota.cancelada
+            nota_original.observacao = f"Cancelada - Estorno venda a prazo: {motivo_estorno}"
+            nota_original.sincronizado = False
+            
+            db.session.commit()
+            
+            return {
+                'success': True,
+                'message': 'Estorno de venda a prazo realizado com sucesso. Produtos devolvidos ao estoque e conta a receber removida.',
+                'nota_original_id': nota_original.id,
+                'venda_a_prazo': True
+            }
         
-        db.session.add(nota_estorno)
-        db.session.flush()
-        
-        # Cria os itens de estorno (com quantidades negativas)
-        for item in nota_original.itens:
-            item_estorno = NotaFiscalItem(
-                nota_id=nota_estorno.id,
-                produto_id=item.produto_id,
-                estoque_origem=item.estoque_origem,
-                quantidade=-item.quantidade,
-                valor_unitario=item.valor_unitario,
-                valor_total=-item.valor_total,
-                desconto_aplicado=-item.desconto_aplicado if item.desconto_aplicado else 0.00,
-                tipo_desconto=item.tipo_desconto,
+        # COMPORTAMENTO ORIGINAL PARA OUTRAS VENDAS (NÃO A PRAZO)
+        else:
+            # Usa o mesmo caixa da nota original
+            caixa_id = nota_original.caixa_id
+            
+            # Cria uma nova nota fiscal de estorno (com valores negativos)
+            nota_estorno = NotaFiscal(
+                cliente_id=nota_original.cliente_id,
+                operador_id=usuario_id,
+                caixa_id=caixa_id,
+                data_emissao=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                valor_total=-nota_original.valor_total,
+                valor_desconto=-nota_original.valor_desconto if nota_original.valor_desconto else 0.00,
+                tipo_desconto=nota_original.tipo_desconto,
+                status=StatusNota.emitida,
+                observacao=f"ESTORNO da nota #{nota_original.id}. Motivo: {motivo_estorno}",
+                forma_pagamento=nota_original.forma_pagamento,
+                a_prazo=nota_original.a_prazo,
                 sincronizado=False
             )
-            db.session.add(item_estorno)
             
-            # Atualiza o estoque do produto
-            produto = Produto.query.get(item.produto_id)
-            if produto:
-                # Devolve a quantidade ao estoque de origem
-                if item.estoque_origem == TipoEstoque.loja:
-                    produto.estoque_loja += item.quantidade
-                elif item.estoque_origem == TipoEstoque.deposito:
-                    produto.estoque_deposito += item.quantidade
-                elif item.estoque_origem == TipoEstoque.fabrica:
-                    produto.estoque_fabrica += item.quantidade
+            db.session.add(nota_estorno)
+            db.session.flush()
+            
+            # Cria os itens de estorno (com quantidades negativas)
+            for item in nota_original.itens:
+                item_estorno = NotaFiscalItem(
+                    nota_id=nota_estorno.id,
+                    produto_id=item.produto_id,
+                    estoque_origem=item.estoque_origem,
+                    quantidade=-item.quantidade,
+                    valor_unitario=item.valor_unitario,
+                    valor_total=-item.valor_total,
+                    desconto_aplicado=-item.desconto_aplicado if item.desconto_aplicado else 0.00,
+                    tipo_desconto=item.tipo_desconto,
+                    sincronizado=False
+                )
+                db.session.add(item_estorno)
                 
-                produto.sincronizado = False
+                # Atualiza o estoque do produto
+                produto = Produto.query.get(item.produto_id)
+                if produto:
+                    # Devolve a quantidade ao estoque de origem
+                    if item.estoque_origem == TipoEstoque.loja:
+                        produto.estoque_loja += item.quantidade
+                    elif item.estoque_origem == TipoEstoque.deposito:
+                        produto.estoque_deposito += item.quantidade
+                    elif item.estoque_origem == TipoEstoque.fabrica:
+                        produto.estoque_fabrica += item.quantidade
+                    
+                    produto.sincronizado = False
+                
+                # Cria movimentação de estoque reversa
+                movimentacao = MovimentacaoEstoque(
+                    produto_id=item.produto_id,
+                    usuario_id=usuario_id,
+                    cliente_id=nota_original.cliente_id,
+                    caixa_id=caixa_id,
+                    tipo=TipoMovimentacao.entrada,
+                    estoque_origem=item.estoque_origem,
+                    quantidade=item.quantidade,
+                    valor_unitario=item.valor_unitario,
+                    valor_recebido=0,
+                    forma_pagamento=None,
+                    observacao=f"Estorno nota #{nota_original.id}",
+                    data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                    sincronizado=False
+                )
+                db.session.add(movimentacao)
             
-            # Cria movimentação de estoque reversa
-            movimentacao = MovimentacaoEstoque(
-                produto_id=item.produto_id,
-                usuario_id=usuario_id,
+            # Atualiza status da nota original para cancelada
+            nota_original.status = StatusNota.cancelada
+            nota_original.observacao = f"Cancelada por estorno. Motivo: {motivo_estorno}"
+            nota_original.sincronizado = False
+            
+            # Registra no financeiro
+            financeiro_estorno = Financeiro(
+                tipo=TipoMovimentacao.saida_estorno,
+                categoria=CategoriaFinanceira.estorno,
+                valor=nota_original.valor_total,
+                descricao=f"Estorno da nota #{nota_original.id}",
+                caixa_id=caixa_id,
                 cliente_id=nota_original.cliente_id,
-                caixa_id=caixa_id,  # Usa o mesmo caixa da nota original
-                tipo=TipoMovimentacao.entrada,
-                estoque_origem=item.estoque_origem,
-                quantidade=item.quantidade,
-                valor_unitario=item.valor_unitario,
-                valor_recebido=0,
-                forma_pagamento=None,
-                observacao=f"Estorno nota #{nota_original.id}",
+                nota_fiscal_id=nota_estorno.id,
                 data=datetime.now(ZoneInfo('America/Sao_Paulo')),
                 sincronizado=False
             )
-            db.session.add(movimentacao)
-        
-        # Atualiza status da nota original para cancelada
-        nota_original.status = StatusNota.cancelada
-        nota_original.observacao = f"Cancelada por estorno. Motivo: {motivo_estorno}"
-        nota_original.sincronizado = False
-        
-        # Registra no financeiro
-        financeiro_estorno = Financeiro(
-            tipo=TipoMovimentacao.saida_estorno,
-            categoria=CategoriaFinanceira.estorno,
-            valor=nota_original.valor_total,
-            descricao=f"Estorno da nota #{nota_original.id}",
-            caixa_id=caixa_id,  # Usa o mesmo caixa da nota original
-            cliente_id=nota_original.cliente_id,
-            nota_fiscal_id=nota_estorno.id,
-            data=datetime.now(ZoneInfo('America/Sao_Paulo')),
-            sincronizado=False
-        )
-        db.session.add(financeiro_estorno)
-        
-        # Cancela contas a receber associadas
-        for conta in nota_original.contas_receber:
-            if conta.status != StatusPagamento.quitado:
-                conta.status = StatusPagamento.cancelado
-                conta.observacoes = f"Cancelada devido ao estorno da nota #{nota_original.id}"
-                conta.sincronizado = False
-        
-        db.session.commit()
-        
-        return {
-            'success': True,
-            'message': 'Estorno realizado com sucesso',
-            'nota_estorno_id': nota_estorno.id,
-            'nota_original_id': nota_original.id
-        }
+            db.session.add(financeiro_estorno)
+            
+            # Cancela contas a receber associadas (se houver)
+            for conta in nota_original.contas_receber:
+                if conta.status != StatusPagamento.quitado:
+                    conta.status = StatusPagamento.cancelado
+                    conta.observacoes = f"Cancelada devido ao estorno da nota #{nota_original.id}"
+                    conta.sincronizado = False
+            
+            db.session.commit()
+            
+            return {
+                'success': True,
+                'message': 'Estorno realizado com sucesso',
+                'nota_estorno_id': nota_estorno.id,
+                'nota_original_id': nota_original.id,
+                'venda_a_prazo': False
+            }
         
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Erro ao estornar venda {nota_fiscal_id}: {str(e)}")
         return {'success': False, 'message': f'Erro ao estornar venda: {str(e)}'}
 
 def obter_detalhes_vendas_dia(data=None, caixa_id=None, operador_id=None):

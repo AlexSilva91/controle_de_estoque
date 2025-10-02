@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,21 +13,26 @@
         .tab-content {
             display: none;
         }
-        
+
         .tab-content.active {
             display: block;
             animation: fadeIn 0.3s ease;
         }
-        
+
         @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
         }
-        
+
         .flash-message {
             transition: opacity 1s ease-out;
         }
-        
+
         /* Estilos para o status do caixa */
         .status-container {
             position: fixed;
@@ -38,65 +44,73 @@
             z-index: 1000;
             pointer-events: none;
         }
-        
+
         .caixa-status {
             padding: 12px 25px;
             border-radius: 30px;
             font-weight: bold;
             font-size: 1.1rem;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             display: inline-flex;
             align-items: center;
             pointer-events: auto;
             animation: slideDown 0.5s ease-out;
         }
-        
+
         @keyframes slideDown {
-            from { transform: translateY(-50px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
-        
+
         .caixa-livre {
             background-color: #28a745;
             color: white;
         }
-        
+
         .caixa-operacao {
             background-color: #ffc107;
             color: #212529;
         }
-        
+
         .caixa-status i {
             margin-right: 10px;
             font-size: 1.2rem;
         }
-        
+
         .content-header {
             position: relative;
         }
-        
+
         /* Estilos para a aba de vendas do dia */
         .sales-day-table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
         }
-        
-        .sales-day-table th, .sales-day-table td {
+
+        .sales-day-table th,
+        .sales-day-table td {
             padding: 12px 15px;
             text-align: left;
             border-bottom: 1px solid #ddd;
         }
-        
+
         .sales-day-table th {
             background-color: #f8f9fa;
             font-weight: bold;
         }
-        
+
         .sales-day-table tr:hover {
             background-color: #f5f5f5;
         }
-        
+
         .btn-void {
             background-color: #dc3545;
             color: white;
@@ -105,28 +119,28 @@
             border-radius: 4px;
             cursor: pointer;
         }
-        
+
         .btn-void:hover {
             background-color: #c82333;
         }
-        
+
         /* Estilos para o campo de desconto manual */
         .discount-control {
             display: flex;
             align-items: center;
             margin-bottom: 15px;
         }
-        
+
         .discount-control input {
             flex: 1;
             margin-right: 10px;
         }
-        
+
         .discount-type-select {
             width: 120px;
             margin-right: 10px;
         }
-        
+
         .discount-badge {
             background-color: #28a745;
             color: white;
@@ -135,14 +149,14 @@
             font-size: 0.8rem;
             margin-left: 5px;
         }
-        
+
         .original-price {
             text-decoration: line-through;
             color: #6c757d;
             font-size: 0.9rem;
             display: block;
         }
-        
+
         .discount-value {
             color: #28a745;
             font-size: 0.8rem;
@@ -150,6 +164,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="dashboard">
         <!-- Sidebar -->
@@ -157,12 +172,12 @@
             <div class="logo-container">
                 <img src="{{ url_for('static', filename='assets/logo.jpeg') }}" alt="Logo" class="logo">
             </div>
-            
+
             <div class="user-info">
                 <div class="user-greeting">Bem-vindo, {{ nome_usuario }}</div>
                 <div class="current-date" id="current-date"></div>
             </div>
-            
+
             <div class="balance-info">
                 <div class="balance-header">
                     <i class="fas fa-wallet"></i>
@@ -182,7 +197,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <nav class="main-menu">
                 <button class="menu-item active" id="sales-tab" data-tab="sales">
                     <i class="fas fa-shopping-cart"></i>
@@ -203,13 +218,13 @@
                     <i class="fas fa-lock"></i> Fechar Caixa
                 </button>
             </nav>
-            
+
             <button class="btn-logout" id="logout-btn">
                 <i class="fas fa-sign-out-alt"></i>
                 <span>Sair</span>
             </button>
         </div>
-        
+
         <!-- Main Content -->
         <div class="main-content">
             <!-- Header -->
@@ -218,14 +233,14 @@
                 <div class="actions">
                     {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
-                        {% for category, message in messages %}
-                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
-                        {% endfor %}
+                    {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
                     {% endif %}
                     {% endwith %}
                 </div>
             </div>
-            
+
             <!-- Status do Caixa Centralizado -->
             <div class="status-container">
                 <div id="caixa-status-display" class="caixa-status caixa-livre">
@@ -233,7 +248,7 @@
                     <span>CAIXA LIVRE</span>
                 </div>
             </div>
-            
+
             <!-- Tab Contents -->
             <div class="tab-content active" id="sales">
                 <!-- Client Search Section -->
@@ -245,7 +260,8 @@
                     <div class="card-body">
                         <div class="search-container">
                             <div class="search-input-group">
-                                <input type="text" id="client-search-input" class="search-input" placeholder="Buscar por nome, CPF ou telefone..." autocomplete="off">
+                                <input type="text" id="client-search-input" class="search-input"
+                                    placeholder="Buscar por nome, CPF ou telefone..." autocomplete="off">
                                 <button class="btn-search" id="search-client-btn">
                                     <i class="fas fa-search"></i>
                                 </button>
@@ -262,7 +278,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Products Section -->
                 <div class="card">
                     <div class="card-header">
@@ -272,14 +288,15 @@
                     <div class="card-body">
                         <div class="search-container">
                             <div class="search-input-group">
-                                <input type="text" id="product-search-input" class="search-input" placeholder="Buscar por nome, marca ou código..." autocomplete="off">
+                                <input type="text" id="product-search-input" class="search-input"
+                                    placeholder="Buscar por nome, marca ou código..." autocomplete="off">
                                 <button class="btn-search" id="search-product-btn">
                                     <i class="fas fa-search"></i>
                                 </button>
                             </div>
                             <div class="search-results-dropdown" id="product-search-results"></div>
                         </div>
-                        
+
                         <!-- Products List -->
                         <div class="products-table-container">
                             <table class="products-table">
@@ -300,7 +317,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Payment Section -->
                 <div class="card">
                     <div class="card-header">
@@ -313,7 +330,8 @@
                                 <button class="btn-delivery" id="delivery-btn">
                                     <i class="fas fa-truck"></i> Adicionar Entrega
                                 </button>
-                                <button class="btn-delivery" id="use-client-address-btn" title="Usar endereço do cliente">
+                                <button class="btn-delivery" id="use-client-address-btn"
+                                    title="Usar endereço do cliente">
                                     <i class="fas fa-user"></i> Endereço do Cliente
                                 </button>
                             </div>
@@ -324,7 +342,7 @@
                                 <i class="fas fa-times"></i> Remover
                             </button>
                         </div>
-                        
+
                         <!-- Controle de Desconto Manual -->
                         <div class="form-group">
                             <label>Desconto Manual</label>
@@ -333,18 +351,15 @@
                                     <option value="percentual">Percentual (%)</option>
                                     <option value="fixo">Valor Fixo (R$)</option>
                                 </select>
-                                <input type="text" 
-                                    class="form-control" 
-                                    id="discount-value" 
-                                    placeholder="Valor"
-                                    pattern="[0-9]+([,\.][0-9]+)?" 
+                                <input type="text" class="form-control" id="discount-value" placeholder="Valor"
+                                    pattern="[0-9]+([,\.][0-9]+)?"
                                     title="Use números com ponto ou vírgula como separador decimal">
                                 <button class="btn-primary" id="apply-discount-btn">
                                     Aplicar Desconto
                                 </button>
                             </div>
                         </div>
-                        
+
                         <!-- Formas de Pagamento -->
                         <div class="payment-methods-container">
                             <div class="form-group">
@@ -352,7 +367,6 @@
                                 <div class="payment-method-input">
                                     <select class="form-control payment-method-select">
                                         <option value="">Selecione...</option>
-                                        <option value="pix_fabiano">Pix - Fabiano</option>
                                         <option value="pix_edfrance">Pix - Edfrance</option>
                                         <option value="pix_loja">Pix - Loja</option>
                                         <option value="pix_maquineta">Pix - Maquineta</option>
@@ -365,34 +379,35 @@
                                     <button class="btn btn-primary add-payment-method">Adicionar</button>
                                 </div>
                             </div>
-                            
+
                             <div class="selected-payments-list">
                                 <!-- Os pagamentos adicionados aparecerão aqui -->
                             </div>
                         </div>
-                        
+
                         <!-- Sale Summary -->
                         <div class="sale-summary">
                             <div class="summary-row">
                                 <span>Subtotal:</span>
                                 <span id="subtotal-value">R$ 0.00</span>
                             </div>
-                            
+
                             <div class="summary-row discount-row">
                                 <span>Descontos:</span>
                                 <span id="discount-value">R$ 0.00</span>
                             </div>
-                            
+
                             <div class="summary-row total">
                                 <span>Total da Venda:</span>
                                 <span id="sale-total">R$ 0.00</span>
                             </div>
-                            
+
                             <div class="form-group">
                                 <label for="amount-received">Valor Recebido</label>
-                                <input type="text" id="amount-received" class="form-control currency-input" placeholder="Digite o valor recebido">
+                                <input type="text" id="amount-received" class="form-control currency-input"
+                                    placeholder="Digite o valor recebido">
                             </div>
-                            
+
                             <div class="summary-row change">
                                 <span>Troco:</span>
                                 <span id="change-value">R$ 0.00</span>
@@ -401,13 +416,9 @@
                         <!-- Observação da Venda -->
                         <div class="form-group">
                             <label for="sale-notes">Observações da Venda</label>
-                            <textarea 
-                                id="sale-notes" 
-                                class="form-control" 
-                                placeholder="Observações adicionais sobre a venda (opcional)"
-                                rows="3"
-                                maxlength="500"
-                            ></textarea>
+                            <textarea id="sale-notes" class="form-control"
+                                placeholder="Observações adicionais sobre a venda (opcional)" rows="3"
+                                maxlength="500"></textarea>
                             <small class="text-muted">Máximo de 500 caracteres</small>
                         </div>
                         <!-- Action Buttons -->
@@ -422,7 +433,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Vendas do Dia Tab -->
             <div class="tab-content" id="day-sales">
                 <div class="card">
@@ -496,7 +507,7 @@
                                     <span id="sale-details-notes"></span>
                                 </div>
                             </div>
-                            
+
                             <div class="sale-details-section">
                                 <h4>Produtos</h4>
                                 <table class="sale-products-table">
@@ -514,7 +525,7 @@
                                     </tbody>
                                 </table>
                             </div>
-                            
+
                             <div class="sale-details-section">
                                 <h4>Pagamentos</h4>
                                 <table class="sale-payments-table">
@@ -593,7 +604,7 @@
                                 </tbody>
                             </table>
                         </div>
-                        
+
                         <!-- Informações de paginação/total -->
                         <div class="table-footer">
                             <div class="table-info">
@@ -603,7 +614,7 @@
                                 <!-- Controles de paginação serão adicionados aqui se necessário -->
                             </div>
                         </div>
-                        
+
                         <!-- Estado vazio -->
                         <div class="empty-state" id="clients-empty-state" style="display: none;">
                             <div class="empty-icon">
@@ -615,7 +626,7 @@
                                 <i class="fas fa-plus"></i> Cadastrar Primeiro Cliente
                             </button>
                         </div>
-                        
+
                         <!-- Loading state -->
                         <div class="loading-state" id="clients-loading" style="display: none;">
                             <div class="spinner"></div>
@@ -626,7 +637,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Client Modal -->
     <div class="modal" id="client-modal">
         <div class="modal-content">
@@ -640,22 +651,22 @@
                         <label for="client-name">Nome:</label>
                         <input type="text" id="client-name" class="form-control" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="client-document">Documento:</label>
                         <input type="text" id="client-document" class="form-control" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="client-phone">Telefone:</label>
                         <input type="text" id="client-phone" class="form-control">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="client-email">Email:</label>
                         <input type="email" id="client-email" class="form-control">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="client-address">Endereço:</label>
                         <input type="text" id="client-address" class="form-control">
@@ -683,7 +694,7 @@
                         <i class="fas fa-search"></i>
                     </button>
                 </div>
-                
+
                 <div class="search-results" id="product-search-results">
                     <!-- Search results will appear here -->
                 </div>
@@ -707,37 +718,37 @@
                         <label for="delivery-address">Endereço:</label>
                         <input type="text" id="delivery-address" class="form-control">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="delivery-number">Número:</label>
                         <input type="text" id="delivery-number" class="form-control">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="delivery-complement">Complemento:</label>
                         <input type="text" id="delivery-complement" class="form-control">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="delivery-neighborhood">Bairro:</label>
                         <input type="text" id="delivery-neighborhood" class="form-control">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="delivery-city">Cidade:</label>
                         <input type="text" id="delivery-city" class="form-control">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="delivery-state">Estado:</label>
                         <input type="text" id="delivery-state" class="form-control" maxlength="2">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="delivery-zipcode">CEP:</label>
                         <input type="text" id="delivery-zipcode" class="form-control">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="delivery-instructions">Instruções de entrega:</label>
                         <textarea id="delivery-instructions" class="form-control" rows="3"></textarea>
@@ -750,7 +761,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Expense Modal -->
     <div class="modal" id="expense-modal">
         <div class="modal-content">
@@ -792,7 +803,8 @@
                 <p>Você está prestes a estornar esta venda. Esta ação não pode ser desfeita.</p>
                 <div class="form-group">
                     <label for="void-sale-reason">Motivo do Estorno:</label>
-                    <textarea id="void-sale-reason" class="form-control" rows="3" placeholder="Descreva o motivo do estorno..."></textarea>
+                    <textarea id="void-sale-reason" class="form-control" rows="3"
+                        placeholder="Descreva o motivo do estorno..."></textarea>
                 </div>
                 <input type="hidden" id="void-sale-id">
             </div>
@@ -825,7 +837,7 @@
                             <h6><strong>Saldo Devedor:</strong> R$ <span id="clientBalance"></span></h6>
                         </div>
                     </div>
-                    
+
                     <h5 class="mb-3">Compras Realizadas</h5>
                     <div class="table-responsive">
                         <table class="table table-bordered table-hover">
@@ -878,7 +890,6 @@
                             <label for="formaPagamento">Forma de Pagamento *</label>
                             <select class="form-control" id="formaPagamento" required>
                                 <option value="">Selecione...</option>
-                                <option value="pix_fabiano">PIX Fabiano</option>
                                 <option value="pix_maquineta">PIX Maquineta</option>
                                 <option value="pix_edfrance">PIX EDFrance</option>
                                 <option value="pix_loja">PIX Loja</option>
@@ -909,7 +920,8 @@
             <span id="notification-message"></span>
         </div>
     </div>
-    
+
     <script src="{{ url_for('static', filename='js/script_operador.js') }}"></script>
 </body>
+
 </html>

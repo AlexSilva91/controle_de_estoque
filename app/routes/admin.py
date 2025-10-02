@@ -3426,7 +3426,20 @@ def gerar_pdf_caixas_detalhado():
                 
                 total_saidas = float(total_saidas)
                 
-                # *** CORREÇÃO: CALCULAR TOTAL - SAÍDAS CONSISTENTE COM O RESUMO ***
+                # *** CÁLCULO DO VALOR FÍSICO EM DINHEIRO (IGUAL NA ROTA /caixas/<id>/financeiro) ***
+                valor_dinheiro_bruto = todas_formas_pagamento.get('dinheiro', 0.0)
+                valor_fisico = valor_dinheiro_bruto
+                
+                # Aplica a mesma lógica de cálculo da rota financeiro
+                if caixa.valor_fechamento and caixa.valor_abertura:
+                    valor_abertura = float(caixa.valor_abertura)
+                    valor_fechamento = float(caixa.valor_fechamento)
+                    valor_fisico = max((valor_dinheiro_bruto + valor_abertura) - valor_fechamento - total_saidas, 0.0)
+                
+                # Atualiza o valor de dinheiro nas formas de pagamento com o valor físico calculado
+                todas_formas_pagamento['dinheiro'] = valor_fisico
+
+                # *** CALCULAR TOTAL - SAÍDAS CONSISTENTE COM O RESUMO ***
                 # Total - Saídas = Entradas Líquidas - Saídas (mesma lógica do resumo)
                 saldo_caixa = total_entradas_liquidas
                 
@@ -3445,7 +3458,7 @@ def gerar_pdf_caixas_detalhado():
                         status_text,
                         caixa.data_abertura.strftime('%d/%m/%Y %H:%M') if caixa.data_abertura else '-',
                         caixa.data_fechamento.strftime('%d/%m/%Y %H:%M') if caixa.data_fechamento else 'Em aberto',
-                        formatarMoeda(saldo_caixa)
+                        formatarMoeda(float(saldo_caixa)  + float(caixa.valor_abertura - caixa.valor_fechamento) + float(total_saidas))
                     ]
                 ]
 
@@ -3542,12 +3555,12 @@ def gerar_pdf_caixas_detalhado():
                     elements.append(Spacer(1, 6))
                     elements.append(formas_table)
 
-                # OBSERVAÇÕES (com os valores que estavam nas colunas antigas)
+                # OBSERVAÇÕES (com informações adicionais incluindo o cálculo do dinheiro)
                 observacao_style = ParagraphStyle(
                     'Observacao',
                     parent=styles['Normal'],
                     fontSize=10,
-                    textColor=colors.black,
+                    textColor=colors.darkgrey,
                     leftIndent=0
                 )
                 

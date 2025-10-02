@@ -116,12 +116,12 @@ function showHelpMenu() {
             <button class="btn-primary" onclick="closeHelpMenu()">Fechar</button>
         </div>
     `;
-    
+
     const helpMenu = document.createElement('div');
     helpMenu.id = 'help-menu-overlay';
     helpMenu.innerHTML = helpContent;
     document.body.appendChild(helpMenu);
-    
+
     helpMenu.style.display = 'flex';
     helpMenu.addEventListener('click', (e) => {
         if (e.target === helpMenu) closeHelpMenu();
@@ -137,7 +137,7 @@ function closeHelpMenu() {
 function handleKeyDown(e) {
     const key = e.key;
     const ctrlKey = e.ctrlKey || e.metaKey;
-    
+
     if (ctrlKey) {
         const combo = `Ctrl+${key.toUpperCase()}`;
         if (keyMap[combo]) {
@@ -150,7 +150,7 @@ function handleKeyDown(e) {
             closeAllDropdowns();
             return;
         }
-        
+
         // Navegação nos resultados da busca
         if (activeSearchDropdown) {
             if (key === 'ArrowDown') {
@@ -170,7 +170,7 @@ function handleKeyDown(e) {
                 return;
             }
         }
-        
+
         if (keyMap[key]) {
             e.preventDefault();
             keyMap[key]();
@@ -261,12 +261,12 @@ async function loadClients() {
 function renderClientsTable() {
     const tbody = document.getElementById('clients-tbody');
     if (!tbody) return;
-    
+
     if (filteredClients.length === 0) {
         showClientsEmptyState(true);
         return;
     }
-    
+
     showClientsEmptyState(false);
     tbody.innerHTML = filteredClients.map(client => `
         <tr class="client-row" data-client-id="${client.id}">
@@ -332,7 +332,7 @@ function searchClients(searchTerm) {
     if (!term) {
         filteredClients = [...clients];
     } else {
-        filteredClients = clients.filter(client => 
+        filteredClients = clients.filter(client =>
             (client.nome && client.nome.toLowerCase().includes(term)) ||
             (client.documento && client.documento.includes(term)) ||
             (client.telefone && client.telefone.includes(term)) ||
@@ -349,22 +349,22 @@ function filterClients(filterType) {
     currentFilter = filterType;
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    
+
     switch (filterType) {
         case 'recent':
-            filteredClients = clients.filter(client => 
+            filteredClients = clients.filter(client =>
                 new Date(client.data_cadastro) >= thirtyDaysAgo
             );
             break;
         case 'frequent':
-            filteredClients = clients.filter(client => 
+            filteredClients = clients.filter(client =>
                 client.total_vendas && client.total_vendas > 5
             );
             break;
         default:
             filteredClients = [...clients];
     }
-    
+
     applySortAndFilter();
     renderClientsTable();
     updateClientsCount();
@@ -380,11 +380,11 @@ function sortClients(field) {
         currentSort.field = field;
         currentSort.direction = 'asc';
     }
-    
+
     filteredClients.sort((a, b) => {
         let valueA = a[field] || '';
         let valueB = b[field] || '';
-        
+
         if (field === 'id') {
             valueA = parseInt(valueA) || 0;
             valueB = parseInt(valueB) || 0;
@@ -395,14 +395,14 @@ function sortClients(field) {
             valueA = valueA.toString().toLowerCase();
             valueB = valueB.toString().toLowerCase();
         }
-        
+
         let comparison = 0;
         if (valueA > valueB) comparison = 1;
         if (valueA < valueB) comparison = -1;
-        
+
         return currentSort.direction === 'desc' ? -comparison : comparison;
     });
-    
+
     renderClientsTable();
     updateSortIcons();
 }
@@ -417,11 +417,11 @@ function updateSortIcons() {
     document.querySelectorAll('.sortable i').forEach(icon => {
         icon.className = 'fas fa-sort';
     });
-    
+
     const activeHeader = document.querySelector(`[data-sort="${currentSort.field}"] i`);
     if (activeHeader) {
-        activeHeader.className = currentSort.direction === 'asc' 
-            ? 'fas fa-sort-up' 
+        activeHeader.className = currentSort.direction === 'asc'
+            ? 'fas fa-sort-up'
             : 'fas fa-sort-down';
     }
 }
@@ -431,7 +431,7 @@ function updateClientsCount() {
     if (countElement) {
         const total = clients.length;
         const filtered = filteredClients.length;
-        
+
         if (total === filtered) {
             countElement.textContent = `${total} cliente${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`;
         } else {
@@ -509,12 +509,12 @@ async function searchClient() {
         });
         if (!response.ok) throw new Error('Erro ao buscar clientes');
         const results = await response.json();
-        
+
         if (results.length === 0) {
             showMessage('Nenhum cliente encontrado', 'error');
             return;
         }
-        
+
         if (results.length === 1) {
             selectClient(results[0]);
         } else {
@@ -528,7 +528,7 @@ async function searchClient() {
 // Função para selecionar cliente para venda (chamada pelo botão)
 function selectClientForSale(clientId) {
     const client = findClientById(clientId);
-    
+
     if (client) {
         selectClient(client);
         showMessage(`Cliente ${client.nome} selecionado para venda`);
@@ -543,7 +543,7 @@ function findClientById(clientId) {
         const client = clients.find(c => c.id == clientId);
         if (client) return client;
     }
-    
+
     // Se não encontrou, tenta extrair da tabela HTML (fallback)
     const clientRow = document.querySelector(`[data-client-id="${clientId}"]`);
     if (clientRow) {
@@ -556,7 +556,7 @@ function findClientById(clientId) {
             endereco: clientRow.querySelector('.address-text')?.textContent || ''
         };
     }
-    
+
     return null;
 }
 
@@ -601,7 +601,7 @@ function selectClientForSaleByObject(buttonElement) {
         nome: buttonElement.getAttribute('data-client-name'),
         // Adicione outros campos conforme necessário
     };
-    
+
     selectClient(clientData);
     closeClientModal();
 }
@@ -610,13 +610,13 @@ function showClientSearchResults(clients) {
     const resultsContainer = document.getElementById('client-search-results');
     if (!resultsContainer) return;
     resultsContainer.innerHTML = '';
-    
+
     if (clients.length === 0) {
         resultsContainer.innerHTML = '<div class="no-results">Nenhum cliente encontrado</div>';
         resultsContainer.style.display = 'block';
         return;
     }
-    
+
     clients.forEach(client => {
         const resultItem = document.createElement('div');
         resultItem.className = 'search-result-item';
@@ -632,7 +632,7 @@ function showClientSearchResults(clients) {
         });
         resultsContainer.appendChild(resultItem);
     });
-    
+
     resultsContainer.style.display = 'block';
     activeSearchDropdown = resultsContainer;
 }
@@ -642,7 +642,7 @@ function renderClientCards(filteredClients = null) {
     if (!container) return;
     container.innerHTML = '';
     const clientsToRender = filteredClients || clients;
-    
+
     clientsToRender.forEach(client => {
         const card = document.createElement('div');
         card.className = 'client-card';
@@ -666,7 +666,7 @@ function renderClientCards(filteredClients = null) {
         `;
         container.appendChild(card);
     });
-    
+
     document.querySelectorAll('.btn-edit-client').forEach(btn => {
         btn.addEventListener('click', () => editClient(btn.dataset.id));
     });
@@ -683,7 +683,7 @@ function openClientModal() {
 function editClient(clientId) {
     const client = clients.find(c => c.id == clientId);
     if (!client || !clientModalTitle) return;
-    
+
     currentEditingClient = client;
     clientModalTitle.textContent = 'Editar Cliente';
     document.getElementById('client-name').value = client.nome;
@@ -696,7 +696,7 @@ function editClient(clientId) {
 
 async function saveClient() {
     if (!clientForm) return;
-    
+
     const clientData = {
         nome: document.getElementById('client-name')?.value,
         documento: document.getElementById('client-document')?.value,
@@ -704,7 +704,7 @@ async function saveClient() {
         email: document.getElementById('client-email')?.value,
         endereco: document.getElementById('client-address')?.value
     };
-    
+
     try {
         let response;
         if (currentEditingClient) {
@@ -722,12 +722,12 @@ async function saveClient() {
                 body: JSON.stringify(clientData)
             });
         }
-        
+
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || 'Erro ao salvar cliente');
         }
-        
+
         showMessage(currentEditingClient ? 'Cliente atualizado com sucesso!' : 'Cliente cadastrado com sucesso!');
         await loadClients();
         closeModal();
@@ -739,15 +739,15 @@ async function saveClient() {
 async function viewClientDetails(clientId) {
     try {
         const client = await findClientById(clientId);
-        
+
         if (!client) {
             showMessage('Cliente não encontrado', 'error');
             return;
         }
-        
+
         // Busca as contas a receber do cliente
         const contasReceber = await findContasReceberByClienteId(clientId);
-        
+
         // Create a modal to display client details
         const modal = document.createElement('div');
         modal.className = 'modal';
@@ -771,8 +771,8 @@ async function viewClientDetails(clientId) {
                     <!-- Seção de Contas a Receber -->
                     <div class="client-section">
                         <h4>Contas a Receber (${contasReceber.length})</h4>
-                        ${contasReceber.length > 0 ? 
-                            contasReceber.map(conta => `
+                        ${contasReceber.length > 0 ?
+                contasReceber.map(conta => `
                                 <div class="conta-receber-card" data-conta-id="${conta.id}">
                                     <div class="conta-header">
                                         <h5>${conta.descricao || 'Conta sem descrição'}</h5>
@@ -804,31 +804,31 @@ async function viewClientDetails(clientId) {
                                                         </thead>
                                                         <tbody>
                                                             ${conta.itens_nota_fiscal.map(item => {
-                                                                const valorBrutoItem = item.quantidade * item.valor_unitario;
-                                                                const temDesconto = item.desconto_aplicado > 0;
-                                                                
-                                                                return `
+                    const valorBrutoItem = item.quantidade * item.valor_unitario;
+                    const temDesconto = item.desconto_aplicado > 0;
+
+                    return `
                                                                 <tr>
                                                                     <td>${item.produto_nome}</td>
                                                                     <td>${item.quantidade} ${item.unidade_medida}</td>
                                                                     <td>${formatCurrency(item.valor_unitario)}</td>
                                                                     <td>
-                                                                        ${temDesconto ? 
-                                                                            `${formatCurrency(item.desconto_aplicado)} 
+                                                                        ${temDesconto ?
+                            `${formatCurrency(item.desconto_aplicado)} 
                                                                              ${item.tipo_desconto ? `(${item.tipo_desconto})` : ''}`
-                                                                            : 'Sem desconto'
-                                                                        }
+                            : 'Sem desconto'
+                        }
                                                                     </td>
                                                                     <td>
-                                                                        ${temDesconto ? 
-                                                                            `<span style="text-decoration: line-through; color: #999; font-size: 0.9em;">${formatCurrency(valorBrutoItem)}</span><br>` 
-                                                                            : ''
-                                                                        }
+                                                                        ${temDesconto ?
+                            `<span style="text-decoration: line-through; color: #999; font-size: 0.9em;">${formatCurrency(valorBrutoItem)}</span><br>`
+                            : ''
+                        }
                                                                         <strong>${formatCurrency(item.valor_total)}</strong>
                                                                     </td>
                                                                 </tr>
                                                                 `;
-                                                            }).join('')}
+                }).join('')}
                                                         </tbody>
                                                         <tfoot>
                                                             <tr>
@@ -865,9 +865,9 @@ async function viewClientDetails(clientId) {
                                                         <div class="resumo-item">
                                                             <span>Total de Descontos:</span>
                                                             <strong style="color: #e74c3c;">${formatCurrency(
-                                                                conta.itens_nota_fiscal.reduce((sum, item) => sum + (item.desconto_aplicado || 0), 0) + 
-                                                                (conta.valor_desconto_nota || 0)
-                                                            )}</strong>
+                    conta.itens_nota_fiscal.reduce((sum, item) => sum + (item.desconto_aplicado || 0), 0) +
+                    (conta.valor_desconto_nota || 0)
+                )}</strong>
                                                         </div>
                                                     ` : ''}
                                                 </div>
@@ -893,8 +893,8 @@ async function viewClientDetails(clientId) {
                                         </button>
                                     </div>
                                 </div>
-                            `).join('') : 
-                            '<p class="no-accounts">Nenhuma conta a receber encontrada</p>'}
+                            `).join('') :
+                '<p class="no-accounts">Nenhuma conta a receber encontrada</p>'}
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -902,26 +902,26 @@ async function viewClientDetails(clientId) {
                 </div>
             </div>
         `;
-        
+
         document.body.appendChild(modal);
-        
+
         // Add event listeners for closing the modal
         modal.querySelectorAll('.modal-close').forEach(closeBtn => {
             closeBtn.addEventListener('click', () => {
                 modal.remove();
             });
         });
-        
+
         // Show the modal
         modal.style.display = 'flex';
-        
+
         // Close modal when clicking outside
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.remove();
             }
         });
-        
+
         // Add event listeners for payment buttons
         modal.querySelectorAll('.btn-pay-partial').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -930,7 +930,7 @@ async function viewClientDetails(clientId) {
                 showPartialPaymentModal(contaId, valorAberto);
             });
         });
-        
+
         modal.querySelectorAll('.btn-pay-full').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const contaId = e.target.getAttribute('data-conta-id');
@@ -999,7 +999,6 @@ function showPartialPaymentModal(contaId, valorAberto) {
                         <label for="payment-method">Forma de Pagamento:</label>
                         <select id="payment-method" name="payment-method" required>
                             <option value="">Selecione...</option>
-                            <option value="pix_fabiano">PIX Fabiano</option>
                             <option value="pix_maquineta">PIX Maquineta</option>
                             <option value="pix_edfrance">PIX EDFrance</option>
                             <option value="pix_loja">PIX Loja</option>
@@ -1021,57 +1020,57 @@ function showPartialPaymentModal(contaId, valorAberto) {
             </div>
         </div>
     `;
-    
+
     document.body.appendChild(paymentModal);
-    
+
     // Add event listeners for closing the modal
     paymentModal.querySelectorAll('.modal-close').forEach(closeBtn => {
         closeBtn.addEventListener('click', () => {
             paymentModal.remove();
         });
     });
-    
+
     // Show the modal
     paymentModal.style.display = 'flex';
-    
+
     // Close modal when clicking outside
     paymentModal.addEventListener('click', (e) => {
         if (e.target === paymentModal) {
             paymentModal.remove();
         }
     });
-    
+
     // Handle partial payment confirmation
     paymentModal.querySelector('#confirm-partial-payment').addEventListener('click', async () => {
         const form = paymentModal.querySelector('#partial-payment-form');
         const formData = new FormData(form);
-        
+
         const valorPago = parseFloat(formData.get('payment-amount'));
         const formaPagamento = formData.get('payment-method');
         const observacoes = formData.get('payment-notes');
-        
+
         if (!valorPago || valorPago <= 0) {
             showMessage('Valor do pagamento inválido', 'error');
             return;
         }
-        
+
         if (valorPago > valorAberto) {
             showMessage('Valor do pagamento excede o valor em aberto', 'error');
             return;
         }
-        
+
         if (!formaPagamento) {
             showMessage('Selecione uma forma de pagamento', 'error');
             return;
         }
-        
+
         try {
             const response = await registerPayment(contaId, valorPago, formaPagamento, observacoes);
-            
+
             if (response.success) {
                 showMessage('Pagamento registrado com sucesso', 'success');
                 paymentModal.remove();
-                
+
                 // Recarrega os dados do cliente para atualizar a tabela
                 const clientId = await getClientIdFromConta(contaId);
                 if (clientId) {
@@ -1109,7 +1108,6 @@ async function confirmFullPayment(contaId, valorAberto) {
                         <label for="payment-method">Forma de Pagamento:</label>
                         <select id="payment-method" name="payment-method" required>
                             <option value="">Selecione...</option>
-                            <option value="pix_fabiano">PIX Fabiano</option>
                             <option value="pix_maquineta">PIX Maquineta</option>
                             <option value="pix_edfrance">PIX EDFrance</option>
                             <option value="pix_loja">PIX Loja</option>
@@ -1131,46 +1129,46 @@ async function confirmFullPayment(contaId, valorAberto) {
             </div>
         </div>
     `;
-    
+
     document.body.appendChild(confirmModal);
-    
+
     // Add event listeners for closing the modal
     confirmModal.querySelectorAll('.modal-close').forEach(closeBtn => {
         closeBtn.addEventListener('click', () => {
             confirmModal.remove();
         });
     });
-    
+
     // Show the modal
     confirmModal.style.display = 'flex';
-    
+
     // Close modal when clicking outside
     confirmModal.addEventListener('click', (e) => {
         if (e.target === confirmModal) {
             confirmModal.remove();
         }
     });
-    
+
     // Handle full payment confirmation
     confirmModal.querySelector('#confirm-full-payment').addEventListener('click', async () => {
         const form = confirmModal.querySelector('#full-payment-form');
         const formData = new FormData(form);
-        
+
         const formaPagamento = formData.get('payment-method');
         const observacoes = formData.get('payment-notes');
-        
+
         if (!formaPagamento) {
             showMessage('Selecione uma forma de pagamento', 'error');
             return;
         }
-        
+
         try {
             const response = await registerPayment(contaId, valorAberto, formaPagamento, observacoes);
-            
+
             if (response.success) {
                 showMessage('Pagamento total registrado com sucesso', 'success');
                 confirmModal.remove();
-                
+
                 // Recarrega os dados do cliente para atualizar a tabela
                 const clientId = await getClientIdFromConta(contaId);
                 if (clientId) {
@@ -1199,7 +1197,7 @@ async function registerPayment(contaId, valorPago, formaPagamento, observacoes) 
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                valor_pago: valorPago,
+                valor_pago: valorPago.toFixed(2),
                 forma_pagamento: formaPagamento,
                 observacoes: observacoes
             })
@@ -1218,11 +1216,11 @@ async function registerPayment(contaId, valorPago, formaPagamento, observacoes) 
 async function getClientIdFromConta(contaId) {
     try {
         const response = await fetch(`/operador/api/contas_receber/${contaId}/cliente`);
-        
+
         if (!response.ok) {
             throw new Error('Erro ao buscar cliente da conta');
         }
-        
+
         const data = await response.json();
         return data.cliente_id;
     } catch (error) {
@@ -1236,8 +1234,8 @@ async function getClientIdFromConta(contaId) {
  */
 function formatCurrency(value) {
     if (value === null || value === undefined) return 'R$ 0,00';
-    return new Intl.NumberFormat('pt-BR', { 
-        style: 'currency', 
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
         currency: 'BRL',
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
@@ -1252,11 +1250,11 @@ function formatDate(dateString) {
     try {
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return 'N/A';
-        
+
         const day = date.getDate().toString().padStart(2, '0');
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
         const year = date.getFullYear();
-        
+
         return `${day}/${month}/${year}`;
     } catch (e) {
         console.error('Erro ao formatar data:', e);
@@ -1272,13 +1270,13 @@ function formatDateTime(dateTimeString) {
     try {
         const date = new Date(dateTimeString);
         if (isNaN(date.getTime())) return 'N/A';
-        
+
         const day = date.getDate().toString().padStart(2, '0');
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
         const year = date.getFullYear();
         const hours = date.getHours().toString().padStart(2, '0');
         const minutes = date.getMinutes().toString().padStart(2, '0');
-        
+
         return `${day}/${month}/${year} ${hours}:${minutes}`;
     } catch (e) {
         console.error('Erro ao formatar data/hora:', e);
@@ -1291,20 +1289,20 @@ function formatDateTime(dateTimeString) {
  */
 function formatDocument(doc) {
     if (!doc) return '';
-    
+
     // Remove caracteres não numéricos
     const cleanDoc = doc.replace(/\D/g, '');
-    
+
     // Formata como CPF (11 dígitos)
     if (cleanDoc.length === 11) {
         return cleanDoc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
     }
-    
+
     // Formata como CNPJ (14 dígitos)
     if (cleanDoc.length === 14) {
         return cleanDoc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
     }
-    
+
     // Retorna o original se não for CPF nem CNPJ
     return doc;
 }
@@ -1314,20 +1312,20 @@ function formatDocument(doc) {
  */
 function formatPhone(phone) {
     if (!phone) return '';
-    
+
     // Remove caracteres não numéricos
     const cleanPhone = phone.replace(/\D/g, '');
-    
+
     // Formata como celular com 9º dígito (11 dígitos)
     if (cleanPhone.length === 11) {
         return cleanPhone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
     }
-    
+
     // Formata como telefone fixo (10 dígitos)
     if (cleanPhone.length === 10) {
         return cleanPhone.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
     }
-    
+
     // Retorna o original se não corresponder aos padrões
     return phone;
 }
@@ -1340,7 +1338,7 @@ function showMessage(message, type = 'success') {
     toast.className = `toast ${type}`;
     toast.textContent = message;
     document.body.appendChild(toast);
-    
+
     setTimeout(() => {
         toast.remove();
     }, 5000);
@@ -1352,11 +1350,11 @@ function showMessage(message, type = 'success') {
 async function findClientById(clientId) {
     try {
         const response = await fetch(`/operador/api/clientes/${clientId}`);
-        
+
         if (!response.ok) {
             throw new Error('Erro ao buscar cliente');
         }
-        
+
         return await response.json();
     } catch (error) {
         console.error('Erro ao buscar cliente:', error);
@@ -1370,13 +1368,13 @@ async function findClientById(clientId) {
 async function findContasReceberByClienteId(clienteId) {
     try {
         const response = await fetch(`/operador/api/clientes/${clienteId}/contas_receber`);
-        
+
         if (!response.ok) {
             throw new Error('Erro ao buscar contas a receber');
         }
-        
+
         const contas = await response.json();
-        
+
         return contas.map(conta => ({
             id: conta.id,
             descricao: conta.descricao || 'Sem descrição',
@@ -1394,7 +1392,7 @@ async function findContasReceberByClienteId(clienteId) {
             valor_desconto_nota: conta.valor_desconto_nota || 0.0,
             tipo_desconto_nota: conta.tipo_desconto_nota
         }));
-        
+
     } catch (error) {
         console.error('Erro ao buscar contas a receber:', error);
         showMessage('Erro ao carregar contas a receber', 'error');
@@ -1407,13 +1405,13 @@ async function findContasReceberByClienteId(clienteId) {
 async function findNotasFiscaisByClienteId(clienteId) {
     try {
         const response = await fetch(`/operador/api/clientes/${clienteId}/notas_fiscais`);
-        
+
         if (!response.ok) {
             throw new Error('Erro ao buscar notas fiscais');
         }
-        
+
         const notas = await response.json();
-        
+
         // Processa os dados para o formato esperado
         return notas.map(nota => ({
             id: nota.id,
@@ -1428,7 +1426,7 @@ async function findNotasFiscaisByClienteId(clienteId) {
             operador_id: nota.operador_id,
             caixa_id: nota.caixa_id
         }));
-        
+
     } catch (error) {
         console.error('Erro ao buscar notas fiscais:', error);
         showMessage('Erro ao carregar histórico de compras', 'error');
@@ -1438,10 +1436,10 @@ async function findNotasFiscaisByClienteId(clienteId) {
 // ==================== FUNÇÕES DE PRODUTOS ====================
 async function loadProducts(forceUpdate = false) {
     try {
-        const url = forceUpdate 
+        const url = forceUpdate
             ? `/operador/api/produtos?timestamp=${new Date().getTime()}`
             : '/operador/api/produtos';
-            
+
         const response = await fetch(url, {
             ...preventCacheConfig,
             method: 'GET'
@@ -1470,7 +1468,7 @@ function searchProductsInModal() {
         return;
     }
 
-    const filteredProducts = products.filter(product => 
+    const filteredProducts = products.filter(product =>
         product.nome.toLowerCase().includes(searchTerm) ||
         (product.marca && product.marca.toLowerCase().includes(searchTerm)) ||
         (product.codigo && product.codigo.toLowerCase().includes(searchTerm))
@@ -1482,12 +1480,12 @@ function searchProductsInModal() {
 function displayProductSearchResults(products) {
     if (!productSearchResults) return;
     productSearchResults.innerHTML = '';
-    
+
     if (products.length === 0) {
         productSearchResults.innerHTML = '<p>Nenhum produto encontrado</p>';
         return;
     }
-    
+
     products.forEach(product => {
         const item = document.createElement('div');
         item.className = 'search-result-item';
@@ -1506,28 +1504,28 @@ function displayProductSearchResults(products) {
 
 async function addProductToSale(product, initialQuantity = 1) {
     if (!product) return;
-    
+
     // Busca descontos do produto
     const discounts = await fetchProductDiscounts(product.id);
     const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(
-        product.valor_unitario, 
-        initialQuantity, 
+        product.valor_unitario,
+        initialQuantity,
         discounts
     );
-    
+
     const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
-    
+
     if (existingProductIndex >= 0) {
         selectedProducts[existingProductIndex].quantity += initialQuantity;
         const newQuantity = selectedProducts[existingProductIndex].quantity;
-        
+
         // Recalcula desconto para a nova quantidade
         const newPriceInfo = calculateDiscountedPrice(
-            product.valor_unitario, 
-            newQuantity, 
+            product.valor_unitario,
+            newQuantity,
             discounts
         );
-        
+
         selectedProducts[existingProductIndex].price = newPriceInfo.finalPrice;
         selectedProducts[existingProductIndex].hasDiscount = newPriceInfo.discountApplied;
         selectedProducts[existingProductIndex].discountInfo = newPriceInfo.discountInfo;
@@ -1548,7 +1546,7 @@ async function addProductToSale(product, initialQuantity = 1) {
             availableDiscounts: discounts
         });
     }
-    
+
     renderProductsList();
     calculateSaleTotal();
 }
@@ -1595,7 +1593,7 @@ function calculateDiscountedPrice(basePrice, quantity, discounts) {
     let bestDiscount = null;
     let bestPrice = basePrice;
     const hoje = new Date();
-    
+
     // Ordenar descontos: percentual primeiro, depois fixo
     const sortedDiscounts = [...discounts].sort((a, b) => {
         if (a.tipo === 'percentual' && b.tipo !== 'percentual') return -1;
@@ -1609,7 +1607,7 @@ function calculateDiscountedPrice(basePrice, quantity, discounts) {
             if (!discount.ativo) {
                 continue;
             }
-                
+
             // Verifica a data limite (se existir)
             if (discount.valido_ate) {
                 const validoAte = new Date(discount.valido_ate);
@@ -1617,33 +1615,33 @@ function calculateDiscountedPrice(basePrice, quantity, discounts) {
                     continue; // Desconto expirado
                 }
             }
-            
+
             // Verifica quantidade mínima
             if (quantity < discount.quantidade_minima) {
                 continue;
             }
-            
+
             // Verifica quantidade máxima (se existir)
             if (discount.quantidade_maxima && quantity > discount.quantidade_maxima) {
                 continue;
             }
-            
+
             // Calcula preço com desconto
             let discountedPrice = basePrice;
-            
+
             if (discount.tipo === 'percentual') {
                 discountedPrice = basePrice * (1 - (discount.valor / 100));
             } else if (discount.tipo === 'fixo') {
                 discountedPrice = Math.max(0, basePrice - discount.valor);
             }
-            
+
             // Verifica se é o melhor desconto encontrado até agora
             if (discountedPrice < bestPrice) {
                 bestPrice = discountedPrice;
                 bestDiscount = {
                     ...discount,
-                    valor_aplicado: discount.tipo === 'percentual' 
-                        ? `${discount.valor}%` 
+                    valor_aplicado: discount.tipo === 'percentual'
+                        ? `${discount.valor}%`
                         : formatCurrency(discount.valor),
                     valor_desconto: basePrice - discountedPrice
                 };
@@ -1653,7 +1651,7 @@ function calculateDiscountedPrice(basePrice, quantity, discounts) {
             continue;
         }
     }
-    
+
     return {
         finalPrice: bestPrice,
         discountApplied: bestDiscount !== null,
@@ -1662,7 +1660,7 @@ function calculateDiscountedPrice(basePrice, quantity, discounts) {
 }
 
 // Adicione esta chamada na inicialização para criar o botão de atualização
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     setTimeout(addDiscountRefreshButton, 1000);
 });
 
@@ -1676,7 +1674,7 @@ async function updateAllProductDiscounts() {
                 product.quantity,
                 discounts
             );
-            
+
             selectedProducts[i] = {
                 ...product,
                 price: finalPrice,
@@ -1695,18 +1693,18 @@ function applyManualDiscount() {
         // 1. Obtém os valores dos campos
         const discountType = document.getElementById('discount-type').value;
         const discountValueInput = document.getElementById('discount-value').value.trim();
-        
+
         // 2. Validações básicas
         if (!discountValueInput) throw new Error('Digite um valor para o desconto');
-        
+
         const discountValue = parseFloat(discountValueInput.replace(',', '.'));
         if (isNaN(discountValue)) throw new Error('Valor inválido. Use apenas números.');
-        
+
         // 3. Calcula o total atual SEM descontos
         const subtotal = selectedProducts.reduce((sum, product) => {
             return sum + (product.originalPrice * product.quantity);
         }, 0);
-        
+
         // 4. Validações específicas
         if (discountType === 'percentual') {
             if (discountValue <= 0 || discountValue > 100) {
@@ -1716,7 +1714,7 @@ function applyManualDiscount() {
             if (discountValue <= 0) throw new Error('Valor fixo deve ser maior que zero');
             if (discountValue >= subtotal) throw new Error(`Desconto não pode ser maior que ${formatCurrency(subtotal)}`);
         }
-        
+
         // 5. Calcula o valor total do desconto
         let totalDiscount = 0;
         if (discountType === 'percentual') {
@@ -1724,14 +1722,14 @@ function applyManualDiscount() {
         } else {
             totalDiscount = discountValue;
         }
-        
+
         // 6. Distribui o desconto proporcionalmente entre os produtos
         selectedProducts = selectedProducts.map(product => {
             const productTotal = product.originalPrice * product.quantity;
             const discountRatio = productTotal / subtotal;
             const productDiscount = totalDiscount * discountRatio;
             const discountedPrice = product.originalPrice - (productDiscount / product.quantity);
-            
+
             return {
                 ...product,
                 price: discountedPrice,
@@ -1739,21 +1737,21 @@ function applyManualDiscount() {
                 discountInfo: {
                     tipo: discountType,
                     valor: discountValue,
-                    valor_aplicado: discountType === 'percentual' 
-                        ? `${discountValue}%` 
+                    valor_aplicado: discountType === 'percentual'
+                        ? `${discountValue}%`
                         : formatCurrency(discountValue),
                     identificador: 'MANUAL',
                     descricao: 'Desconto manual aplicado'
                 }
             };
         });
-        
+
         // 7. Atualiza a interface
         renderProductsList();
         calculateSaleTotal();
         showMessage(`Desconto de ${formatCurrency(totalDiscount)} aplicado ao total!`);
         document.getElementById('discount-value').value = '';
-        
+
     } catch (error) {
         showMessage(error.message, 'error');
     }
@@ -1777,19 +1775,19 @@ function renderProductsList() {
                       style="display:${product.hasDiscount ? 'inline-block' : 'none'}">
                     ${product.hasDiscount && product.discountInfo ? `
                         <i class="fas fa-tag"></i> ${product.discountInfo.identificador || 'DESCONTO'}
-                        ${product.discountInfo.tipo === 'percentual' ? 
-                            ` (${product.discountInfo.valor}%)` : 
-                            ` (${formatCurrency(product.discountInfo.valor)})`
-                        }
+                        ${product.discountInfo.tipo === 'percentual' ?
+                    ` (${product.discountInfo.valor}%)` :
+                    ` (${formatCurrency(product.discountInfo.valor)})`
+                }
                     ` : ''}
                 </span>
             </td>
             <td>${product.description}</td>
             <td class="product-price">
                 ${formatCurrency(product.price)}
-                ${product.hasDiscount ? 
-                    `<small class="original-price">${formatCurrency(product.originalPrice)}</small>` : ''
-                }
+                ${product.hasDiscount ?
+                `<small class="original-price">${formatCurrency(product.originalPrice)}</small>` : ''
+            }
             </td>
             <td>
                 <input type="text" class="quantity-input" 
@@ -1800,9 +1798,9 @@ function renderProductsList() {
             </td>
             <td class="product-total">
                 ${formatCurrency(totalValue)}
-                ${product.hasDiscount ? 
-                    `<small class="discount-value">(Economia: ${formatCurrency(discountValue)})</small>` : ''
-                }
+                ${product.hasDiscount ?
+                `<small class="discount-value">(Economia: ${formatCurrency(discountValue)})</small>` : ''
+            }
             </td>
             <td>
                 <button class="btn-remove" data-index="${index}" title="Remover produto">
@@ -1816,21 +1814,21 @@ function renderProductsList() {
     // Adiciona eventos
     document.querySelectorAll('.quantity-input').forEach(input => {
         // Validação de caracteres
-        input.addEventListener('input', function(e) {
+        input.addEventListener('input', function (e) {
             let value = e.target.value;
             if (!/^[0-9]*[,.]?[0-9]*$/.test(value)) {
                 e.target.value = value.slice(0, -1);
             }
         });
-    
+
         // 🔹 Atualiza em tempo real enquanto digita
-        input.addEventListener('input', async function(e) {
+        input.addEventListener('input', async function (e) {
             await updateProductQuantity(e.target);
         });
     });
 
     document.querySelectorAll('.btn-remove').forEach(button => {
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function () {
             removeProductRow(button);
         });
     });
@@ -1882,7 +1880,7 @@ async function updateProductQuantity(input) {
         if (priceCell) {
             priceCell.innerHTML = `
                 ${formatCurrency(updatedProduct.price)}
-                ${updatedProduct.hasDiscount ? 
+                ${updatedProduct.hasDiscount ?
                     `<small class="original-price">${formatCurrency(updatedProduct.originalPrice)}</small>` : ''
                 }
             `;
@@ -1894,8 +1892,8 @@ async function updateProductQuantity(input) {
             if (updatedProduct.hasDiscount && updatedProduct.discountInfo) {
                 badgeCell.innerHTML = `
                     <i class="fas fa-tag"></i> ${updatedProduct.discountInfo.identificador || 'DESCONTO'}
-                    ${updatedProduct.discountInfo.tipo === 'percentual' ? 
-                        ` (${updatedProduct.discountInfo.valor}%)` : 
+                    ${updatedProduct.discountInfo.tipo === 'percentual' ?
+                        ` (${updatedProduct.discountInfo.valor}%)` :
                         ` (${formatCurrency(updatedProduct.discountInfo.valor)})`
                     }
                 `;
@@ -1916,7 +1914,7 @@ async function updateProductQuantity(input) {
 
             totalCell.innerHTML = `
                 ${formatCurrency(totalValue)}
-                ${updatedProduct.hasDiscount ? 
+                ${updatedProduct.hasDiscount ?
                     `<small class="discount-value">(Economia: ${formatCurrency(discountValue)})</small>` : ''
                 }
             `;
@@ -1949,7 +1947,7 @@ async function registerSale() {
 
         const paymentMethods = [];
         const paymentItems = document.querySelectorAll('.payment-item');
-        
+
         // Processa os métodos de pagamento já definidos
         paymentItems.forEach(item => {
             const method = item.querySelector('input[name="payment_methods[]"]').value;
@@ -1965,7 +1963,7 @@ async function registerSale() {
         const totalText = saleTotalElement?.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
         const total = parseFloat(totalText) || 0;
         let valor_recebido = 0;
-        
+
         if (paymentMethods.length > 0) {
             // Se há múltiplos métodos de pagamento, soma todos os valores
             valor_recebido = paymentMethods.reduce((sum, pm) => sum + pm.valor, 0);
@@ -1976,13 +1974,13 @@ async function registerSale() {
         }
 
         const totalPagamentos = paymentMethods.reduce((sum, pm) => sum + pm.valor, 0);
-        
+
         if (totalPagamentos < total) {
             const remaining = total - totalPagamentos;
-            
+
             // Verifica se já existe um pagamento em dinheiro para somar
             const pagamentoDinheiroExistente = paymentMethods.find(pm => pm.forma_pagamento === 'dinheiro');
-            
+
             if (pagamentoDinheiroExistente) {
                 // Se já existe pagamento em dinheiro, adiciona o valor restante
                 pagamentoDinheiroExistente.valor += remaining;
@@ -1993,11 +1991,11 @@ async function registerSale() {
                     valor: remaining
                 });
             }
-            
+
             // Atualiza o valor_recebido para incluir o pagamento em dinheiro
             valor_recebido = total;
         }
-        
+
         // Se não há nenhum método de pagamento definido, assume pagamento total em dinheiro
         if (paymentMethods.length === 0) {
             paymentMethods.push({
@@ -2011,7 +2009,7 @@ async function registerSale() {
             const originalTotal = product.originalPrice * product.quantity;
             const discountedTotal = product.price * product.quantity;
             const discountValue = originalTotal - discountedTotal;
-            
+
             return {
                 produto_id: product.id,
                 quantidade: Number(product.quantity),
@@ -2053,19 +2051,19 @@ async function registerSale() {
         }
         const response = await fetch('/operador/api/vendas', {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(saleData)
         });
-        
+
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.message || 'Erro ao registrar venda');
         }
-        
+
         const result = await response.json();
-        
+
         if (!result.success) {
             throw new Error(result.message || 'Erro ao registrar venda');
         }
@@ -2082,10 +2080,10 @@ async function registerSale() {
     }
 }
 // Adicione este evento listener no seu código de inicialização
-document.getElementById('sale-notes').addEventListener('input', function(e) {
+document.getElementById('sale-notes').addEventListener('input', function (e) {
     const maxLength = 500;
     const currentLength = e.target.value.length;
-    
+
     if (currentLength > maxLength) {
         e.target.value = e.target.value.substring(0, maxLength);
         showMessage('Observação limitada a 500 caracteres', 'warning');
@@ -2094,11 +2092,11 @@ document.getElementById('sale-notes').addEventListener('input', function(e) {
 
 function calculateSaleTotal() {
     let subtotal = 0;
-    
+
     selectedProducts.forEach((product, index) => {
         const totalValue = product.price * product.quantity;
         subtotal += totalValue;
-        
+
         if (productsList && productsList.children[index]) {
             const row = productsList.children[index];
             const totalCell = row.querySelector('.product-total');
@@ -2107,12 +2105,12 @@ function calculateSaleTotal() {
             }
         }
     });
-    
+
     let total = subtotal;
-    
+
     if (subtotalValueElement) subtotalValueElement.textContent = formatCurrency(subtotal);
     if (saleTotalElement) saleTotalElement.textContent = formatCurrency(total);
-    
+
     if (amountReceivedInput && amountReceivedInput.value) {
         const amountReceivedText = amountReceivedInput.value.replace(/\./g, '').replace(',', '.');
         const amountReceived = parseFloat(amountReceivedText) || 0;
@@ -2194,7 +2192,7 @@ function resetSaleForm() {
 // ==================== FUNÇÕES DE ENTREGA ====================
 function openDeliveryModal() {
     if (!deliveryModal) return;
-    
+
     if (deliveryAddress) {
         document.getElementById('delivery-address').value = deliveryAddress.logradouro || '';
         document.getElementById('delivery-number').value = deliveryAddress.numero || '';
@@ -2205,7 +2203,7 @@ function openDeliveryModal() {
         document.getElementById('delivery-zipcode').value = deliveryAddress.cep || '';
         document.getElementById('delivery-instructions').value = deliveryAddress.instrucoes || '';
     }
-    
+
     openModal('delivery');
 }
 
@@ -2221,7 +2219,7 @@ function saveDeliveryAddress() {
         instrucoes: document.getElementById('delivery-instructions')?.value || '',
         endereco_completo: `${document.getElementById('delivery-address')?.value || ''}, ${document.getElementById('delivery-number')?.value || ''}`
     };
-    
+
     updateDeliveryUI();
     closeModal();
     showMessage('Endereço de entrega salvo com sucesso!');
@@ -2235,7 +2233,7 @@ function useClientAddress() {
 
     const clientId = selectedClientIdInput.value;
     const client = clients.find(c => c.id == clientId);
-    
+
     if (!client || (!client.endereco && !client.endereco_completo)) {
         showMessage('Cliente não possui endereço cadastrado', 'error');
         return;
@@ -2257,7 +2255,7 @@ function useClientAddress() {
         const addressString = client.endereco || client.endereco_completo;
         const addressRegex = /^(.*?)(?:,\s*(?:nº|no|numero|número)\s*(\d+))?(?:,\s*(.*?))?(?:,\s*(.*?)\s*-\s*([A-Z]{2}))?$/i;
         const matches = addressString.match(addressRegex);
-        
+
         deliveryAddress = {
             endereco_completo: addressString,
             logradouro: matches[1]?.trim() || '',
@@ -2286,7 +2284,7 @@ function useClientAddress() {
 
 function updateDeliveryUI() {
     if (!deliveryAddress) return;
-    
+
     if (deliveryBtn) {
         deliveryBtn.classList.add('has-delivery');
         deliveryBtn.innerHTML = '<i class="fas fa-check-circle"></i> Endereço de Entrega Cadastrado';
@@ -2296,10 +2294,10 @@ function updateDeliveryUI() {
 
 function showDeliveryInfo() {
     if (!deliveryBtn || !deliveryAddress) return;
-    
+
     const existingInfo = document.querySelector('.delivery-info');
     if (existingInfo) existingInfo.remove();
-    
+
     const deliveryInfo = document.createElement('div');
     deliveryInfo.className = 'delivery-info';
     deliveryInfo.innerHTML = `
@@ -2317,7 +2315,7 @@ function showDeliveryInfo() {
             </button>
         </div>
     `;
-    
+
     deliveryBtn.insertAdjacentElement('afterend', deliveryInfo);
     document.getElementById('edit-delivery-btn')?.addEventListener('click', openDeliveryModal);
     document.getElementById('remove-delivery-btn')?.addEventListener('click', removeDeliveryAddress);
@@ -2325,17 +2323,17 @@ function showDeliveryInfo() {
 
 function removeDeliveryAddress() {
     deliveryAddress = null;
-    
+
     if (deliveryBtn) {
         deliveryBtn.classList.remove('has-delivery');
         deliveryBtn.innerHTML = '<i class="fas fa-truck"></i> Adicionar Entrega';
     }
-    
+
     const deliveryInfo = document.querySelector('.delivery-info');
     if (deliveryInfo) {
         deliveryInfo.remove();
     }
-    
+
     showMessage('Endereço de entrega removido');
 }
 
@@ -2345,7 +2343,7 @@ function openExpenseModal() {
         showMessage('Nenhum caixa aberto encontrado', 'error');
         return;
     }
-    
+
     expenseModal.style.display = 'flex';
     document.getElementById('expense-description')?.focus();
 }
@@ -2360,17 +2358,17 @@ async function saveExpense() {
     const description = document.getElementById('expense-description')?.value.trim();
     const amount = document.getElementById('expense-amount')?.value;
     const note = document.getElementById('expense-note')?.value.trim();
-    
+
     if (!description) {
         showMessage('Descrição da despesa é obrigatória', 'error');
         return;
     }
-    
+
     if (!amount || parseFloat(amount) <= 0) {
         showMessage('Valor da despesa deve ser maior que zero', 'error');
         return;
     }
-    
+
     try {
         const response = await fetch('/operador/api/despesa', {
             ...preventCacheConfig,
@@ -2385,12 +2383,12 @@ async function saveExpense() {
                 caixa_id: currentCaixaId
             })
         });
-        
+
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || 'Erro ao registrar despesa');
         }
-        
+
         showMessage('Despesa registrada com sucesso!');
         closeExpenseModal();
         updateBalance(true);
@@ -2434,7 +2432,7 @@ async function gerarOrcamentoPDF() {
         const pdfBlob = await response.blob();
         const pdfUrl = URL.createObjectURL(pdfBlob);
         window.open(pdfUrl, '_blank');
-        
+
     } catch (error) {
         console.error('Erro ao gerar orçamento:', error);
         showMessage(error.message, 'error');
@@ -2502,7 +2500,7 @@ function removerVendasDuplicadas(vendas) {
 function renderDaySales(vendas) {
     const tableBody = document.querySelector('#day-sales-table tbody');
     if (!tableBody) return;
-    
+
     tableBody.innerHTML = '';
 
     if (!Array.isArray(vendas) || vendas.length === 0) {
@@ -2538,13 +2536,13 @@ function renderDaySales(vendas) {
     });
 
     // Configurar event listeners para os botões
-    tableBody.addEventListener('click', function(e) {
+    tableBody.addEventListener('click', function (e) {
         const viewBtn = e.target.closest('.btn-view');
         if (viewBtn) {
             openSaleDetailsModal(viewBtn.dataset.id);
             return;
         }
-        
+
         const voidBtn = e.target.closest('.btn-void');
         if (voidBtn) {
             openVoidSaleModal(voidBtn.dataset.id);
@@ -2560,7 +2558,7 @@ function openVoidSaleModal(saleId) {
         console.error('Modal de estorno não encontrado');
         return;
     }
-    
+
     document.getElementById('void-sale-id').value = saleId;
     document.getElementById('void-sale-id-display').textContent = saleId;
     document.getElementById('void-sale-reason').value = '';
@@ -2571,7 +2569,7 @@ function openVoidSaleModal(saleId) {
 async function voidSale() {
     const saleId = document.getElementById('void-sale-id').value;
     const reason = document.getElementById('void-sale-reason').value || "Sem motivo informado";
-    
+
     if (!saleId) {
         showMessage('ID da venda não informado', 'error');
         return;
@@ -2592,12 +2590,12 @@ async function voidSale() {
                 motivo_estorno: reason
             })
         });
-        
+
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.message || `Erro ${response.status} ao estornar venda`);
         }
-        
+
         const result = await response.json();
         showMessage(`Venda #${saleId} estornada com sucesso!`, 'success');
         closeModal('void-sale-modal');
@@ -2669,10 +2667,10 @@ async function openSaleDetailsModal(saleId) {
             console.error('Modal de detalhes da venda não encontrado');
             return;
         }
-        
+
         modal.style.display = 'flex';
         currentOpenModal = modal;
-        
+
         // Reset elementos do modal
         const elementsToReset = [
             'sale-details-id',
@@ -2687,7 +2685,7 @@ async function openSaleDetailsModal(saleId) {
             'sale-details-products',
             'sale-details-payments'
         ];
-        
+
         elementsToReset.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
@@ -2702,12 +2700,12 @@ async function openSaleDetailsModal(saleId) {
         // Buscar dados da API
         const response = await fetch(`/operador/api/vendas/${saleId}/detalhes`);
         if (!response.ok) throw new Error('Erro ao buscar detalhes da venda');
-        
+
         const result = await response.json();
         if (!result.success) throw new Error(result.message || 'Erro ao carregar detalhes');
-        
+
         const venda = result.data;
-        
+
         // Preencher informações básicas
         safeSetText('sale-details-id', saleId);
         safeSetText('sale-details-date', new Date(venda.data_emissao).toLocaleString('pt-BR'));
@@ -2716,23 +2714,23 @@ async function openSaleDetailsModal(saleId) {
         safeSetText('sale-details-total', formatCurrency(venda.valor_total));
         safeSetText('sale-details-discount', formatCurrency(venda.valor_desconto || 0));
         safeSetText('sale-details-notes', venda.observacao || 'Nenhuma observação');
-        
+
         // Tratar informações de entrega
         handleDeliveryInfo(venda);
-        
+
         // Tratar produtos com remoção de duplicatas
         handleProductsTable(venda.itens);
-        
+
         // Tratar pagamentos com remoção de duplicatas
         handlePaymentsTable(venda);
-        
+
         // Event listener para fechar modal
-        modal.addEventListener('click', function(e) {
+        modal.addEventListener('click', function (e) {
             if (e.target === modal) {
                 closeModal('sale-details-modal');
             }
         });
-        
+
     } catch (error) {
         console.error("Erro ao abrir detalhes da venda:", error);
         showMessage(error.message || "Erro ao carregar detalhes da venda", 'error');
@@ -2744,7 +2742,7 @@ async function openSaleDetailsModal(saleId) {
 function handleDeliveryInfo(venda) {
     const deliveryContainer = document.getElementById('sale-details-delivery-container');
     const deliveryInstructions = document.getElementById('sale-details-delivery-instructions');
-    
+
     if (deliveryContainer) {
         if (venda.entrega) {
             const endereco = [
@@ -2755,10 +2753,10 @@ function handleDeliveryInfo(venda) {
                 `${venda.entrega.cidade}/${venda.entrega.estado}`.toUpperCase(),
                 venda.entrega.cep ? formatCEP(venda.entrega.cep) : ''
             ].filter(Boolean).join(', ');
-            
+
             safeSetText('sale-details-delivery', endereco);
             deliveryContainer.style.display = 'flex';
-            
+
             if (deliveryInstructions) {
                 if (venda.entrega.instrucoes) {
                     deliveryInstructions.textContent = `Instruções: ${venda.entrega.instrucoes}`;
@@ -2780,24 +2778,24 @@ function handleDeliveryInfo(venda) {
 function handleProductsTable(itens) {
     const productsTable = document.getElementById('sale-details-products');
     if (!productsTable || !itens) return;
-    
+
     // Limpar tabela antes de popular
     productsTable.innerHTML = '';
-    
+
     // Remover duplicatas baseado no produto_id ou produto_nome
     const itensUnicos = [];
     const idsVistos = new Set();
-    
+
     itens.forEach(item => {
         // Usar uma chave única baseada no produto e valor unitário para evitar duplicatas
         const chaveUnica = `${item.produto_id || item.produto_nome}-${item.valor_unitario}-${item.quantidade}`;
-        
+
         if (!idsVistos.has(chaveUnica)) {
             idsVistos.add(chaveUnica);
             itensUnicos.push(item);
         }
     });
-    
+
     // Adicionar produtos únicos na tabela
     itensUnicos.forEach(item => {
         const row = document.createElement('tr');
@@ -2816,14 +2814,14 @@ function handleProductsTable(itens) {
 function handlePaymentsTable(venda) {
     const paymentsTable = document.getElementById('sale-details-payments');
     if (!paymentsTable) return;
-    
+
     // Limpar tabela antes de popular
     paymentsTable.innerHTML = '';
-    
+
     if (venda.pagamentos && venda.pagamentos.length > 0) {
         // Agregar pagamentos para evitar duplicatas
         const pagamentosAgregados = agregarPagamentos(venda.pagamentos);
-        
+
         pagamentosAgregados.forEach(pagamento => {
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -2833,7 +2831,7 @@ function handlePaymentsTable(venda) {
             `;
             paymentsTable.appendChild(row);
         });
-        
+
         // Adicionar linha de total se houver múltiplos pagamentos
         if (pagamentosAgregados.length > 1) {
             const totalPagamentos = pagamentosAgregados.reduce((sum, pag) => sum + parseFloat(pag.valor), 0);
@@ -2861,15 +2859,15 @@ function handlePaymentsTable(venda) {
 // Função para agregar pagamentos e remover duplicatas
 function agregarPagamentos(pagamentos) {
     if (!pagamentos || !Array.isArray(pagamentos)) return [];
-    
+
     const agregados = new Map();
-    
+
     pagamentos.forEach(pag => {
         // Criar chave única baseada na forma de pagamento e data
         const data = new Date(pag.data);
         const dataFormatada = data.toISOString().split('T')[0]; // YYYY-MM-DD
         const chave = `${pag.forma_pagamento}-${dataFormatada}`;
-        
+
         if (agregados.has(chave)) {
             // Somar valores de pagamentos duplicados
             const existing = agregados.get(chave);
@@ -2883,7 +2881,7 @@ function agregarPagamentos(pagamentos) {
             });
         }
     });
-    
+
     return Array.from(agregados.values());
 }
 
@@ -2906,7 +2904,6 @@ function formatCEP(cep) {
 
 function formatPaymentMethod(method) {
     const methods = {
-        'pix_fabiano': 'Pix (Fabiano)',
         'pix_edfrance': 'Pix (Edfrance)',
         'pix_loja': 'Pix (Loja)',
         'pix_maquineta': 'Pix (Maquineta)',
@@ -2927,7 +2924,7 @@ async function checkCaixaStatus() {
         });
         if (!response.ok) throw new Error('Erro ao verificar status do caixa');
         const data = await response.json();
-        
+
         if (data.message === 'Nenhum caixa aberto encontrado') {
             if (closeRegisterBtn) closeRegisterBtn.style.display = 'none';
             currentCaixaId = null;
@@ -2952,18 +2949,18 @@ function startBalanceAutoUpdate() {
 // Função modificada para atualizar o saldo
 async function updateBalance(forceUpdate = false) {
     try {
-        const url = forceUpdate 
+        const url = forceUpdate
             ? `/operador/api/saldo?timestamp=${new Date().getTime()}`
             : '/operador/api/saldo';
-            
+
         const response = await fetch(url, {
             ...preventCacheConfig,
             method: 'GET'
         });
-        
+
         if (!response.ok) throw new Error('Erro ao carregar saldo');
         const data = await response.json();
-        
+
         if (data.message === 'Nenhum caixa aberto encontrado') {
             if (openingBalanceLabel) openingBalanceLabel.textContent = 'Caixa fechado';
             if (currentBalanceLabel) currentBalanceLabel.textContent = '';
@@ -2978,13 +2975,13 @@ async function updateBalance(forceUpdate = false) {
             if (openingBalanceLabel) openingBalanceLabel.textContent = '******';
             if (currentBalanceLabel) currentBalanceLabel.textContent = '******';
         }
-        
+
         // Atualiza o saldo atual na variável global
         currentBalance = data.saldo || 0;
-        
+
         // Dispara evento personalizado para notificar outras partes do sistema
         document.dispatchEvent(new CustomEvent('balanceUpdated', { detail: data }));
-        
+
     } catch (error) {
         console.error('Error updating balance:', error);
         if (openingBalanceLabel) openingBalanceLabel.textContent = 'Erro';
@@ -3013,10 +3010,10 @@ async function closeRegister() {
             </div>
         </div>
     `;
-    
+
     // Adicionar ao corpo do documento
     document.body.appendChild(modal);
-    
+
     // Adicionar estilos básicos (pode mover para CSS)
     const style = document.createElement('style');
     style.textContent = `
@@ -3066,14 +3063,14 @@ async function closeRegister() {
         }
     `;
     document.head.appendChild(style);
-    
+
     // Configurar máscara para o input de valor
     const valorInput = document.getElementById('fechamento-valor');
     const observacaoInput = document.getElementById('fechamento-observacao');
     if (valorInput) {
-        valorInput.addEventListener('input', function(e) {
+        valorInput.addEventListener('input', function (e) {
             let value = e.target.value.replace(/\D/g, '');
-            value = (value/100).toLocaleString('pt-BR', {
+            value = (value / 100).toLocaleString('pt-BR', {
                 style: 'decimal',
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
@@ -3081,7 +3078,7 @@ async function closeRegister() {
             e.target.value = value;
         });
     }
-    
+
     // Retornar uma Promise que resolve quando o modal é confirmado ou rejeitado
     return new Promise(async (resolve, reject) => {
         // Evento de confirmação
@@ -3089,12 +3086,12 @@ async function closeRegister() {
             const valorText = valorInput?.value.replace(/\./g, '').replace(',', '.');
             const valorNumerico = parseFloat(valorText);
             const observacao = observacaoInput?.value || "";
-            
+
             if (!valorText || isNaN(valorNumerico) || valorNumerico <= 0) {
                 showMessage('Valor de fechamento inválido', 'error');
                 return;
             }
-            
+
             try {
                 // Primeiro gerar o relatório PDF
                 const pdfResponse = await fetch('/operador/api/vendas/relatorio-diario-pdf', {
@@ -3122,7 +3119,7 @@ async function closeRegister() {
                     ...preventCacheConfig,
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
                         valor_fechamento: valorNumerico,
                         observacao: observacao
                     })
@@ -3136,17 +3133,17 @@ async function closeRegister() {
                 const now = new Date();
                 showMessage(`Caixa fechado às ${now.toLocaleTimeString('pt-BR')}`);
                 await checkCaixaStatus();
-                
+
                 modal.remove();
                 style.remove();
-                
+
                 resolve(true);
             } catch (error) {
                 showMessage(error.message, 'error');
                 reject(error);
             }
         });
-        
+
         // Evento de cancelamento
         document.getElementById('cancel-fechamento')?.addEventListener('click', () => {
             showMessage('Operação cancelada', 'warning');
@@ -3157,10 +3154,10 @@ async function closeRegister() {
     });
 }
 
-window.updateCaixaStatus = function() {
+window.updateCaixaStatus = function () {
     const caixaStatusDisplay = document.querySelector('.caixa-status');
     if (!caixaStatusDisplay || !selectedClientInput) return;
-    
+
     if (selectedClientInput.value.trim() !== '') {
         caixaStatusDisplay.className = 'caixa-status caixa-operacao';
         caixaStatusDisplay.innerHTML = '<i class="fas fa-user-check"></i><span>CAIXA EM OPERAÇÃO</span>';
@@ -3187,7 +3184,7 @@ function showSearchResults(results, containerId, type) {
         resultItem.className = 'search-result-item';
         resultItem.dataset.id = item.id;
         resultItem.tabIndex = 0; // Torna o item focável
-        
+
         if (type === 'client') {
             resultItem.innerHTML = `
                 <h4>${item.nome}</h4>
@@ -3211,7 +3208,7 @@ function showSearchResults(results, containerId, type) {
                 if (productSearchInput) productSearchInput.value = '';
             });
         }
-        
+
         // Permite selecionar com Enter quando o item está focado
         resultItem.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -3219,7 +3216,7 @@ function showSearchResults(results, containerId, type) {
                 resultItem.click();
             }
         });
-        
+
         resultsContainer.appendChild(resultItem);
     });
 
@@ -3250,7 +3247,7 @@ function showClientResultsDropdown(clients) {
     const dropdown = document.getElementById('client-search-results');
     if (!dropdown) return;
     dropdown.innerHTML = '';
-    
+
     clients.forEach(client => {
         const item = document.createElement('div');
         item.className = 'client-result-item';
@@ -3385,19 +3382,21 @@ function setupEventListeners() {
         });
     }
     if (clientSearchInput) {
-    clientSearchInput.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowDown' && activeSearchDropdown) {
-            e.preventDefault();
-            navigateSearchResults('down');
-        }
-    })};
+        clientSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown' && activeSearchDropdown) {
+                e.preventDefault();
+                navigateSearchResults('down');
+            }
+        })
+    };
     if (productSearchInput) {
-    productSearchInput.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowDown' && activeSearchDropdown) {
-            e.preventDefault();
-            navigateSearchResults('down');
-        }
-    })};
+        productSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown' && activeSearchDropdown) {
+                e.preventDefault();
+                navigateSearchResults('down');
+            }
+        })
+    };
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
             window.location.href = '/logout?' + new Date().getTime();
@@ -3406,10 +3405,10 @@ function setupEventListeners() {
     const searchClientBtn = document.getElementById('search-client-btn');
     if (searchClientBtn) searchClientBtn.addEventListener('click', searchClient);
     if (clientSearchInput) {
-        clientSearchInput.addEventListener('focus', function() {
+        clientSearchInput.addEventListener('focus', function () {
             showClientSearchResults(clients);
         });
-        clientSearchInput.addEventListener('input', function(e) {
+        clientSearchInput.addEventListener('input', function (e) {
             clearTimeout(clientSearchTimeout);
             const searchTerm = e.target.value.trim();
             if (searchTerm.length >= 2) {
@@ -3461,7 +3460,7 @@ function setupEventListeners() {
             }
         });
     }
-    document.addEventListener('balanceUpdated', (event) => console.log('Saldo atualizado:', event.detail));
+    // document.addEventListener('balanceUpdated', (event) => console.log('Saldo atualizado:', event.detail));
     document.getElementById('day-sales-tab')?.addEventListener('click', loadDaySales);
     if (amountReceivedInput) {
         amountReceivedInput.addEventListener('input', calculateSaleTotal);
@@ -3478,9 +3477,9 @@ function setupEventListeners() {
     if (cancelDeliveryBtn) {
         cancelDeliveryBtn.addEventListener('click', closeModal);
     }
-    
+
     if (clientSearchInput) {
-        clientSearchInput.addEventListener('input', function(e) {
+        clientSearchInput.addEventListener('input', function (e) {
             clearTimeout(clientSearchTimeout);
             const searchTerm = e.target.value.trim();
             if (searchTerm.length >= 2) {
@@ -3493,12 +3492,12 @@ function setupEventListeners() {
                 closeAllDropdowns();
             }
         });
-        clientSearchInput.addEventListener('focus', async function() {
+        clientSearchInput.addEventListener('focus', async function () {
             await searchClients('');
         });
     }
     if (productSearchInput) {
-        productSearchInput.addEventListener('input', function(e) {
+        productSearchInput.addEventListener('input', function (e) {
             clearTimeout(productSearchTimeout);
             const searchTerm = e.target.value.trim();
             if (searchTerm.length >= 2) {
@@ -3511,7 +3510,7 @@ function setupEventListeners() {
                 closeAllDropdowns();
             }
         });
-        productSearchInput.addEventListener('focus', function() {
+        productSearchInput.addEventListener('focus', function () {
             if (productSearchInput.value.trim().length >= 2) {
                 searchProducts(productSearchInput.value.trim());
             } else {
@@ -3519,28 +3518,28 @@ function setupEventListeners() {
             }
         });
     }
-    document.addEventListener('click', function(e) {
+    document.addEventListener('click', function (e) {
         if (!e.target.closest('.search-container') && activeSearchDropdown) {
             closeAllDropdowns();
         }
     });
-    document.addEventListener('keydown', function(e) {
+    document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && activeSearchDropdown) {
             closeAllDropdowns();
         }
     });
     const removeClientBtn = document.getElementById("remove-selected-client-btn");
     if (removeClientBtn) {
-        removeClientBtn.addEventListener("click", function() {
+        removeClientBtn.addEventListener("click", function () {
             if (selectedClientInput) selectedClientInput.value = "";
             if (selectedClientIdInput) selectedClientIdInput.value = "";
             updateCaixaStatus();
         });
     }
-    
+
     const paymentMethodSelect = document.getElementById('payment-method');
     if (paymentMethodSelect) {
-        paymentMethodSelect.addEventListener('change', function() {
+        paymentMethodSelect.addEventListener('change', function () {
             if (this.value === 'dinheiro' && amountReceivedInput) {
                 const totalText = saleTotalElement.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
                 const total = parseFloat(totalText) || 0;
@@ -3554,10 +3553,10 @@ function setupEventListeners() {
             }
         });
     }
-    
+
     // Adiciona listeners para múltiplas formas de pagamento
     document.querySelector('.add-payment-method')?.addEventListener('click', addPaymentMethod);
-    document.querySelector('.payment-amount')?.addEventListener('keypress', function(e) {
+    document.querySelector('.payment-amount')?.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') {
             addPaymentMethod();
         }
@@ -3569,7 +3568,7 @@ function setupDiscountControls() {
     if (applyDiscountBtn) {
         applyDiscountBtn.addEventListener('click', applyManualDiscount);
     }
-    
+
     // Adiciona listener para tecla Enter no campo de valor do desconto
     const discountValueInput = document.getElementById('discount-value');
     if (discountValueInput) {
@@ -3586,7 +3585,7 @@ function applyManualDiscount() {
         // 1. Obtém os valores dos campos
         const discountType = document.getElementById('discount-type').value;
         const discountValueInput = document.getElementById('discount-value').value.trim();
-        
+
         // 2. Validações básicas
         if (!discountValueInput) {
             throw new Error('Digite um valor para o desconto');
@@ -3612,7 +3611,7 @@ function applyManualDiscount() {
             if (discountValue <= 0) {
                 throw new Error('Valor fixo deve ser maior que zero');
             }
-            
+
             if (discountValue >= subtotal) {
                 throw new Error(`Desconto não pode ser maior que ${formatCurrency(subtotal)}`);
             }
@@ -3638,7 +3637,7 @@ function applyManualDiscount() {
         // 8. Aplica o fator de ajuste para manter a proporção entre os produtos
         selectedProducts = selectedProducts.map(product => {
             const newPrice = product.originalPrice * adjustmentFactor;
-            
+
             return {
                 ...product,
                 price: newPrice,
@@ -3646,8 +3645,8 @@ function applyManualDiscount() {
                 discountInfo: {
                     tipo: discountType,
                     valor: discountValue,
-                    valor_aplicado: discountType === 'percentual' 
-                        ? `${discountValue}%` 
+                    valor_aplicado: discountType === 'percentual'
+                        ? `${discountValue}%`
                         : formatCurrency(discountValue),
                     identificador: 'MANUAL',
                     descricao: 'Desconto manual aplicado'
@@ -3658,7 +3657,7 @@ function applyManualDiscount() {
         // 9. Atualiza a interface
         renderProductsList();
         calculateSaleTotal();
-        
+
         // 10. Mostra mensagem de sucesso e limpa o campo
         showMessage(`Desconto de ${formatCurrency(totalDiscount)} aplicado com sucesso!`);
         document.getElementById('discount-value').value = '';
@@ -3671,23 +3670,23 @@ function addPaymentMethod() {
     const paymentMethodSelect = document.querySelector('.payment-method-select');
     const paymentAmountInput = document.querySelector('.payment-amount');
     const selectedPaymentsList = document.querySelector('.selected-payments-list');
-    
+
     if (!paymentMethodSelect || !paymentAmountInput || !selectedPaymentsList) return;
-    
+
     const method = paymentMethodSelect.value;
     const amountText = paymentAmountInput.value.replace(/\./g, '').replace(',', '.');
     const amount = parseFloat(amountText);
-    
+
     if (!method) {
         showMessage('Selecione uma forma de pagamento', 'error');
         return;
     }
-    
+
     if (isNaN(amount) || amount <= 0) {
         showMessage('Digite um valor válido para o pagamento', 'error');
         return;
     }
-    
+
     const paymentItem = document.createElement('div');
     paymentItem.className = 'payment-item';
     paymentItem.innerHTML = `
@@ -3699,25 +3698,25 @@ function addPaymentMethod() {
             <i class="fas fa-trash"></i>
         </button>
     `;
-    
+
     selectedPaymentsList.appendChild(paymentItem);
-    
+
     // Adiciona listener para o botão de remover
-    paymentItem.querySelector('.btn-remove-payment').addEventListener('click', function() {
+    paymentItem.querySelector('.btn-remove-payment').addEventListener('click', function () {
         paymentItem.remove();
         calculateSaleTotal();
     });
-    
+
     // Limpa os campos
     paymentMethodSelect.value = '';
     paymentAmountInput.value = '';
-    
+
     // Calcula o total novamente
     calculateSaleTotal();
 }
 
 // ==================== INICIALIZAÇÃO ADICIONAL ====================
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const modalSearchProductBtn = document.getElementById('modal-search-product-btn');
     if (modalSearchProductBtn) {
         modalSearchProductBtn.addEventListener('click', searchProductsInModal);
