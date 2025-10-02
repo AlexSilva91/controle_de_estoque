@@ -3111,6 +3111,9 @@ def gerar_pdf_caixas_detalhado():
         elements.append(Spacer(1, 12))
 
         # -------------------- Resumo Executivo (mesmo estilo da primeira rota) --------------------
+        # NOVO: Dicionário para armazenar totais por forma de pagamento por caixa
+        totais_formas_pagamento_por_caixa = {}
+        
         if caixas:
             # Cálculos para o resumo
             total_caixas = len(caixas)
@@ -3566,12 +3569,94 @@ def gerar_pdf_caixas_detalhado():
                 elements.append(Spacer(1, 4))
                 elements.append(Paragraph(f"Observações: {texto_observacoes}", observacao_style))
                 
+                # NOVO: Armazenar totais por forma de pagamento para este caixa
+                totais_formas_pagamento_por_caixa[caixa.id] = {
+                    'operador': operador_nome,
+                    'data_abertura': caixa.data_abertura.strftime('%d/%m/%Y') if caixa.data_abertura else '-',
+                    'formas_pagamento': todas_formas_pagamento.copy(),
+                    'total_entradas': total_entradas_liquidas,
+                    'total_saidas': total_saidas,
+                    'saldo': saldo_caixa
+                }
+                
                 elements.append(Spacer(1, 12))
 
             # Verificação de consistência (para debug - pode ser removida em produção)
             diferenca = abs(soma_total_saidas_caixas - saldo_geral)
             if diferenca > 0.01:  # Tolerância de 1 centavo
                 logging.warning(f"Diferença encontrada na soma dos caixas: {diferenca:.2f}")
+
+            # NOVA SEÇÃO: Soma das Formas de Pagamento por Caixa
+            elements.append(Spacer(1, 20))
+            elements.append(Paragraph("🧮 Soma das Formas de Pagamento por Caixa", styles['Heading2']))
+            elements.append(Spacer(1, 8))
+            
+            # Calcular totais consolidados das formas de pagamento dos caixas
+            totais_consolidados_formas = {}
+            
+            for caixa_id, dados_caixa in totais_formas_pagamento_por_caixa.items():
+                for forma, valor in dados_caixa['formas_pagamento'].items():
+                    totais_consolidados_formas[forma] = totais_consolidados_formas.get(forma, 0) + valor
+            
+            # Ordenar formas de pagamento por valor (maior para menor)
+            formas_ordenadas_consolidadas = sorted(totais_consolidados_formas.items(), key=lambda x: x[1], reverse=True)
+            
+            if formas_ordenadas_consolidadas:
+                # Preparar dados para a tabela
+                formas_colunas_consolidadas = []
+                valores_colunas_consolidadas = []
+                
+                for forma, valor in formas_ordenadas_consolidadas:
+                    if valor != 0:  # Mostrar apenas formas com valores diferentes de zero
+                        forma_nome = forma.replace("_", " ").title()
+                        formas_colunas_consolidadas.append(forma_nome)
+                        valores_colunas_consolidadas.append(formatarMoeda(valor))
+                
+                # Adicionar linha de TOTAL
+                formas_colunas_consolidadas.append("TOTAL GERAL")
+                total_geral_formas = sum(valor for _, valor in formas_ordenadas_consolidadas)
+                valores_colunas_consolidadas.append(formatarMoeda(total_geral_formas))
+                
+                # Criar tabela
+                formas_consolidadas_data = [formas_colunas_consolidadas, valores_colunas_consolidadas]
+                
+                # Calcular largura das colunas
+                num_colunas_consolidadas = len(formas_colunas_consolidadas)
+                if num_colunas_consolidadas > 0:
+                    largura_coluna_consolidadas = 195 * mm / num_colunas_consolidadas
+                    
+                    formas_consolidadas_table = Table(
+                        formas_consolidadas_data, 
+                        colWidths=[largura_coluna_consolidadas] * num_colunas_consolidadas
+                    )
+                    
+                    formas_consolidadas_style = TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#32CD32")),  # Verde mais escuro
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                        ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 10),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('FONT', (0, 1), (-1, 1), 'Helvetica', 10),
+                        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('BACKGROUND', (-1, 0), (-1, -1), colors.HexColor("#228B22")),  # Verde mais escuro para total
+                        ('FONT', (-1, 0), (-1, -1), 'Helvetica-Bold', 10),
+                    ])
+                    formas_consolidadas_table.setStyle(formas_consolidadas_style)
+                    elements.append(formas_consolidadas_table)
+                    
+                    # Adicionar observação explicativa
+                    obs_style = ParagraphStyle(
+                        'ObsConsolidado',
+                        parent=styles['Normal'],
+                        fontSize=8,
+                        textColor=colors.grey,
+                        alignment=TA_CENTER
+                    )
+                    elements.append(Spacer(1, 6))
+                    elements.append(Paragraph(
+                        "* Valores consolidados das formas de pagamento calculados a partir dos detalhes de cada caixa",
+                        obs_style
+                    ))
 
         else:
             # Mensagem quando não há caixas
