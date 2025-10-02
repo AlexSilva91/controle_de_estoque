@@ -3061,7 +3061,7 @@ def gerar_pdf_caixas_detalhado():
             except ValueError:
                 pass
 
-        caixas = query.order_by(Caixa.data_abertura.desc()).all()
+        caixas = query.order_by(Caixa.data_abertura.asc()).all()
 
         # Criar buffer para PDF
         buffer = BytesIO()
@@ -3372,6 +3372,33 @@ def gerar_pdf_caixas_detalhado():
                 for forma, valor in formas_pagamento_contas.items():
                     todas_formas_pagamento[forma] = todas_formas_pagamento.get(forma, 0) + valor
 
+                # *** CORREÇÃO: CALCULAR VALOR EM DINHEIRO SEGUINDO A LÓGICA DA ROTA /caixas/<int:caixa_id>/financeiro ***
+                valor_dinheiro_original = todas_formas_pagamento.get('dinheiro', 0.0)
+                valor_fisico = valor_dinheiro_original
+                
+                # Aplica o mesmo cálculo da rota de financeiro
+                if caixa.valor_abertura and caixa.valor_fechamento:
+                    valor_abertura = float(caixa.valor_abertura)
+                    valor_fechamento = float(caixa.valor_fechamento)
+                    
+                    # Busca total de saídas (somente despesas) para o cálculo do dinheiro físico
+                    total_saidas_dinheiro = session.query(
+                        func.sum(Financeiro.valor)
+                    ).filter(
+                        Financeiro.caixa_id == caixa.id,
+                        Financeiro.tipo == TipoMovimentacao.saida,
+                        Financeiro.categoria == CategoriaFinanceira.despesa
+                    ).scalar() or 0.0
+                    
+                    total_saidas_dinheiro = float(total_saidas_dinheiro)
+                    
+                    # Cálculo do valor físico seguindo a mesma lógica da rota de financeiro
+                    valor_fisico = (valor_dinheiro_original + valor_abertura) - valor_fechamento - total_saidas_dinheiro
+                
+                # *** CORREÇÃO: GARANTIR QUE DINHEIRO SEMPRE APAREÇA, MESMO QUE ZERO OU NEGATIVO ***
+                # Atualiza o valor de dinheiro nas formas de pagamento com o cálculo correto
+                todas_formas_pagamento['dinheiro'] = valor_fisico
+
                 # Entradas brutas = vendas + contas recebidas
                 total_entradas_bruto = total_vendas + total_contas_recebidas
 
@@ -3401,7 +3428,7 @@ def gerar_pdf_caixas_detalhado():
                 
                 # *** CORREÇÃO: CALCULAR TOTAL - SAÍDAS CONSISTENTE COM O RESUMO ***
                 # Total - Saídas = Entradas Líquidas - Saídas (mesma lógica do resumo)
-                saldo_caixa = total_entradas_liquidas - total_saidas
+                saldo_caixa = total_entradas_liquidas
                 
                 # Acumula para verificação
                 soma_total_saidas_caixas += saldo_caixa
@@ -3411,7 +3438,7 @@ def gerar_pdf_caixas_detalhado():
 
                 # Tabela de informações do caixa
                 caixa_data = [
-                    ['ID', 'Operador', 'Status', 'Data Abertura', 'Data Fechamento', 'Total - Saídas'],
+                    ['ID', 'Operador', 'Status', 'Data Abertura', 'Data Fechamento', 'Total'],
                     [
                         str(caixa.id),
                         operador_nome[:20] + '...' if len(operador_nome) > 20 else operador_nome,
@@ -3441,23 +3468,35 @@ def gerar_pdf_caixas_detalhado():
                 elements.append(caixa_table)
 
                 # TABELA: FORMAS DE PAGAMENTO COMO COLUNAS + SAÍDAS
+                # *** CORREÇÃO: GARANTIR QUE DINHEIRO SEMPRE APAREÇA, MESMO QUE ZERO OU NEGATIVO ***
                 if todas_formas_pagamento:
                     # Preparar cabeçalho das colunas
                     formas_colunas = []
                     valores_colunas = []
                     
-                    # Ordenar formas de pagamento por valor (maior para menor)
-                    formas_ordenadas = sorted(todas_formas_pagamento.items(), key=lambda x: x[1], reverse=True)
+                    # *** CORREÇÃO: GARANTIR QUE DINHEIRO SEMPRE APAREÇA PRIMEIRO ***
+                    # Lista fixa de formas de pagamento para garantir ordem consistente
+                    formas_prioridade = ['dinheiro', 'pix_loja', 'pix_fabiano', 'pix_edfrance', 'pix_maquineta', 
+                                       'cartao_credito', 'cartao_debito', 'a_prazo']
                     
-                    for forma, valor in formas_ordenadas:
-                        if valor > 0:
+                    # Primeiro adiciona as formas de pagamento prioritárias
+                    for forma in formas_prioridade:
+                        if forma in todas_formas_pagamento:
+                            forma_nome = forma.replace("_", " ").title()
+                            formas_colunas.append(forma_nome)
+                            valor = todas_formas_pagamento[forma]
+                            valores_colunas.append(formatarMoeda(valor))
+                    
+                    # Depois adiciona quaisquer outras formas de pagamento que possam existir
+                    for forma, valor in todas_formas_pagamento.items():
+                        if forma not in formas_prioridade:
                             forma_nome = forma.replace("_", " ").title()
                             formas_colunas.append(forma_nome)
                             valores_colunas.append(formatarMoeda(valor))
                     
                     # Adicionar coluna de TOTAL
                     formas_colunas.append("TOTAL")
-                    total_entradas = sum(valor for _, valor in formas_ordenadas if valor > 0)
+                    total_entradas = sum(valor for valor in todas_formas_pagamento.values())
                     valores_colunas.append(formatarMoeda(total_entradas))
                     
                     # Adicionar coluna de SAÍDAS
@@ -3473,14 +3512,15 @@ def gerar_pdf_caixas_detalhado():
                     
                     # Calcular largura das colunas dinamicamente
                     num_colunas = len(formas_colunas)
-                    largura_coluna = 190 * mm / num_colunas  # Distribui igualmente as 160mm disponíveis
+                    largura_coluna = 190 * mm / num_colunas
                     
                     formas_table = Table(formas_data, colWidths=[largura_coluna] * num_colunas)
                     
-                    # Encontrar os índices das colunas SAÍDAS e ESTORNOS
-                    indice_saidas = formas_colunas.index("SAÍDAS")
-                    indice_estornos = formas_colunas.index("Estornos")
-                    indice_total = formas_colunas.index("TOTAL")
+                    # Encontrar os índices das colunas especiais
+                    indice_saidas = formas_colunas.index("SAÍDAS") if "SAÍDAS" in formas_colunas else -1
+                    indice_estornos = formas_colunas.index("Estornos") if "Estornos" in formas_colunas else -1
+                    indice_total = formas_colunas.index("TOTAL") if "TOTAL" in formas_colunas else -1
+                    indice_dinheiro = formas_colunas.index("Dinheiro") if "Dinheiro" in formas_colunas else -1
                     
                     formas_style = TableStyle([
                         ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
@@ -3490,10 +3530,13 @@ def gerar_pdf_caixas_detalhado():
                         ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                         # COR VERMELHA APENAS PARA OS VALORES DE SAÍDAS (linha 1)
-                        ('TEXTCOLOR', (indice_saidas, 1), (indice_saidas, 1), colors.red),
+                        ('TEXTCOLOR', (indice_saidas, 1), (indice_saidas, 1), colors.red) if indice_saidas != -1 else (),
                         # COR VERMELHA APENAS PARA OS VALORES DE ESTORNOS (linha 1)
-                        ('TEXTCOLOR', (indice_estornos, 1), (indice_estornos, 1), colors.red),
-                        ('TEXTCOLOR', (indice_total, 1), (indice_total, 1), colors.green),
+                        ('TEXTCOLOR', (indice_estornos, 1), (indice_estornos, 1), colors.red) if indice_estornos != -1 else (),
+                        ('TEXTCOLOR', (indice_total, 1), (indice_total, 1), colors.green) if indice_total != -1 else (),
+                        # DESTACAR DINHEIRO MESMO QUE ZERO OU NEGATIVO
+                        ('BACKGROUND', (indice_dinheiro, 0), (indice_dinheiro, 1), colors.lightblue) if indice_dinheiro != -1 else (),
+                        ('FONT', (indice_dinheiro, 0), (indice_dinheiro, 1), 'Helvetica-Bold', 8) if indice_dinheiro != -1 else (),
                     ])
                     formas_table.setStyle(formas_style)
                     elements.append(Spacer(1, 6))
@@ -3504,7 +3547,7 @@ def gerar_pdf_caixas_detalhado():
                     'Observacao',
                     parent=styles['Normal'],
                     fontSize=10,
-                    textColor=colors.darkgrey,
+                    textColor=colors.black,
                     leftIndent=0
                 )
                 
@@ -3885,6 +3928,15 @@ def get_caixa_financeiro(caixa_id):
             PagamentoContaReceber.caixa_id == caixa_id
         ).scalar() or 0.0
         
+        # Busca estornos (saida_estorno) para deduzir das entradas
+        estornos = session.query(
+            func.sum(Financeiro.valor)
+        ).filter(
+            Financeiro.caixa_id == caixa.id,
+            Financeiro.tipo == TipoMovimentacao.saida_estorno
+        ).scalar() or 0.0
+                
+        estornos_valor = float(estornos)
         total_contas_prazo_recebidas = float(total_contas_prazo_recebidas)
         
         logger.info(f"Dados financeiros do caixa ID {caixa_id} recuperados com sucesso")
@@ -3894,7 +3946,7 @@ def get_caixa_financeiro(caixa_id):
             'totais': {
                 'entradas': total_entradas,
                 'saidas': total_saidas,
-                'saldo': total_entradas - total_saidas,
+                'saldo': total_entradas - estornos_valor,
                 'valor_fisico': valor_fisico,
                 'valor_digital': valor_digital,
                 'a_prazo': a_prazo,
