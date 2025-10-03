@@ -44,7 +44,7 @@ from app.models import db
 from app.utils.audit import calcular_diferencas
 from app.utils.format_data_moeda import format_currency, format_number
 from app.models.entities import ( 
-    AuditLog, Cliente, Produto, NotaFiscal, TipoUsuario, UnidadeMedida, StatusNota,
+    AuditLog, Cliente, Conta, Produto, NotaFiscal, TipoUsuario, UnidadeMedida, StatusNota,
     Financeiro, TipoMovimentacao, CategoriaFinanceira, MovimentacaoEstoque, ContaReceber,
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
@@ -2018,7 +2018,8 @@ def listar_usuarios():
                 'tipo': usuario.tipo.value.capitalize(),
                 'status': 'Ativo' if usuario.status else 'Inativo',
                 'ultimo_acesso': usuario.ultimo_acesso.strftime('%d/%m/%Y %H:%M') if usuario.ultimo_acesso else 'Nunca',
-                'cpf': usuario.cpf
+                'cpf': usuario.cpf,
+                'conta': usuario.conta.id if usuario.conta else None  # ← AQUI ESTÁ O PROBLEMA
             })
         
         return jsonify({'success': True, 'usuarios': result})
@@ -2047,6 +2048,20 @@ def get_usuario(usuario_id):
         ultimo_acesso = usuario.ultimo_acesso.strftime('%d/%m/%Y %H:%M') if usuario.ultimo_acesso else None
         data_cadastro = usuario.criado_em.strftime('%d/%m/%Y %H:%M') if usuario.criado_em else None
         
+        # Informações da conta
+        conta_info = None
+        if usuario.conta:
+            saldos_por_forma = {}
+            for saldo in usuario.conta.saldos_forma_pagamento:
+                saldos_por_forma[saldo.forma_pagamento.value] = float(saldo.saldo)
+            
+            conta_info = {
+                'id': usuario.conta.id,
+                'saldo_total': float(usuario.conta.saldo_total) if usuario.conta.saldo_total else 0.00,
+                'saldos_por_forma': saldos_por_forma,
+                'atualizado_em': usuario.conta.atualizado_em.strftime('%d/%m/%Y %H:%M') if usuario.conta.atualizado_em else None
+            }
+        
         return jsonify({
             'success': True,
             'usuario': {
@@ -2057,7 +2072,8 @@ def get_usuario(usuario_id):
                 'status': bool(usuario.status),  # Garantir que é booleano
                 'ultimo_acesso': ultimo_acesso,
                 'data_cadastro': data_cadastro,
-                'observacoes': usuario.observacoes or ''  # Garantir string vazia se None
+                'observacoes': usuario.observacoes or '',  # Garantir string vazia se None
+                'conta': conta_info  # Nova informação da conta
             }
         })
     except Exception as e:
@@ -6794,3 +6810,33 @@ def historico_financeiro_pdf():
     except Exception as e:
         logger.error(f"Erro ao gerar PDF do histórico financeiro: {str(e)}", exc_info=True)
         abort(500, description=str(e))
+        
+# ============ ROTAS DAS CONTAS DOS USUÁRIOS ==============
+@admin_bp.route('/conta/criar/<int:usuario_id>', methods=['POST'])
+@login_required
+@admin_required
+def criar_conta_usuario(usuario_id):
+    try:
+        # Verificar se o usuário existe
+        usuario = Usuario.query.get(usuario_id)
+        if not usuario:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+        
+        # Verificar se o usuário já possui conta
+        if usuario.conta:
+            return jsonify({'error': 'Usuário já possui uma conta'}), 400
+        
+        # Criar a conta
+        conta = Conta(usuario_id=usuario_id)
+        db.session.add(conta)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Conta criada com sucesso',
+            'conta': conta.to_dict()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro ao criar conta: {str(e)}'}), 500

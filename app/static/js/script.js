@@ -4923,15 +4923,28 @@ document.addEventListener('DOMContentLoaded', function () {
             const statusBool = usuario.status === true || usuario.status === 'true' || usuario.status === 'Ativo';
             const status = statusBool ? 'Ativo' : 'Inativo';
 
+            // Verificar se o usuário tem conta
+            const temConta = usuario.conta !== null && usuario.conta !== undefined;
+
             const row = document.createElement('tr');
             row.innerHTML = `
               <td>${usuario.id}</td>
               <td>${usuario.nome}</td>
               <td><span class="badge badge-${usuario.tipo.toLowerCase()}">${formatPerfil(usuario.tipo)}</span></td>
               <td><span class="badge ${statusBool ? 'badge-success' : 'badge-danger'}">${status}</span></td>
+              <td>
+                <span class="badge ${temConta ? 'badge-success' : 'badge-warning'}">
+                  ${temConta ? 'Com conta' : 'Sem conta'}
+                </span>
+              </td>
               <td>${usuario.ultimo_acesso || 'Nunca'}</td>
               <td>
                 <div class="table-actions">
+                  ${!temConta ? `
+                    <button class="btn-icon btn-info criar-conta-usuario" data-id="${usuario.id}" title="Criar Conta">
+                      <i class="fa-solid fa-landmark">‌</i>
+                    </button>
+                  ` : ''}
                   <button class="btn-icon btn-primary visualizar-usuario" data-id="${usuario.id}" title="Visualizar">
                     <i class="fas fa-eye"></i>
                   </button>
@@ -4959,6 +4972,27 @@ document.addEventListener('DOMContentLoaded', function () {
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
       showFlashMessage('error', 'Erro ao carregar lista de usuários');
+    }
+  }
+
+  async function criarContaUsuario(usuarioId) {
+    try {
+        const response = await fetchWithErrorHandling(`/admin/conta/criar/${usuarioId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.success) {
+            showFlashMessage('success', 'Conta criada com sucesso!');
+            loadUsuariosData(); // Recarrega a lista para atualizar o status
+        } else {
+            showFlashMessage('error', response.message || 'Erro ao criar conta');
+        }
+    } catch (error) {
+        console.error('Erro ao criar conta:', error);
+        showFlashMessage('error', 'Erro ao criar conta para o usuário');
     }
   }
 
@@ -5037,40 +5071,114 @@ document.addEventListener('DOMContentLoaded', function () {
 
   async function openVisualizarUsuarioModal(usuarioId) {
     try {
-      const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`);
+        const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`);
 
-      if (response.success) {
-        const usuario = response.usuario;
+        if (response.success) {
+            const usuario = response.usuario;
 
-        if (document.getElementById('visualizarUsuarioNome')) document.getElementById('visualizarUsuarioNome').textContent = usuario.nome;
-        if (document.getElementById('visualizarUsuarioCPF')) document.getElementById('visualizarUsuarioCPF').textContent = usuario.cpf;
-        if (document.getElementById('visualizarUsuarioUltimoAcesso')) document.getElementById('visualizarUsuarioUltimoAcesso').textContent = usuario.ultimo_acesso || 'Nunca acessou';
-        if (document.getElementById('visualizarUsuarioDataCadastro')) document.getElementById('visualizarUsuarioDataCadastro').textContent = usuario.data_cadastro || 'Data não disponível';
-        if (document.getElementById('visualizarUsuarioObservacoes')) document.getElementById('visualizarUsuarioObservacoes').textContent = usuario.observacoes || 'Nenhuma observação';
+            // Informações básicas do usuário
+            if (document.getElementById('visualizarUsuarioNome')) document.getElementById('visualizarUsuarioNome').textContent = usuario.nome;
+            if (document.getElementById('visualizarUsuarioCPF')) document.getElementById('visualizarUsuarioCPF').textContent = usuario.cpf;
+            if (document.getElementById('visualizarUsuarioUltimoAcesso')) document.getElementById('visualizarUsuarioUltimoAcesso').textContent = usuario.ultimo_acesso || 'Nunca acessou';
+            if (document.getElementById('visualizarUsuarioDataCadastro')) document.getElementById('visualizarUsuarioDataCadastro').textContent = usuario.data_cadastro || 'Data não disponível';
+            if (document.getElementById('visualizarUsuarioObservacoes')) document.getElementById('visualizarUsuarioObservacoes').textContent = usuario.observacoes || 'Nenhuma observação';
 
-        const perfilBadge = document.getElementById('visualizarUsuarioPerfil');
-        if (perfilBadge) {
-          perfilBadge.textContent = formatPerfil(usuario.tipo);
-          perfilBadge.className = 'badge';
-          perfilBadge.classList.add(`badge-${usuario.tipo.toLowerCase()}`);
+            // Badges de perfil e status
+            const perfilBadge = document.getElementById('visualizarUsuarioPerfil');
+            if (perfilBadge) {
+                perfilBadge.textContent = formatPerfil(usuario.tipo);
+                perfilBadge.className = 'badge';
+                perfilBadge.classList.add(`badge-${usuario.tipo.toLowerCase()}`);
+            }
+
+            const statusBadge = document.getElementById('visualizarUsuarioStatus');
+            if (statusBadge) {
+                statusBadge.textContent = usuario.status ? 'Ativo' : 'Inativo';
+                statusBadge.className = 'badge';
+                statusBadge.classList.add(usuario.status ? 'badge-success' : 'badge-danger');
+            }
+
+            // Informações da conta
+            const contaInfoDiv = document.getElementById('contaInfo');
+            if (contaInfoDiv) {
+                if (usuario.conta) {
+                    contaInfoDiv.innerHTML = `
+                        <div class="account-details">
+                            <div class="detail-item">
+                                <label>Status da Conta:</label>
+                                <span class="badge badge-success">Ativa</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Saldo Total:</label>
+                                <span class="valor-saldo">R$ ${usuario.conta.saldo_total.toFixed(2)}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Atualizado em:</label>
+                                <span>${usuario.conta.atualizado_em || 'Data não disponível'}</span>
+                            </div>
+                            ${Object.keys(usuario.conta.saldos_por_forma).length > 0 ? `
+                                <div class="saldos-forma-pagamento">
+                                    <label>Saldos por Forma de Pagamento:</label>
+                                    <div class="saldos-list">
+                                        ${Object.entries(usuario.conta.saldos_por_forma).map(([forma, saldo]) => `
+                                            <div class="saldo-item">
+                                                <span class="forma-pagamento">${formatFormaPagamento(forma)}:</span>
+                                                <span class="valor-saldo ${saldo >= 0 ? 'positivo' : 'negativo'}">R$ ${saldo.toFixed(2)}</span>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : '<p class="no-saldos">Nenhum saldo registrado</p>'}
+                        </div>
+                    `;
+                } else {
+                    contaInfoDiv.innerHTML = `
+                        <div class="no-account">
+                            <p class="text-warning">Usuário não possui conta</p>
+                            <button class="btn btn-sm btn-info criar-conta-modal" data-id="${usuario.id}">
+                                <i class="fas fa-plus-circle"></i> Criar Conta
+                            </button>
+                        </div>
+                    `;
+                    
+                    // Adicionar evento ao botão de criar conta no modal
+                    document.querySelector('.criar-conta-modal')?.addEventListener('click', function() {
+                        const usuarioId = this.getAttribute('data-id');
+                        if (confirm('Deseja criar uma conta para este usuário?')) {
+                            criarContaUsuario(usuarioId);
+                            closeModal('visualizarUsuarioModal');
+                        }
+                    });
+                }
+            }
+
+            // Badge de status da conta
+            const contaStatusBadge = document.getElementById('visualizarUsuarioContaStatus');
+            if (contaStatusBadge) {
+                contaStatusBadge.textContent = usuario.conta ? 'Com conta' : 'Sem conta';
+                contaStatusBadge.className = 'badge';
+                contaStatusBadge.classList.add(usuario.conta ? 'badge-info' : 'badge-warning');
+            }
+
+            openModal('visualizarUsuarioModal');
         }
-
-        const statusBadge = document.getElementById('visualizarUsuarioStatus');
-        if (statusBadge) {
-          statusBadge.textContent = usuario.status ? 'Ativo' : 'Inativo';
-          statusBadge.className = 'badge';
-          statusBadge.classList.add(usuario.status ? 'badge-success' : 'badge-danger');
-        }
-
-        openModal('visualizarUsuarioModal');
-      }
     } catch (error) {
-      console.error('Erro ao carregar dados do usuário:', error);
-      showFlashMessage('error', 'Erro ao carregar dados do usuário');
+        console.error('Erro ao carregar dados do usuário:', error);
+        showFlashMessage('error', 'Erro ao carregar dados do usuário');
     }
   }
 
   function setupUsuarioActions() {
+    
+    document.querySelectorAll('.criar-conta-usuario').forEach(btn => {
+      btn.addEventListener('click', function() {
+          const usuarioId = this.getAttribute('data-id');
+          if (confirm('Deseja criar uma conta para este usuário?')) {
+              criarContaUsuario(usuarioId);
+          }
+      });
+    });
+
     document.querySelectorAll('.visualizar-usuario').forEach(btn => {
       btn.addEventListener('click', function () {
         const usuarioId = this.getAttribute('data-id');

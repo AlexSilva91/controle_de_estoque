@@ -87,6 +87,88 @@ produto_desconto_association = Table(
 )
 
 # --------------------
+# Conta do Usuário
+# --------------------
+class Conta(Base):
+    __tablename__ = "contas"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, unique=True)
+    saldo_total = Column(DECIMAL(12, 2), nullable=False, default=0.00)
+    atualizado_em = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+    sincronizado = Column(Boolean, default=False, nullable=False)
+
+    # Relacionamentos
+    usuario = relationship("Usuario", back_populates="conta")
+    saldos_forma_pagamento = relationship("SaldoFormaPagamento", back_populates="conta", cascade="all, delete-orphan")
+    movimentacoes = relationship("MovimentacaoConta", back_populates="conta")
+
+    @property
+    def saldo_geral(self):
+        """Retorna o saldo total"""
+        return float(self.saldo_total) if self.saldo_total else 0.00
+
+    def get_saldo_forma_pagamento(self, forma_pagamento):
+        """Retorna saldo específico por forma de pagamento"""
+        saldo = next(
+            (s for s in self.saldos_forma_pagamento if s.forma_pagamento == forma_pagamento), 
+            None
+        )
+        return float(saldo.saldo) if saldo else 0.00
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "usuario_id": self.usuario_id,
+            "saldo_total": float(self.saldo_total),
+            "saldos_por_forma_pagamento": {
+                saldo.forma_pagamento.value: float(saldo.saldo)
+                for saldo in self.saldos_forma_pagamento
+            },
+            "atualizado_em": self.atualizado_em.isoformat() if self.atualizado_em else None
+        }
+
+# --------------------
+# Saldo por Forma de Pagamento
+# --------------------
+class SaldoFormaPagamento(Base):
+    __tablename__ = "saldos_forma_pagamento"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    conta_id = Column(Integer, ForeignKey("contas.id"), nullable=False)
+    forma_pagamento = Column(Enum(FormaPagamento), nullable=False)
+    saldo = Column(DECIMAL(12, 2), nullable=False, default=0.00)
+    atualizado_em = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+    sincronizado = Column(Boolean, default=False, nullable=False)
+
+    # Constraints
+    __table_args__ = (UniqueConstraint('conta_id', 'forma_pagamento', name='uq_conta_forma_pagamento'),)
+
+    # Relacionamentos
+    conta = relationship("Conta", back_populates="saldos_forma_pagamento")
+
+# --------------------
+# Movimentação de Conta
+# --------------------
+class MovimentacaoConta(Base):
+    __tablename__ = "movimentacoes_contas"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    conta_id = Column(Integer, ForeignKey("contas.id"), nullable=False)
+    tipo = Column(Enum(TipoMovimentacao), nullable=False)
+    forma_pagamento = Column(Enum(FormaPagamento), nullable=False)
+    valor = Column(DECIMAL(12, 2), nullable=False)
+    descricao = Column(Text, nullable=True)
+    data = Column(DateTime, default=datetime.now, nullable=False)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    caixa_id = Column(Integer, ForeignKey("caixas.id"), nullable=True)
+
+    # Relacionamentos
+    conta = relationship("Conta", back_populates="movimentacoes")
+    usuario = relationship("Usuario")
+    caixa = relationship("Caixa")
+
+# --------------------
 # Entrega/Delivery
 # --------------------
 class Entrega(Base):
@@ -121,6 +203,10 @@ class Usuario(UserMixin, Base):
     observacoes = Column(Text, nullable=True)
     sincronizado = Column(Boolean, default=False, nullable=False)
 
+    # Relacionamento 1:1 com Conta
+    conta = relationship("Conta", back_populates="usuario", uselist=False)
+    
+    # Relacionamentos existentes...
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="usuario")
     notas_fiscais = relationship("NotaFiscal", back_populates="operador")
     caixas_operados = relationship("Caixa", foreign_keys="[Caixa.operador_id]", back_populates="operador")
@@ -595,7 +681,7 @@ class NotaFiscal(Base):
         inicio_dia = datetime.combine(data, datetime.min.time())
         fim_dia = datetime.combine(data, datetime.max.time())
         
-        # Cria a query base
+        # Cria la query base
         query = cls.query.join(
             Caixa,
             cls.caixa_id == Caixa.id

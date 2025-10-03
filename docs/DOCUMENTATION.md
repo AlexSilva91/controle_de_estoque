@@ -131,3 +131,83 @@ MODIFY COLUMN status ENUM('pendente', 'parcial', 'quitado') NOT NULL DEFAULT 'pe
 
 ALTER TABLE pagamentos_contas_receber 
 MODIFY COLUMN forma_pagamento ENUM('pix_fabiano', 'pix_maquineta', 'pix_edfrance', 'pix_loja', 'dinheiro', 'cartao_credito', 'cartao_debito', 'a_prazo') NOT NULL;
+
+
+
+FLUXO DE CRIAÇÃO DA CONTA
+1. Criação Automática:
+
+Quando um usuário é criado no sistema, uma conta é automaticamente criada para ele
+
+Relacionamento 1:1 → 1 usuário = 1 conta
+
+A conta nasce com saldo total zero e sem saldos por forma de pagamento
+
+FLUXO DE MOVIMENTAÇÕES
+2. Para toda movimentação financeira, o fluxo é:
+
+ENTRADA (Venda, Recebimento):
+
+text
+1. Usuário realiza ação que gera entrada (ex: venda)
+2. Sistema identifica a conta do usuário
+3. Sistema identifica a forma de pagamento (PIX, dinheiro, cartão)
+4. REGISTRA movimentação do tipo "entrada"
+5. ATUALIZA saldo total da conta (+ valor)
+6. ATUALIZA saldo específico da forma de pagamento (+ valor)
+SAÍDA (Despesa, Pagamento):
+
+text
+1. Usuário realiza ação que gera saída (ex: pagamento)
+2. Sistema verifica se há saldo suficiente na forma de pagamento
+3. Se tiver saldo: REGISTRA movimentação do tipo "saída"
+4. ATUALIZA saldo total da conta (- valor)
+5. ATUALIZA saldo específico da forma de pagamento (- valor)
+TRANSFERÊNCIA (Entre formas de pagamento):
+
+text
+1. Usuário quer transferir valor entre formas (ex: dinheiro → PIX)
+2. Sistema verifica saldo na forma de ORIGEM
+3. Se tiver saldo: REGISTRA DUAS movimentações:
+   - SAÍDA da forma origem
+   - ENTRADA na forma destino
+4. Saldo total da conta PERMANECE O MESMO
+5. Saldo da forma origem DIMINUI
+6. Saldo da forma destino AUMENTA
+FLUXO DE CONSULTA
+3. Para ver saldos:
+
+text
+1. Sistema busca a conta do usuário
+2. Retorna:
+   - Saldo total (soma de todas as formas)
+   - Saldo individual por forma de pagamento
+   - Histórico completo de movimentações
+REGRAS IMPORTANTES
+Toda movimentação é auditável - fica registrado quem fez, quando, quanto e por quê
+
+Saldos são sempre calculados em tempo real - não precisa somar histórico
+
+Uma conta pode ter saldo negativo em uma forma se houver estornos
+
+O saldo total é a soma matemática de todos os saldos por forma
+
+EXEMPLO PRÁTICO
+text
+CONTA DO JOÃO:
+- Saldo total: R$ 1.500,00
+- Dinheiro: R$ 500,00
+- PIX: R$ 800,00  
+- Cartão: R$ 200,00
+
+João faz uma venda de R$ 100 no PIX:
+1. Registra entrada de R$ 100 no PIX
+2. Saldo total vai para R$ 1.600,00
+3. Saldo PIX vai para R$ 900,00
+
+João paga uma conta de R$ 200 no dinheiro:
+1. Verifica se tem R$ 200 no dinheiro ✓
+2. Registra saída de R$ 200 no dinheiro  
+3. Saldo total vai para R$ 1.400,00
+4. Saldo dinheiro vai para R$ 300,00
+Resumo: Cada usuário tem UMA conta, mas essa conta tem MÚLTIPLOS "cofrinhos" (formas de pagamento) com saldos individuais, e todo movimento é registrado para auditoria.
