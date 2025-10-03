@@ -2013,8 +2013,8 @@ def gerar_comprovante_conta(conta_id):
         
         c.setFont("Helvetica", 9)
         y_position = add_text(f"Descrição: {conta.descricao}", margin, y_position, width - 2*margin)
-        y_position = add_text(f"Valor Original: R$ {conta.valor_original:.2f}", margin, y_position, width - 2*margin)
-        y_position = add_text(f"Valor Aberto: R$ {conta.valor_aberto:.2f}", margin, y_position, width - 2*margin)
+        y_position = add_text(f"Valor Original: R$ {format_number(conta.valor_original)}", margin, y_position, width - 2*margin)
+        y_position = add_text(f"Valor Aberto: R$ {format_number(conta.valor_aberto)}", margin, y_position, width - 2*margin)
         y_position = add_text(f"Vencimento: {conta.data_vencimento.strftime('%d/%m/%Y')}", margin, y_position, width - 2*margin)
         
         if conta.data_pagamento:
@@ -2041,12 +2041,12 @@ def gerar_comprovante_conta(conta_id):
             for item in conta.nota_fiscal.itens:
                 produto_text = f"{item.produto.nome if item.produto else 'Produto'}"
                 y_position = add_text(produto_text, margin, y_position, width - 2*margin, 8)
-                
-                detalhes = f"{item.quantidade:.2f} {item.produto.unidade.value if item.produto else 'un'} x R$ {item.valor_unitario:.2f}"
+
+                detalhes = f"{item.quantidade:.2f} {item.produto.unidade.value if item.produto else 'un'} x R$ {format_number(item.valor_unitario)}"
                 if item.desconto_aplicado and item.desconto_aplicado > 0:
-                    detalhes += f" (-R$ {item.desconto_aplicado:.2f})"
+                    detalhes += f" (-R$ {format_number(item.desconto_aplicado)})"
                 
-                detalhes += f" = R$ {item.valor_total:.2f}"
+                detalhes += f" = R$ {format_number(item.valor_total)}"
                 
                 y_position = add_text(detalhes, margin + 5*mm, y_position, width - 7*margin, 8)
                 y_position -= 4
@@ -2054,7 +2054,7 @@ def gerar_comprovante_conta(conta_id):
             # Total da nota
             y_position -= 4
             c.setFont("Helvetica-Bold", 9)
-            total_text = f"TOTAL NOTA: R$ {conta.nota_fiscal.valor_total:.2f}"
+            total_text = f"TOTAL NOTA: R$ {format_number(conta.nota_fiscal.valor_total)}"
             c.drawString(margin, y_position, total_text)
             y_position -= 12
             
@@ -2070,7 +2070,7 @@ def gerar_comprovante_conta(conta_id):
             c.setFont("Helvetica", 8)
             total_pago = 0
             for pagamento in pagamentos:
-                pag_text = f"{pagamento.data_pagamento.strftime('%d/%m/%Y')} - R$ {pagamento.valor_pago:.2f}"
+                pag_text = f"{pagamento.data_pagamento.strftime('%d/%m/%Y')} - R$ {format_number(pagamento.valor_pago)}"
                 pag_text += f" ({pagamento.forma_pagamento.value})"
                 
                 y_position = add_text(pag_text, margin, y_position, width - 2*margin, 8)
@@ -2078,7 +2078,7 @@ def gerar_comprovante_conta(conta_id):
             
             y_position -= 4
             c.setFont("Helvetica-Bold", 9)
-            c.drawString(margin, y_position, f"TOTAL PAGO: R$ {total_pago:.2f}")
+            c.drawString(margin, y_position, f"TOTAL PAGO: R$ {format_number(total_pago)}")
             y_position -= 12
             
             # Linha separadora

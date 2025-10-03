@@ -990,9 +990,8 @@ function showPartialPaymentModal(contaId, valorAberto) {
                 <form id="partial-payment-form">
                     <div class="form-group">
                         <label for="payment-amount">Valor do Pagamento:</label>
-                        <input type="number" id="payment-amount" name="payment-amount" 
-                               min="0.01" max="${valorAberto}" step="0.01" 
-                               placeholder="Digite o valor" required>
+                        <input type="text" id="payment-amount" name="payment-amount" 
+                               placeholder="Ex: 1.950,50" required>
                         <small>Valor disponível: ${formatCurrency(valorAberto)}</small>
                     </div>
                     <div class="form-group">
@@ -1040,12 +1039,31 @@ function showPartialPaymentModal(contaId, valorAberto) {
         }
     });
 
+    // Mascara/validação do campo valor
+    const amountInput = paymentModal.querySelector('#payment-amount');
+    amountInput.addEventListener('input', () => {
+        // Permitir apenas números, ponto e vírgula
+        let value = amountInput.value.replace(/[^\d.,]/g, '');
+        // Se tiver mais de uma vírgula, manter só a primeira
+        const parts = value.split(',');
+        if (parts.length > 2) {
+            value = parts[0] + ',' + parts[1];
+        }
+        amountInput.value = value;
+    });
+
     // Handle partial payment confirmation
     paymentModal.querySelector('#confirm-partial-payment').addEventListener('click', async () => {
         const form = paymentModal.querySelector('#partial-payment-form');
         const formData = new FormData(form);
 
-        const valorPago = parseFloat(formData.get('payment-amount'));
+        let rawValue = formData.get('payment-amount').trim();
+
+        // Converte valor brasileiro para float (1.950,50 -> 1950.50)
+        let valorPago = parseFloat(
+            rawValue.replace(/\./g, '').replace(',', '.')
+        );
+
         const formaPagamento = formData.get('payment-method');
         const observacoes = formData.get('payment-notes');
 
