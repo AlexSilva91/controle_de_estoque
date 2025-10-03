@@ -44,7 +44,7 @@ from app.models import db
 from app.utils.audit import calcular_diferencas
 from app.utils.format_data_moeda import format_currency, format_number
 from app.models.entities import ( 
-    AuditLog, Cliente, Conta, Produto, NotaFiscal, TipoUsuario, UnidadeMedida, StatusNota,
+    AuditLog, Cliente, Conta, MovimentacaoConta, Produto, NotaFiscal, SaldoFormaPagamento, TipoUsuario, UnidadeMedida, StatusNota,
     Financeiro, TipoMovimentacao, CategoriaFinanceira, MovimentacaoEstoque, ContaReceber,
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
@@ -2012,6 +2012,20 @@ def listar_usuarios():
                           search not in usuario.email.lower()):
                 continue
                 
+            # Informações da conta
+            conta_info = None
+            if usuario.conta:
+                saldos_por_forma = {}
+                for saldo in usuario.conta.saldos_forma_pagamento:
+                    saldos_por_forma[saldo.forma_pagamento.value] = float(saldo.saldo)
+                
+                conta_info = {
+                    'id': usuario.conta.id,
+                    'saldo_total': float(usuario.conta.saldo_total) if usuario.conta.saldo_total else 0.00,
+                    'saldos_por_forma': saldos_por_forma,
+                    'atualizado_em': usuario.conta.atualizado_em.strftime('%d/%m/%Y %H:%M') if usuario.conta.atualizado_em else None
+                }
+                
             result.append({
                 'id': usuario.id,
                 'nome': usuario.nome,
@@ -2019,7 +2033,7 @@ def listar_usuarios():
                 'status': 'Ativo' if usuario.status else 'Inativo',
                 'ultimo_acesso': usuario.ultimo_acesso.strftime('%d/%m/%Y %H:%M') if usuario.ultimo_acesso else 'Nunca',
                 'cpf': usuario.cpf,
-                'conta': usuario.conta.id if usuario.conta else None  # ← AQUI ESTÁ O PROBLEMA
+                'conta': conta_info  # Incluir informações completas da conta
             })
         
         return jsonify({'success': True, 'usuarios': result})
@@ -6840,3 +6854,118 @@ def criar_conta_usuario(usuario_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Erro ao criar conta: {str(e)}'}), 500
+
+@admin_bp.route('/conta/transferir', methods=['POST'])
+@login_required
+@admin_required
+def transferir_entre_contas():
+    try:
+        data = request.get_json()
+        print(data)
+        # Validar dados obrigatórios
+        required_fields = ['conta_origem_id', 'conta_destino_id', 'forma_pagamento', 'valor', 'descricao']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                print(f"Campo obrigatório faltando: {field}")
+                logger.warning(f"Campo obrigatório faltando: {field}")
+                return jsonify({'error': f'Campo obrigatório faltando: {field}'}), 400
+        
+        conta_origem_id = data['conta_origem_id']
+        conta_destino_id = data['conta_destino_id']
+        forma_pagamento = data['forma_pagamento']
+        valor = Decimal(str(data['valor']))
+        descricao = data['descricao']
+        usuario_id = current_user.id
+        
+        # Validar valor positivo
+        if valor <= 0:
+            logger.warning("Valor da transferência deve ser positivo")
+            print("Valor da transferência deve ser positivo")
+            return jsonify({'error': 'O valor da transferência deve ser positivo'}), 400
+        
+        # Verificar se as contas existem
+        conta_origem = Conta.query.get(conta_origem_id)
+        if not conta_origem:
+            logger.warning("Conta de origem não encontrada")
+            print("Conta de origem não encontrada")
+            return jsonify({'error': 'Conta de origem não encontrada'}), 404
+        
+        conta_destino = Conta.query.get(conta_destino_id)
+        if not conta_destino:
+            logger.warning("Conta de destino não encontrada")
+            print("Conta de destino não encontrada")
+            return jsonify({'error': 'Conta de destino não encontrada'}), 404
+        
+        # Verificar se não é a mesma conta
+        if conta_origem_id == conta_destino_id:
+            logger.warning("Não é possível transferir para a mesma conta")
+            print("Não é possível transferir para a mesma conta")
+            return jsonify({'error': 'Não é possível transferir para a mesma conta'}), 400
+        
+        # Verificar se a forma de pagamento é válida
+        try:
+            forma_pagamento_enum = FormaPagamento(forma_pagamento)
+        except ValueError:
+            logger.warning("Forma de pagamento inválida")
+            print("Forma de pagamento inválida")
+            return jsonify({'error': 'Forma de pagamento inválida'}), 400
+        
+        # CORREÇÃO: Verificar saldo TOTAL da conta de origem, não por forma de pagamento
+        saldo_total_origem = conta_origem.saldo_total if conta_origem.saldo_total else Decimal('0.00')
+        if saldo_total_origem < valor:
+            logger.warning(f'Saldo insuficiente. Saldo atual: R$ {saldo_total_origem:.2f}, Valor solicitado: R$ {valor:.2f}')
+            print(f'Saldo insuficiente. Saldo atual: R$ {saldo_total_origem:.2f}, Valor solicitado: R$ {valor:.2f}')
+            return jsonify({
+                'error': f'Saldo insuficiente. Saldo atual: R$ {saldo_total_origem:.2f}, Valor solicitado: R$ {valor:.2f}'
+            }), 400
+        
+        with db.session.begin_nested():
+            # 1. Registrar movimentação de SAÍDA na conta origem
+            movimentacao_saida = MovimentacaoConta(
+                conta_id=conta_origem_id,
+                tipo=TipoMovimentacao.saida,
+                forma_pagamento=forma_pagamento_enum,
+                valor=valor,
+                descricao=f"Transferência para conta #{conta_destino_id}: {descricao}",
+                usuario_id=usuario_id
+            )
+            db.session.add(movimentacao_saida)
+            
+            # 2. Registrar movimentação de ENTRADA na conta destino
+            movimentacao_entrada = MovimentacaoConta(
+                conta_id=conta_destino_id,
+                tipo=TipoMovimentacao.entrada,
+                forma_pagamento=forma_pagamento_enum,
+                valor=valor,
+                descricao=f"Transferência da conta #{conta_origem_id}: {descricao}",
+                usuario_id=usuario_id
+            )
+            db.session.add(movimentacao_entrada)
+            
+            # CORREÇÃO: NÃO atualizar saldos por forma de pagamento, apenas registrar no histórico
+            # A forma de pagamento é apenas para auditoria, não para controle de saldo
+            
+            # 3. Atualizar apenas os saldos totais das contas
+            conta_origem.saldo_total -= valor
+            conta_destino.saldo_total += valor
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Transferência de R$ {valor:.2f} realizada com sucesso',
+            'transferencia': {
+                'conta_origem_id': conta_origem_id,
+                'conta_destino_id': conta_destino_id,
+                'forma_pagamento': forma_pagamento_enum.value,
+                'valor': float(valor),
+                'descricao': descricao,
+                'data': datetime.now().strftime('%d/%m/%Y %H:%M')
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(e)
+        logger.error(f"Erro ao transferir entre contas: {str(e)}")
+        return jsonify({'error': f'Erro ao realizar transferência: {str(e)}'}), 500

@@ -134,7 +134,6 @@ document.addEventListener('DOMContentLoaded', function () {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Erro na requisição:', error);
 
       if (error.message && error.message.includes('HTTP error')) {
         throw error;
@@ -204,7 +203,6 @@ document.addEventListener('DOMContentLoaded', function () {
       modalElement = document.getElementById(modalElement);
     }
     if (!modalElement) {
-      console.error('Modal não encontrado');
       return;
     }
     modalElement.style.display = 'flex';
@@ -871,7 +869,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
     } catch (error) {
-      console.error('Erro ao atualizar gráficos:', error);
       showFlashMessage('error', 'Erro ao atualizar gráficos');
     }
   }
@@ -894,7 +891,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar movimentações:', error);
       showFlashMessage('error', 'Erro ao carregar movimentações');
     }
   }
@@ -980,7 +976,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
     } catch (error) {
-      console.error('Erro ao atualizar métricas:', error);
       showFlashMessage('error', 'Erro ao atualizar métricas');
     }
   }
@@ -996,7 +991,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
       if (loadingElement) loadingElement.style.display = 'none';
     } catch (error) {
-      console.error('Erro ao carregar dados do dashboard:', error);
       showFlashMessage('error', 'Erro ao carregar dados do dashboard');
 
       const loadingElement = document.getElementById('loadingIndicator');
@@ -1068,7 +1062,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar clientes:', error);
       showFlashMessage('error', 'Erro ao carregar lista de clientes');
     }
   }
@@ -1264,7 +1257,6 @@ document.addEventListener('DOMContentLoaded', function () {
       openModal('detalhesClienteModal');
 
     } catch (err) {
-      console.error(err);
       showFlashMessage('error', 'Erro ao carregar detalhes do cliente');
     }
   }
@@ -1302,7 +1294,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
       }
     } catch (error) {
-      console.error('Erro ao carregar cliente:', error);
       showFlashMessage('error', 'Erro ao carregar dados do cliente');
       return;
     }
@@ -1395,7 +1386,6 @@ document.addEventListener('DOMContentLoaded', function () {
           showFlashMessage('error', response.message || 'Erro ao salvar cliente');
         }
       } catch (error) {
-        console.error('Erro ao salvar cliente:', error);
         showFlashMessage('error', 'Erro ao salvar cliente');
       }
     });
@@ -1453,7 +1443,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
       showFlashMessage('error', 'Erro ao carregar lista de produtos');
     }
   }
@@ -1686,7 +1675,6 @@ document.addEventListener('DOMContentLoaded', function () {
         throw new Error('Erro ao carregar dados do produto');
       }
     } catch (error) {
-      console.error('Erro ao carregar dados do produto:', error);
       showFlashMessage('error', 'Erro ao carregar dados do produto');
     }
   }
@@ -1775,7 +1763,6 @@ document.addEventListener('DOMContentLoaded', function () {
         openModal('transferenciaModal');
       }
     } catch (error) {
-      console.error('Erro ao abrir modal de transferência:', error);
       showFlashMessage('error', 'Erro ao carregar dados do produto');
     }
   }
@@ -1940,7 +1927,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFlashMessage('error', response.message);
       }
     } catch (error) {
-      console.error('Erro ao realizar transferência:', error);
       showFlashMessage('error', 'Erro ao realizar transferência');
     }
   });
@@ -1986,7 +1972,6 @@ document.addEventListener('DOMContentLoaded', function () {
     if (refreshButton) {
       refreshButton.addEventListener('click', function (e) {
         e.preventDefault();
-        console.log('Botão refresh clicado!'); // Debug
         loadProdutosData();
       });
     }
@@ -2046,7 +2031,6 @@ document.addEventListener('DOMContentLoaded', function () {
           showFlashMessage('error', response.message || 'Erro ao cadastrar produto');
         }
       } catch (error) {
-        console.error('Erro ao cadastrar produto:', error);
         showFlashMessage('error', 'Erro ao cadastrar produto');
       }
     });
@@ -2100,7 +2084,6 @@ document.addEventListener('DOMContentLoaded', function () {
           showFlashMessage('error', response.message || 'Erro ao atualizar produto');
         }
       } catch (error) {
-        console.error('Erro ao atualizar produto:', error);
         showFlashMessage('error', 'Erro ao atualizar produto');
       }
     });
@@ -2159,7 +2142,6 @@ document.addEventListener('DOMContentLoaded', function () {
           showFlashMessage('error', response.message || 'Erro ao realizar transferência');
         }
       } catch (error) {
-        console.error('Erro ao realizar transferência:', error);
         showFlashMessage('error', error.message || 'Erro ao realizar transferência');
       }
     });
@@ -2200,7 +2182,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFlashMessage("error", result.message);
       }
     } catch (err) {
-      console.error(err);
       showFlashMessage("error", "Erro ao registrar entrada de estoque");
     }
   });
@@ -2306,7 +2287,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
       }
     } catch (error) {
-      console.error('Erro ao carregar clientes:', error);
       showFlashMessage('error', 'Erro ao carregar clientes');
     }
   }
@@ -2331,7 +2311,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       }
     } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
       showFlashMessage('error', 'Erro ao carregar produtos');
     }
   }
@@ -2354,7 +2333,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       }
     } catch (error) {
-      console.error('Erro ao carregar caixas fechados:', error);
       showFlashMessage('error', 'Erro ao carregar caixas fechados');
     }
   }
@@ -2497,7 +2475,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFlashMessage('error', response.message || 'Erro ao registrar venda retroativa');
       }
     } catch (error) {
-      console.error('Erro ao enviar venda retroativa:', error);
       showFlashMessage('error', 'Erro ao enviar venda retroativa');
     }
   }
@@ -2707,7 +2684,6 @@ document.addEventListener('DOMContentLoaded', function () {
         openModal('detalhesContaModal');
       }
     } catch (error) {
-      console.error('Erro ao abrir detalhes da conta:', error);
       showFlashMessage('error', 'Erro ao carregar detalhes da conta');
     }
   }
@@ -2798,7 +2774,6 @@ document.addEventListener('DOMContentLoaded', function () {
         preencherTabelaRelatorio(response.dados);
       }
     } catch (error) {
-      console.error('Erro ao carregar relatório:', error);
       const tbody = document.querySelector('#tabelaRelatorio tbody');
       tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">Erro ao carregar dados do relatório</td></tr>';
       showFlashMessage('error', 'Erro ao carregar relatório de saídas');
@@ -2914,7 +2889,6 @@ document.addEventListener('DOMContentLoaded', function () {
       window.open(`/admin/relatorios/vendas-produtos/pdf?${params.toString()}`, '_blank');
 
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
       showFlashMessage('error', 'Erro ao gerar relatório em PDF');
     }
   }
@@ -3011,7 +2985,6 @@ document.addEventListener('DOMContentLoaded', function () {
         modalBody.innerHTML = `<div class="alert alert-danger">${response.message || 'Erro ao carregar detalhes'}</div>`;
       }
     } catch (error) {
-      console.error('Erro ao carregar detalhes:', error);
       const modalBody = document.querySelector('#modalDetalhesProduto .modal-body');
       modalBody.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
     }
@@ -3085,23 +3058,17 @@ document.addEventListener('DOMContentLoaded', function () {
   // Função para carregar a lista de operadores
   async function loadOperadores() {
     try {
-      console.log('Iniciando loadOperadores...');
-
       // Aguarda um pouco para garantir que o DOM esteja pronto
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const select = document.getElementById('caixaOperador');
-      console.log('Elemento caixaOperador:', select);
 
       if (!select) {
-        console.error('Elemento caixaOperador não encontrado!');
         return;
       }
 
       const response = await fetch('/admin/usuarios/operadores');
       const data = await response.json();
-
-      console.log('Dados recebidos da API:', data);
 
       if (data.success) {
         // Limpa opções existentes (exceto a primeira "Todos")
@@ -3115,7 +3082,6 @@ document.addEventListener('DOMContentLoaded', function () {
           select.appendChild(option);
         });
 
-        console.log(`Operadores carregados: ${data.data.length}`);
       }
     } catch (error) {
       console.error('Erro ao carregar operadores:', error);
@@ -3130,7 +3096,6 @@ document.addEventListener('DOMContentLoaded', function () {
       const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
       const dataFim = document.getElementById('caixaDataFim')?.value || '';
 
-      console.log('Filtros aplicados:', { status, operadorId, dataInicio, dataFim });
 
       // Monta query string dinamicamente
       const params = new URLSearchParams();
@@ -3143,9 +3108,6 @@ document.addEventListener('DOMContentLoaded', function () {
       if ([...params].length > 0) {
         url += `?${params.toString()}`;
       }
-
-      console.log('URL da requisição:', url);
-
       const data = await fetchWithErrorHandling(url);
 
       if (data.success) {
@@ -3211,7 +3173,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar caixas:', error);
       showFlashMessage('error', 'Erro ao carregar lista de caixas');
     }
   }
@@ -3227,7 +3188,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Função para inicializar tudo quando a página carregar
   function initializeCaixasPage() {
-    console.log('Inicializando página de caixas...');
 
     // Carrega os operadores primeiro
     loadOperadores().then(() => {
@@ -3283,7 +3243,6 @@ document.addEventListener('DOMContentLoaded', function () {
       window.open(url, '_blank');
 
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
       showFlashMessage('error', 'Erro ao gerar PDF');
     }
   }
@@ -3325,7 +3284,6 @@ document.addEventListener('DOMContentLoaded', function () {
             loadCaixasData();
           }
         } catch (error) {
-          console.error('Erro ao enviar para análise:', error);
           showFlashMessage('error', error.message || 'Erro ao enviar para análise');
         }
       });
@@ -3360,7 +3318,6 @@ document.addEventListener('DOMContentLoaded', function () {
             loadCaixasData();
           }
         } catch (error) {
-          console.error('Erro ao aprovar caixa:', error);
           showFlashMessage('error', error.message || 'Erro ao aprovar caixa');
         }
       });
@@ -3398,7 +3355,6 @@ document.addEventListener('DOMContentLoaded', function () {
             loadCaixasData();
           }
         } catch (error) {
-          console.error('Erro ao recusar caixa:', error);
           showFlashMessage('error', error.message || 'Erro ao recusar caixa');
         }
       });
@@ -3424,7 +3380,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
           }
         } catch (error) {
-          console.error('Erro ao reabrir caixa:', error);
           showFlashMessage('error', error.message || 'Erro ao reabrir caixa');
         }
       });
@@ -3548,7 +3503,6 @@ document.addEventListener('DOMContentLoaded', function () {
               modal.remove();
             }
           } catch (err) {
-            console.error(err);
             showFlashMessage('error', 'Erro ao fechar caixa');
           }
         });
@@ -3612,7 +3566,6 @@ document.addEventListener('DOMContentLoaded', function () {
         openModal(document.getElementById('visualizarCaixaModal'));
       }
     } catch (error) {
-      console.error('Erro ao visualizar caixa:', error);
       showFlashMessage('error', 'Erro ao carregar dados do caixa');
     }
   }
@@ -3666,7 +3619,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFlashMessage('error', response.message || 'Erro ao estornar venda');
       }
     } catch (error) {
-      console.error('Erro ao estornar venda:', error);
       showFlashMessage('error', 'Erro ao processar estorno');
     } finally {
       showLoading(false);
@@ -3794,7 +3746,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar financeiro do caixa:', error);
       showFlashMessage('error', 'Erro ao carregar movimentações financeiras');
     }
   }
@@ -3912,7 +3863,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFlashMessage('error', response.error || 'Erro ao carregar vendas');
       }
     } catch (error) {
-      console.error('Erro ao abrir modal de vendas:', error);
       showFlashMessage('error', 'Erro ao carregar vendas');
     }
   }
@@ -3982,7 +3932,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFlashMessage('error', response.error || 'Erro ao carregar detalhes da venda');
       }
     } catch (error) {
-      console.error('Erro ao abrir modal de detalhes:', error);
       showFlashMessage('error', 'Erro ao carregar detalhes da venda');
     }
   }
@@ -4074,7 +4023,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFlashMessage('error', response.error || 'Erro ao carregar detalhes da venda');
       }
     } catch (error) {
-      console.error('Erro ao abrir modal de edição:', error);
       showFlashMessage('error', 'Erro ao carregar detalhes da venda');
     }
   }
@@ -4207,7 +4155,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFlashMessage('error', response.error || 'Erro ao atualizar formas de pagamento');
       }
     } catch (error) {
-      console.error('Erro ao salvar formas de pagamento:', error);
       showFlashMessage('error', 'Erro ao atualizar formas de pagamento');
     }
   }
@@ -4294,7 +4241,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFlashMessage('warning', 'Nenhuma conta encontrada com os filtros aplicados');
       }
     } catch (error) {
-      console.error('Erro ao carregar contas a receber:', error);
       showFlashMessage('error', 'Erro ao carregar contas a receber');
     }
   }
@@ -4345,7 +4291,6 @@ document.addEventListener('DOMContentLoaded', function () {
       }, 1000);
 
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
       showFlashMessage('error', 'Erro ao gerar PDF da conta');
     }
   }
@@ -4541,7 +4486,6 @@ document.addEventListener('DOMContentLoaded', function () {
         openModal('detalhesContaModal');
       }
     } catch (error) {
-      console.error('Erro ao carregar detalhes da conta:', error);
       showFlashMessage('error', 'Erro ao carregar detalhes da conta');
     }
   }
@@ -4648,7 +4592,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
     } catch (error) {
-      console.error('Erro ao registrar pagamento:', error);
       showFlashMessage('error', error.message || 'Erro ao registrar pagamento');
     } finally {
       pagamentoEmProcesso = false;
@@ -4896,7 +4839,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar movimentações:', error);
       showFlashMessage('error', 'Erro ao carregar histórico de movimentações');
     }
   }
@@ -4907,75 +4849,74 @@ document.addEventListener('DOMContentLoaded', function () {
   // ===== USUÁRIOS =====
   async function loadUsuariosData() {
     try {
-      const searchText = document.getElementById('searchUsuario')?.value.toLowerCase() || '';
-      const data = await fetchWithErrorHandling('/admin/usuarios');
+        const searchText = document.getElementById('searchUsuario')?.value.toLowerCase() || '';
+        const data = await fetchWithErrorHandling('/admin/usuarios');
 
-      if (data.success) {
-        const usuariosTable = document.querySelector('#usuariosTable tbody');
-        if (usuariosTable) {
-          usuariosTable.innerHTML = '';
+        if (data.success) {
+            const usuariosTable = document.querySelector('#usuariosTable tbody');
+            if (usuariosTable) {
+                usuariosTable.innerHTML = '';
 
-          data.usuarios.forEach(usuario => {
-            if (searchText && !usuario.nome.toLowerCase().includes(searchText)) {
-              return;
+                data.usuarios.forEach(usuario => {
+                    if (searchText && !usuario.nome.toLowerCase().includes(searchText)) {
+                        return;
+                    }
+
+                    const statusBool = usuario.status === true || usuario.status === 'true' || usuario.status === 'Ativo';
+                    const status = statusBool ? 'Ativo' : 'Inativo';
+
+                    // Verificar se o usuário tem conta
+                    const temConta = usuario.conta !== null && usuario.conta !== undefined;
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${usuario.id}</td>
+                        <td>${usuario.nome}</td>
+                        <td><span class="badge badge-${usuario.tipo.toLowerCase()}">${formatPerfil(usuario.tipo)}</span></td>
+                        <td><span class="badge ${statusBool ? 'badge-success' : 'badge-danger'}">${status}</span></td>
+                        <td>
+                            <span class="badge ${temConta ? 'badge-success' : 'badge-warning'}">
+                                ${temConta ? 'Com conta' : 'Sem conta'}
+                            </span>
+                        </td>
+                        <td>${usuario.ultimo_acesso || 'Nunca'}</td>
+                        <td>
+                            <div class="table-actions">
+                                ${!temConta ? `
+                                    <button class="btn-icon btn-info criar-conta-usuario" data-id="${usuario.id}" title="Criar Conta">
+                                        <i class="fa-solid fa-landmark">‌</i>
+                                    </button>
+                                ` : ''}
+                                <button class="btn-icon btn-primary visualizar-usuario" data-id="${usuario.id}" title="Visualizar">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn-icon btn-warning editar-usuario" data-id="${usuario.id}" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-icon ${statusBool ? 'btn-danger' : 'btn-success'} alterar-status-usuario" 
+                                        data-id="${usuario.id}" 
+                                        data-status="${status}"
+                                        title="${statusBool ? 'Desativar' : 'Ativar'}">
+                                    <i class="fas ${statusBool ? 'fa-user-slash' : 'fa-user-check'}"></i>
+                                </button>
+                                <button class="btn-icon btn-danger remover-usuario" data-id="${usuario.id}" title="Remover">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    usuariosTable.appendChild(row);
+                });
+
+                setupUsuarioActions();
             }
-
-            const statusBool = usuario.status === true || usuario.status === 'true' || usuario.status === 'Ativo';
-            const status = statusBool ? 'Ativo' : 'Inativo';
-
-            // Verificar se o usuário tem conta
-            const temConta = usuario.conta !== null && usuario.conta !== undefined;
-
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${usuario.id}</td>
-              <td>${usuario.nome}</td>
-              <td><span class="badge badge-${usuario.tipo.toLowerCase()}">${formatPerfil(usuario.tipo)}</span></td>
-              <td><span class="badge ${statusBool ? 'badge-success' : 'badge-danger'}">${status}</span></td>
-              <td>
-                <span class="badge ${temConta ? 'badge-success' : 'badge-warning'}">
-                  ${temConta ? 'Com conta' : 'Sem conta'}
-                </span>
-              </td>
-              <td>${usuario.ultimo_acesso || 'Nunca'}</td>
-              <td>
-                <div class="table-actions">
-                  ${!temConta ? `
-                    <button class="btn-icon btn-info criar-conta-usuario" data-id="${usuario.id}" title="Criar Conta">
-                      <i class="fa-solid fa-landmark">‌</i>
-                    </button>
-                  ` : ''}
-                  <button class="btn-icon btn-primary visualizar-usuario" data-id="${usuario.id}" title="Visualizar">
-                    <i class="fas fa-eye"></i>
-                  </button>
-                  <button class="btn-icon btn-warning editar-usuario" data-id="${usuario.id}" title="Editar">
-                    <i class="fas fa-edit"></i>
-                  </button>
-                  <button class="btn-icon ${statusBool ? 'btn-danger' : 'btn-success'} alterar-status-usuario" 
-                          data-id="${usuario.id}" 
-                          data-status="${status}"
-                          title="${statusBool ? 'Desativar' : 'Ativar'}">
-                    <i class="fas ${statusBool ? 'fa-user-slash' : 'fa-user-check'}"></i>
-                  </button>
-                  <button class="btn-icon btn-danger remover-usuario" data-id="${usuario.id}" title="Remover">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </div>
-              </td>
-            `;
-            usuariosTable.appendChild(row);
-          });
-
-          setupUsuarioActions();
         }
-      }
     } catch (error) {
-      console.error('Erro ao carregar usuários:', error);
-      showFlashMessage('error', 'Erro ao carregar lista de usuários');
+        showFlashMessage('error', 'Erro ao carregar lista de usuários');
     }
-  }
+}
 
-  async function criarContaUsuario(usuarioId) {
+async function criarContaUsuario(usuarioId) {
     try {
         const response = await fetchWithErrorHandling(`/admin/conta/criar/${usuarioId}`, {
             method: 'POST',
@@ -4991,85 +4932,83 @@ document.addEventListener('DOMContentLoaded', function () {
             showFlashMessage('error', response.message || 'Erro ao criar conta');
         }
     } catch (error) {
-        console.error('Erro ao criar conta:', error);
         showFlashMessage('error', 'Erro ao criar conta para o usuário');
     }
-  }
+}
 
-  async function openEditarUsuarioModal(usuarioId = null) {
+async function openEditarUsuarioModal(usuarioId = null) {
     const isEdit = usuarioId !== null;
 
     const usuarioModalTitle = document.getElementById('usuarioModalTitle');
     if (usuarioModalTitle) {
-      usuarioModalTitle.textContent = isEdit ? 'Editar Usuário' : 'Cadastrar Usuário';
+        usuarioModalTitle.textContent = isEdit ? 'Editar Usuário' : 'Cadastrar Usuário';
     }
 
     const usuarioModalSubmitText = document.getElementById('usuarioModalSubmitText');
     if (usuarioModalSubmitText) {
-      usuarioModalSubmitText.textContent = isEdit ? 'Atualizar' : 'Cadastrar';
+        usuarioModalSubmitText.textContent = isEdit ? 'Atualizar' : 'Cadastrar';
     }
 
     const senhaInput = document.getElementById('usuarioSenha');
     const confirmaSenhaInput = document.getElementById('usuarioConfirmaSenha');
 
     if (isEdit) {
-      if (senhaInput) {
-        senhaInput.required = false;
-        senhaInput.placeholder = "Deixe em branco para manter a senha atual";
-      }
-      if (confirmaSenhaInput) {
-        confirmaSenhaInput.required = false;
-        confirmaSenhaInput.placeholder = "Repita a nova senha se for alterar";
-      }
+        if (senhaInput) {
+            senhaInput.required = false;
+            senhaInput.placeholder = "Deixe em branco para manter a senha atual";
+        }
+        if (confirmaSenhaInput) {
+            confirmaSenhaInput.required = false;
+            confirmaSenhaInput.placeholder = "Repita a nova senha se for alterar";
+        }
     } else {
-      if (senhaInput) {
-        senhaInput.required = true;
-        senhaInput.placeholder = "";
-      }
-      if (confirmaSenhaInput) {
-        confirmaSenhaInput.required = true;
-        confirmaSenhaInput.placeholder = "";
-      }
+        if (senhaInput) {
+            senhaInput.required = true;
+            senhaInput.placeholder = "";
+        }
+        if (confirmaSenhaInput) {
+            confirmaSenhaInput.required = true;
+            confirmaSenhaInput.placeholder = "";
+        }
     }
 
     if (!isEdit) {
-      const usuarioForm = document.getElementById('usuarioForm');
-      if (usuarioForm) usuarioForm.reset();
+        const usuarioForm = document.getElementById('usuarioForm');
+        if (usuarioForm) usuarioForm.reset();
 
-      const usuarioIdField = document.getElementById('usuarioId');
-      if (usuarioIdField) usuarioIdField.value = '';
+        const usuarioIdField = document.getElementById('usuarioId');
+        if (usuarioIdField) usuarioIdField.value = '';
     }
 
     if (isEdit) {
-      try {
-        const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`);
+        try {
+            const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`);
 
-        if (!response.success) {
-          throw new Error(response.message || 'Erro ao carregar usuário');
+            if (!response.success) {
+                throw new Error(response.message || 'Erro ao carregar usuário');
+            }
+
+            const usuario = response.usuario;
+
+            if (document.getElementById('usuarioId')) document.getElementById('usuarioId').value = usuario.id;
+            if (document.getElementById('usuarioNome')) document.getElementById('usuarioNome').value = usuario.nome;
+            if (document.getElementById('usuarioCpf')) document.getElementById('usuarioCpf').value = usuario.cpf;
+            if (document.getElementById('usuarioPerfil')) document.getElementById('usuarioPerfil').value = usuario.tipo.toLowerCase();
+            if (document.getElementById('usuarioStatus')) document.getElementById('usuarioStatus').value = usuario.status ? 'true' : 'false';
+            if (document.getElementById('usuarioObservacoes')) document.getElementById('usuarioObservacoes').value = usuario.observacoes || '';
+
+            if (document.getElementById('usuarioSenha')) document.getElementById('usuarioSenha').value = '';
+            if (document.getElementById('usuarioConfirmaSenha')) document.getElementById('usuarioConfirmaSenha').value = '';
+        } catch (error) {
+            showFlashMessage('error', error.message || 'Erro ao carregar dados do usuário');
+            return;
         }
-
-        const usuario = response.usuario;
-
-        if (document.getElementById('usuarioId')) document.getElementById('usuarioId').value = usuario.id;
-        if (document.getElementById('usuarioNome')) document.getElementById('usuarioNome').value = usuario.nome;
-        if (document.getElementById('usuarioCpf')) document.getElementById('usuarioCpf').value = usuario.cpf;
-        if (document.getElementById('usuarioPerfil')) document.getElementById('usuarioPerfil').value = usuario.tipo.toLowerCase();
-        if (document.getElementById('usuarioStatus')) document.getElementById('usuarioStatus').value = usuario.status ? 'true' : 'false';
-        if (document.getElementById('usuarioObservacoes')) document.getElementById('usuarioObservacoes').value = usuario.observacoes || '';
-
-        if (document.getElementById('usuarioSenha')) document.getElementById('usuarioSenha').value = '';
-        if (document.getElementById('usuarioConfirmaSenha')) document.getElementById('usuarioConfirmaSenha').value = '';
-      } catch (error) {
-        console.error('Erro ao carregar dados do usuário:', error);
-        showFlashMessage('error', error.message || 'Erro ao carregar dados do usuário');
-        return;
-      }
     }
 
     openModal('usuarioModal');
-  }
+}
 
-  async function openVisualizarUsuarioModal(usuarioId) {
+async function openVisualizarUsuarioModal(usuarioId) {
     try {
         const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`);
 
@@ -5100,8 +5039,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Informações da conta
             const contaInfoDiv = document.getElementById('contaInfo');
+            const btnTransferir = document.getElementById('btnTransferir');
+            
             if (contaInfoDiv) {
                 if (usuario.conta) {
+                    // Mostrar botão de transferência apenas se o usuário tiver conta
+                    if (btnTransferir) {
+                        btnTransferir.style.display = 'inline-block';
+                        btnTransferir.onclick = () => openTransferenciaModal(usuario);
+                    }
+                    
                     contaInfoDiv.innerHTML = `
                         <div class="account-details">
                             <div class="detail-item">
@@ -5132,6 +5079,11 @@ document.addEventListener('DOMContentLoaded', function () {
                         </div>
                     `;
                 } else {
+                    // Esconder botão de transferência se não tiver conta
+                    if (btnTransferir) {
+                        btnTransferir.style.display = 'none';
+                    }
+                    
                     contaInfoDiv.innerHTML = `
                         <div class="no-account">
                             <p class="text-warning">Usuário não possui conta</p>
@@ -5163,145 +5115,302 @@ document.addEventListener('DOMContentLoaded', function () {
             openModal('visualizarUsuarioModal');
         }
     } catch (error) {
-        console.error('Erro ao carregar dados do usuário:', error);
         showFlashMessage('error', 'Erro ao carregar dados do usuário');
     }
-  }
+}
 
-  function setupUsuarioActions() {
+async function openTransferenciaModal(usuarioDestino) {
+    try {
+        
+        // Carregar lista de usuários com conta para seleção da origem
+        const response = await fetchWithErrorHandling('/admin/usuarios');
+        
+        if (!response.success) {
+            throw new Error('Erro ao carregar lista de usuários');
+        }
+
+        // Filtrar apenas usuários com conta (excluindo o usuário destino)
+        const usuariosComConta = response.usuarios.filter(u => {
+            const temConta = u.conta !== null && u.conta !== undefined;
+            const naoEhDestino = u.id !== usuarioDestino.id;
+            return temConta && naoEhDestino;
+        });
+
+        if (usuariosComConta.length === 0) {
+            showFlashMessage('warning', 'Não há outras contas disponíveis para transferência');
+            return;
+        }
+
+        // Preencher o modal de transferência
+        const modalTitle = document.getElementById('transferenciaModalTitle');
+        if (modalTitle) {
+            modalTitle.textContent = `Transferir para ${usuarioDestino.nome}`;
+        }
+
+        // Preencher select de contas origem
+        const selectOrigem = document.getElementById('contaOrigemSelect');
+        if (selectOrigem) {
+            selectOrigem.innerHTML = `
+                <option value="">Selecione a conta de origem</option>
+                ${usuariosComConta.map(usuario => {
+                    const saldoTotal = usuario.conta && usuario.conta.saldo_total ? 
+                        usuario.conta.saldo_total.toFixed(2) : '0.00';
+                    return `
+                        <option value="${usuario.conta.id}" data-usuario-id="${usuario.id}">
+                            ${usuario.nome} (Saldo: R$ ${saldoTotal})
+                        </option>
+                    `;
+                }).join('')}
+            `;
+        }
+
+        // Preencher formas de pagamento
+        const selectFormaPagamento = document.getElementById('formaPagamentoSelect');
+        if (selectFormaPagamento) {
+            selectFormaPagamento.innerHTML = `
+                <option value="">Selecione a forma de pagamento</option>
+                <option value="pix_fabiano">PIX Fabiano</option>
+                <option value="pix_maquineta">PIX Maquineta</option>
+                <option value="pix_edfrance">PIX Edfrance</option>
+                <option value="pix_loja">PIX Loja</option>
+                <option value="dinheiro">Dinheiro</option>
+                <option value="cartao_credito">Cartão de Crédito</option>
+                <option value="cartao_debito">Cartão de Débito</option>
+                <option value="a_prazo">A Prazo</option>
+            `;
+        }
+
+        // Guardar ID do usuário destino no formulário
+        const usuarioDestinoIdInput = document.getElementById('usuarioDestinoId');
+        if (usuarioDestinoIdInput) {
+            usuarioDestinoIdInput.value = usuarioDestino.id;
+        }
+
+        const contaDestinoIdInput = document.getElementById('contaDestinoId');
+        if (contaDestinoIdInput && usuarioDestino.conta) {
+            contaDestinoIdInput.value = usuarioDestino.conta.id;
+        }
+
+        // Configurar eventos do modal de transferência
+        setupTransferenciaEvents();
+
+        openModal('transferenciaModalContas');
+
+    } catch (error) {
+        showFlashMessage('error', 'Erro ao carregar dados para transferência');
+    }
+}
+
+// Função para processar a transferência
+async function processarTransferenciaContas() {
+    try {
+        const contaOrigemId = document.getElementById('contaOrigemSelect').value;
+        const contaDestinoId = document.getElementById('contaDestinoId').value;
+        const formaPagamento = document.getElementById('formaPagamentoSelect').value;
+        const valor = parseFloat(document.getElementById('valorTransferencia').value);
+        const descricao = document.getElementById('descricaoTransferencia').value;
+
+        // Validações básicas
+        if (!contaOrigemId || !formaPagamento || !valor || valor <= 0) {
+            showFlashMessage('error', 'Preencha todos os campos obrigatórios com valores válidos');
+            return;
+        }
+
+        const transferenciaData = {
+            conta_origem_id: parseInt(contaOrigemId),
+            conta_destino_id: parseInt(contaDestinoId),
+            forma_pagamento: formaPagamento,
+            valor: valor,
+            descricao: descricao || `Transferência entre contas`
+        };
+
+        const response = await fetchWithErrorHandling('/admin/conta/transferir', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(transferenciaData)
+        });
+
+
+        if (response.success) {
+            showFlashMessage('success', response.message);
+            closeModal('transferenciaModalContas');
+            // Recarregar dados se necessário
+            loadUsuariosData();
+        } else {
+            showFlashMessage('error', response.error || 'Erro ao realizar transferência');
+        }
+
+    } catch (error) {
+        showFlashMessage('error', 'Erro ao processar transferência');
+    }
+}
+
+// Configurar eventos do modal de transferência
+function setupTransferenciaEvents() {
+    const btnConfirmarTransferencia = document.getElementById('confirmarTransferencia');
     
+    if (btnConfirmarTransferencia) {
+        // Remover event listeners antigos para evitar duplicação
+        btnConfirmarTransferencia.replaceWith(btnConfirmarTransferencia.cloneNode(true));
+        
+        // Adicionar novo event listener
+        document.getElementById('confirmarTransferencia').addEventListener('click', processarTransferenciaContas);
+     
+    }
+}
+
+function setupUsuarioActions() {
     document.querySelectorAll('.criar-conta-usuario').forEach(btn => {
-      btn.addEventListener('click', function() {
-          const usuarioId = this.getAttribute('data-id');
-          if (confirm('Deseja criar uma conta para este usuário?')) {
-              criarContaUsuario(usuarioId);
-          }
-      });
+        btn.addEventListener('click', function() {
+            const usuarioId = this.getAttribute('data-id');
+            if (confirm('Deseja criar uma conta para este usuário?')) {
+                criarContaUsuario(usuarioId);
+            }
+        });
     });
 
     document.querySelectorAll('.visualizar-usuario').forEach(btn => {
-      btn.addEventListener('click', function () {
-        const usuarioId = this.getAttribute('data-id');
-        openVisualizarUsuarioModal(usuarioId);
-      });
+        btn.addEventListener('click', function() {
+            const usuarioId = this.getAttribute('data-id');
+            openVisualizarUsuarioModal(usuarioId);
+        });
     });
 
     document.querySelectorAll('.editar-usuario').forEach(btn => {
-      btn.addEventListener('click', function () {
-        const usuarioId = this.getAttribute('data-id');
-        openEditarUsuarioModal(usuarioId);
-      });
+        btn.addEventListener('click', function() {
+            const usuarioId = this.getAttribute('data-id');
+            openEditarUsuarioModal(usuarioId);
+        });
     });
 
     document.querySelectorAll('.alterar-status-usuario').forEach(btn => {
-      btn.addEventListener('click', async function () {
-        const usuarioId = this.getAttribute('data-id');
-        const currentStatus = this.getAttribute('data-status') === 'Ativo';
-        const newStatus = !currentStatus;
+        btn.addEventListener('click', async function() {
+            const usuarioId = this.getAttribute('data-id');
+            const currentStatus = this.getAttribute('data-status') === 'Ativo';
+            const newStatus = !currentStatus;
 
-        if (confirm(`Tem certeza que deseja ${currentStatus ? 'desativar' : 'ativar'} este usuário?`)) {
-          try {
-            const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                status: newStatus
-              })
-            });
+            if (confirm(`Tem certeza que deseja ${currentStatus ? 'desativar' : 'ativar'} este usuário?`)) {
+                try {
+                    const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            status: newStatus
+                        })
+                    });
 
-            if (response.success) {
-              showFlashMessage('success', `Usuário ${newStatus ? 'ativado' : 'desativado'} com sucesso`);
-              loadUsuariosData();
-            } else {
-              showFlashMessage('error', response.message || 'Erro ao alterar status do usuário');
+                    if (response.success) {
+                        showFlashMessage('success', `Usuário ${newStatus ? 'ativado' : 'desativado'} com sucesso`);
+                        loadUsuariosData();
+                    } else {
+                        showFlashMessage('error', response.message || 'Erro ao alterar status do usuário');
+                    }
+                } catch (error) {
+                    showFlashMessage('error', 'Erro ao alterar status do usuário');
+                }
             }
-          } catch (error) {
-            console.error('Erro ao alterar status do usuário:', error);
-            showFlashMessage('error', 'Erro ao alterar status do usuário');
-          }
-        }
-      });
+        });
     });
 
     document.querySelectorAll('.remover-usuario').forEach(btn => {
-      btn.addEventListener('click', function () {
-        const usuarioId = this.getAttribute('data-id');
-        const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
-        const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
+        btn.addEventListener('click', function() {
+            const usuarioId = this.getAttribute('data-id');
+            const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
+            const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
 
-        if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir permanentemente o usuário ${usuarioId}?`;
-        if (confirmarExclusaoBtn) {
-          confirmarExclusaoBtn.setAttribute('data-id', usuarioId);
-          confirmarExclusaoBtn.setAttribute('data-type', 'usuario');
-        }
-        openModal('confirmarExclusaoModal');
-      });
-    });
-  }
-
-  // Event Listeners para Usuários
-  document.getElementById('searchUsuario')?.addEventListener('input', loadUsuariosData);
-  document.getElementById('refreshUsuarios')?.addEventListener('click', loadUsuariosData);
-  document.getElementById('addUsuario')?.addEventListener('click', () => openEditarUsuarioModal());
-
-  const usuarioForm = document.getElementById('usuarioForm');
-  if (usuarioForm) {
-    usuarioForm.addEventListener('submit', async function (e) {
-      e.preventDefault();
-
-      const isEdit = document.getElementById('usuarioId')?.value !== '';
-      const usuarioId = document.getElementById('usuarioId')?.value || '';
-
-      const formData = {
-        nome: document.getElementById('usuarioNome')?.value || '',
-        cpf: document.getElementById('usuarioCpf')?.value || '',
-        tipo: document.getElementById('usuarioPerfil')?.value || '',
-        status: document.getElementById('usuarioStatus')?.value === 'true',
-        observacoes: document.getElementById('usuarioObservacoes')?.value || ''
-      };
-
-      const senha = document.getElementById('usuarioSenha')?.value || '';
-      const confirmaSenha = document.getElementById('usuarioConfirmaSenha')?.value || '';
-
-      if (senha || confirmaSenha) {
-        if (senha !== confirmaSenha) {
-          showFlashMessage('error', 'As senhas não coincidem');
-          return;
-        }
-        if (senha.length > 0) {
-          formData.senha = senha;
-          formData.confirma_senha = confirmaSenha;
-        }
-      }
-
-      try {
-        const url = isEdit ? `/admin/usuarios/${usuarioId}` : '/admin/usuarios';
-        const method = isEdit ? 'PUT' : 'POST';
-
-        const response = await fetchWithErrorHandling(url, {
-          method: method,
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(formData)
+            if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir permanentemente o usuário ${usuarioId}?`;
+            if (confirmarExclusaoBtn) {
+                confirmarExclusaoBtn.setAttribute('data-id', usuarioId);
+                confirmarExclusaoBtn.setAttribute('data-type', 'usuario');
+            }
+            openModal('confirmarExclusaoModal');
         });
-
-        if (response.success) {
-          showFlashMessage('success', `Usuário ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
-          closeModal('usuarioModal');
-          loadUsuariosData();
-        } else {
-          showFlashMessage('error', response.message || `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
-        }
-      } catch (error) {
-        console.error(`Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário:`, error);
-        showFlashMessage('error', `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
-      }
     });
-  }
+}
 
+// Event Listeners para Usuários
+document.getElementById('searchUsuario')?.addEventListener('input', loadUsuariosData);
+document.getElementById('refreshUsuarios')?.addEventListener('click', loadUsuariosData);
+document.getElementById('addUsuario')?.addEventListener('click', () => openEditarUsuarioModal());
+
+const usuarioForm = document.getElementById('usuarioForm');
+if (usuarioForm) {
+    usuarioForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const isEdit = document.getElementById('usuarioId')?.value !== '';
+        const usuarioId = document.getElementById('usuarioId')?.value || '';
+
+        const formData = {
+            nome: document.getElementById('usuarioNome')?.value || '',
+            cpf: document.getElementById('usuarioCpf')?.value || '',
+            tipo: document.getElementById('usuarioPerfil')?.value || '',
+            status: document.getElementById('usuarioStatus')?.value === 'true',
+            observacoes: document.getElementById('usuarioObservacoes')?.value || ''
+        };
+
+        const senha = document.getElementById('usuarioSenha')?.value || '';
+        const confirmaSenha = document.getElementById('usuarioConfirmaSenha')?.value || '';
+
+        if (senha || confirmaSenha) {
+            if (senha !== confirmaSenha) {
+                showFlashMessage('error', 'As senhas não coincidem');
+                return;
+            }
+            if (senha.length > 0) {
+                formData.senha = senha;
+                formData.confirma_senha = confirmaSenha;
+            }
+        }
+
+        try {
+            const url = isEdit ? `/admin/usuarios/${usuarioId}` : '/admin/usuarios';
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const response = await fetchWithErrorHandling(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            if (response.success) {
+                showFlashMessage('success', `Usuário ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
+                closeModal('usuarioModal');
+                loadUsuariosData();
+            } else {
+                showFlashMessage('error', response.message || `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
+            }
+        } catch (error) {
+            showFlashMessage('error', `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
+        }
+    });
+}
+
+// Inicializar eventos quando o DOM estiver carregado
+document.addEventListener('DOMContentLoaded', function() {
+    setupTransferenciaEvents();
+});
+
+// Função auxiliar para formatar forma de pagamento
+function formatFormaPagamento(forma) {
+    const formatos = {
+        'pix_fabiano': 'PIX Fabiano',
+        'pix_maquineta': 'PIX Maquineta',
+        'pix_edfrance': 'PIX Edfrance',
+        'pix_loja': 'PIX Loja',
+        'dinheiro': 'Dinheiro',
+        'cartao_credito': 'Cartão Crédito',
+        'cartao_debito': 'Cartão Débito',
+        'a_prazo': 'A Prazo'
+    };
+    return formatos[forma] || forma;
+}
   // ===== DESCONTOS =====
   async function loadDescontosData() {
     try {
@@ -5358,7 +5467,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar descontos:', error);
       showFlashMessage('error', 'Erro ao carregar lista de descontos');
     }
   }
@@ -5410,7 +5518,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFlashMessage('error', responseDesconto.erro || 'Erro ao carregar dados do desconto');
       }
     } catch (error) {
-      console.error('Erro ao carregar produtos do desconto:', error);
       showFlashMessage('error', 'Erro ao carregar produtos do desconto');
     }
   }
@@ -5451,7 +5558,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFlashMessage('error', response.erro || 'Erro ao carregar dados do desconto');
       }
     } catch (error) {
-      console.error('Erro ao carregar dados do desconto:', error);
       showFlashMessage('error', 'Erro ao carregar dados do desconto');
     }
   }
@@ -5531,7 +5637,6 @@ document.addEventListener('DOMContentLoaded', function () {
           showFlashMessage('error', response.message || `Erro ao salvar desconto`);
         }
       } catch (error) {
-        console.error('Erro ao salvar desconto:', error);
         showFlashMessage('error', 'Erro ao salvar desconto');
       }
     });
@@ -5584,7 +5689,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFlashMessage('error', response.message || `Erro ao excluir ${type}`);
       }
     } catch (error) {
-      console.error(`Erro ao excluir ${type}:`, error);
       showFlashMessage('error', `Erro ao excluir ${type}`);
     }
   });
