@@ -616,8 +616,9 @@ def registrar_transferencia(db: Session, transf: dict):
                     db.add(produto_destino)
                     db.flush()  # para obter ID
 
-        # --------- Atualiza somente o que precisa ---------
-        # Atualizar estoque de origem (sempre subtrai quantidade)
+        # --------- CORREÇÃO: Lógica de atualização de estoque ---------
+        
+        # 1. SEMPRE subtrai do estoque de origem
         if estoque_origem == TipoEstoque.loja:
             produto_orig.estoque_loja -= quantidade_origem
         elif estoque_origem == TipoEstoque.deposito:
@@ -625,9 +626,19 @@ def registrar_transferencia(db: Session, transf: dict):
         elif estoque_origem == TipoEstoque.fabrica:
             produto_orig.estoque_fabrica -= quantidade_origem
 
-        # Atualizar estoque de destino SOMENTE se for produto diferente e mesma unidade
+        # 2. SEMPRE adiciona ao estoque de destino
         estoque_destino = transf['estoque_destino']
-        if produto_destino.unidade != produto_orig.unidade:
+        
+        # Se for o MESMO produto (sem conversão de unidade)
+        if produto_destino.id == produto_orig.id:
+            if estoque_destino == TipoEstoque.loja:
+                produto_destino.estoque_loja += quantidade_destino
+            elif estoque_destino == TipoEstoque.deposito:
+                produto_destino.estoque_deposito += quantidade_destino
+            elif estoque_destino == TipoEstoque.fabrica:
+                produto_destino.estoque_fabrica += quantidade_destino
+        else:
+            # Se for produto DIFERENTE (com conversão de unidade)
             if estoque_destino == TipoEstoque.loja:
                 produto_destino.estoque_loja += quantidade_destino
             elif estoque_destino == TipoEstoque.deposito:
@@ -636,13 +647,13 @@ def registrar_transferencia(db: Session, transf: dict):
                 produto_destino.estoque_fabrica += quantidade_destino
 
         # Atualizar valor unitário apenas se for produto diferente
-        if produto_destino != produto_orig:
+        if produto_destino.id != produto_orig.id:
             produto_destino.valor_unitario = valor_unitario_destino
 
         # Registrar transferência
         transferencia = TransferenciaEstoque(
             produto_id=produto_orig.id,
-            produto_destino_id=produto_destino.id if produto_destino != produto_orig else None,
+            produto_destino_id=produto_destino.id if produto_destino.id != produto_orig.id else None,
             usuario_id=transf['usuario_id'],
             estoque_origem=estoque_origem,
             estoque_destino=estoque_destino,
@@ -665,7 +676,7 @@ def registrar_transferencia(db: Session, transf: dict):
 
     except Exception as e:
         db.rollback()
-        print(e)
+        print(f"Erro ao registrar transferência: {str(e)}")
         raise e
 
 def get_transferencia_by_id(db: Session, transf_id: int):

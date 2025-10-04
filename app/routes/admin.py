@@ -2422,6 +2422,8 @@ def criar_transferencia():
     try:
         data = request.get_json()
         # Campos obrigatórios básicos
+        print(data)
+        
         required_keys = [
             'produto_id', 'estoque_origem', 'estoque_destino', 
             'quantidade', 'valor_unitario_destino'
