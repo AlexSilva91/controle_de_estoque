@@ -503,7 +503,7 @@ def produtos_maior_fluxo():
         })
         
     except Exception as e:
-        print(f"Erro ao buscar produtos com maior fluxo: {e}")
+        logger.error(f"Erro ao buscar dados dos produtos: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -3951,7 +3951,6 @@ def rota_estornar_venda(venda_id):
     except Exception as e:
         logger.error(f"Erro ao estornar venda ID {venda_id}: {str(e)}", exc_info=True)
         db.session.rollback()
-        print(e)
         return jsonify({
             'success': False,
             'message': 'Erro interno ao processar estorno'
@@ -4143,7 +4142,6 @@ def get_caixa_financeiro(caixa_id):
     except Exception as e:
         logger.error(f"Erro no financeiro do caixa {caixa_id}: {str(e)}", exc_info=True)
         session.rollback()
-        print(f"Erro no financeiro do caixa {caixa_id}: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
             'error': 'Erro interno ao processar dados financeiros'
@@ -4269,7 +4267,6 @@ def get_caixa_financeiro_pdf(caixa_id):
     except Exception as e:
         logger.error(f"Erro ao gerar PDF do caixa {caixa_id}: {str(e)}", exc_info=True)
         session.rollback()
-        print(f"Erro ao gerar PDF do caixa {caixa_id}: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
             'error': 'Erro interno ao gerar PDF'
@@ -4942,7 +4939,7 @@ def aprovar_caixa(caixa_id):
     data = request.get_json()
     valor_confirmado = data.get('valor_confirmado')
     observacoes = data.get('observacoes')
-    print(data)
+    
     try:
         caixa.aprovar_fechamento(
             administrador_id=current_user.id,
@@ -5011,14 +5008,12 @@ def recusar_caixa(caixa_id):
 @admin_required
 def enviar_para_analise(caixa_id):
     """Rota para enviar um caixa para análise (fechamento inicial)"""
-    print(f"Recebendo solicitação para caixa {caixa_id}")  # Log de depuração
     
     try:
         caixa =  Caixa.query.get_or_404(caixa_id)
-        print(f"Caixa encontrado: {caixa.id}, status: {caixa.status}")  # Log de depuração
-        
+        logger.info(f"Caixa encontrado: {caixa.id}, status: {caixa.status}")
+
         data = request.get_json()
-        print(f"Dados recebidos: {data}")  # Log de depuração
         
         valor_fechamento = data.get('valor_fechamento')
         observacoes = data.get('observacoes')
@@ -5026,9 +5021,6 @@ def enviar_para_analise(caixa_id):
         if not valor_fechamento:
             logger.warning(f"Valor de fechamento não fornecido para caixa {caixa_id}")
             return jsonify({'error': 'Valor de fechamento é obrigatório'}), 400
-        
-        # Adicione mais logs para verificar o usuário atual
-        print(f"Usuário atual: {current_user.nome}, Tipo: {current_user.tipo}")
         
         caixa.fechar_caixa(
             valor_fechamento=valor_fechamento,

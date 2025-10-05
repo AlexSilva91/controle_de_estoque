@@ -636,13 +636,11 @@ def visualizar_pdf_venda(id_list):
         
         # Buscar os dados das notas fiscais
         resultado_busca = buscar_pagamentos_notas_fiscais(db.session, ids)
-        print(resultado_busca)
         if not resultado_busca or not resultado_busca['data']:
             abort(404, description="Nenhuma nota encontrada com os IDs fornecidos")
         
         # Pegar os dados da primeira nota (mesmo para múltiplas notas)
         dados_nota = resultado_busca['data'][0]
-        print(dados_nota)
         # Gerar PDF em memória com os dados completos
         pdf_buffer = gerar_nfce_pdf_bobina_bytesio(dados_nota=dados_nota)
         
@@ -1271,7 +1269,6 @@ def gerar_pdf_vendas_dia():
     total_vendas_positivas = sum(v['valor_total'] for v in dados['vendas'] if 'valor_total' in v and v['valor_total'] > 0) if 'vendas' in dados else 0
     total_estornos = sum(abs(v['valor_total']) for v in dados['vendas'] if 'valor_total' in v and v['valor_total'] < 0) if 'vendas' in dados else 0
     total_liquido = total_vendas_positivas - dados.get('total_saidas', 0)
-    print(f"\nTotal saídas: \n{json.dumps(dados.get('total_saidas', 0), indent=2)}\n")
     # Calcular total a prazo pendente
     total_a_prazo_pendente = 0
     if 'vendas' in dados:
@@ -2051,7 +2048,6 @@ def gerar_comprovante_conta(conta_id):
                            preserveAspectRatio=True, anchor='n')
                 y_position = height - 25*mm  # Ajusta a posição Y após a imagem
             except Exception as e:
-                print(f"Erro ao carregar imagem: {e}")
                 # Se houver erro, continua sem a imagem
                 y_position -= 5*mm
         else:
@@ -2394,7 +2390,7 @@ def gerar_pdf_orcamento():
                 # Espaçamento mínimo após a imagem
                 elements.append(Spacer(1, 2))
             except Exception as e:
-                print(f"Erro ao carregar imagem: {e}")
+                logger.error(f"Erro ao carregar imagem: {e}")
 
         # Cabeçalho
         elements.append(Paragraph("ORÇAMENTO", style_title))
