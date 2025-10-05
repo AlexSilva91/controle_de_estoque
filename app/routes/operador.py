@@ -30,7 +30,7 @@ from app.utils.converter_endereco import parse_endereco_string
 from app.utils.format_data_moeda import format_currency, format_number
 from app.utils.nfce import gerar_nfce_pdf_bobina_bytesio
 from app.models.entities import (
-     Caixa, Cliente, ContaReceber, Desconto, Entrega, Financeiro, NotaFiscal,
+     Caixa, Cliente, ContaReceber, Desconto, Entrega, Financeiro, LoteEstoque, NotaFiscal,
      NotaFiscalItem, PagamentoNotaFiscal, Produto, TipoDesconto, TipoEstoque, 
      TipoUsuario, produto_desconto_association, NotaFiscal, PagamentoContaReceber
 )
@@ -304,7 +304,7 @@ def api_registrar_venda():
             }), 400
 
         # Consultar cliente
-        cliente =  Cliente.query.get(cliente_id)
+        cliente = Cliente.query.get(cliente_id)
         if not cliente:
             logger.error(f"Cliente não encontrado: ID {cliente_id}")
             return jsonify({
@@ -313,6 +313,7 @@ def api_registrar_venda():
             }), 404
 
         # Validar itens e estoque
+        produtos_info = {}
         for item_data in dados_venda['itens']:
             try:
                 produto_id = int(item_data.get('produto_id'))
@@ -320,13 +321,50 @@ def api_registrar_venda():
                 valor_unitario = Decimal(str(item_data.get('valor_unitario')))
                 valor_total_item = Decimal(str(item_data.get('valor_total')))
                 
-                produto =  Produto.query.get(produto_id)
+                produto = Produto.query.get(produto_id)
                 if not produto:
                     logger.error(f"Produto não encontrado: ID {produto_id}")
                     return jsonify({
                         'success': False,
                         'message': f'Produto não encontrado: ID {produto_id}'
                     }), 404
+
+                # Verificar se há estoque suficiente
+                if produto.estoque_loja < quantidade:
+                    logger.error(f"Estoque insuficiente para produto: {produto.nome}")
+                    return jsonify({
+                        'success': False,
+                        'message': f'Estoque insuficiente para {produto.nome}. Disponível: {produto.estoque_loja}'
+                    }), 400
+
+                # Verificar se há lotes suficientes
+                lotes_disponiveis = LoteEstoque.query.filter(
+                    LoteEstoque.produto_id == produto_id,
+                    LoteEstoque.quantidade_disponivel > 0
+                ).order_by(LoteEstoque.data_entrada.asc()).all()
+
+                quantidade_necessaria = quantidade
+                for lote in lotes_disponiveis:
+                    if quantidade_necessaria <= 0:
+                        break
+                    if lote.quantidade_disponivel >= quantidade_necessaria:
+                        quantidade_necessaria = Decimal('0')
+                    else:
+                        quantidade_necessaria -= lote.quantidade_disponivel
+
+                if quantidade_necessaria > 0:
+                    logger.error(f"Lotes insuficientes para produto: {produto.nome}")
+                    return jsonify({
+                        'success': False,
+                        'message': f'Lotes insuficientes para {produto.nome}. Quantidade faltante: {quantidade_necessaria}'
+                    }), 400
+
+                produtos_info[produto_id] = {
+                    'produto': produto,
+                    'quantidade': quantidade,
+                    'valor_unitario': valor_unitario,
+                    'valor_total_item': valor_total_item
+                }
 
             except (ValueError, InvalidOperation, TypeError) as e:
                 logger.error(f"Erro ao processar item: {str(e)}")
@@ -340,6 +378,15 @@ def api_registrar_venda():
             soma_pagamentos = sum(Decimal(str(p.get('valor'))) for p in dados_venda['pagamentos'])
             a_prazo_usado = any(p.get('forma_pagamento') == 'a_prazo' for p in dados_venda['pagamentos'])
             
+            # Verificar se a soma dos pagamentos é igual ao valor total (com tolerância para arredondamento)
+            diferenca = abs(soma_pagamentos - valor_total)
+            if diferenca > Decimal('0.01'):  # Tolerância de 1 centavo
+                logger.error(f"Soma dos pagamentos ({soma_pagamentos}) não confere com valor total ({valor_total})")
+                return jsonify({
+                    'success': False,
+                    'message': f'Soma dos pagamentos ({soma_pagamentos}) não confere com valor total ({valor_total})'
+                }), 400
+                
         except (ValueError, InvalidOperation, TypeError) as e:
             logger.error(f"Erro ao verificar pagamentos: {str(e)}")
             return jsonify({
@@ -358,7 +405,7 @@ def api_registrar_venda():
             }), 400
 
         # Criar registro de Nota Fiscal
-        nota =  NotaFiscal(
+        nota = NotaFiscal(
             cliente_id=cliente.id,
             operador_id=current_user.id,
             caixa_id=caixa_aberto.id,
@@ -366,8 +413,8 @@ def api_registrar_venda():
             valor_total=valor_total,
             valor_desconto=total_descontos,
             tipo_desconto=None,
-            status= StatusNota.emitida,
-            forma_pagamento= FormaPagamento.dinheiro,  # Será atualizado abaixo
+            status=StatusNota.emitida,
+            forma_pagamento=FormaPagamento.dinheiro,  # Será atualizado abaixo
             valor_recebido=valor_recebido,
             troco=max(valor_recebido - valor_total, Decimal(0)) if not a_prazo_usado else Decimal(0),
             a_prazo=a_prazo_usado,
@@ -377,7 +424,7 @@ def api_registrar_venda():
         # Criar Entrega, se presente - COM TRATAMENTO SEGURO
         endereco_entrega = dados_venda.get('endereco_entrega')
         if endereco_entrega and isinstance(endereco_entrega, dict):
-            entrega =  Entrega(
+            entrega = Entrega(
                 logradouro=endereco_entrega.get('logradouro', ''),
                 numero=endereco_entrega.get('numero', ''),
                 complemento=endereco_entrega.get('complemento', ''),
@@ -395,34 +442,99 @@ def api_registrar_venda():
         db.session.add(nota)
         db.session.flush()
 
-        # Criar itens da nota fiscal
+        # Criar itens da nota fiscal e processar lotes
         for item_data in dados_venda['itens']:
             produto_id = item_data.get('produto_id')
-            produto =  Produto.query.get(produto_id)
-            quantidade = Decimal(str(item_data.get('quantidade')))
-            valor_unitario = Decimal(str(item_data.get('valor_unitario')))
-            valor_total_item = Decimal(str(item_data.get('valor_total')))
+            produto_info = produtos_info[produto_id]
+            produto = produto_info['produto']
+            quantidade = produto_info['quantidade']
+            valor_unitario = produto_info['valor_unitario']
+            valor_total_item = produto_info['valor_total_item']
             desconto_aplicado = Decimal(str(item_data.get('valor_desconto', 0)))
             
             # Tratamento seguro para desconto_info
             desconto_info = item_data.get('desconto_info', {}) or {}
             tipo_desconto = desconto_info.get('tipo') if isinstance(desconto_info, dict) else None
 
-            item_nf =  NotaFiscalItem(
+            # BUSCAR LOTES DO PRODUTO ORDENADOS POR DATA DE ENTRADA (MAIS ANTIGO PRIMEIRO)
+            lotes = LoteEstoque.query.filter(
+                LoteEstoque.produto_id == produto_id,
+                LoteEstoque.quantidade_disponivel > 0
+            ).order_by(LoteEstoque.data_entrada.asc()).all()
+
+            quantidade_restante = quantidade
+            valor_unitario_compra_final = Decimal('0')
+            total_custo = Decimal('0')
+            quantidade_total_usada = Decimal('0')
+
+            # PROCESSAR LOTES PARA DAR SAÍDA (PEPS - Primeiro a Entrar, Primeiro a Sair)
+            for lote in lotes:
+                if quantidade_restante <= 0:
+                    break
+                    
+                if lote.quantidade_disponivel > 0:
+                    quantidade_a_usar = min(quantidade_restante, lote.quantidade_disponivel)
+                    
+                    # Atualizar lote
+                    lote.quantidade_disponivel -= quantidade_a_usar
+                    quantidade_restante -= quantidade_a_usar
+                    quantidade_total_usada += quantidade_a_usar
+                    
+                    # Acumular custo para cálculo da média ponderada
+                    total_custo += quantidade_a_usar * lote.valor_unitario_compra
+                    
+                    # Se este foi o último lote usado, definir como valor_unitario_compra_final
+                    if quantidade_restante == 0:
+                        valor_unitario_compra_final = lote.valor_unitario_compra
+
+            # Calcular valor unitário de compra médio ponderado se usou múltiplos lotes
+            if quantidade_total_usada > 0:
+                valor_unitario_compra_final = total_custo / quantidade_total_usada
+
+            # VERIFICAR SE O ESTOQUE SERÁ ZERADO E ATUALIZAR COM O PRÓXIMO LOTE VÁLIDO
+            estoque_atual = produto.estoque_loja
+            estoque_futuro = estoque_atual - quantidade
+            estoque_zerado = estoque_futuro == 0
+
+            if estoque_zerado:
+                # Buscar o próximo lote mais antigo com quantidade válida (se existir)
+                proximo_lote_valido = LoteEstoque.query.filter(
+                    LoteEstoque.produto_id == produto_id,
+                    LoteEstoque.quantidade_disponivel > 0
+                ).order_by(LoteEstoque.data_entrada.asc()).first()
+                
+                if proximo_lote_valido:
+                    # Se há próximo lote válido, usar seu valor_unitario_compra
+                    produto.valor_unitario_compra = proximo_lote_valido.valor_unitario_compra
+                    logger.info(f"Estoque zerado para produto {produto.nome}. Atualizado valor_unitario_compra para: {proximo_lote_valido.valor_unitario_compra}")
+                else:
+                    # Se não há mais lotes, manter o último valor usado ou definir como 0
+                    if valor_unitario_compra_final > 0:
+                        produto.valor_unitario_compra = valor_unitario_compra_final
+                    else:
+                        # Se não temos valor final e não há lotes, manter o atual
+                        produto.valor_unitario_compra = produto.valor_unitario_compra if produto.valor_unitario_compra else Decimal('0')
+                    logger.info(f"Estoque zerado para produto {produto.nome}. Sem lotes disponíveis. Valor mantido: {produto.valor_unitario_compra}")
+            elif valor_unitario_compra_final > 0:
+                # Se o estoque não foi zerado mas temos um valor final válido, atualizar
+                produto.valor_unitario_compra = valor_unitario_compra_final
+                logger.info(f"Produto {produto.nome}. valor_unitario_compra atualizado para: {valor_unitario_compra_final}")
+
+            item_nf = NotaFiscalItem(
                 nota_id=nota.id,
                 produto_id=produto_id,
-                estoque_origem= TipoEstoque.loja,
+                estoque_origem=TipoEstoque.loja,
                 quantidade=quantidade,
                 valor_unitario=valor_unitario,
                 valor_total=valor_total_item,
                 desconto_aplicado=desconto_aplicado,
-                tipo_desconto= TipoDesconto(tipo_desconto) if tipo_desconto else None,
+                tipo_desconto=TipoDesconto(tipo_desconto) if tipo_desconto else None,
                 sincronizado=False
             )
             db.session.add(item_nf)
             
-            # Atualizar estoque
-            produto.estoque_loja -= quantidade
+            # Atualizar estoque do produto
+            produto.estoque_loja = estoque_futuro
 
         # Criar pagamentos e armazenar seus IDs
         pagamentos_ids = []
@@ -432,9 +544,9 @@ def api_registrar_venda():
             forma = pagamento_data.get('forma_pagamento')
             valor = Decimal(str(pagamento_data.get('valor')))
             
-            pagamento_nf =  PagamentoNotaFiscal(
+            pagamento_nf = PagamentoNotaFiscal(
                 nota_fiscal_id=nota.id,
-                forma_pagamento= FormaPagamento(forma),
+                forma_pagamento=FormaPagamento(forma),
                 valor=valor,
                 data=datetime.now(),
                 sincronizado=False
@@ -446,9 +558,9 @@ def api_registrar_venda():
             
             # Registrar no financeiro APENAS se não for a prazo
             if forma != 'a_prazo':
-                financeiro =  Financeiro(
-                    tipo= TipoMovimentacao.entrada,
-                    categoria= CategoriaFinanceira.venda,
+                financeiro = Financeiro(
+                    tipo=TipoMovimentacao.entrada,
+                    categoria=CategoriaFinanceira.venda,
                     valor=valor,
                     descricao=f"Pagamento venda NF #{nota.id}",
                     cliente_id=cliente.id,
@@ -463,14 +575,14 @@ def api_registrar_venda():
 
         # Se houver pagamento a prazo, criar conta a receber
         if a_prazo_usado and valor_a_prazo > 0:
-            conta_receber =  ContaReceber(
+            conta_receber = ContaReceber(
                 cliente_id=cliente.id,
                 nota_fiscal_id=nota.id,
                 descricao=f"Venda a prazo NF #{nota.id}",
                 valor_original=valor_a_prazo,
                 valor_aberto=valor_a_prazo,
                 data_vencimento=datetime.now() + timedelta(days=30),
-                status= StatusPagamento.pendente,
+                status=StatusPagamento.pendente,
                 sincronizado=False
             )
             db.session.add(conta_receber)
@@ -478,10 +590,10 @@ def api_registrar_venda():
         # Atualizar a forma de pagamento principal da nota fiscal
         if len(dados_venda['pagamentos']) == 1:
             # Se houver apenas um pagamento, usa essa forma
-            nota.forma_pagamento =  FormaPagamento(dados_venda['pagamentos'][0]['forma_pagamento'])
+            nota.forma_pagamento = FormaPagamento(dados_venda['pagamentos'][0]['forma_pagamento'])
         else:
             # Se houver múltiplos pagamentos, define como "misto"
-            nota.forma_pagamento =  FormaPagamento.dinheiro  # Ou criar um enum para "misto"
+            nota.forma_pagamento = FormaPagamento.dinheiro  # Ou criar um enum para "misto"
 
         db.session.commit()
 

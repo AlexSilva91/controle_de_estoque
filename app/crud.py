@@ -24,6 +24,7 @@ from typing import Dict, Any, List, Union, Tuple
 from app.models.entities import (
     Caixa,
     Financeiro,
+    LoteEstoque,
     NotaFiscal,
     NotaFiscalItem,
     MovimentacaoEstoque,
@@ -2645,3 +2646,44 @@ def buscar_historico_financeiro_agrupado(
     resultado.sort(key=lambda x: x['data'], reverse=True)
     
     return resultado
+
+def criar_ou_atualizar_lote(db: Session, produto_id, quantidade, valor_unitario_compra, data_entrada=None, observacao=None):
+    """
+    Cria ou atualiza um lote para o produto na data especificada.
+    Se já existir um lote na mesma data, atualiza as quantidades.
+    Caso contrário, cria um novo lote.
+    """
+    if data_entrada is None:
+        data_entrada = datetime.now(ZoneInfo('America/Sao_Paulo'))
+    
+    # Normaliza a data para comparar apenas a parte da data (sem hora)
+    data_entrada_date = data_entrada.date()
+    
+    # Busca por lotes existentes na mesma data
+    lote_existente = db.query(LoteEstoque).filter(
+        LoteEstoque.produto_id == produto_id,
+        func.date(LoteEstoque.data_entrada) == data_entrada_date,
+        LoteEstoque.valor_unitario_compra == valor_unitario_compra
+    ).first()
+    
+    if lote_existente:
+        # Atualiza lote existente
+        lote_existente.quantidade_inicial += quantidade
+        lote_existente.quantidade_disponivel += quantidade
+        if observacao:
+            lote_existente.observacao = observacao
+        lote_existente.sincronizado = False
+        return lote_existente
+    else:
+        # Cria novo lote
+        novo_lote = LoteEstoque(
+            produto_id=produto_id,
+            quantidade_inicial=quantidade,
+            quantidade_disponivel=quantidade,
+            valor_unitario_compra=valor_unitario_compra,
+            data_entrada=data_entrada,
+            observacao=observacao,
+            sincronizado=False
+        )
+        db.add(novo_lote)
+        return novo_lote

@@ -50,7 +50,7 @@ from app.models.entities import (
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
 from app.crud import (
     TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao,
-    criar_desconto, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
+    criar_desconto, criar_ou_atualizar_lote, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
     get_transferencias,get_user_by_cpf, get_user_by_id, get_usuarios, create_user, obter_caixas_completo,
     registrar_transferencia, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
     registrar_movimentacao, get_cliente, get_clientes, create_cliente, 
@@ -1005,6 +1005,7 @@ def criar_produto():
     try:
         data = request.get_json()
         usuario_id = current_user.id  # ID do usuário logado
+        data_atual = datetime.now(ZoneInfo('America/Sao_Paulo'))
 
         # VERIFICAÇÃO DE PRODUTO EXISTENTE (NOME + UNIDADE)
         nome = data['nome']
@@ -1022,6 +1023,7 @@ def criar_produto():
             estoque_loja_add = Decimal(data.get('estoque_loja', 0))
             estoque_deposito_add = Decimal(data.get('estoque_deposito', 0))
             estoque_fabrica_add = Decimal(data.get('estoque_fabrica', 0))
+            valor_unitario_compra = Decimal(data.get('valor_unitario_compra', data['valor_unitario']))
             
             # Atualizar estoques
             novo_estoque_loja = produto_existente.estoque_loja + estoque_loja_add
@@ -1035,14 +1037,45 @@ def criar_produto():
             }
             
             if 'valor_unitario_compra' in data:
-                update_data['valor_unitario_compra'] = Decimal(data['valor_unitario_compra'])
+                update_data['valor_unitario_compra'] = valor_unitario_compra
             
             produto_update = ProdutoUpdate(**update_data)
             produto = update_produto(db.session, produto_existente.id, produto_update)
             
+            # CRIAR/ATUALIZAR LOTES PARA CADA TIPO DE ESTOQUE
+            if estoque_loja_add > 0:
+                criar_ou_atualizar_lote(
+                    db.session,
+                    produto_id=produto.id,
+                    quantidade=estoque_loja_add,
+                    valor_unitario_compra=valor_unitario_compra,
+                    data_entrada=data_atual,
+                    observacao="Entrada em estoque loja - produto existente"
+                )
+                
+            if estoque_deposito_add > 0:
+                criar_ou_atualizar_lote(
+                    db.session,
+                    produto_id=produto.id,
+                    quantidade=estoque_deposito_add,
+                    valor_unitario_compra=valor_unitario_compra,
+                    data_entrada=data_atual,
+                    observacao="Entrada em estoque depósito - produto existente"
+                )
+                
+            if estoque_fabrica_add > 0:
+                criar_ou_atualizar_lote(
+                    db.session,
+                    produto_id=produto.id,
+                    quantidade=estoque_fabrica_add,
+                    valor_unitario_compra=valor_unitario_compra,
+                    data_entrada=data_atual,
+                    observacao="Entrada em estoque fábrica - produto existente"
+                )
+            
             # REGISTRAR MOVIMENTAÇÃO DE ENTRADA PARA PRODUTO EXISTENTE (SEM VINCULAR A CAIXA)
             if estoque_loja_add > 0:
-                movimentacao =MovimentacaoEstoque(
+                movimentacao = MovimentacaoEstoque(
                     produto_id=produto.id,
                     usuario_id=usuario_id,
                     caixa_id=None,  # Removido o vínculo com caixa
@@ -1050,8 +1083,8 @@ def criar_produto():
                     estoque_destino=TipoEstoque.loja,
                     quantidade=estoque_loja_add,
                     valor_unitario = 0,
-                    valor_unitario_compra=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
-                    data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                    valor_unitario_compra=valor_unitario_compra,
+                    data=data_atual,
                     observacao=f"Entrada de estoque - produto existente"
                 )
                 db.session.add(movimentacao)
@@ -1065,8 +1098,8 @@ def criar_produto():
                     estoque_destino=TipoEstoque.deposito,
                     quantidade=estoque_deposito_add,
                     valor_unitario = 0,
-                    valor_unitario_compra=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
-                    data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                    valor_unitario_compra=valor_unitario_compra,
+                    data=data_atual,
                     observacao=f"Entrada de estoque - produto existente"
                 )
                 db.session.add(movimentacao)
@@ -1080,8 +1113,8 @@ def criar_produto():
                     estoque_destino=TipoEstoque.fabrica,
                     quantidade=estoque_fabrica_add,
                     valor_unitario = 0,
-                    valor_unitario_compra=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
-                    data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                    valor_unitario_compra=valor_unitario_compra,
+                    data=data_atual,
                     observacao=f"Entrada de estoque - produto existente"
                 )
                 db.session.add(movimentacao)
@@ -1112,6 +1145,7 @@ def criar_produto():
             })
 
         # Se não existe, criar novo produto
+        valor_unitario_compra = Decimal(data.get('valor_unitario_compra', data['valor_unitario']))
         produto_data = ProdutoCreate(
             codigo=data.get('codigo'),
             nome=data['nome'],
@@ -1119,7 +1153,7 @@ def criar_produto():
             marca=data.get('marca'),
             unidade=data['unidade'],
             valor_unitario=Decimal(data['valor_unitario']),
-            valor_unitario_compra=Decimal(data.get('valor_unitario_compra', 0)),
+            valor_unitario_compra=valor_unitario_compra,
             valor_total_compra=Decimal(data.get('valor_total_compra', 0)),
             imcs=Decimal(data.get('imcs', 0)),
             estoque_loja=Decimal(data.get('estoque_loja', 0)),
@@ -1132,11 +1166,42 @@ def criar_produto():
 
         produto = create_produto(db.session, produto_data)
         
-        # REGISTRAR MOVIMENTAÇÃO DE ENTRADA PARA NOVO PRODUTO (SEM VINCULAR A CAIXA)
+        # CRIAR LOTES PARA O NOVO PRODUTO
         estoque_loja = Decimal(data.get('estoque_loja', 0))
         estoque_deposito = Decimal(data.get('estoque_deposito', 0))
         estoque_fabrica = Decimal(data.get('estoque_fabrica', 0))
         
+        if estoque_loja > 0:
+            criar_ou_atualizar_lote(
+                db.session,
+                produto_id=produto.id,
+                quantidade=estoque_loja,
+                valor_unitario_compra=valor_unitario_compra,
+                data_entrada=data_atual,
+                observacao="Entrada inicial em estoque loja - novo produto"
+            )
+            
+        if estoque_deposito > 0:
+            criar_ou_atualizar_lote(
+                db.session,
+                produto_id=produto.id,
+                quantidade=estoque_deposito,
+                valor_unitario_compra=valor_unitario_compra,
+                data_entrada=data_atual,
+                observacao="Entrada inicial em estoque depósito - novo produto"
+            )
+            
+        if estoque_fabrica > 0:
+            criar_ou_atualizar_lote(
+                db.session,
+                produto_id=produto.id,
+                quantidade=estoque_fabrica,
+                valor_unitario_compra=valor_unitario_compra,
+                data_entrada=data_atual,
+                observacao="Entrada inicial em estoque fábrica - novo produto"
+            )
+        
+        # REGISTRAR MOVIMENTAÇÃO DE ENTRADA PARA NOVO PRODUTO (SEM VINCULAR A CAIXA)
         if estoque_loja > 0:
             movimentacao = MovimentacaoEstoque(
                 produto_id=produto.id,
@@ -1146,8 +1211,8 @@ def criar_produto():
                 estoque_destino=TipoEstoque.loja,
                 quantidade=estoque_loja,
                 valor_unitario = 0,
-                valor_unitario_compra=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
-                data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                valor_unitario_compra=valor_unitario_compra,
+                data=data_atual,
                 observacao=f"Entrada de estoque - novo produto"
             )
             db.session.add(movimentacao)
@@ -1161,8 +1226,8 @@ def criar_produto():
                 estoque_destino=TipoEstoque.deposito,
                 quantidade=estoque_deposito,
                 valor_unitario = 0,
-                valor_unitario_compra=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
-                data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                valor_unitario_compra=valor_unitario_compra,
+                data=data_atual,
                 observacao=f"Entrada de estoque - novo produto"
             )
             db.session.add(movimentacao)
@@ -1176,8 +1241,8 @@ def criar_produto():
                 estoque_destino=TipoEstoque.fabrica,
                 quantidade=estoque_fabrica,
                 valor_unitario = 0,
-                valor_unitario_compra=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
-                data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                valor_unitario_compra=valor_unitario_compra,
+                data=data_atual,
                 observacao=f"Entrada de estoque - novo produto"
             )
             db.session.add(movimentacao)
@@ -1211,7 +1276,7 @@ def criar_produto():
         logger.error(f"Erro ao criar produto: {str(e)}")
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
-
+    
 def to_decimal_or_none(value):
     if value is None:
         return None
@@ -1366,6 +1431,7 @@ def entrada_estoque(produto_id):
     try:
         data = request.get_json()
         usuario_id = current_user.id
+        data_atual = datetime.now(ZoneInfo('America/Sao_Paulo'))
         
         produto = get_produto(db.session, produto_id)
         if not produto:
@@ -1376,6 +1442,7 @@ def entrada_estoque(produto_id):
         estoque_loja_add = Decimal(data.get('estoque_loja', 0))
         estoque_deposito_add = Decimal(data.get('estoque_deposito', 0))
         estoque_fabrica_add = Decimal(data.get('estoque_fabrica', 0))
+        valor_unitario_compra = Decimal(data.get('valor_unitario_compra', produto.valor_unitario_compra or produto.valor_unitario))
 
         update_data = {}
         if estoque_loja_add > 0:
@@ -1393,6 +1460,37 @@ def entrada_estoque(produto_id):
         produto_update = ProdutoUpdate(**update_data)
         produto = update_produto(db.session, produto.id, produto_update)
 
+        # CRIAR/ATUALIZAR LOTES PARA CADA ENTRADA
+        if estoque_loja_add > 0:
+            criar_ou_atualizar_lote(
+                db.session,
+                produto_id=produto.id,
+                quantidade=estoque_loja_add,
+                valor_unitario_compra=valor_unitario_compra,
+                data_entrada=data_atual,
+                observacao="Entrada manual em estoque loja"
+            )
+            
+        if estoque_deposito_add > 0:
+            criar_ou_atualizar_lote(
+                db.session,
+                produto_id=produto.id,
+                quantidade=estoque_deposito_add,
+                valor_unitario_compra=valor_unitario_compra,
+                data_entrada=data_atual,
+                observacao="Entrada manual em estoque depósito"
+            )
+            
+        if estoque_fabrica_add > 0:
+            criar_ou_atualizar_lote(
+                db.session,
+                produto_id=produto.id,
+                quantidade=estoque_fabrica_add,
+                valor_unitario_compra=valor_unitario_compra,
+                data_entrada=data_atual,
+                observacao="Entrada manual em estoque fábrica"
+            )
+
         # Registrar movimentações
         for destino, quantidade in [
             ("loja", estoque_loja_add),
@@ -1408,8 +1506,8 @@ def entrada_estoque(produto_id):
                     estoque_destino=TipoEstoque[destino],
                     quantidade=quantidade,
                     valor_unitario = 0,
-                    valor_unitario_compra=Decimal(data.get('valor_unitario_compra', data['valor_unitario'])),
-                    data=datetime.now(ZoneInfo('America/Sao_Paulo')),
+                    valor_unitario_compra=valor_unitario_compra,
+                    data=data_atual,
                     observacao="Entrada manual de estoque via edição de produto"
                 )
                 db.session.add(movimentacao)

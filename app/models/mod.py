@@ -372,27 +372,11 @@ class PagamentoNotaFiscal(Base):
     nota_fiscal = relationship("NotaFiscal", back_populates="pagamentos")
 
 # --------------------
-# Lote de Estoque
-# --------------------
-class LoteEstoque(Base):
-    __tablename__ = "lotes_estoque"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False)
-    quantidade_inicial = Column(DECIMAL(12, 3), nullable=False)
-    quantidade_disponivel = Column(DECIMAL(12, 3), nullable=False)
-    valor_unitario_compra = Column(DECIMAL(12, 2), nullable=False)
-    data_entrada = Column(DateTime, default=datetime.now, nullable=False)
-    observacao = Column(Text, nullable=True)
-    sincronizado = Column(Boolean, default=False, nullable=False)
-
-    produto = relationship("Produto", back_populates="lotes")
-
-# --------------------
 # Produto
 # --------------------
 class Produto(Base):
     __tablename__ = "produtos"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     codigo = Column(String(50), unique=True, nullable=True)
     nome = Column(String(150), nullable=False)
@@ -405,6 +389,9 @@ class Produto(Base):
     valor_total_compra = Column(DECIMAL(12, 2), nullable=True)
     imcs = Column(DECIMAL(5, 2), nullable=True)
 
+    peso_kg_por_saco = Column(Numeric(10, 3), default=50.0)
+    pacotes_por_saco = Column(Integer, default=10)
+    pacotes_por_fardo = Column(Integer, default=5)
     estoque_loja = Column(DECIMAL(12, 3), nullable=False, default=0.0)
     estoque_deposito = Column(DECIMAL(12, 3), nullable=False, default=0.0)
     estoque_fabrica = Column(DECIMAL(12, 3), nullable=False, default=0.0)
@@ -417,7 +404,6 @@ class Produto(Base):
 
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="produto")
     itens_nf = relationship("NotaFiscalItem", back_populates="produto")
-    lotes = relationship("LoteEstoque", back_populates="produto", cascade="all, delete-orphan")
 
     transferencias_origem = relationship(
         "TransferenciaEstoque",
@@ -429,7 +415,7 @@ class Produto(Base):
         foreign_keys="[TransferenciaEstoque.produto_destino_id]",
         back_populates="produto_destino"
     )
-
+    
     descontos = relationship(
         "Desconto",
         secondary=produto_desconto_association,
