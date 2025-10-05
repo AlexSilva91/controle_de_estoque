@@ -458,11 +458,27 @@ class PagamentoNotaFiscal(Base):
     nota_fiscal = relationship("NotaFiscal", back_populates="pagamentos")
 
 # --------------------
+# Lote de Estoque
+# --------------------
+class LoteEstoque(Base):
+    __tablename__ = "lotes_estoque"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False)
+    quantidade_inicial = Column(DECIMAL(12, 3), nullable=False)
+    quantidade_disponivel = Column(DECIMAL(12, 3), nullable=False)
+    valor_unitario_compra = Column(DECIMAL(12, 2), nullable=False)
+    data_entrada = Column(DateTime, default=datetime.now, nullable=False)
+    observacao = Column(Text, nullable=True)
+    sincronizado = Column(Boolean, default=False, nullable=False)
+
+    produto = relationship("Produto", back_populates="lotes")
+
+# --------------------
 # Produto
 # --------------------
 class Produto(Base):
     __tablename__ = "produtos"
-
     id = Column(Integer, primary_key=True, autoincrement=True)
     codigo = Column(String(50), unique=True, nullable=True)
     nome = Column(String(150), nullable=False)
@@ -490,6 +506,7 @@ class Produto(Base):
 
     movimentacoes = relationship("MovimentacaoEstoque", back_populates="produto")
     itens_nf = relationship("NotaFiscalItem", back_populates="produto")
+    lotes = relationship("LoteEstoque", back_populates="produto", cascade="all, delete-orphan")
 
     transferencias_origem = relationship(
         "TransferenciaEstoque",
@@ -501,7 +518,7 @@ class Produto(Base):
         foreign_keys="[TransferenciaEstoque.produto_destino_id]",
         back_populates="produto_destino"
     )
-    
+
     descontos = relationship(
         "Desconto",
         secondary=produto_desconto_association,
