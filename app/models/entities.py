@@ -405,6 +405,9 @@ class Produto(Base):
     valor_total_compra = Column(DECIMAL(12, 2), nullable=True)
     imcs = Column(DECIMAL(5, 2), nullable=True)
 
+    peso_kg_por_saco = Column(Numeric(10, 3), default=50.0)
+    pacotes_por_saco = Column(Integer, default=10)
+    pacotes_por_fardo = Column(Integer, default=5)
     estoque_loja = Column(DECIMAL(12, 3), nullable=False, default=0.0)
     estoque_deposito = Column(DECIMAL(12, 3), nullable=False, default=0.0)
     estoque_fabrica = Column(DECIMAL(12, 3), nullable=False, default=0.0)
