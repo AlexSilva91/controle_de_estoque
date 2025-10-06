@@ -6826,6 +6826,13 @@ def historico_financeiro_pdf():
         abort(500, description=str(e))
         
 # ============ ROTAS DAS CONTAS DOS USUÁRIOS ==============
+@admin_bp.route('/dashboard/contas')
+@login_required
+@admin_required
+def dashboard_contas():
+    logger.info(f"Acessando dashboard Contas - Usuário: {current_user.nome}")
+    return render_template('contas_usuario.html', nome_usuario=current_user.nome, tipo_usuario=current_user.tipo.value)
+
 @admin_bp.route('/conta/criar/<int:usuario_id>', methods=['POST'])
 @login_required
 @admin_required
@@ -6908,7 +6915,7 @@ def transferir_entre_contas():
                 tipo=TipoMovimentacao.saida,
                 forma_pagamento=forma_pagamento_enum,
                 valor=valor,
-                descricao=f"Transferência para conta #{conta_destino_id}: {descricao}",
+                descricao=f"Conta destino: {conta_destino.get_usuario_nome()} | {descricao}",
                 usuario_id=usuario_id
             )
             db.session.add(movimentacao_saida)
@@ -6919,7 +6926,7 @@ def transferir_entre_contas():
                 tipo=TipoMovimentacao.entrada,
                 forma_pagamento=forma_pagamento_enum,
                 valor=valor,
-                descricao=f"Transferência da conta #{conta_origem_id}: {descricao}",
+                descricao=f"Conta origem: {conta_origem.get_usuario_nome()} | {descricao}",
                 usuario_id=usuario_id
             )
             db.session.add(movimentacao_entrada)
@@ -7146,4 +7153,323 @@ def get_conta(conta_id):
         })
         
     except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+# --------------------
+# Rotas para Dashboard de Contas
+# --------------------
+@admin_bp.route('/api/contas-usuario', methods=['GET'])
+@login_required
+@admin_required
+def api_listar_contas_usuario():
+    """Retorna lista de contas com saldos para o dashboard"""
+    try:
+        contas = Conta.query.all()
+        contas_data = []
+        
+        for conta in contas:
+            # Construir dados da conta no formato esperado pelo frontend
+            saldos_por_forma_pagamento = {}
+            for saldo in conta.saldos_forma_pagamento:
+                saldos_por_forma_pagamento[saldo.forma_pagamento.value] = float(saldo.saldo)
+            
+            conta_data = {
+                'id': conta.id,
+                'usuario_id': conta.usuario_id,
+                'saldo_total': float(conta.saldo_total) if conta.saldo_total else 0.00,
+                'saldos_por_forma_pagamento': saldos_por_forma_pagamento,
+                'atualizado_em': conta.atualizado_em.isoformat() if conta.atualizado_em else None
+            }
+            contas_data.append(conta_data)
+        
+        logger.info(f"Retornando {len(contas_data)} contas para o dashboard")
+        return jsonify({
+            'success': True,
+            'contas': contas_data
+        })
+    except Exception as e:
+        logger.error(f"Erro ao listar contas para dashboard: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/contas-usuario/<int:conta_id>/movimentacoes', methods=['GET'])
+@login_required
+@admin_required
+def api_listar_movimentacoes_conta_usuario(conta_id):
+    """Retorna histórico de movimentações de uma conta para o dashboard"""
+    try:
+        # Verificar se a conta existe
+        conta = Conta.query.get(conta_id)
+        if not conta:
+            return jsonify({'success': False, 'error': 'Conta não encontrada'}), 404
+            
+        # Parâmetros de filtro
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        
+        query = MovimentacaoConta.query.filter_by(conta_id=conta_id)
+        
+        # Aplicar filtros de data se fornecidos
+        if data_inicio:
+            try:
+                data_inicio_dt = datetime.fromisoformat(data_inicio)
+                query = query.filter(MovimentacaoConta.data >= data_inicio_dt)
+            except ValueError:
+                return jsonify({'success': False, 'error': 'Formato de data início inválido'}), 400
+        
+        if data_fim:
+            try:
+                data_fim_dt = datetime.fromisoformat(data_fim)
+                query = query.filter(MovimentacaoConta.data <= data_fim_dt)
+            except ValueError:
+                return jsonify({'success': False, 'error': 'Formato de data fim inválido'}), 400
+        
+        movimentacoes = query.order_by(MovimentacaoConta.data.desc()).limit(100).all()
+        
+        movimentacoes_data = []
+        for mov in movimentacoes:
+            mov_data = {
+                'id': mov.id,
+                'tipo': mov.tipo.value,
+                'forma_pagamento': mov.forma_pagamento.value,
+                'valor': float(mov.valor),
+                'descricao': mov.descricao,
+                'data': mov.data.isoformat() if mov.data else None,
+                'usuario_id': mov.usuario_id,
+                'caixa_id': mov.caixa_id
+            }
+            movimentacoes_data.append(mov_data)
+        
+        logger.info(f"Retornando {len(movimentacoes_data)} movimentações para conta {conta_id}")
+        return jsonify({
+            'success': True,
+            'movimentacoes': movimentacoes_data
+        })
+    except Exception as e:
+        logger.error(f"Erro ao listar movimentações da conta {conta_id}: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/relatorios/movimentacoes-contas-usuario', methods=['GET'])
+@login_required
+@admin_required
+def api_relatorio_movimentacoes():
+    """Gera relatório de movimentações com filtros"""
+    try:
+        # Parâmetros de filtro
+        conta_id = request.args.get('conta_id', type=int)
+        usuario_id = request.args.get('usuario_id', type=int)
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        
+        # Query base para movimentações
+        query = db.session.query(
+            Usuario.nome.label('usuario_nome'),
+            MovimentacaoConta.conta_id,
+            MovimentacaoConta.forma_pagamento,
+            MovimentacaoConta.data,
+            db.func.sum(
+                db.case(
+                    (MovimentacaoConta.tipo == TipoMovimentacao.entrada, MovimentacaoConta.valor),
+                    else_=0
+                )
+            ).label('entradas'),
+            db.func.sum(
+                db.case(
+                    (MovimentacaoConta.tipo == TipoMovimentacao.saida, MovimentacaoConta.valor),
+                    else_=0
+                )
+            ).label('saidas')
+        ).join(Usuario, MovimentacaoConta.usuario_id == Usuario.id)
+        
+        # Aplicar filtros
+        if conta_id:
+            query = query.filter(MovimentacaoConta.conta_id == conta_id)
+        if usuario_id:
+            query = query.filter(MovimentacaoConta.usuario_id == usuario_id)
+        if data_inicio:
+            data_inicio_dt = datetime.fromisoformat(data_inicio)
+            query = query.filter(MovimentacaoConta.data >= data_inicio_dt)
+        if data_fim:
+            data_fim_dt = datetime.fromisoformat(data_fim)
+            query = query.filter(MovimentacaoConta.data <= data_fim_dt)
+        
+        resultados = query.group_by(
+            Usuario.nome,
+            MovimentacaoConta.conta_id,
+            MovimentacaoConta.forma_pagamento,
+            MovimentacaoConta.data
+        ).order_by(MovimentacaoConta.data.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'dados': [{
+                'usuario_nome': r.usuario_nome,
+                'conta_id': r.conta_id,
+                'forma_pagamento': r.forma_pagamento.value,
+                'entradas': float(r.entradas or 0),
+                'saidas': float(r.saidas or 0),
+                'data': r.data.isoformat() if r.data else None
+            } for r in resultados]
+        })
+        
+    except Exception as e:
+        logger.error(f"Erro ao gerar relatório de movimentações: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/relatorios/movimentacoes-contas-usuario/pdf', methods=['POST'])
+@login_required
+@admin_required
+def api_gerar_pdf_relatorio():
+    """Gera relatório em PDF"""
+    try:
+        from flask import send_file
+        import io
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        
+        data = request.get_json()
+        
+        # Parâmetros do relatório
+        data_inicio = data.get('data_inicio')
+        data_fim = data.get('data_fim')
+        conta_id = data.get('conta_id')
+        usuario_id = data.get('usuario_id')
+        
+        # Buscar dados
+        query = db.session.query(
+            Usuario.nome.label('usuario_nome'),
+            MovimentacaoConta.conta_id,
+            MovimentacaoConta.forma_pagamento,
+            MovimentacaoConta.data,
+            db.func.sum(
+                db.case(
+                    (MovimentacaoConta.tipo == TipoMovimentacao.entrada, MovimentacaoConta.valor),
+                    else_=0
+                )
+            ).label('entradas'),
+            db.func.sum(
+                db.case(
+                    (MovimentacaoConta.tipo == TipoMovimentacao.saida, MovimentacaoConta.valor),
+                    else_=0
+                )
+            ).label('saidas')
+        ).join(Usuario, MovimentacaoConta.usuario_id == Usuario.id)
+        
+        if conta_id:
+            query = query.filter(MovimentacaoConta.conta_id == conta_id)
+        if usuario_id:
+            query = query.filter(MovimentacaoConta.usuario_id == usuario_id)
+        if data_inicio:
+            data_inicio_dt = datetime.fromisoformat(data_inicio)
+            query = query.filter(MovimentacaoConta.data >= data_inicio_dt)
+        if data_fim:
+            data_fim_dt = datetime.fromisoformat(data_fim)
+            query = query.filter(MovimentacaoConta.data <= data_fim_dt)
+        
+        resultados = query.group_by(
+            Usuario.nome,
+            MovimentacaoConta.conta_id,
+            MovimentacaoConta.forma_pagamento,
+            MovimentacaoConta.data
+        ).order_by(MovimentacaoConta.data.desc()).all()
+        
+        # Criar PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Título
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=30,
+            textColor=colors.HexColor('#6c5ce7')
+        )
+        
+        title_text = "Relatório de Movimentações de Contas"
+        elements.append(Paragraph(title_text, title_style))
+        
+        # Período
+        periodo_text = f"Período: {data_inicio} a {data_fim}" if data_inicio and data_fim else "Período: Todos"
+        elements.append(Paragraph(periodo_text, styles['Normal']))
+        elements.append(Spacer(1, 20))
+        
+        # Tabela de dados
+        if resultados:
+            # Cabeçalho
+            data = [['Usuário', 'Conta', 'Forma Pagamento', 'Entradas (R$)', 'Saídas (R$)', 'Saldo (R$)', 'Data']]
+            
+            # Dados
+            for r in resultados:
+                entradas = float(r.entradas or 0)
+                saidas = float(r.saidas or 0)
+                saldo = entradas - saidas
+                data.append([
+                    r.usuario_nome,
+                    str(r.conta_id),
+                    r.forma_pagamento.value,
+                    f"R$ {entradas:.2f}",
+                    f"R$ {saidas:.2f}",
+                    f"R$ {saldo:.2f}",
+                    r.data.strftime('%d/%m/%Y') if r.data else '-'
+                ])
+            
+            # Criar tabela
+            table = Table(data, colWidths=[1.2*inch, 0.8*inch, 1.2*inch, 1*inch, 1*inch, 1*inch, 1*inch])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c5ce7')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8f9fa')),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#dddddd'))
+            ]))
+            
+            elements.append(table)
+            
+            # Totais
+            elements.append(Spacer(1, 20))
+            total_entradas = sum(float(r.entradas or 0) for r in resultados)
+            total_saidas = sum(float(r.saidas or 0) for r in resultados)
+            saldo_total = total_entradas - total_saidas
+            
+            totais_data = [
+                ['TOTAIS:', f'R$ {total_entradas:.2f}', f'R$ {total_saidas:.2f}', f'R$ {saldo_total:.2f}']
+            ]
+            
+            totais_table = Table(totais_data, colWidths=[2*inch, 1*inch, 1*inch, 1*inch])
+            totais_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2d3748')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ]))
+            
+            elements.append(totais_table)
+        else:
+            elements.append(Paragraph("Nenhum dado encontrado para os filtros aplicados.", styles['Normal']))
+        
+        # Gerar PDF
+        doc.build(elements)
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f'relatorio_contas_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf',
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        logger.error(f"Erro ao gerar PDF: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500

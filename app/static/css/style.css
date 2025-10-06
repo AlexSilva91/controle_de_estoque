@@ -982,17 +982,33 @@ tr:hover td {
 
 /* Badges */
 .badge {
-  display: inline-block;
-  padding: var(--space-xs) var(--space-sm);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  border-radius: 20px;
-  color: white;
+  display: inline-flex;
+  /* melhor alinhamento interno */
+  align-items: center;
+  /* centraliza verticalmente */
+  justify-content: center;
+  /* centraliza horizontalmente */
+  padding: 0.25em 0.75em;
+  /* padding relativo ao texto */
+  font-size: clamp(0.65rem, 0.9vw, 0.8rem);
+  /* adapta conforme viewport */
+  font-weight: 500;
+  border-radius: 9999px;
+  /* forma de pílula flexível */
+  color: #fff;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   white-space: nowrap;
+  /* evita quebra de linha */
+  line-height: 1;
+  width: fit-content;
+  /* se ajusta ao conteúdo */
+  max-width: 100%;
+  /* evita ultrapassar containers */
+  box-sizing: border-box;
 }
 
+/* Exemplo de variação */
 .badge-primary {
   background: var(--gradient-primary);
 }

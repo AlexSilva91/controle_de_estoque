@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Contas - Dashboard</title>
+    <link rel="icon" href="{{ url_for('static', filename='assets/logo1.ico') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <div class="dashboard-container">
+
+        <!-- Conteúdo Principal -->
+        <div class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-left">
+                    <div class="header-title">
+                        <h1>Gestão de Contas</h1>
+                        <div class="breadcrumb">
+                            <a href="{{ url_for('admin.dashboard') }}" class="breadcrumb-link">
+                                <i class="fas fa-home"></i>
+                                <span>Dashboard</span>
+                            </a>
+                            <span>/</span>
+                            <span>Saldo por Operador</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="user-actions">
+                    <div class="user-info">
+                        <div class="user-avatar">
+                            <i class="fas fa-user-circle"></i>
+                        </div>
+                        <div class="user-details">
+                            <div class="user-name">{{ nome_usuario }}</div>
+                            <div class="user-role">{{ tipo_usuario }}</div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Conteúdo -->
+            <div class="content-wrapper">
+                <!-- Dashboard Tab -->
+                <div id="dashboard" class="tab-content active">
+                    <!-- Barra de Ações -->
+                    <div class="action-bar">
+                        <div class="search-container">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="searchInput" placeholder="Buscar por usuário...">
+                        </div>
+
+                        <div class="filter-container">
+                            <div class="filter-group">
+                                <label for="filterConta">Conta</label>
+                                <select id="filterConta" class="form-control">
+                                    <option value="">Todas as contas</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="filterUsuario">Usuário</label>
+                                <select id="filterUsuario" class="form-control">
+                                    <option value="">Todos os usuários</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="filterDataInicio">Data Início</label>
+                                <input type="date" id="filterDataInicio" class="form-control">
+                            </div>
+                            <div class="filter-group">
+                                <label for="filterDataFim">Data Fim</label>
+                                <input type="date" id="filterDataFim" class="form-control">
+                            </div>
+                            <button id="btnFiltrar" class="btn btn-primary">
+                                <i class="fas fa-filter"></i>
+                                <span>Filtrar</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Cards de Saldo por Operador -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>
+                                <i class="fas fa-users"></i>
+                                <span>Saldo por Operador</span>
+                            </h3>
+                            <div class="card-actions">
+                                <button class="btn btn-icon" id="refreshSaldo">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="operadoresGrid" class="metrics-grid">
+                                <!-- Cards dos operadores serão carregados aqui via JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detalhes do Usuário Selecionado -->
+                    <div id="detalhesUsuario" class="card" style="display: none;">
+                        <div class="card-header">
+                            <h3>
+                                <i class="fas fa-user"></i>
+                                <span id="detalhesUsuarioNome">Detalhes do Usuário</span>
+                            </h3>
+                            <div class="card-actions">
+                                <button class="btn btn-icon" id="fecharDetalhes">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <label>Saldo Total</label>
+                                    <div class="value monetary" id="detalhesSaldoTotal">R$ 0,00</div>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Última Atualização</label>
+                                    <div class="value" id="detalhesAtualizadoEm">-</div>
+                                </div>
+                            </div>
+
+                            <div class="section-title">Saldos por Forma de Pagamento</div>
+                            <div id="saldosFormaPagamento" class="details-grid">
+                                <!-- Saldos por forma de pagamento serão carregados aqui -->
+                            </div>
+
+                            <div class="section-title">Histórico de Movimentações</div>
+                            <div class="table-responsive">
+                                <table id="historicoMovimentacoes">
+                                    <thead>
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Tipo</th>
+                                            <th>Forma Pagamento</th>
+                                            <th>Valor</th>
+                                            <th>Descrição</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Histórico será carregado aqui -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Relatórios Tab -->
+                <div id="relatorios" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>
+                                <i class="fas fa-chart-bar"></i>
+                                <span>Relatórios Detalhados</span>
+                            </h3>
+                            <div class="card-actions">
+                                <button id="btnExportarPdf" class="btn btn-danger">
+                                    <i class="fas fa-file-pdf"></i>
+                                    <span>Exportar PDF</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="action-bar">
+                                <div class="filter-container">
+                                    <div class="filter-group">
+                                        <label for="relatorioConta">Conta</label>
+                                        <select id="relatorioConta" class="form-control">
+                                            <option value="">Todas as contas</option>
+                                        </select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label for="relatorioUsuario">Usuário</label>
+                                        <select id="relatorioUsuario" class="form-control">
+                                            <option value="">Todos os usuários</option>
+                                        </select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label for="relatorioDataInicio">Data Início</label>
+                                        <input type="date" id="relatorioDataInicio" class="form-control">
+                                    </div>
+                                    <div class="filter-group">
+                                        <label for="relatorioDataFim">Data Fim</label>
+                                        <input type="date" id="relatorioDataFim" class="form-control">
+                                    </div>
+                                    <button id="btnGerarRelatorio" class="btn btn-primary">
+                                        <i class="fas fa-chart-bar"></i>
+                                        <span>Gerar Relatório</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table id="tabelaRelatorio">
+                                    <thead>
+                                        <tr>
+                                            <th>Usuário</th>
+                                            <th>Conta</th>
+                                            <th>Forma Pagamento</th>
+                                            <th>Entradas</th>
+                                            <th>Saídas</th>
+                                            <th>Saldo</th>
+                                            <th>Data</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Dados do relatório serão carregados aqui -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer>
+                <p>&copy; 2025 Sistema Financeiro. Todos os direitos reservados.</p>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Modal de Entrada -->
+    <div id="modalEntrada" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Entrada na Conta</span>
+                    </h3>
+                    <button class="close-modal" data-modal="modalEntrada">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="formEntrada">
+                        <input type="hidden" id="entradaContaId">
+                        <div class="form-group">
+                            <label for="entradaFormaPagamento">Forma de Pagamento</label>
+                            <select id="entradaFormaPagamento" class="form-control" required>
+                                <option value="">Selecione a forma de pagamento</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="entradaValor">Valor</label>
+                            <input type="number" id="entradaValor" class="form-control" step="0.01" min="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="entradaDescricao">Descrição</label>
+                            <textarea id="entradaDescricao" class="form-control" rows="3" required></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" data-modal="modalEntrada">Cancelar</button>
+                    <button class="btn btn-success" id="btnConfirmarEntrada">Confirmar Entrada</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Saída -->
+    <div id="modalSaida" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-minus-circle"></i>
+                        <span>Saída da Conta</span>
+                    </h3>
+                    <button class="close-modal" data-modal="modalSaida">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="formSaida">
+                        <input type="hidden" id="saidaContaId">
+                        <div class="form-group">
+                            <label for="saidaFormaPagamento">Forma de Pagamento</label>
+                            <select id="saidaFormaPagamento" class="form-control" required>
+                                <option value="">Selecione a forma de pagamento</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="saidaValor">Valor</label>
+                            <input type="number" id="saidaValor" class="form-control" step="0.01" min="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="saidaDescricao">Descrição</label>
+                            <textarea id="saidaDescricao" class="form-control" rows="3" required></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" data-modal="modalSaida">Cancelar</button>
+                    <button class="btn btn-danger" id="btnConfirmarSaida">Confirmar Saída</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Transferência -->
+    <div id="modalTransferencia" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-md">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-exchange-alt"></i>
+                        <span>Transferência entre Contas</span>
+                    </h3>
+                    <button class="close-modal" data-modal="modalTransferencia">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="formTransferencia">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="transferenciaContaOrigem">Conta de Origem</label>
+                                <select id="transferenciaContaOrigem" class="form-control" required>
+                                    <option value="">Selecione a conta de origem</option>
+                                </select>
+                                <div class="saldo-info" id="saldoOrigemInfo"></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="transferenciaContaDestino">Conta de Destino</label>
+                                <select id="transferenciaContaDestino" class="form-control" required>
+                                    <option value="">Selecione a conta de destino</option>
+                                </select>
+                                <div class="saldo-info" id="saldoDestinoInfo"></div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="transferenciaFormaPagamento">Forma de Pagamento</label>
+                                <select id="transferenciaFormaPagamento" class="form-control" required>
+                                    <option value="">Selecione a forma de pagamento</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="transferenciaValor">Valor</label>
+                                <input type="number" id="transferenciaValor" class="form-control" step="0.01" min="0.01"
+                                    required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="transferenciaDescricao">Descrição</label>
+                            <textarea id="transferenciaDescricao" class="form-control" rows="3"
+                                required>Transferência entre contas</textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" data-modal="modalTransferencia">Cancelar</button>
+                    <button class="btn btn-primary" id="btnConfirmarTransferencia">
+                        <i class="fas fa-exchange-alt"></i>
+                        <span>Realizar Transferência</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação -->
+    <div id="modalConfirmacao" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Confirmação</span>
+                    </h3>
+                    <button class="close-modal" data-modal="modalConfirmacao">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p id="modalMensagem">Tem certeza que deseja realizar esta ação?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" data-modal="modalConfirmacao">Cancelar</button>
+                    <button class="btn btn-primary" id="modalConfirmar">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/script_contas_usuario.js') }}"></script>
+</body>
+
+</html>

@@ -116,6 +116,10 @@ class Conta(Base):
         )
         return float(saldo.saldo) if saldo else 0.00
 
+    def get_usuario_nome(self):
+        """Retorna o nome do usuário associado à conta"""
+        return self.usuario.nome if self.usuario else None
+    
     def to_dict(self):
         return {
             "id": self.id,
