@@ -7327,157 +7327,186 @@ def api_relatorio_movimentacoes():
 @login_required
 @admin_required
 def api_gerar_pdf_relatorio():
-    """Gera relatório em PDF"""
+    """Gera relatório em PDF com todas as movimentações"""
     try:
         from flask import send_file
         import io
-        from reportlab.pdfgen import canvas
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.pagesizes import letter
         from reportlab.lib import colors
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import inch
-        
-        data = request.get_json()
-        
-        # Parâmetros do relatório
-        data_inicio = data.get('data_inicio')
-        data_fim = data.get('data_fim')
-        conta_id = data.get('conta_id')
-        usuario_id = data.get('usuario_id')
-        
-        # Buscar dados
-        query = db.session.query(
-            Usuario.nome.label('usuario_nome'),
-            MovimentacaoConta.conta_id,
-            MovimentacaoConta.forma_pagamento,
-            MovimentacaoConta.data,
-            db.func.sum(
-                db.case(
-                    (MovimentacaoConta.tipo == TipoMovimentacao.entrada, MovimentacaoConta.valor),
-                    else_=0
-                )
-            ).label('entradas'),
-            db.func.sum(
-                db.case(
-                    (MovimentacaoConta.tipo == TipoMovimentacao.saida, MovimentacaoConta.valor),
-                    else_=0
-                )
-            ).label('saidas')
-        ).join(Usuario, MovimentacaoConta.usuario_id == Usuario.id)
-        
+
+        data_req = request.get_json()
+
+        data_inicio = data_req.get('data_inicio')
+        data_fim = data_req.get('data_fim')
+        conta_id = data_req.get('conta_id')
+
+        # Buscar a conta para obter informações adicionais
+        conta = None
         if conta_id:
-            query = query.filter(MovimentacaoConta.conta_id == conta_id)
-        if usuario_id:
-            query = query.filter(MovimentacaoConta.usuario_id == usuario_id)
+            conta = Conta.query.get(conta_id)
+            if not conta:
+                return jsonify({'success': False, 'error': 'Conta não encontrada'}), 404
+
+        # BUSCAR TODAS AS MOVIMENTAÇÕES DA CONTA
+        query = MovimentacaoConta.query.filter_by(conta_id=conta_id)
+
+        # Aplicar filtros de data CORRETAMENTE (incluindo todo o dia)
         if data_inicio:
-            data_inicio_dt = datetime.fromisoformat(data_inicio)
-            query = query.filter(MovimentacaoConta.data >= data_inicio_dt)
+            try:
+                data_inicio_dt = datetime.fromisoformat(data_inicio)
+                # Incluir todo o dia desde 00:00:00
+                query = query.filter(MovimentacaoConta.data >= data_inicio_dt)
+            except ValueError:
+                return jsonify({'success': False, 'error': 'Formato de data início inválido'}), 400
+        
         if data_fim:
-            data_fim_dt = datetime.fromisoformat(data_fim)
-            query = query.filter(MovimentacaoConta.data <= data_fim_dt)
-        
-        resultados = query.group_by(
-            Usuario.nome,
-            MovimentacaoConta.conta_id,
-            MovimentacaoConta.forma_pagamento,
-            MovimentacaoConta.data
-        ).order_by(MovimentacaoConta.data.desc()).all()
-        
-        # Criar PDF
+            try:
+                data_fim_dt = datetime.fromisoformat(data_fim)
+                # Incluir todo o dia até 23:59:59
+                data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
+                query = query.filter(MovimentacaoConta.data <= data_fim_dt)
+            except ValueError:
+                return jsonify({'success': False, 'error': 'Formato de data fim inválido'}), 400
+
+        # BUSCAR TODOS OS REGISTROS SEM LIMITE
+        movimentacoes = query.order_by(MovimentacaoConta.data.desc()).all()
+
+        # DEBUG: Log para verificar o que está sendo buscado
+        logger.info(f"PDF - Conta {conta_id}: {len(movimentacoes)} movimentações encontradas")
+        for mov in movimentacoes:
+            logger.info(f"Mov {mov.id}: {mov.data} | {mov.tipo.value} | {mov.valor} | {mov.descricao}")
+
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=20, leftMargin=20, topMargin=30, bottomMargin=30)
         elements = []
         styles = getSampleStyleSheet()
-        
+
         # Título
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
             fontSize=16,
-            spaceAfter=30,
+            spaceAfter=20,
             textColor=colors.HexColor('#6c5ce7')
         )
         
-        title_text = "Relatório de Movimentações de Contas"
-        elements.append(Paragraph(title_text, title_style))
-        
+        titulo = f"Relatório de Movimentações - Conta {conta_id}"
+        if conta and conta.usuario:
+            titulo += f" - {conta.usuario.nome}"
+            
+        elements.append(Paragraph(titulo, title_style))
+
+        # Informações da conta
+        if conta:
+            info_conta = []
+            info_conta.append(f"Saldo Atual: R$ {float(conta.saldo_total):.2f}")
+                
+            elements.append(Paragraph(" | ".join(info_conta), styles['Normal']))
+
         # Período
         periodo_text = f"Período: {data_inicio} a {data_fim}" if data_inicio and data_fim else "Período: Todos"
         elements.append(Paragraph(periodo_text, styles['Normal']))
-        elements.append(Spacer(1, 20))
-        
-        # Tabela de dados
-        if resultados:
-            # Cabeçalho
-            data = [['Usuário', 'Conta', 'Forma Pagamento', 'Entradas (R$)', 'Saídas (R$)', 'Saldo (R$)', 'Data']]
-            
-            # Dados
-            for r in resultados:
-                entradas = float(r.entradas or 0)
-                saidas = float(r.saidas or 0)
-                saldo = entradas - saidas
-                data.append([
-                    r.usuario_nome,
-                    str(r.conta_id),
-                    r.forma_pagamento.value,
-                    f"R$ {entradas:.2f}",
-                    f"R$ {saidas:.2f}",
-                    f"R$ {saldo:.2f}",
-                    r.data.strftime('%d/%m/%Y') if r.data else '-'
+
+        elements.append(Spacer(1, 12))
+
+        if movimentacoes:
+            table_data = [['Data', 'Usuário', 'Tipo', 'Forma Pagamento', 'Valor (R$)', 'Descrição']]
+            total_entradas = 0
+            total_saidas = 0
+            total_transferencias = 0
+
+            for mov in movimentacoes:
+                valor = float(mov.valor)
+                
+                # Classificar CORRETAMENTE por tipo
+                if mov.tipo.value == 'entrada':
+                    total_entradas += valor
+                    tipo_exibicao = 'ENTRADA'
+                elif mov.tipo.value == 'saida':
+                    total_saidas += valor
+                    tipo_exibicao = 'SAÍDA'
+                elif mov.tipo.value == 'transferencia':
+                    total_transferencias += valor
+                    tipo_exibicao = 'TRANSFERÊNCIA'
+                elif mov.tipo.value == 'saida_estorno':
+                    total_saidas += valor
+                    tipo_exibicao = 'ESTORNO SAÍDA'
+                else:
+                    tipo_exibicao = mov.tipo.value.upper()
+
+                table_data.append([
+                    mov.data.strftime('%d/%m/%Y %H:%M') if mov.data else '-',
+                    mov.usuario.nome if mov.usuario else '-',
+                    tipo_exibicao,
+                    mov.forma_pagamento.value.replace('_', ' ').title(),
+                    f"R$ {valor:.2f}",
+                    Paragraph(mov.descricao or '-', styles['Normal'])
                 ])
-            
-            # Criar tabela
-            table = Table(data, colWidths=[1.2*inch, 0.8*inch, 1.2*inch, 1*inch, 1*inch, 1*inch, 1*inch])
+
+            # Ajuste de largura das colunas
+            col_widths = [1.2*inch, 1.5*inch, 1.0*inch, 1.2*inch, 1*inch, 2.1*inch]
+
+            table = Table(table_data, colWidths=col_widths, repeatRows=1)
             table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c5ce7')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (0, 0), (-2, -1), 'CENTER'),
+                ('ALIGN', (4, 1), (4, -1), 'RIGHT'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8f9fa')),
                 ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 1), (-1, -1), 8),
-                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#dddddd'))
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
             ]))
-            
             elements.append(table)
-            
-            # Totais
-            elements.append(Spacer(1, 20))
-            total_entradas = sum(float(r.entradas or 0) for r in resultados)
-            total_saidas = sum(float(r.saidas or 0) for r in resultados)
-            saldo_total = total_entradas - total_saidas
+
+            # Totais detalhados
+            elements.append(Spacer(1, 12))
+            saldo_total = total_entradas - total_saidas - total_transferencias
             
             totais_data = [
-                ['TOTAIS:', f'R$ {total_entradas:.2f}', f'R$ {total_saidas:.2f}', f'R$ {saldo_total:.2f}']
+                [f'Entradas: R$ {total_entradas:.2f}', f'Saídas: R$ {total_saidas:.2f}', f' Transferências: R$ {total_transferencias:.2f} ']
             ]
-            
-            totais_table = Table(totais_data, colWidths=[2*inch, 1*inch, 1*inch, 1*inch])
+
+            totais_table = Table(totais_data, colWidths=[1.5*inch, 1.3*inch, 1.8*inch])
             totais_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2d3748')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
                 ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
             ]))
-            
             elements.append(totais_table)
+
+            # Resumo
+            elements.append(Spacer(1, 8))
+            resumo_text = f"Total de movimentações: {len(movimentacoes)}"
+            elements.append(Paragraph(resumo_text, styles['Normal']))
+            
+            # Estatísticas por tipo
+            elements.append(Spacer(1, 4))
+            estatisticas_text = f"Entradas: {sum(1 for m in movimentacoes if m.tipo.value == 'entrada')} | "
+            estatisticas_text += f"Saídas: {sum(1 for m in movimentacoes if m.tipo.value == 'saida')} | "
+            estatisticas_text += f"Transferências: {sum(1 for m in movimentacoes if m.tipo.value == 'transferencia')} | "
+            elements.append(Paragraph(estatisticas_text, styles['Normal']))
+
         else:
-            elements.append(Paragraph("Nenhum dado encontrado para os filtros aplicados.", styles['Normal']))
-        
-        # Gerar PDF
+            elements.append(Paragraph("Nenhuma movimentação encontrada para esta conta no período selecionado.", styles['Normal']))
+
         doc.build(elements)
         buffer.seek(0)
-        
         return send_file(
             buffer,
             as_attachment=True,
-            download_name=f'relatorio_contas_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf',
+            download_name=f'relatorio_movimentacoes_conta_{conta_id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf',
             mimetype='application/pdf'
         )
-        
+
     except Exception as e:
         logger.error(f"Erro ao gerar PDF: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
