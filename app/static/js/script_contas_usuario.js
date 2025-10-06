@@ -405,8 +405,14 @@ async function carregarHistoricoMovimentacoes(contaId) {
         movimentacoes.forEach(mov => {
             const tr = document.createElement('tr');
             const dataFormatada = mov.data ? new Date(mov.data).toLocaleString('pt-BR') : '-';
-            const tipoClasse = mov.tipo === 'entrada' ? 'badge-success' : 'badge-danger';
-            const tipoTexto = mov.tipo === 'entrada' ? 'Entrada' : 'Saída';
+            const tipoMap = {
+                entrada: { classe: 'badge-success', texto: 'Entrada' },
+                saida: { classe: 'badge-danger', texto: 'Saída' },
+                transferencia: { classe: 'badge-warning', texto: 'Transferência' }
+            };
+
+            const tipoClasse = tipoMap[mov.tipo]?.classe || 'badge-secondary';
+            const tipoTexto = tipoMap[mov.tipo]?.texto || 'Desconhecido';
 
             tr.innerHTML = `
                 <td>${dataFormatada}</td>

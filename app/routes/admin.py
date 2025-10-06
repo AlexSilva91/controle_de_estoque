@@ -6870,7 +6870,7 @@ def transferir_entre_contas():
         data = request.get_json()
 
         # Validar dados obrigatórios
-        required_fields = ['conta_origem_id', 'conta_destino_id', 'forma_pagamento', 'valor', 'descricao']
+        required_fields = ['conta_origem_id', 'conta_destino_id', 'forma_pagamento', 'valor']
         for field in required_fields:
             if field not in data or not data[field]:
                 return jsonify({'error': f'Campo obrigatório faltando: {field}'}), 400
@@ -6909,13 +6909,20 @@ def transferir_entre_contas():
             }), 400
 
         with db.session.begin_nested():
+            conta_destino_nome = conta_destino.get_usuario_nome()
+            conta_origem_nome = conta_origem.get_usuario_nome()
+
+            # Descrições completas
+            descricao_saida = f"{descricao} | Conta destino: {conta_destino_nome}" if descricao else f"Conta destino: {conta_destino_nome}"
+            descricao_entrada = f"{descricao} | Conta origem: {conta_origem_nome}" if descricao else f"Conta origem: {conta_origem_nome}"
+
             # Movimentação de saída (origem)
             movimentacao_saida = MovimentacaoConta(
                 conta_id=conta_origem_id,
-                tipo=TipoMovimentacao.saida,
+                tipo=TipoMovimentacao.transferencia,
                 forma_pagamento=forma_pagamento_enum,
                 valor=valor,
-                descricao=f"Conta destino: {conta_destino.get_usuario_nome()} | {descricao}",
+                descricao=descricao_saida,
                 usuario_id=usuario_id
             )
             db.session.add(movimentacao_saida)
@@ -6926,10 +6933,11 @@ def transferir_entre_contas():
                 tipo=TipoMovimentacao.entrada,
                 forma_pagamento=forma_pagamento_enum,
                 valor=valor,
-                descricao=f"Conta origem: {conta_origem.get_usuario_nome()} | {descricao}",
+                descricao=descricao_entrada,
                 usuario_id=usuario_id
             )
             db.session.add(movimentacao_entrada)
+
 
             # Atualizar saldo total
             conta_origem.saldo_total -= valor
