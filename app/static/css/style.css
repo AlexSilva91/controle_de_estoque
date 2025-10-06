@@ -2997,3 +2997,87 @@ canvas {
   color: #dc3545;
   font-weight: bold;
 }
+
+/* === CADA CARD DE OPERADOR === */
+.metric-card[data-usuario-id] {
+  display: flex;
+  flex-direction: column;
+  /* organiza o conteúdo em coluna */
+  justify-content: space-between;
+  /* distribui o conteúdo verticalmente */
+  align-items: center;
+  /* centraliza horizontalmente */
+  text-align: center;
+  /* centraliza textos */
+
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+
+  width: 320px;
+  /* largura fixa */
+  height: 500px;
+  /* altura consistente */
+  padding: var(--space-md);
+  box-sizing: border-box;
+  transition: transform 0.2s ease, box-shadow 0.3s ease;
+}
+
+.metric-card[data-usuario-id]:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+/* === TOPO: ÍCONE + NOME === */
+.metric-card h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: var(--space-md);
+  color: var(--text-color);
+}
+
+/* === SALDOS === */
+.metric-card .valor-saldo {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: var(--space-sm);
+}
+
+.metric-card .valor-saldo.positivo {
+  color: var(--success-color);
+}
+
+.metric-card .valor-saldo.negativo {
+  color: var(--danger-color);
+}
+
+.metric-card .formas-pagamento {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--space-lg);
+}
+
+/* === BOTÕES === */
+.metric-card .card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  /* 2 por linha */
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.metric-card .card-actions .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.metric-card .card-actions .btn i {
+  font-size: 1rem;
+}

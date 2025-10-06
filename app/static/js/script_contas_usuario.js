@@ -204,8 +204,7 @@ async function carregarFormasPagamento() {
         { value: 'pix_loja', label: 'PIX Loja' },
         { value: 'dinheiro', label: 'Dinheiro' },
         { value: 'cartao_credito', label: 'Cartão de Crédito' },
-        { value: 'cartao_debito', label: 'Cartão de Débito' },
-        { value: 'a_prazo', label: 'A Prazo' }
+        { value: 'cartao_debito', label: 'Cartão de Débito' }
     ];
     console.log('Formas de pagamento carregadas:', formasPagamento.length);
 }
