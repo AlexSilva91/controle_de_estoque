@@ -52,7 +52,7 @@ from app.crud import (
     TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao, calcular_formas_pagamento,
     criar_desconto, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
     get_transferencias,get_user_by_cpf, get_user_by_id, get_usuarios, create_user, obter_caixas_completo,
-    registrar_transferencia, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
+    registrar_transferencia, transferir_todo_saldo, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
     registrar_movimentacao, get_cliente, get_clientes, create_cliente, 
     update_cliente, delete_cliente, create_nota_fiscal, get_nota_fiscal, 
     get_notas_fiscais, create_lancamento_financeiro, get_lancamento_financeiro,
@@ -4752,8 +4752,8 @@ def gerar_pdf_caixa_financeiro(caixa_id):
 @login_required
 @admin_required
 def aprovar_caixa(caixa_id):
-    """Rota para aprovar o fechamento de um caixa"""
-    caixa =  Caixa.query.get_or_404(caixa_id)
+    """Rota para aprovar o fechamento de um caixa e transferir saldo para o admin"""
+    caixa = Caixa.query.get_or_404(caixa_id)
     
     if current_user.tipo != 'admin':
         logger.warning(f"Usuário não autorizado a aprovar caixa: {current_user.nome}")
@@ -4762,23 +4762,54 @@ def aprovar_caixa(caixa_id):
     data = request.get_json()
     valor_confirmado = data.get('valor_confirmado')
     observacoes = data.get('observacoes')
-    print(data)
+    
     try:
+        # Aprovar o fechamento do caixa
         caixa.aprovar_fechamento(
             administrador_id=current_user.id,
             valor_confirmado=valor_confirmado,
             observacoes_admin=observacoes
         )
+        
+        # TRANSFERIR TODO O SALDO DO OPERADOR PARA O ADMINISTRADOR
+        operador = caixa.operador
+        if operador and operador.conta:
+            # Verificar se o operador tem saldo para transferir
+            if operador.conta.saldo_total > 0:
+                # Buscar a conta do administrador (current_user)
+                admin_conta = current_user.conta
+                if not admin_conta:
+                    # Se o admin não tem conta, criar uma
+                    admin_conta = Conta(usuario_id=current_user.id, saldo_total=0.00)
+                    db.session.add(admin_conta)
+                    db.session.flush()
+                
+                # Transferir todo o saldo do operador para o admin
+                resultado_transferencia = transferir_todo_saldo(
+                    conta_origem_id=operador.conta.id,
+                    conta_destino_id=admin_conta.id,
+                    usuario_id=current_user.id,
+                    session=db.session,
+                    descricao=f"Aprovação do Caixa {caixa_id}"
+                )
+                
+            else:
+                logger.info(f"Operador {operador.nome} não possui saldo para transferir")
+        
         db.session.commit()
         logger.info(f"Caixa {caixa_id} aprovado com sucesso pelo usuário {current_user.nome}")
+        
         return jsonify({
             'success': True,
-            'message': 'Caixa aprovado com sucesso',
+            'message': 'Caixa aprovado com sucesso e saldo transferido',
             'status': caixa.status.value,
-            'valor_confirmado': float(caixa.valor_confirmado) if caixa.valor_confirmado else None
+            'valor_confirmado': float(caixa.valor_confirmado) if caixa.valor_confirmado else None,
+            'transferencia_realizada': operador.conta.saldo_total > 0 if operador and operador.conta else False
         }), 200
+        
     except ValueError as e:
         logger.error(f"Erro ao aprovar caixa {caixa_id}: {str(e)}")
+        db.session.rollback()
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         logger.error(f"Erro ao aprovar caixa {caixa_id}: {str(e)}")

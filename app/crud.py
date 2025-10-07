@@ -23,6 +23,7 @@ from typing import Dict, Any, List, Union, Tuple
 
 from app.models.entities import (
     Caixa,
+    Conta,
     Financeiro,
     MovimentacaoConta,
     NotaFiscal,
@@ -2859,3 +2860,121 @@ def buscar_historico_financeiro_agrupado(
     resultado.sort(key=lambda x: x['data'], reverse=True)
     
     return resultado
+
+def transferir_todo_saldo(conta_origem_id, conta_destino_id, usuario_id, session, descricao=None):
+    """
+    Transfere TODO o saldo de uma conta de origem para uma conta de destino
+    Transferência é feita por forma de pagamento individualmente
+    """
+    try:
+        # Buscar contas
+        conta_origem = session.query(Conta).get(conta_origem_id)
+        conta_destino = session.query(Conta).get(conta_destino_id)
+
+        if not conta_origem:
+            raise ValueError('Conta de origem não encontrada')
+        if not conta_destino:
+            raise ValueError('Conta de destino não encontrada')
+        if conta_origem_id == conta_destino_id:
+            raise ValueError('Não é possível transferir para a mesma conta')
+
+        # Verificar se há saldo para transferir
+        if conta_origem.saldo_total <= 0:
+            raise ValueError('Conta de origem não possui saldo para transferir')
+
+        # Obter nomes dos usuários para as descrições
+        nome_origem = conta_origem.get_usuario_nome()
+        nome_destino = conta_destino.get_usuario_nome()
+
+        total_transferido = Decimal('0.00')  # Usar Decimal em vez de float
+        transferencias_realizadas = []
+
+        # Transferir cada forma de pagamento individualmente
+        for saldo_fp in conta_origem.saldos_forma_pagamento:
+            if saldo_fp.saldo > 0:  # Comparar Decimal diretamente
+                valor_transferencia = saldo_fp.saldo
+                forma_pagamento = saldo_fp.forma_pagamento
+
+                # Descrições completas
+                descricao_saida = f"Transferência total para {nome_destino}"
+                descricao_entrada = f"Transferência total de {nome_origem}"
+                
+                if descricao:
+                    descricao_saida = f"{descricao} | {descricao_saida}"
+                    descricao_entrada = f"{descricao} | {descricao_entrada}"
+
+                # Movimentação de saída (origem)
+                movimentacao_saida = MovimentacaoConta(
+                    conta_id=conta_origem_id,
+                    tipo=TipoMovimentacao.transferencia,
+                    forma_pagamento=forma_pagamento,
+                    valor=valor_transferencia,
+                    descricao=descricao_saida,
+                    usuario_id=usuario_id
+                )
+                session.add(movimentacao_saida)
+
+                # Movimentação de entrada (destino)
+                movimentacao_entrada = MovimentacaoConta(
+                    conta_id=conta_destino_id,
+                    tipo=TipoMovimentacao.entrada,
+                    forma_pagamento=forma_pagamento,
+                    valor=valor_transferencia,
+                    descricao=descricao_entrada,
+                    usuario_id=usuario_id
+                )
+                session.add(movimentacao_entrada)
+
+                # Atualizar saldo por forma de pagamento - DESTINO
+                saldo_fp_destino = next(
+                    (s for s in conta_destino.saldos_forma_pagamento if s.forma_pagamento == forma_pagamento),
+                    None
+                )
+                if not saldo_fp_destino:
+                    saldo_fp_destino = SaldoFormaPagamento(
+                        conta_id=conta_destino.id,
+                        forma_pagamento=forma_pagamento,
+                        saldo=Decimal('0.00')
+                    )
+                    session.add(saldo_fp_destino)
+
+                saldo_fp_destino.saldo += valor_transferencia
+
+                # Zerar saldo da forma de pagamento na ORIGEM
+                saldo_fp.saldo = Decimal('0.00')
+
+                total_transferido += valor_transferencia  # Agora ambos são Decimal
+                transferencias_realizadas.append({
+                    'forma_pagamento': forma_pagamento.value,
+                    'valor': float(valor_transferencia)  # Converter para float apenas no retorno
+                })
+
+        # Atualizar saldos totais - ambos são Decimal
+        conta_destino.saldo_total += total_transferido
+        conta_origem.saldo_total = Decimal('0.00')  # Zera o saldo total da origem
+
+        # Marcar como não sincronizado
+        conta_origem.sincronizado = False
+        conta_destino.sincronizado = False
+
+        return {
+            'success': True,
+            'message': f'Transferência total de R$ {float(total_transferido):.2f} realizada com sucesso',
+            'total_transferido': float(total_transferido),
+            'transferencias': transferencias_realizadas,
+            'contas': {
+                'origem': {
+                    'id': conta_origem_id,
+                    'usuario': nome_origem,
+                    'novo_saldo_total': 0.00
+                },
+                'destino': {
+                    'id': conta_destino_id,
+                    'usuario': nome_destino,
+                    'novo_saldo_total': float(conta_destino.saldo_total)
+                }
+            }
+        }
+
+    except Exception as e:
+        raise ValueError(f'Erro ao realizar transferência total: {str(e)}')

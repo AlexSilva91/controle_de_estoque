@@ -3160,8 +3160,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                     <button class="btn-icon btn-danger fechar-caixa" data-id="${caixa.id}" title="Fechar Caixa">
                                         <i class="fas fa-lock"></i>
                                     </button>
-                                    <button class="btn-icon btn-secondary venda-retroativa-caixa" data-id="${caixa.id}" title="Venda Retroativa">
+                                    <button class="btn-icon btn-primary venda-retroativa-caixa" data-id="${caixa.id}" title="Venda Retroativa">
                                         <i class="fas fa-history"></i>
+                                    </button>
+                                    <button class="btn-icon btn-success aprovar-caixa" data-id="${caixa.id}" title="Transferir Saldo">
+                                        <i class="fas fa-check"></i>
                                     </button>
                                 </div>
                             </td>
@@ -3314,7 +3317,11 @@ document.addEventListener('DOMContentLoaded', function () {
           });
 
           if (response.success) {
-            showFlashMessage('success', 'Caixa aprovado com sucesso');
+            if (response.transferencia_realizada) {
+              showFlashMessage('success', 'Caixa aprovado com sucesso e saldo transferido para sua conta');
+            } else {
+              showFlashMessage('success', 'Caixa aprovado com sucesso (sem saldo para transferir)');
+            }
             loadCaixasData();
           }
         } catch (error) {
