@@ -24,10 +24,13 @@ from typing import Dict, Any, List, Union, Tuple
 from app.models.entities import (
     Caixa,
     Financeiro,
+    MovimentacaoConta,
     NotaFiscal,
     NotaFiscalItem,
     MovimentacaoEstoque,
+    PagamentoContaReceber,
     PagamentoNotaFiscal,
+    SaldoFormaPagamento,
     StatusCaixa,
     StatusNota,
     StatusPagamento,
@@ -106,7 +109,228 @@ def abrir_caixa(db: Session, operador_id: int, valor_abertura: Decimal, observac
     except Exception as e:
         db.rollback()
         raise e
+
+def calcular_formas_pagamento(caixa_id, session):
+    from sqlalchemy import func
+    import math
+
+    # Busca o caixa
+    caixa = session.query(Caixa).filter_by(id=caixa_id).first()
+    if not caixa:
+        raise ValueError(f"Caixa ID {caixa_id} não encontrado")
+
+    # --- 1. CALCULA TOTAL DE ENTRADAS ---
+    pagamentos_notas = session.query(
+        PagamentoNotaFiscal.forma_pagamento,
+        func.sum(PagamentoNotaFiscal.valor).label('total')
+    ).join(
+        NotaFiscal,
+        PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+    ).filter(
+        NotaFiscal.caixa_id == caixa_id,
+        NotaFiscal.status == StatusNota.emitida
+    ).group_by(
+        PagamentoNotaFiscal.forma_pagamento
+    ).all()
+
+    pagamentos_contas = session.query(
+        PagamentoContaReceber.forma_pagamento,
+        func.sum(PagamentoContaReceber.valor_pago).label('total')
+    ).filter(
+        PagamentoContaReceber.caixa_id == caixa_id
+    ).group_by(
+        PagamentoContaReceber.forma_pagamento
+    ).all()
+
+    formas_pagamento = {}
+    total_entradas = 0.0
+
+    for forma, total in pagamentos_notas:
+        valor = float(total)
+        formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor
+        total_entradas += valor
+
+    for forma, total in pagamentos_contas:
+        valor = float(total)
+        formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor
+        total_entradas += valor
+
+    # --- 2. CALCULA TOTAL DE SAÍDAS ---
+    total_saidas = session.query(
+        func.sum(Financeiro.valor)
+    ).filter(
+        Financeiro.caixa_id == caixa_id,
+        Financeiro.tipo == TipoMovimentacao.saida,
+        Financeiro.categoria == CategoriaFinanceira.despesa
+    ).scalar() or 0.0
+    total_saidas = float(total_saidas)
+
+    # --- 3. CALCULA VALOR FÍSICO (DINHEIRO) ---
+    valor_dinheiro = formas_pagamento.get('dinheiro', 0.0)
+    valor_fisico = valor_dinheiro
+
+    if caixa.valor_fechamento and caixa.valor_abertura:
+        valor_abertura = float(caixa.valor_abertura)
+        valor_fechamento = float(caixa.valor_fechamento)
+        valor_fisico = max((valor_dinheiro + valor_abertura) - valor_fechamento - total_saidas, 0.0)
+        parte_inteira = math.floor(valor_fisico)
+        parte_decimal = valor_fisico - parte_inteira
+        # Caso precise arredondar:
+        # if parte_decimal > 0.5: valor_fisico = math.ceil(valor_fisico)
+        # else: valor_fisico = math.floor(valor_fisico)
+
+    formas_pagamento['dinheiro'] = valor_fisico
+
+    # --- 4. VALORES DIGITAIS ---
+    valor_digital = sum([
+        formas_pagamento.get('pix_loja', 0.0),
+        formas_pagamento.get('pix_fabiano', 0.0),
+        formas_pagamento.get('pix_edfrance', 0.0),
+        formas_pagamento.get('pix_maquineta', 0.0),
+        formas_pagamento.get('cartao_debito', 0.0),
+        formas_pagamento.get('cartao_credito', 0.0)
+    ])
+
+    a_prazo = formas_pagamento.get('a_prazo', 0.0)
+
+    # --- 5. TOTAL RECEBIDO DE CONTAS A PRAZO ---
+    total_contas_prazo_recebidas = session.query(
+        func.sum(PagamentoContaReceber.valor_pago)
+    ).filter(
+        PagamentoContaReceber.caixa_id == caixa_id
+    ).scalar() or 0.0
+
+    # --- 6. ESTORNOS ---
+    estornos = session.query(
+        func.sum(Financeiro.valor)
+    ).filter(
+        Financeiro.caixa_id == caixa.id,
+        Financeiro.tipo == TipoMovimentacao.saida_estorno
+    ).scalar() or 0.0
+    estornos_valor = float(estornos)
+
+    return {
+        'vendas_por_forma_pagamento': formas_pagamento,
+        'entradas': total_entradas,
+        'saidas': total_saidas,
+        'saldo': total_entradas - estornos_valor,
+        'valor_fisico': valor_fisico,
+        'valor_digital': valor_digital,
+        'a_prazo': a_prazo,
+        'contas_prazo_recebidas': float(total_contas_prazo_recebidas),
+        'estornos': estornos_valor
+    }
+
+def processar_movimentacoes_conta(caixa_id, usuario_logado_id, session):
+    """
+    Processa as movimentações do caixa na conta do usuário logado
+    Salva apenas os valores líquidos finais por forma de pagamento
+    """
+    from sqlalchemy import func
     
+    # Busca o caixa
+    caixa = session.query(Caixa).filter_by(id=caixa_id).first()
+    if not caixa:
+        raise ValueError(f"Caixa ID {caixa_id} não encontrado")
+    
+    # Busca o usuário logado e sua conta
+    usuario = session.query(Usuario).filter_by(id=usuario_logado_id).first()
+    if not usuario:
+        raise ValueError(f"Usuário ID {usuario_logado_id} não encontrado")
+    
+    if not usuario.conta:
+        raise ValueError(f"Usuário {usuario.nome} não possui conta cadastrada")
+    
+    conta = usuario.conta
+    
+    # VERIFICA SE JÁ EXISTEM MOVIMENTAÇÕES PARA ESTE CAIXA
+    movimentacoes_existentes = session.query(MovimentacaoConta).filter_by(
+        caixa_id=caixa_id,
+        conta_id=conta.id
+    ).count()
+    
+    if movimentacoes_existentes > 0:
+        raise ValueError(f"Já existem movimentações processadas para o Caixa {caixa_id} na conta do usuário")
+    
+    # Calcula os valores líquidos do caixa
+    valores_caixa = calcular_formas_pagamento(caixa_id, session)
+    
+    # Formas de pagamento que devem ser creditadas
+    formas_creditar = [
+        'dinheiro', 'pix_loja', 'pix_fabiano', 'pix_edfrance', 
+        'pix_maquineta', 'cartao_debito', 'cartao_credito'
+    ]
+    
+    total_creditos = 0.0
+    
+    # 1. SALVAR VALORES LÍQUIDOS POR FORMA DE PAGAMENTO
+    for forma_pagamento_str, valor in valores_caixa['vendas_por_forma_pagamento'].items():
+        # Apenas processa formas de pagamento válidas
+        if forma_pagamento_str in formas_creditar and valor > 0:
+            # Converte string para enum FormaPagamento
+            try:
+                forma_pagamento = FormaPagamento(forma_pagamento_str)
+            except ValueError:
+                continue
+            
+            # Busca ou cria saldo específico para a forma de pagamento
+            saldo_fp = next(
+                (s for s in conta.saldos_forma_pagamento if s.forma_pagamento == forma_pagamento),
+                None
+            )
+            
+            if not saldo_fp:
+                saldo_fp = SaldoFormaPagamento(
+                    conta_id=conta.id,
+                    forma_pagamento=forma_pagamento,
+                    saldo=0.00
+                )
+                session.add(saldo_fp)
+                session.flush()
+            
+            # Atualiza saldo da forma de pagamento com o valor líquido
+            novo_saldo = float(saldo_fp.saldo) + valor
+            saldo_fp.saldo = novo_saldo
+            saldo_fp.sincronizado = False
+            
+            # Cria UMA movimentação para o valor líquido total
+            movimentacao = MovimentacaoConta(
+                conta_id=conta.id,
+                tipo=TipoMovimentacao.entrada,
+                forma_pagamento=forma_pagamento,
+                valor=valor,
+                descricao=f"Crédito líquido - Caixa {caixa_id}",
+                data=datetime.now(),
+                usuario_id=usuario_logado_id,
+                caixa_id=caixa_id
+            )
+            session.add(movimentacao)
+            
+            total_creditos += valor
+            
+    # 3. ATUALIZAR SALDO TOTAL DA CONTA
+    novo_saldo_total = float(conta.saldo_total) + total_creditos
+    conta.saldo_total = max(novo_saldo_total, 0)
+    conta.sincronizado = False
+    
+    # Commit das alterações
+    session.commit()
+    
+    return {
+        'usuario': usuario.nome,
+        'conta_id': conta.id,
+        'total_creditado': total_creditos,
+        'novo_saldo_total': float(conta.saldo_total),
+        'saldos_por_forma_pagamento': {
+            saldo.forma_pagamento.value: float(saldo.saldo)
+            for saldo in conta.saldos_forma_pagamento
+        },
+        'movimentacoes_processadas': len([
+            mov for mov in conta.movimentacoes 
+            if mov.caixa_id == caixa_id
+        ])
+    }
+
 def fechar_caixa(db: Session, operador_id: int, valor_fechamento: Decimal, observacao: str = "") -> entities.Caixa:
     """
     Fecha o caixa atual do operador específico com o valor de fechamento especificado.
@@ -142,6 +366,7 @@ def fechar_caixa(db: Session, operador_id: int, valor_fechamento: Decimal, obser
         lancamento = schemas.FinanceiroCreate(**lancamento_data)
         create_lancamento_financeiro(db, lancamento)
         
+        resultado = processar_movimentacoes_conta(caixa.id, operador_id, db)
         return caixa
     except SQLAlchemyError as e:
         db.rollback()

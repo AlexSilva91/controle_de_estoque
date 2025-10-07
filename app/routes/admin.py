@@ -49,7 +49,7 @@ from app.models.entities import (
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
 from app.crud import (
-    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao,
+    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao, calcular_formas_pagamento,
     criar_desconto, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
     get_transferencias,get_user_by_cpf, get_user_by_id, get_usuarios, create_user, obter_caixas_completo,
     registrar_transferencia, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
@@ -3898,34 +3898,22 @@ def get_caixa_financeiro(caixa_id):
         if not caixa:
             logger.warning(f"Caixa não encontrado: ID {caixa_id}")
             return jsonify({'success': False, 'error': 'Caixa não encontrado'}), 404
-            
+
         # Busca todas as movimentações financeiras do caixa
         movimentacoes = session.query(Financeiro)\
             .filter_by(caixa_id=caixa_id)\
             .order_by(Financeiro.data.desc())\
             .all()
-        
-        # Inicializa estruturas de dados
-        dados = []
-        totais_vendas = {
-            'pix_fabiano': 0.0,
-            'pix_maquineta': 0.0,
-            'pix_edfrance': 0.0,
-            'pix_loja': 0.0,
-            'dinheiro': 0.0,
-            'cartao_credito': 0.0,
-            'cartao_debito': 0.0,
-            'a_prazo': 0.0
-        }
 
-        # Processa cada movimentação
+        # Inicializa estrutura de dados das movimentações
+        dados = []
         for mov in movimentacoes:
             # Busca informações do cliente
             cliente_nome = None
             if mov.cliente_id:
                 cliente = session.query(Cliente).get(mov.cliente_id)
                 cliente_nome = cliente.nome if cliente else None
-            
+
             # Busca formas de pagamento
             formas_pagamento = []
             if mov.nota_fiscal_id:
@@ -3933,14 +3921,13 @@ def get_caixa_financeiro(caixa_id):
                     .filter_by(nota_fiscal_id=mov.nota_fiscal_id)\
                     .all()
                 formas_pagamento = [p.forma_pagamento.value for p in pagamentos]
-            
+
             if mov.conta_receber_id:
                 pagamentos = session.query(PagamentoContaReceber)\
                     .filter_by(conta_id=mov.conta_receber_id)\
                     .all()
                 formas_pagamento = [p.forma_pagamento.value for p in pagamentos]
-                        
-            # Adiciona ao array de dados
+
             dados.append({
                 'id': mov.id,
                 'data': mov.data.isoformat(),
@@ -3955,125 +3942,28 @@ def get_caixa_financeiro(caixa_id):
                 'formas_pagamento': formas_pagamento
             })
 
-        # 1. CALCULA TOTAL DE ENTRADAS - SOMA TODAS AS FORMAS DE PAGAMENTO
-        pagamentos_notas = session.query(
-            PagamentoNotaFiscal.forma_pagamento,
-            func.sum(PagamentoNotaFiscal.valor).label('total')
-        ).join(
-            NotaFiscal,
-            PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
-        ).filter(
-            NotaFiscal.caixa_id == caixa_id,
-            NotaFiscal.status == StatusNota.emitida
-        ).group_by(
-            PagamentoNotaFiscal.forma_pagamento
-        ).all()
-        
-        # Busca pagamentos de contas a receber
-        pagamentos_contas = session.query(
-            PagamentoContaReceber.forma_pagamento,
-            func.sum(PagamentoContaReceber.valor_pago).label('total')
-        ).filter(
-            PagamentoContaReceber.caixa_id == caixa_id
-        ).group_by(
-            PagamentoContaReceber.forma_pagamento
-        ).all()
-        
-        # Combina os resultados e calcula totais
-        total_entradas = 0.0
-        formas_pagamento = {}
-        
-        for forma, total in pagamentos_notas:
-            valor = float(total)
-            formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor
-            total_entradas += valor
-            
-        for forma, total in pagamentos_contas:
-            valor = float(total)
-            formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor
-            total_entradas += valor
+        # ---- Usa a função nova para calcular os totais ----
+        totais = calcular_formas_pagamento(caixa_id, session)
 
-        # 2. CALCULA TOTAL DE SAÍDAS - SOMENTE DESPESAS
-        total_saidas = session.query(
-            func.sum(Financeiro.valor)
-        ).filter(
-            Financeiro.caixa_id == caixa_id,
-            Financeiro.tipo == TipoMovimentacao.saida,
-            Financeiro.categoria == CategoriaFinanceira.despesa
-        ).scalar() or 0.0
-        
-        total_saidas = float(total_saidas)
-
-        # 3. CALCULA VALORES FÍSICOS E DIGITAIS
-        valor_dinheiro = formas_pagamento.get('dinheiro', 0.0)
-        valor_fisico = valor_dinheiro
-        
-        if caixa.valor_fechamento and caixa.valor_abertura:
-            valor_abertura = float(caixa.valor_abertura)
-            valor_fechamento = float(caixa.valor_fechamento)
-            valor_fisico = max((valor_dinheiro + valor_abertura) - valor_fechamento - total_saidas, 0.0)
-            # Pega parte inteira e parte decimal
-            parte_inteira = math.floor(valor_fisico)
-            parte_decimal = valor_fisico - parte_inteira
-
-            # if parte_decimal == 0.5:
-            #     # Mantém o valor original (sem arredondar)
-            #     valor_fisico = valor_fisico
-            # elif parte_decimal > 0.5:
-            #     valor_fisico = math.ceil(valor_fisico)  # mais perto do de cima
-            # else:
-            #     valor_fisico = math.floor(valor_fisico)  # mais perto do de baixo
-            
-        formas_pagamento['dinheiro'] = valor_fisico
-        valor_digital = sum([
-            formas_pagamento.get('pix_loja', 0.0),
-            formas_pagamento.get('pix_fabiano', 0.0),
-            formas_pagamento.get('pix_edfrance', 0.0),
-            formas_pagamento.get('pix_maquineta', 0.0),
-            formas_pagamento.get('cartao_debito', 0.0),
-            formas_pagamento.get('cartao_credito', 0.0)
-        ])
-
-        a_prazo = formas_pagamento.get('a_prazo', 0.0)
-        
-        # 4. CALCULA TOTAL RECEBIDO DE CONTAS A PRAZO PARA ESTE CAIXA
-        total_contas_prazo_recebidas = session.query(
-            func.sum(PagamentoContaReceber.valor_pago)
-        ).filter(
-            PagamentoContaReceber.caixa_id == caixa_id
-        ).scalar() or 0.0
-        
-        # Busca estornos (saida_estorno) para deduzir das entradas
-        estornos = session.query(
-            func.sum(Financeiro.valor)
-        ).filter(
-            Financeiro.caixa_id == caixa.id,
-            Financeiro.tipo == TipoMovimentacao.saida_estorno
-        ).scalar() or 0.0
-                
-        estornos_valor = float(estornos)
-        total_contas_prazo_recebidas = float(total_contas_prazo_recebidas)
-        
         logger.info(f"Dados financeiros do caixa ID {caixa_id} recuperados com sucesso")
         return jsonify({
             'success': True,
             'data': dados,
             'totais': {
-                'entradas': total_entradas,
-                'saidas': total_saidas,
-                'saldo': total_entradas - estornos_valor,
-                'valor_fisico': valor_fisico,
-                'valor_digital': valor_digital,
-                'a_prazo': a_prazo,
-                'contas_prazo_recebidas': total_contas_prazo_recebidas 
+                'entradas': totais['entradas'],
+                'saidas': totais['saidas'],
+                'saldo': totais['saldo'],
+                'valor_fisico': totais['valor_fisico'],
+                'valor_digital': totais['valor_digital'],
+                'a_prazo': totais['a_prazo'],
+                'contas_prazo_recebidas': totais['contas_prazo_recebidas']
             },
-            'vendas_por_forma_pagamento': formas_pagamento
+            'vendas_por_forma_pagamento': totais['vendas_por_forma_pagamento']
         })
-        
+
     except Exception as e:
         logger.error(f"Erro no financeiro do caixa {caixa_id}: {str(e)}", exc_info=True)
         session.rollback()
-        print(f"Erro no financeiro do caixa {caixa_id}: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
             'error': 'Erro interno ao processar dados financeiros'
