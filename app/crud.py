@@ -175,12 +175,14 @@ def calcular_formas_pagamento(caixa_id, session):
         valor_abertura = float(caixa.valor_abertura)
         valor_fechamento = float(caixa.valor_fechamento)
         valor_fisico = max((valor_dinheiro + valor_abertura) - valor_fechamento - total_saidas, 0.0)
-        parte_inteira = math.floor(valor_fisico)
-        parte_decimal = valor_fisico - parte_inteira
-        # Caso precise arredondar:
-        # if parte_decimal > 0.5: valor_fisico = math.ceil(valor_fisico)
-        # else: valor_fisico = math.floor(valor_fisico)
-
+        # parte_inteira = math.floor(valor_fisico)
+        # parte_decimal = valor_fisico - parte_inteira
+        # # Caso precise arredondar:
+        # # if parte_decimal > 0.5: valor_fisico = math.ceil(valor_fisico)
+        # # else: valor_fisico = math.floor(valor_fisico)
+    else:
+        valor_fisico = max(valor_dinheiro - total_saidas, 0.0)
+        
     formas_pagamento['dinheiro'] = valor_fisico
 
     # --- 4. VALORES DIGITAIS ---
