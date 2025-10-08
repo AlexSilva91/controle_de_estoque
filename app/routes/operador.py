@@ -23,7 +23,7 @@ from flask_login import login_required, current_user
 from app import db
 from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
-from app.bot.bot_movimentacao import enviar_resumo_movimentacao_diaria
+from app.bot.bot_movimentacao import enviar_resumo_caixa_fechado, enviar_resumo_movimentacao_diaria
 from flask import send_file
 from app.utils.preparar_notas import preparar_dados_nota
 from app.utils.converter_endereco import parse_endereco_string
@@ -1806,7 +1806,8 @@ def api_fechar_caixa():
             observacao
         )
         
-        threading.Thread(target=enviar_resumo_movimentacao_diaria).start()
+        # Envia o relatório do caixa fechado para o Telegram
+        threading.Thread(target=enviar_resumo_caixa_fechado, args=(caixa.id,)).start()
         
         return jsonify({
             'success': True,

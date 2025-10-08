@@ -4,8 +4,9 @@ from datetime import datetime
 import requests
 from dotenv import load_dotenv
 
+from app.crud import calcular_formas_pagamento
 from app.database import SessionLocal
-from app.models.entities import MovimentacaoEstoque, Produto, Usuario
+from app.models.entities import MovimentacaoEstoque, Produto, Usuario, Caixa
 from app.models.entities import TipoMovimentacao
 from app.models.entities import Financeiro
 
@@ -22,29 +23,77 @@ def verificar_internet(url="https://www.google.com", timeout=3):
     except requests.RequestException:
         return False
 
-import os
-from decimal import Decimal, ROUND_HALF_UP
-from datetime import datetime
-import requests
-from dotenv import load_dotenv
 
-from app.database import SessionLocal
-from app.models.entities import MovimentacaoEstoque, Produto, Usuario
-from app.models.entities import TipoMovimentacao
-from app.models.entities import Financeiro
-
-load_dotenv()
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
-
-
-def verificar_internet(url="https://www.google.com", timeout=3):
+def enviar_resumo_caixa_fechado(caixa_id):
     try:
-        requests.head(url, timeout=timeout)
-        return True
-    except requests.RequestException:
-        return False
+        if not verificar_internet():
+            print("⚠️ Sem conexão com a internet. O relatório do caixa não será enviado.")
+            return
+
+        db = SessionLocal()
+        
+        # Calcula as formas de pagamento usando a função existente
+        resumo_caixa = calcular_formas_pagamento(caixa_id, db)
+        
+        # Busca informações adicionais do caixa
+        caixa = db.query(Caixa).filter_by(id=caixa_id).first()
+        if not caixa:
+            print(f"❌ Caixa ID {caixa_id} não encontrado")
+            return
+
+        # Formata as formas de pagamento
+        formas_pagamento_texto = ""
+        for forma, valor in resumo_caixa['vendas_por_forma_pagamento'].items():
+            if valor > 0:
+                forma_formatada = forma.replace('_', ' ').title()
+                formas_pagamento_texto += f"• {forma_formatada}: R$ {valor:.2f}\n"
+
+        # Monta a mensagem para o Telegram
+        mensagem = (
+            f"💰 <b>RELATÓRIO DE FECHAMENTO DE CAIXA</b>\n"
+            f"🆔 <b>Caixa ID:</b> {caixa.id}\n"
+            f"📅 <b>Data:</b> {caixa.data_abertura.strftime('%d/%m/%Y')}\n"
+            f"👤 <b>Operador:</b> {caixa.operador.nome if caixa.operador else 'N/A'}\n\n"
+            
+            f"💵 <b>VALORES DE ABERTURA/FECHAMENTO</b>\n"
+            f"• Abertura: R$ {float(caixa.valor_abertura):.2f}\n"
+            f"• Fechamento: R$ {float(caixa.valor_fechamento):.2f}\n\n"
+            
+            f"💳 <b>FORMAS DE PAGAMENTO</b>\n"
+            f"{formas_pagamento_texto}\n"
+            
+            f"📊 <b>RESUMO FINANCEIRO</b>\n"
+            f"• Total Entradas: R$ {resumo_caixa['entradas']:.2f - resumo_caixa['estornos']:.2f}\n"
+            f"• Total Saídas: R$ {resumo_caixa['saidas']:.2f}\n"
+            f"• Estornos: R$ {resumo_caixa['estornos']:.2f}\n"
+            
+            f"💸 <b>DETALHAMENTO</b>\n"
+            f"• Valor Físico (Dinheiro): R$ {resumo_caixa['valor_fisico']:.2f}\n"
+            f"• Valor Digital: R$ {resumo_caixa['valor_digital']:.2f}\n"
+            f"• A Prazo: R$ {resumo_caixa['a_prazo']:.2f}\n"
+            f"• Contas a Prazo Recebidas: R$ {resumo_caixa['contas_prazo_recebidas']:.2f}\n\n"
+            
+            f"<i>Enviado automaticamente pelo sistema Cavalcanti Rações\nEstornos já Deduzidos do Total de entradas</i>"
+        )
+
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": CHAT_ID,
+            "text": mensagem,
+            "parse_mode": "HTML"
+        }
+
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            print(f"✅ Relatório do caixa {caixa_id} enviado com sucesso!")
+        else:
+            print(f"❌ Erro ao enviar relatório do caixa: {response.text}")
+
+    except Exception as e:
+        print(f"❌ Erro no envio do relatório do caixa {caixa_id}:", str(e))
+    finally:
+        db.close()
+
 
 def enviar_resumo_movimentacao_diaria():
     try:
