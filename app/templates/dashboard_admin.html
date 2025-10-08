@@ -113,6 +113,12 @@
                             <span class="nav-text">Usuários</span>
                         </a>
                     </li>
+                    <li data-tab="contas">
+                        <a href="{{ url_for('admin.dashboard_contas') }}" class="nav-link">
+                            <i class="fa-solid fa-building-columns"></i>
+                            <span class="nav-text">Contas Usuários</span>
+                        </a>
+                    </li>
                     <li data-tab="LOG">
                         <a href="{{ url_for('admin.auditoria') }}" class="nav-link">
                             <i class="fa-regular fa-file-lines"></i>
@@ -356,6 +362,7 @@
                                             <th>Nome</th>
                                             <th>Perfil</th>
                                             <th>Status</th>
+                                            <th>Conta</th>
                                             <th>Último Acesso</th>
                                             <th>Ações</th>
                                         </tr>
@@ -1672,6 +1679,7 @@
                                 <h2 id="visualizarUsuarioNome"></h2>
                                 <div class="badge" id="visualizarUsuarioPerfil"></div>
                                 <div class="badge" id="visualizarUsuarioStatus"></div>
+                                <div class="badge" id="visualizarUsuarioContaStatus"></div>
                             </div>
                         </div>
                         <div class="profile-details">
@@ -1687,6 +1695,20 @@
                                 <label>Último Acesso:</label>
                                 <span id="visualizarUsuarioUltimoAcesso"></span>
                             </div>
+
+                            <!-- SEÇÃO DA CONTA -->
+                            <div class="account-section">
+                                <div class="account-header">
+                                    <h4><i class="fas fa-wallet"></i> Informações da Conta</h4>
+                                    <button class="btn btn-sm btn-success" id="btnTransferir" style="display: none;">
+                                        <i class="fas fa-exchange-alt"></i> Transferir
+                                    </button>
+                                </div>
+                                <div id="contaInfo">
+                                    <!-- Será preenchido via JavaScript -->
+                                </div>
+                            </div>
+
                             <div class="detail-item full-width">
                                 <label>Observações:</label>
                                 <div id="visualizarUsuarioObservacoes" class="observacoes"></div>
@@ -1696,6 +1718,122 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Modal para Entrada/Saída na Conta -->
+    <div id="movimentacaoContaModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-exchange-alt"></i>
+                        <span id="movimentacaoModalTitle">Movimentação na Conta</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="movimentacaoContaForm">
+                        <input type="hidden" id="movimentacaoContaId">
+                        <input type="hidden" id="movimentacaoTipo">
+
+                        <div class="form-group">
+                            <label for="movimentacaoFormaPagamento">Forma de Pagamento *</label>
+                            <select id="movimentacaoFormaPagamento" class="form-control" required>
+                                <option value="">Selecione a forma de pagamento</option>
+                                <option value="pix_fabiano">PIX Fabiano</option>
+                                <option value="pix_maquineta">PIX Maquineta</option>
+                                <option value="pix_edfrance">PIX Edfrance</option>
+                                <option value="pix_loja">PIX Loja</option>
+                                <option value="dinheiro">Dinheiro</option>
+                                <option value="cartao_credito">Cartão de Crédito</option>
+                                <option value="cartao_debito">Cartão de Débito</option>
+                                <option value="a_prazo">A Prazo</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="movimentacaoValor">Valor *</label>
+                            <input type="number" id="movimentacaoValor" class="form-control" step="0.01" min="0.01"
+                                required placeholder="0.00">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="movimentacaoDescricao">Descrição</label>
+                            <textarea id="movimentacaoDescricao" class="form-control" rows="3"
+                                placeholder="Descrição da movimentação..."></textarea>
+                        </div>
+
+                        <div class="saldo-info" id="saldoInfo" style="display: none;">
+                            <div class="alert alert-info">
+                                <strong>Saldo atual:</strong>
+                                <span id="saldoAtualValor">R$ 0,00</span>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" id="confirmarMovimentacao">
+                        <i class="fas fa-check"></i>
+                        <span>Confirmar</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+    <!-- Modal de Transferência -->
+    <div id="transferenciaModalContas" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="transferenciaModalTitle">
+                        <i class="fas fa-exchange-alt"></i>
+                        <span>Transferência entre Contas</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="transferenciaFormContas">
+                        <input type="hidden" id="usuarioDestinoId">
+                        <input type="hidden" id="contaDestinoId">
+
+                        <div class="form-group">
+                            <label for="contaOrigemSelect">Conta de Origem *</label>
+                            <select id="contaOrigemSelect" class="form-control" required>
+                                <option value="">Selecione a conta de origem</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="formaPagamentoSelect">Forma de Pagamento *</label>
+                            <select id="formaPagamentoSelect" class="form-control" required>
+                                <option value="">Selecione a forma de pagamento</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="valorTransferencia">Valor *</label>
+                            <input type="number" id="valorTransferencia" class="form-control" step="0.01" min="0.01"
+                                placeholder="0.00" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="descricaoTransferencia">Descrição</label>
+                            <textarea id="descricaoTransferencia" class="form-control"
+                                placeholder="Descrição da transferência" rows="3"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" id="confirmarTransferencia">
+                        <i class="fas fa-check"></i> Confirmar Transferência
+                    </button>
                 </div>
             </div>
         </div>

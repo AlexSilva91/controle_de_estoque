@@ -44,15 +44,17 @@ from app.models import db
 from app.utils.audit import calcular_diferencas
 from app.utils.format_data_moeda import format_currency, format_number
 from app.models.entities import ( 
-    AuditLog, Cliente, Produto, NotaFiscal, TipoUsuario, UnidadeMedida, StatusNota,
+    AuditLog, Cliente, Conta, MovimentacaoConta, Produto, NotaFiscal, SaldoFormaPagamento, TipoUsuario, UnidadeMedida, StatusNota,
     Financeiro, TipoMovimentacao, CategoriaFinanceira, MovimentacaoEstoque, ContaReceber,
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
 from app.crud import (
+    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao, calcular_formas_pagamento,
+    criar_desconto, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
     TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao,
     criar_desconto, criar_ou_atualizar_lote, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
     get_transferencias,get_user_by_cpf, get_user_by_id, get_usuarios, create_user, obter_caixas_completo,
-    registrar_transferencia, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
+    registrar_transferencia, transferir_todo_saldo, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
     registrar_movimentacao, get_cliente, get_clientes, create_cliente, 
     update_cliente, delete_cliente, create_nota_fiscal, get_nota_fiscal, 
     get_notas_fiscais, create_lancamento_financeiro, get_lancamento_financeiro,
@@ -2110,13 +2112,28 @@ def listar_usuarios():
                           search not in usuario.email.lower()):
                 continue
                 
+            # Informações da conta
+            conta_info = None
+            if usuario.conta:
+                saldos_por_forma = {}
+                for saldo in usuario.conta.saldos_forma_pagamento:
+                    saldos_por_forma[saldo.forma_pagamento.value] = float(saldo.saldo)
+                
+                conta_info = {
+                    'id': usuario.conta.id,
+                    'saldo_total': float(usuario.conta.saldo_total) if usuario.conta.saldo_total else 0.00,
+                    'saldos_por_forma': saldos_por_forma,
+                    'atualizado_em': usuario.conta.atualizado_em.strftime('%d/%m/%Y %H:%M') if usuario.conta.atualizado_em else None
+                }
+                
             result.append({
                 'id': usuario.id,
                 'nome': usuario.nome,
                 'tipo': usuario.tipo.value.capitalize(),
                 'status': 'Ativo' if usuario.status else 'Inativo',
                 'ultimo_acesso': usuario.ultimo_acesso.strftime('%d/%m/%Y %H:%M') if usuario.ultimo_acesso else 'Nunca',
-                'cpf': usuario.cpf
+                'cpf': usuario.cpf,
+                'conta': conta_info  # Incluir informações completas da conta
             })
         
         return jsonify({'success': True, 'usuarios': result})
@@ -2145,6 +2162,20 @@ def get_usuario(usuario_id):
         ultimo_acesso = usuario.ultimo_acesso.strftime('%d/%m/%Y %H:%M') if usuario.ultimo_acesso else None
         data_cadastro = usuario.criado_em.strftime('%d/%m/%Y %H:%M') if usuario.criado_em else None
         
+        # Informações da conta
+        conta_info = None
+        if usuario.conta:
+            saldos_por_forma = {}
+            for saldo in usuario.conta.saldos_forma_pagamento:
+                saldos_por_forma[saldo.forma_pagamento.value] = float(saldo.saldo)
+            
+            conta_info = {
+                'id': usuario.conta.id,
+                'saldo_total': float(usuario.conta.saldo_total) if usuario.conta.saldo_total else 0.00,
+                'saldos_por_forma': saldos_por_forma,
+                'atualizado_em': usuario.conta.atualizado_em.strftime('%d/%m/%Y %H:%M') if usuario.conta.atualizado_em else None
+            }
+        
         return jsonify({
             'success': True,
             'usuario': {
@@ -2155,7 +2186,8 @@ def get_usuario(usuario_id):
                 'status': bool(usuario.status),  # Garantir que é booleano
                 'ultimo_acesso': ultimo_acesso,
                 'data_cadastro': data_cadastro,
-                'observacoes': usuario.observacoes or ''  # Garantir string vazia se None
+                'observacoes': usuario.observacoes or '',  # Garantir string vazia se None
+                'conta': conta_info  # Nova informação da conta
             }
         })
     except Exception as e:
@@ -3967,34 +3999,22 @@ def get_caixa_financeiro(caixa_id):
         if not caixa:
             logger.warning(f"Caixa não encontrado: ID {caixa_id}")
             return jsonify({'success': False, 'error': 'Caixa não encontrado'}), 404
-            
+
         # Busca todas as movimentações financeiras do caixa
         movimentacoes = session.query(Financeiro)\
             .filter_by(caixa_id=caixa_id)\
             .order_by(Financeiro.data.desc())\
             .all()
-        
-        # Inicializa estruturas de dados
-        dados = []
-        totais_vendas = {
-            'pix_fabiano': 0.0,
-            'pix_maquineta': 0.0,
-            'pix_edfrance': 0.0,
-            'pix_loja': 0.0,
-            'dinheiro': 0.0,
-            'cartao_credito': 0.0,
-            'cartao_debito': 0.0,
-            'a_prazo': 0.0
-        }
 
-        # Processa cada movimentação
+        # Inicializa estrutura de dados das movimentações
+        dados = []
         for mov in movimentacoes:
             # Busca informações do cliente
             cliente_nome = None
             if mov.cliente_id:
                 cliente = session.query(Cliente).get(mov.cliente_id)
                 cliente_nome = cliente.nome if cliente else None
-            
+
             # Busca formas de pagamento
             formas_pagamento = []
             if mov.nota_fiscal_id:
@@ -4002,14 +4022,13 @@ def get_caixa_financeiro(caixa_id):
                     .filter_by(nota_fiscal_id=mov.nota_fiscal_id)\
                     .all()
                 formas_pagamento = [p.forma_pagamento.value for p in pagamentos]
-            
+
             if mov.conta_receber_id:
                 pagamentos = session.query(PagamentoContaReceber)\
                     .filter_by(conta_id=mov.conta_receber_id)\
                     .all()
                 formas_pagamento = [p.forma_pagamento.value for p in pagamentos]
-                        
-            # Adiciona ao array de dados
+
             dados.append({
                 'id': mov.id,
                 'data': mov.data.isoformat(),
@@ -4024,121 +4043,25 @@ def get_caixa_financeiro(caixa_id):
                 'formas_pagamento': formas_pagamento
             })
 
-        # 1. CALCULA TOTAL DE ENTRADAS - SOMA TODAS AS FORMAS DE PAGAMENTO
-        pagamentos_notas = session.query(
-            PagamentoNotaFiscal.forma_pagamento,
-            func.sum(PagamentoNotaFiscal.valor).label('total')
-        ).join(
-            NotaFiscal,
-            PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
-        ).filter(
-            NotaFiscal.caixa_id == caixa_id,
-            NotaFiscal.status == StatusNota.emitida
-        ).group_by(
-            PagamentoNotaFiscal.forma_pagamento
-        ).all()
-        
-        # Busca pagamentos de contas a receber
-        pagamentos_contas = session.query(
-            PagamentoContaReceber.forma_pagamento,
-            func.sum(PagamentoContaReceber.valor_pago).label('total')
-        ).filter(
-            PagamentoContaReceber.caixa_id == caixa_id
-        ).group_by(
-            PagamentoContaReceber.forma_pagamento
-        ).all()
-        
-        # Combina os resultados e calcula totais
-        total_entradas = 0.0
-        formas_pagamento = {}
-        
-        for forma, total in pagamentos_notas:
-            valor = float(total)
-            formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor
-            total_entradas += valor
-            
-        for forma, total in pagamentos_contas:
-            valor = float(total)
-            formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor
-            total_entradas += valor
+        # ---- Usa a função nova para calcular os totais ----
+        totais = calcular_formas_pagamento(caixa_id, session)
 
-        # 2. CALCULA TOTAL DE SAÍDAS - SOMENTE DESPESAS
-        total_saidas = session.query(
-            func.sum(Financeiro.valor)
-        ).filter(
-            Financeiro.caixa_id == caixa_id,
-            Financeiro.tipo == TipoMovimentacao.saida,
-            Financeiro.categoria == CategoriaFinanceira.despesa
-        ).scalar() or 0.0
-        
-        total_saidas = float(total_saidas)
-
-        # 3. CALCULA VALORES FÍSICOS E DIGITAIS
-        valor_dinheiro = formas_pagamento.get('dinheiro', 0.0)
-        valor_fisico = valor_dinheiro
-        
-        if caixa.valor_fechamento and caixa.valor_abertura:
-            valor_abertura = float(caixa.valor_abertura)
-            valor_fechamento = float(caixa.valor_fechamento)
-            valor_fisico = max((valor_dinheiro + valor_abertura) - valor_fechamento - total_saidas, 0.0)
-            # Pega parte inteira e parte decimal
-            parte_inteira = math.floor(valor_fisico)
-            parte_decimal = valor_fisico - parte_inteira
-
-            # if parte_decimal == 0.5:
-            #     # Mantém o valor original (sem arredondar)
-            #     valor_fisico = valor_fisico
-            # elif parte_decimal > 0.5:
-            #     valor_fisico = math.ceil(valor_fisico)  # mais perto do de cima
-            # else:
-            #     valor_fisico = math.floor(valor_fisico)  # mais perto do de baixo
-            
-        formas_pagamento['dinheiro'] = valor_fisico
-        valor_digital = sum([
-            formas_pagamento.get('pix_loja', 0.0),
-            formas_pagamento.get('pix_fabiano', 0.0),
-            formas_pagamento.get('pix_edfrance', 0.0),
-            formas_pagamento.get('pix_maquineta', 0.0),
-            formas_pagamento.get('cartao_debito', 0.0),
-            formas_pagamento.get('cartao_credito', 0.0)
-        ])
-
-        a_prazo = formas_pagamento.get('a_prazo', 0.0)
-        
-        # 4. CALCULA TOTAL RECEBIDO DE CONTAS A PRAZO PARA ESTE CAIXA
-        total_contas_prazo_recebidas = session.query(
-            func.sum(PagamentoContaReceber.valor_pago)
-        ).filter(
-            PagamentoContaReceber.caixa_id == caixa_id
-        ).scalar() or 0.0
-        
-        # Busca estornos (saida_estorno) para deduzir das entradas
-        estornos = session.query(
-            func.sum(Financeiro.valor)
-        ).filter(
-            Financeiro.caixa_id == caixa.id,
-            Financeiro.tipo == TipoMovimentacao.saida_estorno
-        ).scalar() or 0.0
-                
-        estornos_valor = float(estornos)
-        total_contas_prazo_recebidas = float(total_contas_prazo_recebidas)
-        
         logger.info(f"Dados financeiros do caixa ID {caixa_id} recuperados com sucesso")
         return jsonify({
             'success': True,
             'data': dados,
             'totais': {
-                'entradas': total_entradas,
-                'saidas': total_saidas,
-                'saldo': total_entradas - estornos_valor,
-                'valor_fisico': valor_fisico,
-                'valor_digital': valor_digital,
-                'a_prazo': a_prazo,
-                'contas_prazo_recebidas': total_contas_prazo_recebidas 
+                'entradas': totais['entradas'],
+                'saidas': totais['saidas'],
+                'saldo': totais['saldo'],
+                'valor_fisico': totais['valor_fisico'],
+                'valor_digital': totais['valor_digital'],
+                'a_prazo': totais['a_prazo'],
+                'contas_prazo_recebidas': totais['contas_prazo_recebidas']
             },
-            'vendas_por_forma_pagamento': formas_pagamento
+            'vendas_por_forma_pagamento': totais['vendas_por_forma_pagamento']
         })
-        
+
     except Exception as e:
         logger.error(f"Erro no financeiro do caixa {caixa_id}: {str(e)}", exc_info=True)
         session.rollback()
@@ -4929,8 +4852,8 @@ def gerar_pdf_caixa_financeiro(caixa_id):
 @login_required
 @admin_required
 def aprovar_caixa(caixa_id):
-    """Rota para aprovar o fechamento de um caixa"""
-    caixa =  Caixa.query.get_or_404(caixa_id)
+    """Rota para aprovar o fechamento de um caixa e transferir saldo para o admin"""
+    caixa = Caixa.query.get_or_404(caixa_id)
     
     if current_user.tipo != 'admin':
         logger.warning(f"Usuário não autorizado a aprovar caixa: {current_user.nome}")
@@ -4940,22 +4863,54 @@ def aprovar_caixa(caixa_id):
     valor_confirmado = data.get('valor_confirmado')
     observacoes = data.get('observacoes')
     
+    
     try:
+        # Aprovar o fechamento do caixa
         caixa.aprovar_fechamento(
             administrador_id=current_user.id,
             valor_confirmado=valor_confirmado,
             observacoes_admin=observacoes
         )
+        
+        # TRANSFERIR TODO O SALDO DO OPERADOR PARA O ADMINISTRADOR
+        operador = caixa.operador
+        if operador and operador.conta:
+            # Verificar se o operador tem saldo para transferir
+            if operador.conta.saldo_total > 0:
+                # Buscar a conta do administrador (current_user)
+                admin_conta = current_user.conta
+                if not admin_conta:
+                    # Se o admin não tem conta, criar uma
+                    admin_conta = Conta(usuario_id=current_user.id, saldo_total=0.00)
+                    db.session.add(admin_conta)
+                    db.session.flush()
+                
+                # Transferir todo o saldo do operador para o admin
+                resultado_transferencia = transferir_todo_saldo(
+                    conta_origem_id=operador.conta.id,
+                    conta_destino_id=admin_conta.id,
+                    usuario_id=current_user.id,
+                    session=db.session,
+                    descricao=f"Aprovação do Caixa {caixa_id}"
+                )
+                
+            else:
+                logger.info(f"Operador {operador.nome} não possui saldo para transferir")
+        
         db.session.commit()
         logger.info(f"Caixa {caixa_id} aprovado com sucesso pelo usuário {current_user.nome}")
+        
         return jsonify({
             'success': True,
-            'message': 'Caixa aprovado com sucesso',
+            'message': 'Caixa aprovado com sucesso e saldo transferido',
             'status': caixa.status.value,
-            'valor_confirmado': float(caixa.valor_confirmado) if caixa.valor_confirmado else None
+            'valor_confirmado': float(caixa.valor_confirmado) if caixa.valor_confirmado else None,
+            'transferencia_realizada': operador.conta.saldo_total > 0 if operador and operador.conta else False
         }), 200
+        
     except ValueError as e:
         logger.error(f"Erro ao aprovar caixa {caixa_id}: {str(e)}")
+        db.session.rollback()
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         logger.error(f"Erro ao aprovar caixa {caixa_id}: {str(e)}")
@@ -6886,3 +6841,689 @@ def historico_financeiro_pdf():
     except Exception as e:
         logger.error(f"Erro ao gerar PDF do histórico financeiro: {str(e)}", exc_info=True)
         abort(500, description=str(e))
+        
+# ============ ROTAS DAS CONTAS DOS USUÁRIOS ==============
+@admin_bp.route('/dashboard/contas')
+@login_required
+@admin_required
+def dashboard_contas():
+    logger.info(f"Acessando dashboard Contas - Usuário: {current_user.nome}")
+    return render_template('contas_usuario.html', nome_usuario=current_user.nome, tipo_usuario=current_user.tipo.value)
+
+@admin_bp.route('/conta/criar/<int:usuario_id>', methods=['POST'])
+@login_required
+@admin_required
+def criar_conta_usuario(usuario_id):
+    try:
+        # Verificar se o usuário existe
+        usuario = Usuario.query.get(usuario_id)
+        if not usuario:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+        
+        # Verificar se o usuário já possui conta
+        if usuario.conta:
+            return jsonify({'error': 'Usuário já possui uma conta'}), 400
+        
+        # Criar a conta
+        conta = Conta(usuario_id=usuario_id)
+        db.session.add(conta)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Conta criada com sucesso',
+            'conta': conta.to_dict()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro ao criar conta: {str(e)}'}), 500
+
+@admin_bp.route('/conta/transferir', methods=['POST'])
+@login_required
+@admin_required
+def transferir_entre_contas():
+    try:
+        data = request.get_json()
+
+        # Validar dados obrigatórios
+        required_fields = ['conta_origem_id', 'conta_destino_id', 'forma_pagamento', 'valor']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return jsonify({'error': f'Campo obrigatório faltando: {field}'}), 400
+
+        conta_origem_id = data['conta_origem_id']
+        conta_destino_id = data['conta_destino_id']
+        forma_pagamento = data['forma_pagamento']
+        valor = Decimal(str(data['valor']))
+        descricao = data['descricao']
+        usuario_id = current_user.id
+
+        if valor <= 0:
+            return jsonify({'error': 'O valor da transferência deve ser positivo'}), 400
+
+        conta_origem = Conta.query.get(conta_origem_id)
+        conta_destino = Conta.query.get(conta_destino_id)
+
+        if not conta_origem:
+            return jsonify({'error': 'Conta de origem não encontrada'}), 404
+        if not conta_destino:
+            return jsonify({'error': 'Conta de destino não encontrada'}), 404
+        if conta_origem_id == conta_destino_id:
+            return jsonify({'error': 'Não é possível transferir para a mesma conta'}), 400
+
+        try:
+            forma_pagamento_enum = FormaPagamento(forma_pagamento)
+        except ValueError:
+            return jsonify({'error': 'Forma de pagamento inválida'}), 400
+
+        # Verificar saldo da forma de pagamento na origem
+        saldo_fp_origem = conta_origem.get_saldo_forma_pagamento(forma_pagamento_enum)
+        if saldo_fp_origem < valor:
+            return jsonify({
+                'error': f"Saldo insuficiente em {forma_pagamento_enum.value}. "
+                         f"Saldo atual: R$ {saldo_fp_origem:.2f}, Valor solicitado: R$ {valor:.2f}"
+            }), 400
+
+        with db.session.begin_nested():
+            conta_destino_nome = conta_destino.get_usuario_nome()
+            conta_origem_nome = conta_origem.get_usuario_nome()
+
+            # Descrições completas
+            descricao_saida = f"{descricao} | Conta destino: {conta_destino_nome}" if descricao else f"Conta destino: {conta_destino_nome}"
+            descricao_entrada = f"{descricao} | Conta origem: {conta_origem_nome}" if descricao else f"Conta origem: {conta_origem_nome}"
+
+            # Movimentação de saída (origem)
+            movimentacao_saida = MovimentacaoConta(
+                conta_id=conta_origem_id,
+                tipo=TipoMovimentacao.transferencia,
+                forma_pagamento=forma_pagamento_enum,
+                valor=valor,
+                descricao=descricao_saida,
+                usuario_id=usuario_id
+            )
+            db.session.add(movimentacao_saida)
+
+            # Movimentação de entrada (destino)
+            movimentacao_entrada = MovimentacaoConta(
+                conta_id=conta_destino_id,
+                tipo=TipoMovimentacao.entrada,
+                forma_pagamento=forma_pagamento_enum,
+                valor=valor,
+                descricao=descricao_entrada,
+                usuario_id=usuario_id
+            )
+            db.session.add(movimentacao_entrada)
+
+
+            # Atualizar saldo total
+            conta_origem.saldo_total -= valor
+            conta_destino.saldo_total += valor
+
+            # Atualizar saldo por forma de pagamento - ORIGEM
+            saldo_fp_origem_obj = next(
+                (s for s in conta_origem.saldos_forma_pagamento if s.forma_pagamento == forma_pagamento_enum),
+                None
+            )
+            if not saldo_fp_origem_obj:
+                saldo_fp_origem_obj = SaldoFormaPagamento(
+                    conta_id=conta_origem.id,
+                    forma_pagamento=forma_pagamento_enum,
+                    saldo=Decimal('0.00')
+                )
+                db.session.add(saldo_fp_origem_obj)
+
+            saldo_fp_origem_obj.saldo -= valor
+
+            # Atualizar saldo por forma de pagamento - DESTINO
+            saldo_fp_destino_obj = next(
+                (s for s in conta_destino.saldos_forma_pagamento if s.forma_pagamento == forma_pagamento_enum),
+                None
+            )
+            if not saldo_fp_destino_obj:
+                saldo_fp_destino_obj = SaldoFormaPagamento(
+                    conta_id=conta_destino.id,
+                    forma_pagamento=forma_pagamento_enum,
+                    saldo=Decimal('0.00')
+                )
+                db.session.add(saldo_fp_destino_obj)
+
+            saldo_fp_destino_obj.saldo += valor
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'Transferência de R$ {valor:.2f} realizada com sucesso',
+            'transferencia': {
+                'conta_origem_id': conta_origem_id,
+                'conta_destino_id': conta_destino_id,
+                'forma_pagamento': forma_pagamento_enum.value,
+                'valor': float(valor),
+                'descricao': descricao,
+                'data': datetime.now().strftime('%d/%m/%Y %H:%M')
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro ao realizar transferência: {str(e)}'}), 500
+    
+@admin_bp.route('/conta/entrada', methods=['POST'])
+@login_required
+@admin_required
+def entrada_conta():
+    try:
+        data = request.get_json()
+        
+        conta_id = data.get('conta_id')
+        forma_pagamento = data.get('forma_pagamento')
+        valor = data.get('valor')
+        descricao = data.get('descricao', 'Entrada na conta')
+        usuario_id = current_user.id
+        
+        # Validações
+        if not all([conta_id, forma_pagamento, valor, usuario_id]):
+            return jsonify({'success': False, 'error': 'Dados incompletos'}), 400
+        
+        if valor <= 0:
+            return jsonify({'success': False, 'error': 'Valor deve ser positivo'}), 400
+        
+        # Buscar conta
+        conta = Conta.query.get(conta_id)
+        if not conta:
+            return jsonify({'success': False, 'error': 'Conta não encontrada'}), 404
+        
+        # Converter valor para Decimal
+        valor_decimal = Decimal(str(valor))
+        
+        # Criar movimentação de entrada
+        movimentacao = MovimentacaoConta(
+            conta_id=conta_id,
+            tipo=TipoMovimentacao.entrada,
+            forma_pagamento=FormaPagamento(forma_pagamento),
+            valor=valor_decimal,
+            descricao=descricao,
+            data=datetime.now(),
+            usuario_id=usuario_id
+        )
+        
+        # Atualizar saldo total da conta
+        conta.saldo_total += valor_decimal
+        
+        # Atualizar saldo específico da forma de pagamento
+        saldo_forma = SaldoFormaPagamento.query.filter_by(
+            conta_id=conta_id,
+            forma_pagamento=FormaPagamento(forma_pagamento)
+        ).first()
+        
+        if saldo_forma:
+            saldo_forma.saldo += valor_decimal
+            saldo_forma.atualizado_em = datetime.now()
+        else:
+            saldo_forma = SaldoFormaPagamento(
+                conta_id=conta_id,
+                forma_pagamento=FormaPagamento(forma_pagamento),
+                saldo=valor_decimal
+            )
+            db.session.add(saldo_forma)
+        
+        db.session.add(movimentacao)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Entrada registrada com sucesso',
+            'novo_saldo': float(conta.saldo_total)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/conta/saida', methods=['POST'])
+@login_required
+@admin_required
+def saida_conta():
+    try:
+        data = request.get_json()
+        
+        conta_id = data.get('conta_id')
+        forma_pagamento = data.get('forma_pagamento')
+        valor = data.get('valor')
+        descricao = data.get('descricao', 'Saída da conta')
+        usuario_id = current_user.id
+
+        # Validações básicas
+        if not all([conta_id, forma_pagamento, valor, usuario_id]):
+            return jsonify({'success': False, 'error': 'Dados incompletos'}), 400
+
+        valor_decimal = Decimal(str(valor))
+        if valor_decimal <= 0:
+            return jsonify({'success': False, 'error': 'Valor deve ser positivo'}), 400
+
+        # Buscar conta
+        conta = Conta.query.get(conta_id)
+        if not conta:
+            return jsonify({'success': False, 'error': 'Conta não encontrada'}), 404
+
+        forma_pagamento_enum = FormaPagamento(forma_pagamento)
+
+        # Buscar ou criar saldo por forma de pagamento
+        saldo_forma = SaldoFormaPagamento.query.filter_by(
+            conta_id=conta_id,
+            forma_pagamento=forma_pagamento_enum
+        ).first()
+
+        if not saldo_forma:
+            saldo_forma = SaldoFormaPagamento(
+                conta_id=conta_id,
+                forma_pagamento=forma_pagamento_enum,
+                saldo=Decimal('0.00'),
+                atualizado_em=datetime.now()
+            )
+            db.session.add(saldo_forma)
+
+        # Verificar saldo suficiente
+        if saldo_forma.saldo < valor_decimal:
+            return jsonify({
+                'success': False,
+                'error': f'Saldo insuficiente em {forma_pagamento_enum.value}. '
+                         f'Saldo atual: R$ {saldo_forma.saldo:.2f}'
+            }), 400
+
+        # Criar movimentação de saída
+        movimentacao = MovimentacaoConta(
+            conta_id=conta_id,
+            tipo=TipoMovimentacao.saida,
+            forma_pagamento=forma_pagamento_enum,
+            valor=valor_decimal,
+            descricao=descricao,
+            data=datetime.now(),
+            usuario_id=usuario_id
+        )
+        db.session.add(movimentacao)
+
+        # Atualizar saldos
+        conta.saldo_total -= valor_decimal
+        saldo_forma.saldo -= valor_decimal
+        saldo_forma.atualizado_em = datetime.now()
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Saída registrada com sucesso',
+            'novo_saldo_total': float(conta.saldo_total),
+            'novo_saldo_forma': float(saldo_forma.saldo),
+            'forma_pagamento': forma_pagamento_enum.value
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+@admin_bp.route('/conta/<int:conta_id>', methods=['GET'])
+@login_required
+@admin_required
+def get_conta(conta_id):
+    try:
+        conta = Conta.query.get(conta_id)
+        if not conta:
+            return jsonify({'success': False, 'error': 'Conta não encontrada'}), 404
+        
+        return jsonify({
+            'success': True,
+            'conta': conta.to_dict()
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+# --------------------
+# Rotas para Dashboard de Contas
+# --------------------
+@admin_bp.route('/api/contas-usuario', methods=['GET'])
+@login_required
+@admin_required
+def api_listar_contas_usuario():
+    """Retorna lista de contas com saldos para o dashboard"""
+    try:
+        contas = Conta.query.all()
+        contas_data = []
+        
+        for conta in contas:
+            # Construir dados da conta no formato esperado pelo frontend
+            saldos_por_forma_pagamento = {}
+            for saldo in conta.saldos_forma_pagamento:
+                saldos_por_forma_pagamento[saldo.forma_pagamento.value] = float(saldo.saldo)
+            
+            conta_data = {
+                'id': conta.id,
+                'usuario_id': conta.usuario_id,
+                'saldo_total': float(conta.saldo_total) if conta.saldo_total else 0.00,
+                'saldos_por_forma_pagamento': saldos_por_forma_pagamento,
+                'atualizado_em': conta.atualizado_em.isoformat() if conta.atualizado_em else None
+            }
+            contas_data.append(conta_data)
+        
+        logger.info(f"Retornando {len(contas_data)} contas para o dashboard")
+        return jsonify({
+            'success': True,
+            'contas': contas_data
+        })
+    except Exception as e:
+        logger.error(f"Erro ao listar contas para dashboard: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/contas-usuario/<int:conta_id>/movimentacoes', methods=['GET'])
+@login_required
+@admin_required
+def api_listar_movimentacoes_conta_usuario(conta_id):
+    """Retorna histórico de movimentações de uma conta para o dashboard"""
+    try:
+        # Verificar se a conta existe
+        conta = Conta.query.get(conta_id)
+        if not conta:
+            return jsonify({'success': False, 'error': 'Conta não encontrada'}), 404
+            
+        # Parâmetros de filtro
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        
+        query = MovimentacaoConta.query.filter_by(conta_id=conta_id)
+        
+        # Aplicar filtros de data se fornecidos
+        if data_inicio:
+            try:
+                data_inicio_dt = datetime.fromisoformat(data_inicio)
+                query = query.filter(MovimentacaoConta.data >= data_inicio_dt)
+            except ValueError:
+                return jsonify({'success': False, 'error': 'Formato de data início inválido'}), 400
+        
+        if data_fim:
+            try:
+                data_fim_dt = datetime.fromisoformat(data_fim)
+                query = query.filter(MovimentacaoConta.data <= data_fim_dt)
+            except ValueError:
+                return jsonify({'success': False, 'error': 'Formato de data fim inválido'}), 400
+        
+        movimentacoes = query.order_by(MovimentacaoConta.data.desc()).limit(100).all()
+        
+        movimentacoes_data = []
+        for mov in movimentacoes:
+            mov_data = {
+                'id': mov.id,
+                'tipo': mov.tipo.value,
+                'forma_pagamento': mov.forma_pagamento.value,
+                'valor': float(mov.valor),
+                'descricao': mov.descricao,
+                'data': mov.data.isoformat() if mov.data else None,
+                'usuario_id': mov.usuario_id,
+                'caixa_id': mov.caixa_id
+            }
+            movimentacoes_data.append(mov_data)
+        
+        logger.info(f"Retornando {len(movimentacoes_data)} movimentações para conta {conta_id}")
+        return jsonify({
+            'success': True,
+            'movimentacoes': movimentacoes_data
+        })
+    except Exception as e:
+        logger.error(f"Erro ao listar movimentações da conta {conta_id}: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/relatorios/movimentacoes-contas-usuario', methods=['GET'])
+@login_required
+@admin_required
+def api_relatorio_movimentacoes():
+    """Gera relatório de movimentações com filtros"""
+    try:
+        # Parâmetros de filtro
+        conta_id = request.args.get('conta_id', type=int)
+        usuario_id = request.args.get('usuario_id', type=int)
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        
+        # Query base para movimentações
+        query = db.session.query(
+            Usuario.nome.label('usuario_nome'),
+            MovimentacaoConta.conta_id,
+            MovimentacaoConta.forma_pagamento,
+            MovimentacaoConta.data,
+            db.func.sum(
+                db.case(
+                    (MovimentacaoConta.tipo == TipoMovimentacao.entrada, MovimentacaoConta.valor),
+                    else_=0
+                )
+            ).label('entradas'),
+            db.func.sum(
+                db.case(
+                    (MovimentacaoConta.tipo == TipoMovimentacao.saida, MovimentacaoConta.valor),
+                    else_=0
+                )
+            ).label('saidas')
+        ).join(Usuario, MovimentacaoConta.usuario_id == Usuario.id)
+        
+        # Aplicar filtros
+        if conta_id:
+            query = query.filter(MovimentacaoConta.conta_id == conta_id)
+        if usuario_id:
+            query = query.filter(MovimentacaoConta.usuario_id == usuario_id)
+        if data_inicio:
+            data_inicio_dt = datetime.fromisoformat(data_inicio)
+            query = query.filter(MovimentacaoConta.data >= data_inicio_dt)
+        if data_fim:
+            data_fim_dt = datetime.fromisoformat(data_fim)
+            query = query.filter(MovimentacaoConta.data <= data_fim_dt)
+        
+        resultados = query.group_by(
+            Usuario.nome,
+            MovimentacaoConta.conta_id,
+            MovimentacaoConta.forma_pagamento,
+            MovimentacaoConta.data
+        ).order_by(MovimentacaoConta.data.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'dados': [{
+                'usuario_nome': r.usuario_nome,
+                'conta_id': r.conta_id,
+                'forma_pagamento': r.forma_pagamento.value,
+                'entradas': float(r.entradas or 0),
+                'saidas': float(r.saidas or 0),
+                'data': r.data.isoformat() if r.data else None
+            } for r in resultados]
+        })
+        
+    except Exception as e:
+        logger.error(f"Erro ao gerar relatório de movimentações: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/relatorios/movimentacoes-contas-usuario/pdf', methods=['POST'])
+@login_required
+@admin_required
+def api_gerar_pdf_relatorio():
+    """Gera relatório em PDF com todas as movimentações"""
+    try:
+        from flask import send_file
+        import io
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+
+        data_req = request.get_json()
+
+        data_inicio = data_req.get('data_inicio')
+        data_fim = data_req.get('data_fim')
+        conta_id = data_req.get('conta_id')
+
+        # Buscar a conta para obter informações adicionais
+        conta = None
+        if conta_id:
+            conta = Conta.query.get(conta_id)
+            if not conta:
+                return jsonify({'success': False, 'error': 'Conta não encontrada'}), 404
+
+        # BUSCAR TODAS AS MOVIMENTAÇÕES DA CONTA
+        query = MovimentacaoConta.query.filter_by(conta_id=conta_id)
+
+        # Aplicar filtros de data CORRETAMENTE (incluindo todo o dia)
+        if data_inicio:
+            try:
+                data_inicio_dt = datetime.fromisoformat(data_inicio)
+                # Incluir todo o dia desde 00:00:00
+                query = query.filter(MovimentacaoConta.data >= data_inicio_dt)
+            except ValueError:
+                return jsonify({'success': False, 'error': 'Formato de data início inválido'}), 400
+        
+        if data_fim:
+            try:
+                data_fim_dt = datetime.fromisoformat(data_fim)
+                # Incluir todo o dia até 23:59:59
+                data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
+                query = query.filter(MovimentacaoConta.data <= data_fim_dt)
+            except ValueError:
+                return jsonify({'success': False, 'error': 'Formato de data fim inválido'}), 400
+
+        # BUSCAR TODOS OS REGISTROS SEM LIMITE
+        movimentacoes = query.order_by(MovimentacaoConta.data.desc()).all()
+
+        # DEBUG: Log para verificar o que está sendo buscado
+        logger.info(f"PDF - Conta {conta_id}: {len(movimentacoes)} movimentações encontradas")
+        for mov in movimentacoes:
+            logger.info(f"Mov {mov.id}: {mov.data} | {mov.tipo.value} | {mov.valor} | {mov.descricao}")
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=20, leftMargin=20, topMargin=30, bottomMargin=30)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # Título
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=20,
+            textColor=colors.HexColor('#6c5ce7')
+        )
+        
+        titulo = f"Relatório de Movimentações - Conta {conta_id}"
+        if conta and conta.usuario:
+            titulo += f" - {conta.usuario.nome}"
+            
+        elements.append(Paragraph(titulo, title_style))
+
+        # Informações da conta
+        if conta:
+            info_conta = []
+            info_conta.append(f"Saldo Atual: R$ {float(conta.saldo_total):.2f}")
+                
+            elements.append(Paragraph(" | ".join(info_conta), styles['Normal']))
+
+        # Período
+        periodo_text = f"Período: {data_inicio} a {data_fim}" if data_inicio and data_fim else "Período: Todos"
+        elements.append(Paragraph(periodo_text, styles['Normal']))
+
+        elements.append(Spacer(1, 12))
+
+        if movimentacoes:
+            table_data = [['Data', 'Usuário', 'Tipo', 'Forma Pagamento', 'Valor (R$)', 'Descrição']]
+            total_entradas = 0
+            total_saidas = 0
+            total_transferencias = 0
+
+            for mov in movimentacoes:
+                valor = float(mov.valor)
+                
+                # Classificar CORRETAMENTE por tipo
+                if mov.tipo.value == 'entrada':
+                    total_entradas += valor
+                    tipo_exibicao = 'ENTRADA'
+                elif mov.tipo.value == 'saida':
+                    total_saidas += valor
+                    tipo_exibicao = 'SAÍDA'
+                elif mov.tipo.value == 'transferencia':
+                    total_transferencias += valor
+                    tipo_exibicao = 'TRANSFERÊNCIA'
+                elif mov.tipo.value == 'saida_estorno':
+                    total_saidas += valor
+                    tipo_exibicao = 'ESTORNO SAÍDA'
+                else:
+                    tipo_exibicao = mov.tipo.value.upper()
+
+                table_data.append([
+                    mov.data.strftime('%d/%m/%Y %H:%M') if mov.data else '-',
+                    mov.usuario.nome if mov.usuario else '-',
+                    tipo_exibicao,
+                    mov.forma_pagamento.value.replace('_', ' ').title(),
+                    f"R$ {valor:.2f}",
+                    Paragraph(mov.descricao or '-', styles['Normal'])
+                ])
+
+            # Ajuste de largura das colunas
+            col_widths = [1.2*inch, 1.5*inch, 1.0*inch, 1.2*inch, 1*inch, 2.1*inch]
+
+            table = Table(table_data, colWidths=col_widths, repeatRows=1)
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c5ce7')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-2, -1), 'CENTER'),
+                ('ALIGN', (4, 1), (4, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8f9fa')),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+            ]))
+            elements.append(table)
+
+            # Totais detalhados
+            elements.append(Spacer(1, 12))
+            saldo_total = total_entradas - total_saidas - total_transferencias
+            
+            totais_data = [
+                [f'Entradas: R$ {total_entradas:.2f}', f'Saídas: R$ {total_saidas:.2f}', f' Transferências: R$ {total_transferencias:.2f} ']
+            ]
+
+            totais_table = Table(totais_data, colWidths=[1.5*inch, 1.3*inch, 1.8*inch])
+            totais_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2d3748')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ]))
+            elements.append(totais_table)
+
+            # Resumo
+            elements.append(Spacer(1, 8))
+            resumo_text = f"Total de movimentações: {len(movimentacoes)}"
+            elements.append(Paragraph(resumo_text, styles['Normal']))
+            
+            # Estatísticas por tipo
+            elements.append(Spacer(1, 4))
+            estatisticas_text = f"Entradas: {sum(1 for m in movimentacoes if m.tipo.value == 'entrada')} | "
+            estatisticas_text += f"Saídas: {sum(1 for m in movimentacoes if m.tipo.value == 'saida')} | "
+            estatisticas_text += f"Transferências: {sum(1 for m in movimentacoes if m.tipo.value == 'transferencia')} | "
+            elements.append(Paragraph(estatisticas_text, styles['Normal']))
+
+        else:
+            elements.append(Paragraph("Nenhuma movimentação encontrada para esta conta no período selecionado.", styles['Normal']))
+
+        doc.build(elements)
+        buffer.seek(0)
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f'relatorio_movimentacoes_conta_{conta_id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf',
+            mimetype='application/pdf'
+        )
+
+    except Exception as e:
+        logger.error(f"Erro ao gerar PDF: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
