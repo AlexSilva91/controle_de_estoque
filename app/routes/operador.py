@@ -91,16 +91,52 @@ def dashboard():
 @login_required
 @operador_required
 def api_get_clientes():
-    clientes = get_clientes(db.session)
-    return jsonify([{
-        'id': cliente.id,
-        'nome': cliente.nome,
-        'documento': cliente.documento,
-        'telefone': cliente.telefone,
-        'email': cliente.email,
-        'endereco': cliente.endereco,
-        'ativo': cliente.ativo
-    } for cliente in clientes])
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    search = request.args.get('search', '')
+    
+    # Query base
+    query = Cliente.query.filter_by(ativo=True)
+    
+    # Aplica busca se existir
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            db.or_(
+                Cliente.nome.ilike(search_term),
+                Cliente.documento.ilike(search_term),
+                Cliente.telefone.ilike(search_term),
+                Cliente.email.ilike(search_term),
+                Cliente.endereco.ilike(search_term)
+            )
+        )
+    
+    # Paginação
+    pagination = query.paginate(
+        page=page, 
+        per_page=per_page, 
+        error_out=False
+    )
+    
+    return jsonify({
+        'clientes': [{
+            'id': cliente.id,
+            'nome': cliente.nome,
+            'documento': cliente.documento,
+            'telefone': cliente.telefone,
+            'email': cliente.email,
+            'endereco': cliente.endereco,
+            'ativo': cliente.ativo
+        } for cliente in pagination.items],
+        'pagination': {
+            'current_page': pagination.page,
+            'per_page': pagination.per_page,
+            'total': pagination.total,
+            'pages': pagination.pages,
+            'has_prev': pagination.has_prev,
+            'has_next': pagination.has_next
+        }
+    })
 
 @operador_bp.route('/api/clientes', methods=['POST'])
 @login_required

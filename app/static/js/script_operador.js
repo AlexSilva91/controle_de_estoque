@@ -238,18 +238,44 @@ async function loadCurrentUser() {
 }
 
 // ==================== FUNÇÕES DE CLIENTES ====================
-async function loadClients() {
+// Variáveis globais para paginação
+let currentPage = 1;
+const clientsPerPage = 10;
+let totalPages = 1;
+let totalClients = 0;
+let currentSearchTerm = '';
+
+async function loadClients(page = 1, searchTerm = '') {
     try {
         showClientsLoading(true);
-        const response = await fetch('/operador/api/clientes', {
+        currentPage = page;
+        currentSearchTerm = searchTerm;
+
+        // Constrói a URL com parâmetros
+        let url = `/operador/api/clientes?page=${page}&per_page=${clientsPerPage}`;
+        if (searchTerm) {
+            url += `&search=${encodeURIComponent(searchTerm)}`;
+        }
+
+        const response = await fetch(url, {
             ...preventCacheConfig,
             method: 'GET'
         });
+        
         if (!response.ok) throw new Error('Erro ao carregar clientes');
-        clients = await response.json();
+        
+        const data = await response.json();
+        clients = data.clientes;
         filteredClients = [...clients];
+        
+        // Informações de paginação
+        totalPages = data.pagination.pages;
+        totalClients = data.pagination.total;
+        
         renderClientsTable();
         updateClientsCount();
+        renderPagination();
+        
     } catch (error) {
         showMessage(error.message, 'error');
         showClientsEmptyState(true);
@@ -305,11 +331,6 @@ function renderClientsTable() {
                     ` : '<span class="text-muted">Não informado</span>'}
                 </div>
             </td>
-            <td class="client-date">
-                <span class="date-value" title="${formatDateTime(client.data_cadastro)}">
-                    ${formatDate(client.data_cadastro)}
-                </span>
-            </td>
             <td class="client-actions">
                 <div class="action-buttons">
                     <button class="btn-action btn-edit" onclick="editClient(${client.id})" title="Editar cliente">
@@ -327,25 +348,91 @@ function renderClientsTable() {
     `).join('');
 }
 
-function searchClients(searchTerm) {
-    const term = searchTerm.toLowerCase().trim();
-    if (!term) {
-        filteredClients = [...clients];
-    } else {
-        filteredClients = clients.filter(client =>
-            (client.nome && client.nome.toLowerCase().includes(term)) ||
-            (client.documento && client.documento.includes(term)) ||
-            (client.telefone && client.telefone.includes(term)) ||
-            (client.email && client.email.toLowerCase().includes(term)) ||
-            (client.endereco && client.endereco.toLowerCase().includes(term))
-        );
+function renderPagination() {
+    const paginationContainer = document.getElementById('pagination-controls');
+    if (!paginationContainer) return;
+
+    if (totalPages <= 1) {
+        paginationContainer.innerHTML = '';
+        return;
     }
-    applySortAndFilter();
-    renderClientsTable();
-    updateClientsCount();
+
+    let paginationHTML = '';
+
+    // Botão anterior
+    if (currentPage > 1) {
+        paginationHTML += `<button class="pagination-btn" onclick="loadClients(${currentPage - 1}, '${currentSearchTerm}')">
+            <i class="fas fa-chevron-left"></i>
+        </button>`;
+    } else {
+        paginationHTML += `<button class="pagination-btn disabled" disabled>
+            <i class="fas fa-chevron-left"></i>
+        </button>`;
+    }
+
+    // Páginas
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+
+    if (startPage > 1) {
+        paginationHTML += `<button class="pagination-btn" onclick="loadClients(1, '${currentSearchTerm}')">1</button>`;
+        if (startPage > 2) {
+            paginationHTML += `<span class="pagination-ellipsis">...</span>`;
+        }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+        if (i === currentPage) {
+            paginationHTML += `<button class="pagination-btn active">${i}</button>`;
+        } else {
+            paginationHTML += `<button class="pagination-btn" onclick="loadClients(${i}, '${currentSearchTerm}')">${i}</button>`;
+        }
+    }
+
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            paginationHTML += `<span class="pagination-ellipsis">...</span>`;
+        }
+        paginationHTML += `<button class="pagination-btn" onclick="loadClients(${totalPages}, '${currentSearchTerm}')">${totalPages}</button>`;
+    }
+
+    // Botão próximo
+    if (currentPage < totalPages) {
+        paginationHTML += `<button class="pagination-btn" onclick="loadClients(${currentPage + 1}, '${currentSearchTerm}')">
+            <i class="fas fa-chevron-right"></i>
+        </button>`;
+    } else {
+        paginationHTML += `<button class="pagination-btn disabled" disabled>
+            <i class="fas fa-chevron-right"></i>
+        </button>`;
+    }
+
+    paginationContainer.innerHTML = paginationHTML;
+}
+
+function updateClientsCount() {
+    const countElement = document.getElementById('clients-count');
+    if (countElement) {
+        const startItem = ((currentPage - 1) * clientsPerPage) + 1;
+        const endItem = Math.min(currentPage * clientsPerPage, totalClients);
+        
+        if (currentSearchTerm) {
+            countElement.textContent = `Mostrando ${startItem}-${endItem} de ${totalClients} clientes (filtrado)`;
+        } else {
+            countElement.textContent = `Mostrando ${startItem}-${endItem} de ${totalClients} clientes`;
+        }
+    }
+}
+
+// Funções de busca e filtro atualizadas
+function searchClients(searchTerm) {
+    currentPage = 1; // Reset para primeira página na busca
+    loadClients(1, searchTerm);
 }
 
 function filterClients(filterType) {
+    // Para filtros complexos, você pode precisar implementar no backend
+    // Por enquanto, mantemos a busca no frontend para compatibilidade
     currentFilter = filterType;
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -373,6 +460,7 @@ function filterClients(filterType) {
     });
 }
 
+// Ordenação mantém funcionando no frontend para a página atual
 function sortClients(field) {
     if (currentSort.field === field) {
         currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
@@ -388,9 +476,6 @@ function sortClients(field) {
         if (field === 'id') {
             valueA = parseInt(valueA) || 0;
             valueB = parseInt(valueB) || 0;
-        } else if (field === 'data_cadastro') {
-            valueA = new Date(valueA);
-            valueB = new Date(valueB);
         } else {
             valueA = valueA.toString().toLowerCase();
             valueB = valueB.toString().toLowerCase();
@@ -407,54 +492,29 @@ function sortClients(field) {
     updateSortIcons();
 }
 
-function applySortAndFilter() {
-    if (currentSort.field) {
-        sortClients(currentSort.field);
-    }
-}
-
-function updateSortIcons() {
-    document.querySelectorAll('.sortable i').forEach(icon => {
-        icon.className = 'fas fa-sort';
-    });
-
-    const activeHeader = document.querySelector(`[data-sort="${currentSort.field}"] i`);
-    if (activeHeader) {
-        activeHeader.className = currentSort.direction === 'asc'
-            ? 'fas fa-sort-up'
-            : 'fas fa-sort-down';
-    }
-}
-
-function updateClientsCount() {
-    const countElement = document.getElementById('clients-count');
-    if (countElement) {
-        const total = clients.length;
-        const filtered = filteredClients.length;
-
-        if (total === filtered) {
-            countElement.textContent = `${total} cliente${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`;
-        } else {
-            countElement.textContent = `${filtered} de ${total} clientes`;
-        }
-    }
-}
-
+// Funções auxiliares mantidas
 function showClientsLoading(show) {
     const loading = document.getElementById('clients-loading');
     const table = document.querySelector('.clients-table-container');
+    const footer = document.querySelector('.table-footer');
     if (loading) loading.style.display = show ? 'block' : 'none';
     if (table) table.style.display = show ? 'none' : 'block';
+    if (footer) footer.style.display = show ? 'none' : 'flex';
 }
 
 function showClientsEmptyState(show) {
     const emptyState = document.getElementById('clients-empty-state');
     const table = document.querySelector('.clients-table-container');
-    const tableFooter = document.querySelector('.table-footer');
+    const footer = document.querySelector('.table-footer');
     if (emptyState) emptyState.style.display = show ? 'block' : 'none';
     if (table) table.style.display = show ? 'none' : 'block';
-    if (tableFooter) tableFooter.style.display = show ? 'none' : 'flex';
+    if (footer) footer.style.display = show ? 'none' : 'flex';
 }
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', function() {
+    loadClients(1);
+});
 
 function formatDocument(doc) {
     if (!doc) return '';
