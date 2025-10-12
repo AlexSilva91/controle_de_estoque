@@ -424,15 +424,7 @@ function updateClientsCount() {
     }
 }
 
-// Funções de busca e filtro atualizadas
-function searchClients(searchTerm) {
-    currentPage = 1; // Reset para primeira página na busca
-    loadClients(1, searchTerm);
-}
-
 function filterClients(filterType) {
-    // Para filtros complexos, você pode precisar implementar no backend
-    // Por enquanto, mantemos a busca no frontend para compatibilidade
     currentFilter = filterType;
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -511,8 +503,83 @@ function showClientsEmptyState(show) {
     if (footer) footer.style.display = show ? 'none' : 'flex';
 }
 
-// Inicialização
+// Variável para controlar a busca por nome
+let currentNameSearch = '';
+
+// Função para lidar com a busca por nome ao pressionar Enter
+function handleNameSearch(event) {
+    if (event.key === 'Enter') {
+        performNameSearch();
+    }
+}
+
+// Função para executar a busca por nome - CORRIGIDA
+function performNameSearch() {
+    const searchInput = document.getElementById('name-search-input');
+    const clearButton = document.getElementById('clear-name-search');
+    
+    currentNameSearch = searchInput.value.trim();
+    
+    if (currentNameSearch) {
+        clearButton.style.display = 'block';
+        // Chama a função loadClients diretamente com o termo de busca
+        loadClients(1, currentNameSearch);
+    } else {
+        clearNameSearch();
+    }
+}
+
+// Função para limpar a busca por nome
+function clearNameSearch() {
+    const searchInput = document.getElementById('name-search-input');
+    const clearButton = document.getElementById('clear-name-search');
+    
+    searchInput.value = '';
+    currentNameSearch = '';
+    clearButton.style.display = 'none';
+    
+    // Recarrega os clientes sem filtro
+    loadClients(1, '');
+}
+
+// Inicialização do campo de busca - CORRIGIDA
 document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('name-search-input');
+    const clearButton = document.getElementById('clear-name-search');
+    
+    // Event listener para o botão de limpar
+    if (clearButton) {
+        clearButton.addEventListener('click', clearNameSearch);
+    }
+    
+    // Event listener para input (busca em tempo real opcional)
+    if (searchInput) {
+        // Opcional: busca em tempo real com debounce
+        let searchTimeout;
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            
+            // Se o campo ficar vazio, limpa a busca
+            if (this.value.trim() === '') {
+                clearNameSearch();
+                return;
+            }
+            
+            // Busca automática após 1 segundo (opcional)
+            searchTimeout = setTimeout(() => {
+                currentNameSearch = this.value.trim();
+                if (currentNameSearch) {
+                    clearButton.style.display = 'block';
+                    loadClients(1, currentNameSearch);
+                }
+            }, 1000);
+        });
+        
+        // Foco no campo de busca quando a página carregar
+        searchInput.focus();
+    }
+    
+    // Carrega os clientes inicialmente
     loadClients(1);
 });
 
