@@ -3088,115 +3088,198 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
-  // Modifique a função loadCaixasData para incluir o filtro de operador
-  async function loadCaixasData() {
-    try {
-      const status = document.getElementById('caixaStatus')?.value || '';
-      const operadorId = document.getElementById('caixaOperador')?.value || '';
-      const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
-      const dataFim = document.getElementById('caixaDataFim')?.value || '';
-
-
-      // Monta query string dinamicamente
-      const params = new URLSearchParams();
-      if (status) params.append('status', status);
-      if (operadorId) params.append('operador_id', operadorId);
-      if (dataInicio) params.append('data_inicio', dataInicio);
-      if (dataFim) params.append('data_fim', dataFim);
-
-      let url = '/admin/caixas';
-      if ([...params].length > 0) {
-        url += `?${params.toString()}`;
+  // Variáveis globais para controle de paginação
+  let currentCaixaPage = 1;
+  const caixasPerPage = 30;
+  
+  async function loadCaixasData(page = 1) {
+      try {
+          const status = document.getElementById('caixaStatus')?.value || '';
+          const operadorId = document.getElementById('caixaOperador')?.value || '';
+          const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
+          const dataFim = document.getElementById('caixaDataFim')?.value || '';
+  
+          // Monta query string dinamicamente
+          const params = new URLSearchParams();
+          if (status) params.append('status', status);
+          if (operadorId) params.append('operador_id', operadorId);
+          if (dataInicio) params.append('data_inicio', dataInicio);
+          if (dataFim) params.append('data_fim', dataFim);
+          
+          // NOVO: Adiciona parâmetros de paginação
+          params.append('page', page.toString());
+          params.append('per_page', caixasPerPage.toString());
+  
+          let url = '/admin/caixas';
+          if ([...params].length > 0) {
+              url += `?${params.toString()}`;
+          }
+          
+          const data = await fetchWithErrorHandling(url);
+  
+          if (data.success) {
+              const caixasTable = document.querySelector('#caixasTable tbody');
+              if (caixasTable) {
+                  caixasTable.innerHTML = '';
+  
+                  data.data.forEach(caixa => {
+                      const row = document.createElement('tr');
+  
+                      const dataAbertura = formatDateTime(caixa.data_abertura);
+                      const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
+  
+                      const valorEntradas = formatarMoeda(caixa.total_vendas);
+                      const valorSaidas = formatarMoeda(caixa.total_despesas);
+                      const valorConfirmado = caixa.valor_confirmado ? formatarMoeda(caixa.valor_confirmado) : '-';
+  
+                      let statusClass = '';
+                      let statusText = '';
+                      if (caixa.status === 'aberto') {
+                          statusClass = 'badge-success';
+                          statusText = 'Aberto';
+                      } else if (caixa.status === 'fechado') {
+                          statusClass = 'badge-primary';
+                          statusText = 'Fechado';
+                      } else if (caixa.status === 'analise' || caixa.status === 'em_analise') {
+                          statusClass = 'badge-warning';
+                          statusText = 'Em Análise';
+                      } else if (caixa.status === 'rejeitado' || caixa.status === 'recusado') {
+                          statusClass = 'badge-danger';
+                          statusText = 'Rejeitado';
+                      }
+  
+                      row.innerHTML = `
+                          <td>${caixa.id}</td>
+                          <td>${caixa.operador?.nome || '-'}</td>
+                          <td>${dataAbertura}</td>
+                          <td>${dataFechamento}</td>
+                          <td>${valorEntradas}</td>
+                          <td>${valorSaidas}</td>
+                          <td><span class="badge ${statusClass}">${statusText}</span></td>
+                          <td>
+                              <div class="table-actions">
+                                  <button class="btn-icon btn-info visualizar-caixa" data-id="${caixa.id}" title="Visualizar">
+                                      <i class="fas fa-eye"></i>
+                                  </button>
+                                  <button class="btn-icon btn-warning reabrir-caixa" data-id="${caixa.id}" title="Reabrir Caixa">
+                                      <i class="fas fa-unlock"></i>
+                                  </button>
+                                  <button class="btn-icon btn-danger fechar-caixa" data-id="${caixa.id}" title="Fechar Caixa">
+                                      <i class="fas fa-lock"></i>
+                                  </button>
+                                  <button class="btn-icon btn-primary venda-retroativa-caixa" data-id="${caixa.id}" title="Venda Retroativa">
+                                      <i class="fas fa-history"></i>
+                                  </button>
+                                  <button class="btn-icon btn-success aprovar-caixa" data-id="${caixa.id}" title="Transferir Saldo">
+                                      <i class="fas fa-check"></i>
+                                  </button>
+                              </div>
+                          </td>
+                      `;
+                      caixasTable.appendChild(row);
+                  });
+  
+                  setupCaixaActions();
+                  
+                  // NOVO: Atualiza controles de paginação
+                  updatePaginationControls(data.pagination);
+              }
+          }
+      } catch (error) {
+          showFlashMessage('error', 'Erro ao carregar lista de caixas');
       }
-      const data = await fetchWithErrorHandling(url);
-
-      if (data.success) {
-        const caixasTable = document.querySelector('#caixasTable tbody');
-        if (caixasTable) {
-          caixasTable.innerHTML = '';
-
-          data.data.forEach(caixa => {
-            const row = document.createElement('tr');
-
-            const dataAbertura = formatDateTime(caixa.data_abertura);
-            const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
-
-            const valorEntradas = formatarMoeda(caixa.total_vendas);
-            const valorSaidas = formatarMoeda(caixa.total_despesas);
-            const valorConfirmado = caixa.valor_confirmado ? formatarMoeda(caixa.valor_confirmado) : '-';
-
-            let statusClass = '';
-            let statusText = '';
-            if (caixa.status === 'aberto') {
-              statusClass = 'badge-success';
-              statusText = 'Aberto';
-            } else if (caixa.status === 'fechado') {
-              statusClass = 'badge-primary';
-              statusText = 'Fechado';
-            } else if (caixa.status === 'analise' || caixa.status === 'em_analise') {
-              statusClass = 'badge-warning';
-              statusText = 'Em Análise';
-            } else if (caixa.status === 'rejeitado' || caixa.status === 'recusado') {
-              statusClass = 'badge-danger';
-              statusText = 'Rejeitado';
-            }
-
-            row.innerHTML = `
-                            <td>${caixa.id}</td>
-                            <td>${caixa.operador?.nome || '-'}</td>
-                            <td>${dataAbertura}</td>
-                            <td>${dataFechamento}</td>
-                            <td>${valorEntradas}</td>
-                            <td>${valorSaidas}</td>
-                            <td><span class="badge ${statusClass}">${statusText}</span></td>
-                            <td>
-                                <div class="table-actions">
-                                    <button class="btn-icon btn-info visualizar-caixa" data-id="${caixa.id}" title="Visualizar">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn-icon btn-warning reabrir-caixa" data-id="${caixa.id}" title="Reabrir Caixa">
-                                        <i class="fas fa-unlock"></i>
-                                    </button>
-                                    <button class="btn-icon btn-danger fechar-caixa" data-id="${caixa.id}" title="Fechar Caixa">
-                                        <i class="fas fa-lock"></i>
-                                    </button>
-                                    <button class="btn-icon btn-primary venda-retroativa-caixa" data-id="${caixa.id}" title="Venda Retroativa">
-                                        <i class="fas fa-history"></i>
-                                    </button>
-                                    <button class="btn-icon btn-success aprovar-caixa" data-id="${caixa.id}" title="Transferir Saldo">
-                                        <i class="fas fa-check"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        `;
-            caixasTable.appendChild(row);
-          });
-
-          setupCaixaActions();
-        }
-      }
-    } catch (error) {
-      showFlashMessage('error', 'Erro ao carregar lista de caixas');
-    }
   }
-
-  // Atualize o evento de refresh para limpar também o filtro de operador
+  
+  // NOVO: Função para atualizar controles de paginação
+  function updatePaginationControls(pagination) {
+      let paginationContainer = document.getElementById('caixasPagination');
+      
+      // Remove o container existente se houver
+      if (paginationContainer) {
+          paginationContainer.remove();
+      }
+      
+      // Cria novo container de paginação
+      paginationContainer = document.createElement('div');
+      paginationContainer.id = 'caixasPagination';
+      paginationContainer.className = 'pagination-container';
+      
+      const totalPages = pagination.pages;
+      const currentPage = pagination.page;
+      const totalItems = pagination.total;
+      
+      if (totalPages <= 1) {
+          // Não mostra paginação se só tiver uma página
+          paginationContainer.innerHTML = `
+              <div class="pagination-info">
+                  Mostrando ${pagination.total} caixas
+              </div>
+          `;
+      } else {
+          paginationContainer.innerHTML = `
+              <div class="pagination-info">
+                  Mostrando ${((currentPage - 1) * caixasPerPage) + 1} - ${Math.min(currentPage * caixasPerPage, totalItems)} de ${totalItems} caixas
+              </div>
+              <div class="pagination-buttons">
+                  <button class="btn btn-outline pagination-btn" ${currentPage === 1 ? 'disabled' : ''} data-page="1">
+                      <i class="fas fa-angle-double-left"></i>
+                  </button>
+                  <button class="btn btn-outline pagination-btn" ${currentPage === 1 ? 'disabled' : ''} data-page="${currentPage - 1}">
+                      <i class="fas fa-chevron-left"></i>
+                  </button>
+                  
+                  <span class="pagination-current">Página ${currentPage} de ${totalPages}</span>
+                  
+                  <button class="btn btn-outline pagination-btn" ${currentPage === totalPages ? 'disabled' : ''} data-page="${currentPage + 1}">
+                      <i class="fas fa-chevron-right"></i>
+                  </button>
+                  <button class="btn btn-outline pagination-btn" ${currentPage === totalPages ? 'disabled' : ''} data-page="${totalPages}">
+                      <i class="fas fa-angle-double-right"></i>
+                  </button>
+              </div>
+          `;
+      }
+      
+      // Adiciona o container após a tabela
+      const tableContainer = document.querySelector('#caixas .table-responsive');
+      if (tableContainer) {
+          tableContainer.after(paginationContainer);
+      }
+      
+      // Adiciona event listeners aos botões de paginação
+      document.querySelectorAll('.pagination-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+              if (!btn.disabled) {
+                  const page = parseInt(btn.getAttribute('data-page'));
+                  currentCaixaPage = page;
+                  loadCaixasData(page);
+              }
+          });
+      });
+  }
+  
+  // Atualize a função de refresh para resetar para página 1
   document.getElementById('refreshCaixas')?.addEventListener('click', () => {
-    document.getElementById('caixaStatus').value = '';
-    document.getElementById('caixaOperador').value = '';
-    document.getElementById('caixaDataInicio').value = '';
-    document.getElementById('caixaDataFim').value = '';
-    loadCaixasData();
+      document.getElementById('caixaStatus').value = '';
+      document.getElementById('caixaOperador').value = '';
+      document.getElementById('caixaDataInicio').value = '';
+      document.getElementById('caixaDataFim').value = '';
+      currentCaixaPage = 1;
+      loadCaixasData(1);
   });
-
+  
+  // Atualize o evento de filtro para resetar para página 1
+  document.getElementById('filterCaixas')?.addEventListener('click', () => {
+      currentCaixaPage = 1;
+      loadCaixasData(1);
+  });
+  
   // Função para inicializar tudo quando a página carregar
   function initializeCaixasPage() {
-
-    // Carrega os operadores primeiro
-    loadOperadores().then(() => {
-      // Depois carrega os caixas
-      loadCaixasData();
-    });
+      currentCaixaPage = 1;
+      loadOperadores().then(() => {
+          loadCaixasData(1);
+      });
   }
 
   // Aguarda o DOM estar completamente carregado

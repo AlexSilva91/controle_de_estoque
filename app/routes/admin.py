@@ -2955,10 +2955,19 @@ def buscar_produtos_desconto_route(desconto_id):
 def get_caixas():
     session = Session(db.engine)
 
+    # Parâmetros de filtro
     status = request.args.get('status')
     operador_id = request.args.get('operador_id')
     data_inicio = request.args.get('data_inicio')
     data_fim = request.args.get('data_fim')
+    
+    # Parâmetros de paginação
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 30, type=int)
+    
+    # Limita o máximo por página para evitar abusos
+    if per_page > 100:
+        per_page = 100
 
     query = session.query(Caixa).join(Usuario, Caixa.operador_id == Usuario.id)
 
@@ -2969,7 +2978,6 @@ def get_caixas():
         except ValueError:
             pass  # ignora se status inválido
 
-    # NOVO: Filtro por operador
     if operador_id:
         try:
             operador_id_int = int(operador_id)
@@ -2992,11 +3000,15 @@ def get_caixas():
         except ValueError:
             pass
 
-    caixas = query.order_by(Caixa.data_abertura.desc()).all()
+    # Calcula o total antes da paginação
+    total = query.count()
+    
+    # Aplica paginação
+    caixas = query.order_by(Caixa.data_abertura.desc()).offset((page - 1) * per_page).limit(per_page).all()
 
     data = []
     for c in caixas:
-        # 1. CALCULA TOTAL DE ENTRADAS - SOMA TODAS AS FORMAS DE PAGAMENTO (igual à outra rota)
+        # 1. CALCULA TOTAL DE ENTRADAS - SOMA TODAS AS FORMAS DE PAGAMENTO
         pagamentos_notas = session.query(
             func.sum(PagamentoNotaFiscal.valor)
         ).join(
@@ -3016,7 +3028,7 @@ def get_caixas():
         
         total_entradas = float(pagamentos_notas) + float(pagamentos_contas)
 
-        # 2. CALCULA TOTAL DE SAÍDAS - SOMENTE DESPESAS (igual à outra rota)
+        # 2. CALCULA TOTAL DE SAÍDAS - SOMENTE DESPESAS
         total_saidas = session.query(
             func.sum(Financeiro.valor)
         ).filter(
@@ -3055,7 +3067,7 @@ def get_caixas():
             valor_fechamento = float(c.valor_fechamento)
             valor_fisico = max((valor_dinheiro + valor_abertura) - valor_fechamento - total_despesas, 0.0)
 
-        # 4. CALCULA VALOR DIGITAL (igual à outra rota)
+        # 4. CALCULA VALOR DIGITAL
         formas_digitais = [
             FormaPagamento.pix_loja,
             FormaPagamento.pix_fabiano,
@@ -3085,7 +3097,7 @@ def get_caixas():
         
         valor_digital = float(pagamentos_digitais_notas) + float(pagamentos_digitais_contas)
 
-        # 5. CALCULA A PRAZO (igual à outra rota)
+        # 5. CALCULA A PRAZO
         pagamentos_prazo_notas = session.query(
             func.sum(PagamentoNotaFiscal.valor)
         ).join(
@@ -3099,7 +3111,7 @@ def get_caixas():
         
         a_prazo = float(pagamentos_prazo_notas)
 
-        # 6. TOTAL DE CONTAS A RECEBER PAGAS (igual à outra rota)
+        # 6. TOTAL DE CONTAS A RECEBER PAGAS
         total_contas_recebidas = float(pagamentos_contas)
 
         data.append({
@@ -3120,7 +3132,20 @@ def get_caixas():
             "a_prazo": a_prazo
         })
 
-    return jsonify({"success": True, "data": data, "count": len(data)})
+    # Fecha a sessão
+    session.close()
+
+    # Retorna informações de paginação
+    return jsonify({
+        "success": True, 
+        "data": data, 
+        "pagination": {
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "pages": (total + per_page - 1) // per_page  # cálculo de total de páginas (arredonda para cima)
+        }
+    })
 
 @admin_bp.route('/usuarios/operadores')
 @login_required
