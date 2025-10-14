@@ -5136,7 +5136,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // Mostrar botão de transferência apenas se o usuário tiver conta
             if (btnTransferir) {
               btnTransferir.style.display = 'inline-block';
-              btnTransferir.onclick = () => openTransferenciaModal(usuario);
+              btnTransferir.onclick = () => openTransferenciaModalContas(usuario);
             }
 
             contaInfoDiv.innerHTML = `
@@ -5392,7 +5392,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ===== TRANSFERÊNCIAS =====
 
-  async function openTransferenciaModal(usuarioDestino) {
+  async function openTransferenciaModalContas(usuarioDestino) {
     try {
 
       // Carregar lista de usuários com conta para seleção da origem
