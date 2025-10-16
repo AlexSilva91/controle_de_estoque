@@ -1,8 +1,10 @@
 :root {
-    --primary: #FFD700;        /* Dourado */
+    --primary: #FFD700;
+    /* Dourado */
     --primary-dark: #C9AE00;
     --primary-light: #FFF5B8;
-    --secondary: #3A3A3A;      /* Cinza escuro */
+    --secondary: #3A3A3A;
+    /* Cinza escuro */
     --background: #F8F8F8;
     --text: #333333;
     --text-light: #FFFFFF;
@@ -231,7 +233,7 @@ body {
     margin-left: auto;
 }
 
-.btn-refresh, 
+.btn-refresh,
 .btn-pdf {
     display: inline-flex;
     align-items: center;
@@ -267,7 +269,7 @@ body {
     transform: translateY(-1px);
 }
 
-.btn-refresh i, 
+.btn-refresh i,
 .btn-pdf i {
     font-size: 14px;
 }
@@ -345,7 +347,7 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 15px;       
+    margin-bottom: 15px;
 }
 
 .btn-secondary:hover {
@@ -449,6 +451,7 @@ body {
     grid-template-columns: 2fr 1fr;
     gap: 15px;
 }
+
 /* Container da busca */
 .search-container {
     display: flex;
@@ -499,7 +502,8 @@ body {
     max-height: 200px;
     overflow-y: auto;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    display: none; /* será exibido via JS quando houver resultados */
+    display: none;
+    /* será exibido via JS quando houver resultados */
     z-index: 10;
 }
 
@@ -531,7 +535,8 @@ body {
     font-size: 16px;
     transition: background-color 0.3s ease;
 }
-.btn-remove-payment{
+
+.btn-remove-payment {
     background-color: #ff1100;
     color: white;
     border: none;
@@ -541,9 +546,11 @@ body {
     font-size: 16px;
     transition: background-color 0.3s ease;
 }
-.btn-remove-payment:hover{
+
+.btn-remove-payment:hover {
     background-color: #d32f2f;
 }
+
 .remove-btn:hover {
     background-color: #d32f2f;
 }
@@ -564,7 +571,7 @@ body {
     border-collapse: collapse;
 }
 
-.products-table th, 
+.products-table th,
 .products-table td {
     padding: 12px 15px;
     text-align: left;
@@ -850,54 +857,54 @@ body {
     .dashboard {
         flex-direction: column;
     }
-    
+
     .sidebar {
         width: 100%;
         flex-direction: row;
         flex-wrap: wrap;
         padding: 15px;
     }
-    
+
     .logo-container {
         width: 100%;
         margin-bottom: 15px;
     }
-    
+
     .user-info {
         margin-right: 20px;
         margin-bottom: 15px;
         border-bottom: none;
         padding-bottom: 0;
     }
-    
+
     .balance-info {
         margin-right: 20px;
         margin-bottom: 15px;
     }
-    
+
     .main-menu {
         flex-direction: row;
         flex-wrap: wrap;
         gap: 10px;
     }
-    
+
     .menu-item {
         padding: 8px 12px;
     }
-    
+
     .btn-logout {
         margin-left: auto;
         margin-top: 0;
     }
-    
+
     .main-content {
         padding: 20px;
     }
-    
+
     .search-client-container {
         grid-template-columns: 1fr;
     }
-    
+
     /* Ajustes para os botões no mobile */
     .card-header-actions {
         margin-top: 10px;
@@ -910,17 +917,17 @@ body {
     .action-buttons {
         flex-direction: column;
     }
-    
+
     .action-buttons .btn {
         width: 100%;
     }
-    
+
     .modal-content {
         width: 95%;
     }
-    
+
     /* Ajustes para os botões em telas pequenas */
-    .btn-refresh, 
+    .btn-refresh,
     .btn-pdf {
         padding: 8px 12px;
         font-size: 13px;
@@ -1038,6 +1045,7 @@ body {
 .btn-close:hover {
     background-color: #3A3A3A;
 }
+
 /* Estilos para a busca de produtos */
 .search-result-item {
     padding: 12px;
@@ -1203,6 +1211,7 @@ body {
     padding: 20px;
     color: #666;
 }
+
 /* Adicione ao seu arquivo CSS */
 .search-input-group {
     position: relative;
@@ -1219,7 +1228,7 @@ body {
     background: white;
     border: 1px solid #ddd;
     border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     z-index: 1000;
     display: none;
 }
@@ -1248,10 +1257,12 @@ body {
     color: #666;
     font-size: 0.9em;
 }
+
 .delivery-buttons {
     display: flex;
     gap: 10px;
 }
+
 #use-client-address-btn {
     background-color: #6c757d;
     margin-left: 10px;
@@ -1267,6 +1278,7 @@ body {
     border-radius: 4px;
     border-left: 3px solid #2196F3;
 }
+
 .delivery-buttons {
     display: flex;
     gap: 10px;
@@ -1302,6 +1314,7 @@ body {
 .btn-remove-address:hover {
     text-decoration: underline;
 }
+
 /* Estilos para a tabela de produtos */
 .product-table td {
     vertical-align: middle;
@@ -1330,6 +1343,7 @@ body {
     color: #28a745;
     font-size: 0.8rem;
 }
+
 .discount-badge {
     display: inline-block;
     background-color: #28a745;
@@ -1367,7 +1381,7 @@ body {
     margin-bottom: 10px;
 }
 
-.payment-method-input select, 
+.payment-method-input select,
 .payment-method-input input {
     flex: 1;
 }
@@ -1393,6 +1407,7 @@ body {
     color: #dc3545;
     cursor: pointer;
 }
+
 /* Estilo para o botão de visualizar */
 .btn-view {
     background-color: #4CAF50;
@@ -1415,7 +1430,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.5);
+    background-color: rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -1440,19 +1455,20 @@ body {
     cursor: pointer;
     margin-top: 15px;
 }
-    .modal {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0,0,0,0.5);
-        z-index: 1000;
-        justify-content: center;
-        align-items: center;
-    }
-    
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
 /* Sale Details Modal Styles */
 .sale-details-container {
     display: flex;
@@ -1485,13 +1501,14 @@ body {
     color: #555;
 }
 
-.sale-products-table, .sale-payments-table {
+.sale-products-table,
+.sale-payments-table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 10px;
 }
 
-.sale-products-table th, 
+.sale-products-table th,
 .sale-products-table td,
 .sale-payments-table th,
 .sale-payments-table td {
@@ -1510,6 +1527,7 @@ body {
 .sale-payments-table tr:hover {
     background-color: #f5f5f5;
 }
+
 .header-actions {
     display: flex;
     gap: 10px;
@@ -1549,8 +1567,13 @@ body {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 .flash-message {
@@ -1574,7 +1597,7 @@ body {
     border-radius: 30px;
     font-weight: bold;
     font-size: 1.1rem;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     display: inline-flex;
     align-items: center;
     pointer-events: auto;
@@ -1582,8 +1605,15 @@ body {
 }
 
 @keyframes slideDown {
-    from { transform: translateY(-50px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 .caixa-livre {
@@ -1612,7 +1642,8 @@ body {
     margin-top: 20px;
 }
 
-.sales-day-table th, .sales-day-table td {
+.sales-day-table th,
+.sales-day-table td {
     padding: 12px 15px;
     text-align: left;
     border-bottom: 1px solid #ddd;
@@ -1678,6 +1709,7 @@ body {
     font-size: 0.8rem;
     display: block;
 }
+
 /* ==== ESTILOS PARA A TABELA DE CLIENTES MODERNA ==== */
 
 /* Container da tabela de clientes */
@@ -2123,8 +2155,13 @@ body {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 .loading-state p {
@@ -2161,20 +2198,20 @@ body {
     .clients-table {
         font-size: 13px;
     }
-    
+
     .clients-table th,
     .clients-table td {
         padding: 12px 8px;
     }
-    
+
     .address-container {
         max-width: 140px;
     }
-    
+
     .action-buttons {
         gap: 2px;
     }
-    
+
     .btn-action {
         width: 28px;
         height: 28px;
@@ -2186,18 +2223,18 @@ body {
     .quick-filters {
         flex-wrap: wrap;
     }
-    
+
     .search-bar {
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .search-bar .search-input,
     .search-bar .btn-search,
     .search-bar .btn-secondary {
         width: 100%;
     }
-    
+
     .table-footer {
         flex-direction: column;
         gap: 10px;
@@ -2210,16 +2247,16 @@ body {
         border-radius: 0;
         margin: 0 -20px;
     }
-    
+
     .clients-table {
         font-size: 12px;
     }
-    
+
     .clients-table th,
     .clients-table td {
         padding: 10px 6px;
     }
-    
+
     /* Ocultar algumas colunas em telas pequenas */
     .clients-table th:nth-child(3),
     .clients-table td:nth-child(3),
@@ -2229,36 +2266,36 @@ body {
     .clients-table td:nth-child(6) {
         display: none;
     }
-    
+
     .action-buttons {
         flex-direction: column;
         gap: 2px;
     }
-    
+
     .btn-action {
         width: 100%;
         height: 24px;
         border-radius: 4px;
         font-size: 11px;
     }
-    
+
     .filter-btn {
         padding: 8px 12px;
         font-size: 12px;
     }
-    
+
     .empty-state {
         padding: 40px 15px;
     }
-    
+
     .empty-icon {
         font-size: 48px;
     }
-    
+
     .empty-state h3 {
         font-size: 20px;
     }
-    
+
     .empty-state p {
         font-size: 14px;
     }
@@ -2270,6 +2307,7 @@ body {
         opacity: 0;
         transform: translateX(-20px);
     }
+
     to {
         opacity: 1;
         transform: translateX(0);
@@ -2302,13 +2340,14 @@ body {
 .clients-table tbody tr:hover .btn-action {
     transform: translateY(-1px) scale(1.1);
 }
+
 #help-menu-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.5);
+    background-color: rgba(0, 0, 0, 0.5);
     display: none;
     justify-content: center;
     align-items: center;
@@ -2355,13 +2394,14 @@ body {
     padding: 2px 5px;
     font-family: monospace;
     font-size: 0.9em;
-    box-shadow: 0 1px 0 rgba(0,0,0,0.2);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
 }
 
 .help-menu button {
     margin-top: 1rem;
     width: 100%;
 }
+
 .search-result-item.selected {
     background-color: #f0f0f0;
     outline: 2px solid #4a90e2;
@@ -2370,6 +2410,7 @@ body {
 .search-result-item:focus {
     outline: 2px solid #4a90e2;
 }
+
 /* Estilos para os modais */
 /* Modal principal */
 #client-details-modal .modal-content {
@@ -2381,7 +2422,7 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
 }
 
 /* Cabeçalho */
@@ -2446,7 +2487,7 @@ body {
     font-size: 14px;
 }
 
-#client-details-modal th, 
+#client-details-modal th,
 #client-details-modal td {
     padding: 10px;
     border: 1px solid #ddd;
@@ -2508,8 +2549,10 @@ body {
 #client-details-modal .modal-footer .btn-secondary:hover {
     background: #5a6268;
 }
+
 /* Estilos para os botões de pagamento */
-.btn-pay-partial, .btn-pay-full {
+.btn-pay-partial,
+.btn-pay-full {
     padding: 5px 10px;
     margin: 2px;
     border: none;
@@ -2600,6 +2643,7 @@ body {
     background-color: #28a745;
     color: white;
 }
+
 /* Estilos para o modal de detalhes do cliente */
 .client-details-modal .modal-content {
     max-width: 1200px;
@@ -2626,7 +2670,7 @@ body {
     border-radius: 8px;
     margin-bottom: 20px;
     background: #fff;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     overflow: hidden;
 }
 
@@ -2705,7 +2749,7 @@ body {
     overflow-x: auto;
     margin-bottom: 15px;
     border-radius: 5px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .produtos-table {
@@ -2768,7 +2812,7 @@ body {
     padding: 8px 12px;
     background: white;
     border-radius: 4px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .resumo-item span {
@@ -2790,7 +2834,8 @@ body {
     justify-content: flex-end;
 }
 
-.btn-pay-partial, .btn-pay-full {
+.btn-pay-partial,
+.btn-pay-full {
     padding: 8px 16px;
     border: none;
     border-radius: 4px;
@@ -2827,7 +2872,8 @@ body {
 }
 
 /* Mensagens quando não há dados */
-.no-products, .no-accounts {
+.no-products,
+.no-accounts {
     text-align: center;
     padding: 30px;
     color: #7f8c8d;
@@ -2840,29 +2886,30 @@ body {
         width: 98%;
         margin: 10px;
     }
-    
+
     .conta-info {
         grid-template-columns: 1fr;
     }
-    
+
     .produtos-table {
         font-size: 0.8em;
     }
-    
+
     .produtos-table th,
     .produtos-table td {
         padding: 6px 4px;
     }
-    
+
     .venda-resumo {
         grid-template-columns: 1fr;
     }
-    
+
     .conta-actions {
         flex-direction: column;
     }
-    
-    .btn-pay-partial, .btn-pay-full {
+
+    .btn-pay-partial,
+    .btn-pay-full {
         width: 100%;
         margin-bottom: 5px;
     }
@@ -2888,6 +2935,7 @@ body {
     color: #e74c3c;
     font-weight: 600;
 }
+
 .btn-receipt {
     background-color: #95a5a6;
     color: white;
@@ -2910,6 +2958,7 @@ body {
     margin-top: 10px;
     flex-wrap: wrap;
 }
+
 .pagination-controls {
     display: flex;
     align-items: center;
@@ -2966,6 +3015,7 @@ body {
     color: #666;
     font-size: 14px;
 }
+
 .search-container {
     margin-left: 15px;
 }
@@ -3028,4 +3078,39 @@ body {
     .search-input-wrapper {
         width: 200px;
     }
+}
+
+.btn-download {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: 5px;
+    font-size: 0.875rem;
+    transition: all 0.3s ease;
+}
+
+.btn-download:hover {
+    background: linear-gradient(135deg, #c0392b, #a93226);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-download:disabled {
+    background: #95a5a6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.multiple-payments {
+    cursor: help;
+    border-bottom: 1px dotted #666;
+    padding-bottom: 1px;
+}
+
+.multiple-payments:hover {
+    color: #007bff;
 }

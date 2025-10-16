@@ -261,21 +261,21 @@ async function loadClients(page = 1, searchTerm = '') {
             ...preventCacheConfig,
             method: 'GET'
         });
-        
+
         if (!response.ok) throw new Error('Erro ao carregar clientes');
-        
+
         const data = await response.json();
         clients = data.clientes;
         filteredClients = [...clients];
-        
+
         // Informações de paginação
         totalPages = data.pagination.pages;
         totalClients = data.pagination.total;
-        
+
         renderClientsTable();
         updateClientsCount();
         renderPagination();
-        
+
     } catch (error) {
         showMessage(error.message, 'error');
         showClientsEmptyState(true);
@@ -415,7 +415,7 @@ function updateClientsCount() {
     if (countElement) {
         const startItem = ((currentPage - 1) * clientsPerPage) + 1;
         const endItem = Math.min(currentPage * clientsPerPage, totalClients);
-        
+
         if (currentSearchTerm) {
             countElement.textContent = `Mostrando ${startItem}-${endItem} de ${totalClients} clientes (filtrado)`;
         } else {
@@ -517,9 +517,9 @@ function handleNameSearch(event) {
 function performNameSearch() {
     const searchInput = document.getElementById('name-search-input');
     const clearButton = document.getElementById('clear-name-search');
-    
+
     currentNameSearch = searchInput.value.trim();
-    
+
     if (currentNameSearch) {
         clearButton.style.display = 'block';
         // Chama a função loadClients diretamente com o termo de busca
@@ -533,38 +533,38 @@ function performNameSearch() {
 function clearNameSearch() {
     const searchInput = document.getElementById('name-search-input');
     const clearButton = document.getElementById('clear-name-search');
-    
+
     searchInput.value = '';
     currentNameSearch = '';
     clearButton.style.display = 'none';
-    
+
     // Recarrega os clientes sem filtro
     loadClients(1, '');
 }
 
 // Inicialização do campo de busca - CORRIGIDA
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const searchInput = document.getElementById('name-search-input');
     const clearButton = document.getElementById('clear-name-search');
-    
+
     // Event listener para o botão de limpar
     if (clearButton) {
         clearButton.addEventListener('click', clearNameSearch);
     }
-    
+
     // Event listener para input (busca em tempo real opcional)
     if (searchInput) {
         // Opcional: busca em tempo real com debounce
         let searchTimeout;
-        searchInput.addEventListener('input', function() {
+        searchInput.addEventListener('input', function () {
             clearTimeout(searchTimeout);
-            
+
             // Se o campo ficar vazio, limpa a busca
             if (this.value.trim() === '') {
                 clearNameSearch();
                 return;
             }
-            
+
             // Busca automática após 1 segundo (opcional)
             searchTimeout = setTimeout(() => {
                 currentNameSearch = this.value.trim();
@@ -574,11 +574,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }, 1000);
         });
-        
+
         // Foco no campo de busca quando a página carregar
         searchInput.focus();
     }
-    
+
     // Carrega os clientes inicialmente
     loadClients(1);
 });
@@ -1126,7 +1126,7 @@ function showPartialPaymentModal(contaId, valorAberto) {
                         <select id="payment-method" name="payment-method" required>
                             <option value="">Selecione...</option>
                             <option value="pix_maquineta">PIX Maquineta</option>
-                            <option value="pix_edfrance">PIX EDFrance</option>
+                            <option value="pix_edfrance">PIX Edfranci</option>
                             <option value="pix_loja">PIX Loja</option>
                             <option value="dinheiro">Dinheiro</option>
                             <option value="cartao_credito">Cartão de Crédito</option>
@@ -1254,7 +1254,7 @@ async function confirmFullPayment(contaId, valorAberto) {
                         <select id="payment-method" name="payment-method" required>
                             <option value="">Selecione...</option>
                             <option value="pix_maquineta">PIX Maquineta</option>
-                            <option value="pix_edfrance">PIX EDFrance</option>
+                            <option value="pix_edfrance">PIX Edfranci</option>
                             <option value="pix_loja">PIX Loja</option>
                             <option value="dinheiro">Dinheiro</option>
                             <option value="cartao_credito">Cartão de Crédito</option>
@@ -2641,6 +2641,28 @@ function removerVendasDuplicadas(vendas) {
 
     return vendasUnicas;
 }
+function formatPaymentMethods(pagamentos) {
+    if (!pagamentos || !Array.isArray(pagamentos) || pagamentos.length === 0) {
+        return '-';
+    }
+
+    // Se houver apenas um pagamento, mostra normalmente
+    if (pagamentos.length === 1) {
+        return formatPaymentMethod(pagamentos[0].forma_pagamento);
+    }
+
+    // Para múltiplos pagamentos, cria um tooltip ou texto resumido
+    const formasUnicas = [...new Set(pagamentos.map(p => p.forma_pagamento))];
+
+    if (formasUnicas.length === 1) {
+        // Mesma forma em múltiplos pagamentos
+        return `${formatPaymentMethod(formasUnicas[0])} (${pagamentos.length}x)`;
+    } else {
+        // Diferentes formas de pagamento
+        return formasUnicas.map(fp => formatPaymentMethod(fp)).join(' + ');
+    }
+}
+
 
 function renderDaySales(vendas) {
     const tableBody = document.querySelector('#day-sales-table tbody');
@@ -2649,7 +2671,7 @@ function renderDaySales(vendas) {
     tableBody.innerHTML = '';
 
     if (!Array.isArray(vendas) || vendas.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 1rem; color: #666;">Nenhuma venda registrada para o dia.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 1rem; color: #666;">Nenhuma venda registrada para o dia.</td></tr>`;
         return;
     }
 
@@ -2666,10 +2688,13 @@ function renderDaySales(vendas) {
                 <td>${new Date(sale.data_emissao).toLocaleString('pt-BR')}</td>
                 <td>${sale.cliente?.nome || 'Consumidor Final'}</td>
                 <td>${formatCurrency(sale.valor_total)}</td>
-                <td>${formatPaymentMethod(sale.forma_pagamento) || '-'}</td>
+                <td>${formatPaymentMethods(sale.pagamentos)}</td>
                 <td>
                     <button class="btn-view" data-id="${sale.id}">
                         <i class="fas fa-eye"></i> Detalhes
+                    </button>
+                    <button class="btn-download" data-id="${sale.id}">
+                        <i class="fas fa-file-pdf"></i> Nota
                     </button>
                     <button class="btn-void" data-id="${sale.id}">
                         <i class="fas fa-undo"></i> Estornar
@@ -2688,6 +2713,12 @@ function renderDaySales(vendas) {
             return;
         }
 
+        const downloadBtn = e.target.closest('.btn-download');
+        if (downloadBtn) {
+            downloadSaleReceipt(downloadBtn.dataset.id);
+            return;
+        }
+
         const voidBtn = e.target.closest('.btn-void');
         if (voidBtn) {
             openVoidSaleModal(voidBtn.dataset.id);
@@ -2695,6 +2726,7 @@ function renderDaySales(vendas) {
         }
     });
 }
+
 
 function openVoidSaleModal(saleId) {
     closeModal();
@@ -2709,6 +2741,47 @@ function openVoidSaleModal(saleId) {
     document.getElementById('void-sale-reason').value = '';
     modal.style.display = 'flex';
     currentOpenModal = modal;
+}
+
+async function downloadSaleReceipt(saleId) {
+    if (!saleId) {
+        showMessage('ID da venda não informado', 'error');
+        return;
+    }
+
+    try {
+        // Criar botão de loading
+        const downloadBtn = document.querySelector(`.btn-download[data-id="${saleId}"]`);
+        if (downloadBtn) {
+            const originalText = downloadBtn.innerHTML;
+            downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+            downloadBtn.disabled = true;
+        }
+
+        // Abrir diretamente em nova guia
+        const pdfUrl = `/operador/pdf/nota-venda/${saleId}`;
+        window.open(pdfUrl, '_blank');
+
+        // Restaurar botão após um tempo
+        setTimeout(() => {
+            const downloadBtn = document.querySelector(`.btn-download[data-id="${saleId}"]`);
+            if (downloadBtn) {
+                downloadBtn.innerHTML = '<i class="fas fa-file-pdf"></i> Nota';
+                downloadBtn.disabled = false;
+            }
+        }, 1000);
+
+    } catch (error) {
+        console.error('Erro ao abrir nota fiscal:', error);
+        showMessage(error.message, 'error');
+
+        // Restaurar botão em caso de erro
+        const downloadBtn = document.querySelector(`.btn-download[data-id="${saleId}"]`);
+        if (downloadBtn) {
+            downloadBtn.innerHTML = '<i class="fas fa-file-pdf"></i> Nota';
+            downloadBtn.disabled = false;
+        }
+    }
 }
 
 async function voidSale() {
@@ -3049,7 +3122,7 @@ function formatCEP(cep) {
 
 function formatPaymentMethod(method) {
     const methods = {
-        'pix_edfrance': 'Pix (Edfrance)',
+        'pix_edfrance': 'Pix (Edfranci)',
         'pix_loja': 'Pix (Loja)',
         'pix_maquineta': 'Pix (Maquineta)',
         'dinheiro': 'Dinheiro',

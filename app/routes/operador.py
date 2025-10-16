@@ -693,6 +693,91 @@ def visualizar_pdf_venda(id_list):
         logger.error(f"Erro ao gerar PDF: {str(e)}")
         abort(500, description="Ocorreu um erro ao gerar o PDF")
 
+@operador_bp.route('/pdf/nota-venda/<int:venda_id>', methods=['GET'])
+@login_required
+@operador_required
+def download_nota_venda(venda_id):
+    try:
+        # Buscar os detalhes da venda usando a mesma lógica da rota de detalhes
+        nota_fiscal = NotaFiscal.query.get_or_404(venda_id)
+        
+        # Buscar pagamentos associados
+        pagamentos = PagamentoNotaFiscal.query.filter_by(
+            nota_fiscal_id=venda_id
+        ).all()
+        
+        # Remover duplicatas
+        pagamentos_unicos = []
+        ids_vistos = set()
+        
+        for pagamento in pagamentos:
+            if pagamento.id not in ids_vistos:
+                ids_vistos.add(pagamento.id)
+                pagamentos_unicos.append(pagamento)
+        
+        # Preparar dados no formato esperado pelo gerador de PDF
+        dados_nota = {
+            "nota_fiscal_id": nota_fiscal.id,
+            "data_emissao": nota_fiscal.data_emissao.isoformat(),
+            "valor_total_nota": float(nota_fiscal.valor_total),
+            "valor_total_sem_desconto": float(nota_fiscal.valor_total + nota_fiscal.valor_desconto),
+            "operador": {
+                "nome": nota_fiscal.operador.nome
+            },
+            "cliente": {
+                "nome": nota_fiscal.cliente.nome if nota_fiscal.cliente else "Consumidor Final",
+                "documento": nota_fiscal.cliente.documento if nota_fiscal.cliente else None
+            },
+            "produtos": [
+                {
+                    "id": item.id,
+                    "nome": item.produto.nome,
+                    "quantidade": float(item.quantidade),
+                    "valor_unitario": float(item.valor_unitario),
+                    "valor_total_com_desconto": float(item.valor_total),
+                    "desconto_aplicado": float(item.desconto_aplicado) if item.desconto_aplicado else 0.0
+                }
+                for item in nota_fiscal.itens
+            ],
+            "formas_pagamento": [
+                {
+                    "forma_pagamento": pagamento.forma_pagamento.value,
+                    "valor": float(pagamento.valor)
+                }
+                for pagamento in pagamentos_unicos
+            ],
+            "endereco_entrega": {
+                "logradouro": nota_fiscal.entrega.logradouro if nota_fiscal.entrega else None,
+                "numero": nota_fiscal.entrega.numero if nota_fiscal.entrega else None,
+                "complemento": nota_fiscal.entrega.complemento if nota_fiscal.entrega else None,
+                "bairro": nota_fiscal.entrega.bairro if nota_fiscal.entrega else None,
+                "cidade": nota_fiscal.entrega.cidade if nota_fiscal.entrega else None,
+                "estado": nota_fiscal.entrega.estado if nota_fiscal.entrega else None,
+                "cep": nota_fiscal.entrega.cep if nota_fiscal.entrega else None,
+                "instrucoes": nota_fiscal.entrega.instrucoes if nota_fiscal.entrega else None
+            } if nota_fiscal.entrega else None,
+            "metadados": {
+                "possui_entrega": nota_fiscal.entrega is not None
+            }
+        }
+        
+        # Gerar PDF em memória
+        pdf_buffer = gerar_nfce_pdf_bobina_bytesio(dados_nota=dados_nota)
+        
+        # Criar resposta para abrir em nova guia (inline)
+        response = make_response(pdf_buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=nota_venda_{venda_id}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Erro ao gerar PDF da venda {venda_id}: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao gerar PDF: {str(e)}'
+        }), 500
+
 @operador_bp.route('/api/vendas/hoje', methods=['GET'])
 @login_required
 @operador_required
@@ -731,36 +816,36 @@ def obter_vendas_hoje():
         fim_dia = datetime.combine(data_filtro, time.max).replace(tzinfo=tz)
 
         # Query principal com distinct para evitar duplicatas no JOIN
-        vendas = db.session.query( NotaFiscal).distinct(
-             NotaFiscal.id
+        vendas = db.session.query(NotaFiscal).distinct(
+            NotaFiscal.id
         ).options(
-            db.joinedload( NotaFiscal.cliente),
-            db.joinedload( NotaFiscal.operador),
-            db.joinedload( NotaFiscal.caixa),
-            db.joinedload( NotaFiscal.itens).joinedload( NotaFiscalItem.produto),
-            db.joinedload( NotaFiscal.pagamentos)
+            db.joinedload(NotaFiscal.cliente),
+            db.joinedload(NotaFiscal.operador),
+            db.joinedload(NotaFiscal.caixa),
+            db.joinedload(NotaFiscal.itens).joinedload(NotaFiscalItem.produto),
+            db.joinedload(NotaFiscal.pagamentos)  # Carrega os pagamentos
         ).filter(
-             NotaFiscal.caixa_id == caixa.id,
-             NotaFiscal.status ==  StatusNota.emitida,
-             NotaFiscal.data_emissao >= inicio_dia,
-             NotaFiscal.data_emissao <= fim_dia
+            NotaFiscal.caixa_id == caixa.id,
+            NotaFiscal.status == StatusNota.emitida,
+            NotaFiscal.data_emissao >= inicio_dia,
+            NotaFiscal.data_emissao <= fim_dia
         )
 
         # Filtro adicional por operador
         if operador_id and operador_id != current_user.id:
             # Verifica se o usuário tem permissão para consultar outros operadores
-            if not current_user.tipo ==  TipoUsuario.admin:
+            if not current_user.tipo == TipoUsuario.admin:
                 logger.error(f"Operador {current_user.nome} tentou acessar vendas de outro operador sem permissão")
                 return jsonify({
                     'success': False,
                     'message': 'Apenas administradores podem filtrar por outros operadores'
                 }), 403
-            vendas = vendas.filter( NotaFiscal.operador_id == operador_id)
+            vendas = vendas.filter(NotaFiscal.operador_id == operador_id)
         else:
-            vendas = vendas.filter( NotaFiscal.operador_id == current_user.id)
+            vendas = vendas.filter(NotaFiscal.operador_id == current_user.id)
 
         # Execução da query
-        vendas_lista = vendas.order_by( NotaFiscal.data_emissao.desc()).all()
+        vendas_lista = vendas.order_by(NotaFiscal.data_emissao.desc()).all()
 
         # Processamento dos resultados com verificação de duplicatas
         ids_vistas = set()
@@ -772,21 +857,6 @@ def obter_vendas_hoje():
             ids_vistas.add(venda.id)
             vendas_unicas.append(venda)
 
-        # Agregação de pagamentos para evitar duplicação
-        def agregar_pagamentos(pagamentos):
-            agregados = {}
-            for pag in pagamentos:
-                chave = (pag.forma_pagamento, pag.data.date())
-                if chave in agregados:
-                    agregados[chave]['valor'] += float(pag.valor)
-                else:
-                    agregados[chave] = {
-                        'forma_pagamento': pag.forma_pagamento.value,
-                        'valor': float(pag.valor),
-                        'data': pag.data.isoformat()
-                    }
-            return list(agregados.values())
-
         # Formatação final
         resultado = []
         total_geral = Decimal('0.00')
@@ -794,6 +864,15 @@ def obter_vendas_hoje():
         for venda in vendas_unicas:
             total_venda = Decimal(str(venda.valor_total))
             total_geral += total_venda
+            
+            # Formatar formas de pagamento
+            formas_pagamento = []
+            if venda.pagamentos:
+                for pagamento in venda.pagamentos:
+                    formas_pagamento.append({
+                        'forma_pagamento': pagamento.forma_pagamento.value,
+                        'valor': float(pagamento.valor)
+                    })
             
             resultado.append({
                 'id': venda.id,
@@ -818,7 +897,8 @@ def obter_vendas_hoje():
                     }
                     for item in venda.itens
                 ],
-                'pagamentos': agregar_pagamentos(venda.pagamentos) if venda.pagamentos else []
+                'pagamentos': formas_pagamento,  # Agora inclui todas as formas de pagamento
+                'forma_pagamento': venda.forma_pagamento.value if venda.forma_pagamento else None  # Mantém compatibilidade
             })
         
         return jsonify({
