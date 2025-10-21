@@ -3081,3 +3081,383 @@ canvas {
 .metric-card .card-actions .btn i {
   font-size: 1rem;
 }
+
+/* ============================================= */
+/* ESTILOS ESPECÍFICOS PARA MODAIS DE LOTES */
+/* ============================================= */
+
+/* Modal Listar Lotes - Centralizado */
+#listarLotesModal .modal-dialog {
+  max-width: min(95vw, 1200px);
+  width: auto;
+  margin: auto;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+#listarLotesModal .modal-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-color);
+}
+
+#listarLotesModal .modal-header {
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  flex-shrink: 0;
+}
+
+#listarLotesModal .modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+#listarLotesModal .modal-footer {
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
+  padding: var(--space-md) var(--space-lg);
+  flex-shrink: 0;
+}
+
+/* Modal Editar/Adicionar Lote - Centralizado */
+#editarLoteModal .modal-dialog {
+  max-width: min(95vw, 600px);
+  width: auto;
+  margin: auto;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-height: 90vh;
+}
+
+#editarLoteModal .modal-content {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-color);
+}
+
+#editarLoteModal .modal-header {
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  padding: var(--space-lg);
+}
+
+#editarLoteModal .modal-body {
+  padding: var(--space-lg);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+#editarLoteModal .modal-footer {
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
+  padding: var(--space-md) var(--space-lg);
+}
+
+/* Modal Confirmar Exclusão de Lote - Centralizado */
+#confirmarExclusaoLoteModal .modal-dialog {
+  max-width: min(95vw, 500px);
+  width: auto;
+  margin: auto;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+#confirmarExclusaoLoteModal .modal-content {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-color);
+}
+
+#confirmarExclusaoLoteModal .modal-header {
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  padding: var(--space-lg);
+}
+
+#confirmarExclusaoLoteModal .modal-body {
+  padding: var(--space-lg);
+}
+
+#confirmarExclusaoLoteModal .modal-footer {
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
+  padding: var(--space-md) var(--space-lg);
+}
+
+/* Estilos específicos para conteúdo dos modais de lotes */
+.lotes-summary {
+  background: var(--bg-tertiary);
+  border-radius: var(--border-radius);
+  padding: var(--space-lg);
+  border: 1px solid var(--border-color);
+  margin-bottom: var(--space-lg);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-md);
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-md);
+  background: var(--card-bg);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.summary-item label {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  margin-bottom: var(--space-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.summary-value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+/* Ações dos lotes */
+.lote-actions {
+  display: flex;
+  gap: var(--space-xs);
+  justify-content: center;
+  align-items: center;
+}
+
+.btn-lote-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: var(--font-size-sm);
+}
+
+.btn-lote-action.edit {
+  background: rgba(108, 92, 231, 0.1);
+  color: var(--primary-color);
+}
+
+.btn-lote-action.edit:hover {
+  background: var(--primary-color);
+  color: white;
+  transform: translateY(-2px);
+}
+
+.btn-lote-action.delete {
+  background: rgba(214, 48, 49, 0.1);
+  color: var(--danger-color);
+}
+
+.btn-lote-action.delete:hover {
+  background: var(--danger-color);
+  color: white;
+  transform: translateY(-2px);
+}
+
+.btn-lote-action.view {
+  background: rgba(9, 132, 227, 0.1);
+  color: var(--info-color);
+}
+
+.btn-lote-action.view:hover {
+  background: var(--info-color);
+  color: white;
+  transform: translateY(-2px);
+}
+
+/* Valores calculados no formulário de lote */
+.calculated-values {
+  background: var(--bg-tertiary);
+  border-radius: var(--border-radius-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--border-color);
+  margin-top: var(--space-md);
+}
+
+.calc-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.calc-item:last-child {
+  margin-bottom: 0;
+}
+
+.calc-item label {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.calc-value {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+/* Estados de loading para tabelas */
+.loading-lotes {
+  position: relative;
+  opacity: 0.7;
+}
+
+.loading-lotes::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(108, 92, 231, 0.3);
+  border-top: 3px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 10;
+}
+
+/* Badges específicas para lotes */
+.badge-lote {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-lote.ativo {
+  background: rgba(0, 184, 148, 0.2);
+  color: var(--success-color);
+  border: 1px solid rgba(0, 184, 148, 0.3);
+}
+
+.badge-lote.esgotado {
+  background: rgba(214, 48, 49, 0.2);
+  color: var(--danger-color);
+  border: 1px solid rgba(214, 48, 49, 0.3);
+}
+
+.badge-lote.parcial {
+  background: rgba(253, 203, 110, 0.2);
+  color: var(--warning-color);
+  border: 1px solid rgba(253, 203, 110, 0.3);
+}
+
+/* Ajustes responsivos */
+@media (max-width: 768px) {
+
+  #listarLotesModal .modal-dialog,
+  #editarLoteModal .modal-dialog,
+  #confirmarExclusaoLoteModal .modal-dialog {
+    width: 95vw;
+    max-width: 95vw;
+    margin: 2.5vh auto;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lote-actions {
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .btn-lote-action {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+
+  #listarLotesModal .modal-body,
+  #editarLoteModal .modal-body,
+  #confirmarExclusaoLoteModal .modal-body {
+    padding: var(--space-md);
+  }
+
+  .lotes-summary {
+    padding: var(--space-md);
+  }
+
+  .summary-item {
+    padding: var(--space-sm);
+  }
+}
+
+/* Animações específicas para modais de lotes */
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -60%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+#listarLotesModal .modal-dialog,
+#editarLoteModal .modal-dialog,
+#confirmarExclusaoLoteModal .modal-dialog {
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+/* Scrollbar personalizada para modais de lotes */
+#listarLotesModal .modal-body::-webkit-scrollbar,
+#editarLoteModal .modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+#listarLotesModal .modal-body::-webkit-scrollbar-track,
+#editarLoteModal .modal-body::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+}
+
+#listarLotesModal .modal-body::-webkit-scrollbar-thumb,
+#editarLoteModal .modal-body::-webkit-scrollbar-thumb {
+  background: var(--primary-color);
+  border-radius: 3px;
+}
+
+#listarLotesModal .modal-body::-webkit-scrollbar-thumb:hover,
+#editarLoteModal .modal-body::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-dark);
+}

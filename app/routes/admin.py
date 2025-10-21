@@ -45,7 +45,7 @@ from app.models import db
 from app.utils.audit import calcular_diferencas
 from app.utils.format_data_moeda import format_currency, format_number
 from app.models.entities import ( 
-    AuditLog, Cliente, Conta, MovimentacaoConta, Produto, NotaFiscal, SaldoFormaPagamento, TipoUsuario, UnidadeMedida, StatusNota,
+    AuditLog, Cliente, Conta, LoteEstoque, MovimentacaoConta, Produto, NotaFiscal, SaldoFormaPagamento, TipoUsuario, UnidadeMedida, StatusNota,
     Financeiro, TipoMovimentacao, CategoriaFinanceira, MovimentacaoEstoque, ContaReceber,
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
@@ -7463,3 +7463,363 @@ def api_gerar_pdf_relatorio():
     except Exception as e:
         logger.error(f"Erro ao gerar PDF: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+    
+    
+@admin_bp.route('/api/produtos/ativos', methods=['GET'])
+@login_required
+@admin_required
+def obter_produtos_ativos():
+    """Retorna todos os produtos ativos para filtros"""
+    try:
+        produtos = Produto.query.filter_by(ativo=True).all()
+        resultado = []
+        for produto in produtos:
+            resultado.append({
+                'id': produto.id,
+                'nome': produto.nome,
+                'marca': produto.marca,
+                'codigo': produto.codigo,
+                'unidade': produto.unidade.value if produto.unidade else None,
+                'estoque_loja': float(produto.estoque_loja) if produto.estoque_loja else 0.0,
+                'estoque_deposito': float(produto.estoque_deposito) if produto.estoque_deposito else 0.0,
+                'estoque_fabrica': float(produto.estoque_fabrica) if produto.estoque_fabrica else 0.0,
+                'valor_unitario': float(produto.valor_unitario) if produto.valor_unitario else 0.0
+            })
+        return jsonify(resultado)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/api/lotes', methods=['GET'])
+@login_required
+@admin_required
+def obter_todos_lotes():
+    """Retorna todos os lotes com informações do produto"""
+    try:
+        # Parâmetros de filtro
+        produto_id = request.args.get('produto_id')
+        status = request.args.get('status')
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        
+        # Query base com join no produto
+        query = LoteEstoque.query.join(Produto).options(joinedload(LoteEstoque.produto))
+        
+        # Aplicar filtros
+        if produto_id:
+            query = query.filter(LoteEstoque.produto_id == produto_id)
+        
+        if data_inicio:
+            query = query.filter(LoteEstoque.data_entrada >= data_inicio)
+        
+        if data_fim:
+            query = query.filter(LoteEstoque.data_entrada <= data_fim)
+        
+        # Executar query
+        lotes = query.order_by(LoteEstoque.data_entrada.desc()).all()
+        
+        resultado = []
+        for lote in lotes:
+            # Calcular status do lote
+            quantidade_disponivel = float(lote.quantidade_disponivel)
+            quantidade_inicial = float(lote.quantidade_inicial)
+            
+            if quantidade_disponivel == 0:
+                status_lote = 'esgotado'
+            elif quantidade_disponivel < quantidade_inicial:
+                status_lote = 'parcial'
+            else:
+                status_lote = 'ativo'
+            
+            resultado.append({
+                'id': lote.id,
+                'produto_id': lote.produto_id,
+                'produto_nome': lote.produto.nome if lote.produto else 'N/A',
+                'produto_marca': lote.produto.marca if lote.produto else None,
+                'produto_codigo': lote.produto.codigo if lote.produto else None,
+                'quantidade_inicial': float(lote.quantidade_inicial),
+                'quantidade_disponivel': float(lote.quantidade_disponivel),
+                'valor_unitario_compra': float(lote.valor_unitario_compra),
+                'data_entrada': lote.data_entrada.isoformat() if lote.data_entrada else None,
+                'observacao': lote.observacao,
+                'status': status_lote,
+                'sincronizado': lote.sincronizado
+            })
+        
+        return jsonify(resultado)
+    
+    except Exception as e:
+        return jsonify({'error': f'Erro ao carregar lotes: {str(e)}'}), 500
+
+@admin_bp.route('/api/produtos/<int:produto_id>/lotes', methods=['GET'])
+@login_required
+@admin_required
+def obter_lotes_produto(produto_id):
+    """Retorna todos os lotes de um produto específico"""
+    try:
+        lotes = LoteEstoque.query.filter_by(produto_id=produto_id)\
+                                .order_by(LoteEstoque.data_entrada.desc())\
+                                .all()
+        
+        resultado = []
+        for lote in lotes:
+            resultado.append({
+                'id': lote.id,
+                'produto_id': lote.produto_id,
+                'quantidade_inicial': float(lote.quantidade_inicial),
+                'quantidade_disponivel': float(lote.quantidade_disponivel),
+                'valor_unitario_compra': float(lote.valor_unitario_compra),
+                'data_entrada': lote.data_entrada.isoformat() if lote.data_entrada else None,
+                'observacao': lote.observacao,
+                'sincronizado': lote.sincronizado
+            })
+        
+        return jsonify(resultado)
+    
+    except Exception as e:
+        return jsonify({'error': f'Erro ao carregar lotes do produto: {str(e)}'}), 500
+
+@admin_bp.route('/api/lotes/<int:lote_id>', methods=['GET'])
+@login_required
+@admin_required
+def obter_lote(lote_id):
+    """Retorna um lote específico"""
+    try:
+        lote = LoteEstoque.query.get_or_404(lote_id)
+        
+        return jsonify({
+            'id': lote.id,
+            'produto_id': lote.produto_id,
+            'produto_nome': lote.produto.nome if lote.produto else 'N/A',
+            'produto_marca': lote.produto.marca if lote.produto else None,
+            'quantidade_inicial': float(lote.quantidade_inicial),
+            'quantidade_disponivel': float(lote.quantidade_disponivel),
+            'valor_unitario_compra': float(lote.valor_unitario_compra),
+            'data_entrada': lote.data_entrada.isoformat() if lote.data_entrada else None,
+            'observacao': lote.observacao,
+            'sincronizado': lote.sincronizado
+        })
+    
+    except Exception as e:
+        return jsonify({'error': f'Erro ao carregar lote: {str(e)}'}), 500
+
+@admin_bp.route('/api/lotes', methods=['POST'])
+@login_required
+@admin_required
+def criar_lote():
+    """Cria um novo lote de estoque"""
+    try:
+        data = request.get_json()
+        
+        # Validações básicas
+        if not data.get('produto_id'):
+            return jsonify({'error': 'ID do produto é obrigatório'}), 400
+        
+        if not data.get('quantidade_inicial') or float(data['quantidade_inicial']) <= 0:
+            return jsonify({'error': 'Quantidade inicial deve ser maior que zero'}), 400
+        
+        if not data.get('quantidade_disponivel') or float(data['quantidade_disponivel']) < 0:
+            return jsonify({'error': 'Quantidade disponível não pode ser negativa'}), 400
+        
+        if not data.get('valor_unitario_compra') or float(data['valor_unitario_compra']) <= 0:
+            return jsonify({'error': 'Valor unitário de compra deve ser maior que zero'}), 400
+        
+        # Verificar se o produto existe
+        produto = Produto.query.get(data['produto_id'])
+        if not produto:
+            return jsonify({'error': 'Produto não encontrado'}), 404
+        
+        # Criar novo lote
+        novo_lote = LoteEstoque(
+            produto_id=data['produto_id'],
+            quantidade_inicial=data['quantidade_inicial'],
+            quantidade_disponivel=data['quantidade_disponivel'],
+            valor_unitario_compra=data['valor_unitario_compra'],
+            data_entrada=datetime.fromisoformat(data['data_entrada']) if data.get('data_entrada') else datetime.now(),
+            observacao=data.get('observacao', '')
+        )
+        
+        db.session.add(novo_lote)
+        db.session.commit()
+        
+        # Atualizar estoque do produto
+        atualizar_estoque_produto(produto.id)
+        
+        return jsonify({
+            'message': 'Lote criado com sucesso',
+            'lote_id': novo_lote.id
+        }), 201
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro ao criar lote: {str(e)}'}), 500
+
+@admin_bp.route('/api/lotes/<int:lote_id>', methods=['PUT'])
+@login_required
+@admin_required
+def atualizar_lote(lote_id):
+    """Atualiza um lote existente"""
+    try:
+        lote = LoteEstoque.query.get_or_404(lote_id)
+        data = request.get_json()
+        
+        # Validações
+        if 'quantidade_inicial' in data and float(data['quantidade_inicial']) <= 0:
+            return jsonify({'error': 'Quantidade inicial deve ser maior que zero'}), 400
+        
+        if 'quantidade_disponivel' in data and float(data['quantidade_disponivel']) < 0:
+            return jsonify({'error': 'Quantidade disponível não pode ser negativa'}), 400
+        
+        if 'valor_unitario_compra' in data and float(data['valor_unitario_compra']) <= 0:
+            return jsonify({'error': 'Valor unitário de compra deve ser maior que zero'}), 400
+        
+        # Atualizar campos
+        if 'quantidade_inicial' in data:
+            lote.quantidade_inicial = data['quantidade_inicial']
+        
+        if 'quantidade_disponivel' in data:
+            lote.quantidade_disponivel = data['quantidade_disponivel']
+        
+        if 'valor_unitario_compra' in data:
+            lote.valor_unitario_compra = data['valor_unitario_compra']
+        
+        if 'data_entrada' in data:
+            lote.data_entrada = datetime.fromisoformat(data['data_entrada'])
+        
+        if 'observacao' in data:
+            lote.observacao = data['observacao']
+        
+        lote.sincronizado = False
+        
+        db.session.commit()
+        
+        # Atualizar estoque do produto
+        atualizar_estoque_produto(lote.produto_id)
+        
+        return jsonify({'message': 'Lote atualizado com sucesso'})
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro ao atualizar lote: {str(e)}'}), 500
+
+@admin_bp.route('/api/lotes/<int:lote_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def excluir_lote(lote_id):
+    """Exclui um lote"""
+    try:
+        lote = LoteEstoque.query.get_or_404(lote_id)
+        
+        # Verificar se o lote pode ser excluído (quantidade disponível = 0)
+        if float(lote.quantidade_disponivel) > 0:
+            return jsonify({
+                'error': 'Não é possível excluir lote com quantidade disponível maior que zero'
+            }), 400
+        
+        produto_id = lote.produto_id
+        
+        db.session.delete(lote)
+        db.session.commit()
+        
+        # Atualizar estoque do produto
+        atualizar_estoque_produto(produto_id)
+        
+        return jsonify({'message': 'Lote excluído com sucesso'})
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro ao excluir lote: {str(e)}'}), 500
+
+@admin_bp.route('/api/produtos/<int:produto_id>', methods=['GET'])
+@login_required
+@admin_required
+def obter_produto_id(produto_id):
+    """Retorna informações de um produto específico"""
+    try:
+        produto = Produto.query.get_or_404(produto_id)
+        
+        return jsonify({
+            'id': produto.id,
+            'nome': produto.nome,
+            'marca': produto.marca,
+            'codigo': produto.codigo,
+            'unidade': produto.unidade.value if produto.unidade else None,
+            'valor_unitario': float(produto.valor_unitario) if produto.valor_unitario else 0.0,
+            'valor_unitario_compra': float(produto.valor_unitario_compra) if produto.valor_unitario_compra else 0.0,
+            'estoque_loja': float(produto.estoque_loja) if produto.estoque_loja else 0.0,
+            'estoque_deposito': float(produto.estoque_deposito) if produto.estoque_deposito else 0.0,
+            'estoque_fabrica': float(produto.estoque_fabrica) if produto.estoque_fabrica else 0.0,
+            'estoque_minimo': float(produto.estoque_minimo) if produto.estoque_minimo else 0.0,
+            'estoque_maximo': float(produto.estoque_maximo) if produto.estoque_maximo else None,
+            'ativo': produto.ativo
+        })
+    
+    except Exception as e:
+        return jsonify({'error': f'Erro ao carregar produto: {str(e)}'}), 500
+
+# Função auxiliar para atualizar estoque do produto
+def atualizar_estoque_produto(produto_id):
+    """Atualiza o estoque do produto baseado nos lotes"""
+    try:
+        produto = Produto.query.get(produto_id)
+        if not produto:
+            return
+        
+        # Calcular estoque total baseado nos lotes
+        lotes = LoteEstoque.query.filter_by(produto_id=produto_id).all()
+        estoque_total = sum(float(lote.quantidade_disponivel) for lote in lotes)
+        
+        # Atualizar estoque da loja (ou outro estoque padrão)
+        produto.estoque_loja = estoque_total
+        produto.sincronizado = False
+        produto.atualizado_em = datetime.now()
+        
+        db.session.commit()
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao atualizar estoque do produto {produto_id}: {str(e)}")
+
+# Rota para estatísticas de lotes
+@admin_bp.route('/api/lotes/estatisticas', methods=['GET'])
+@login_required
+@admin_required
+def obter_estatisticas_lotes():
+    """Retorna estatísticas gerais sobre os lotes"""
+    try:
+        total_lotes = LoteEstoque.query.count()
+        
+        # Lotes por status
+        lotes_ativos = db.session.query(LoteEstoque).filter(
+            LoteEstoque.quantidade_disponivel == LoteEstoque.quantidade_inicial
+        ).count()
+        
+        lotes_parciais = db.session.query(LoteEstoque).filter(
+            LoteEstoque.quantidade_disponivel > 0,
+            LoteEstoque.quantidade_disponivel < LoteEstoque.quantidade_inicial
+        ).count()
+        
+        lotes_esgotados = db.session.query(LoteEstoque).filter(
+            LoteEstoque.quantidade_disponivel == 0
+        ).count()
+        
+        # Quantidade total disponível
+        quantidade_total = db.session.query(
+            func.sum(LoteEstoque.quantidade_disponivel)
+        ).scalar() or 0
+        
+        # Valor total em estoque
+        valor_total = db.session.query(
+            func.sum(LoteEstoque.quantidade_disponivel * LoteEstoque.valor_unitario_compra)
+        ).scalar() or 0
+        
+        return jsonify({
+            'total_lotes': total_lotes,
+            'lotes_ativos': lotes_ativos,
+            'lotes_parciais': lotes_parciais,
+            'lotes_esgotados': lotes_esgotados,
+            'quantidade_total': float(quantidade_total),
+            'valor_total': float(valor_total)
+        })
+    
+    except Exception as e:
+        return jsonify({'error': f'Erro ao carregar estatísticas: {str(e)}'}), 500

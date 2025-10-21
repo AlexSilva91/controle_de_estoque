@@ -1423,6 +1423,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 <td>${produto.estoque_fabrica}</td>
                 <td>
                   <div class="table-actions">
+                    <button class="btn-icon btn-primary gerenciar-lotes" data-id="${produto.id}" data-nome="${produto.nome}" title="Gerenciar Lotes">
+                      <i class="fas fa-boxes"></i>
+                    </button>
                     <button class="btn-icon btn-info movimentar-estoque" data-id="${produto.id}" title="Transferir entre estoques">
                       <i class="fas fa-exchange-alt"></i>
                     </button>
@@ -1474,6 +1477,23 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
 
+    // NOVO: Botão para gerenciar lotes
+    document.querySelectorAll('.gerenciar-lotes').forEach(btn => {
+      btn.addEventListener('click', function (e) {
+        const produtoId = this.getAttribute('data-id');
+        const produtoNome = this.getAttribute('data-nome');
+
+        // Verificar se a função abrirModalLotesProduto existe (do script_lotes.js)
+        if (typeof abrirModalLotesProduto === 'function') {
+          abrirModalLotesProduto(produtoId, produtoNome);
+        } else {
+          // Fallback: navegar para a aba de lotes
+          switchToTab('lotes');
+          mostrarFlashMessage(`Produto selecionado: ${produtoNome}`, 'info');
+        }
+      });
+    });
+
     document.querySelectorAll('.editar-produto').forEach(btn => {
       btn.addEventListener('click', async function (e) {
         const produtoId = this.getAttribute('data-id');
@@ -1502,6 +1522,7 @@ document.addEventListener('DOMContentLoaded', function () {
         openTransferenciaModal(produtoId);
       });
     });
+
     document.getElementById('btnRelatorioProdutos').addEventListener('click', () => {
       const searchText = document.getElementById('searchProduto')?.value || '';
       const incluirInativos = document.getElementById('mostrarInativos')?.checked ? 'true' : 'false';
@@ -1513,47 +1534,47 @@ document.addEventListener('DOMContentLoaded', function () {
 
   async function openEditarProdutoModal(produtoId) {
     try {
-        const produtoResponse = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
+      const produtoResponse = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
 
-        if (produtoResponse.success) {
-            const produto = produtoResponse.produto;
+      if (produtoResponse.success) {
+        const produto = produtoResponse.produto;
 
-            const descontosResponse = await fetchWithErrorHandling('/admin/descontos');
+        const descontosResponse = await fetchWithErrorHandling('/admin/descontos');
 
-            if (descontosResponse.success) {
-                const formBody = document.querySelector('#editarProdutoModal .modal-body');
+        if (descontosResponse.success) {
+          const formBody = document.querySelector('#editarProdutoModal .modal-body');
 
-                if (!formBody) return;
+          if (!formBody) return;
 
-                // FUNÇÃO PARA FORMATAR VALORES MONETÁRIOS PARA EXIBIÇÃO
-                function formatarValorParaExibicao(valor) {
-                    if (!valor || valor === '' || valor === 0) return '';
-                    
-                    // Converte para número se for string
-                    const numero = typeof valor === 'string' ? 
-                        parseFloat(valor.replace(/[^\d,.-]/g, '').replace(',', '.')) : 
-                        parseFloat(valor);
-                    
-                    if (isNaN(numero)) return '';
-                    
-                    // Formata como moeda brasileira
-                    return numero.toLocaleString('pt-BR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                    });
-                }
+          // FUNÇÃO PARA FORMATAR VALORES MONETÁRIOS PARA EXIBIÇÃO
+          function formatarValorParaExibicao(valor) {
+            if (!valor || valor === '' || valor === 0) return '';
 
-                // Formatar valores monetários para exibição
-                const valorUnitarioFormatado = formatarValorParaExibicao(produto.valor_unitario);
-                const valorCompraFormatado = formatarValorParaExibicao(produto.valor_unitario_compra);
-                const valorTotalCompraFormatado = formatarValorParaExibicao(produto.valor_total_compra);
+            // Converte para número se for string
+            const numero = typeof valor === 'string' ?
+              parseFloat(valor.replace(/[^\d,.-]/g, '').replace(',', '.')) :
+              parseFloat(valor);
 
-                const descontosAtuais = produto.descontos || [];
-                const descontosAtuaisIds = descontosAtuais.map(d => d.id);
+            if (isNaN(numero)) return '';
 
-                const todosDescontos = descontosResponse.descontos || [];
+            // Formata como moeda brasileira
+            return numero.toLocaleString('pt-BR', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            });
+          }
 
-                formBody.innerHTML = `
+          // Formatar valores monetários para exibição
+          const valorUnitarioFormatado = formatarValorParaExibicao(produto.valor_unitario);
+          const valorCompraFormatado = formatarValorParaExibicao(produto.valor_unitario_compra);
+          const valorTotalCompraFormatado = formatarValorParaExibicao(produto.valor_total_compra);
+
+          const descontosAtuais = produto.descontos || [];
+          const descontosAtuaisIds = descontosAtuais.map(d => d.id);
+
+          const todosDescontos = descontosResponse.descontos || [];
+
+          formBody.innerHTML = `
                     <div class="form-row">
                         <div class="form-group">
                             <label for="editCodigo">Código*</label>
@@ -1658,8 +1679,8 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <select id="selecionarDesconto" class="form-control">
                                     <option value="">Selecione um desconto...</option>
                                     ${todosDescontos
-                                        .filter(d => !descontosAtuaisIds.includes(d.id))
-                                        .map(desconto => `
+              .filter(d => !descontosAtuaisIds.includes(d.id))
+              .map(desconto => `
                                             <option value="${desconto.id}" 
                                                 data-quantidade-minima="${desconto.quantidade_minima}"
                                                 data-quantidade-maxima="${desconto.quantidade_maxima || ''}"
@@ -1680,22 +1701,22 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>
                 `;
 
-                const editarProdutoForm = document.getElementById('editarProdutoForm');
-                if (editarProdutoForm) {
-                    editarProdutoForm.setAttribute('data-produto-id', produtoId);
-                }
-                setupDescontoEvents();
-                openModal('editarProdutoModal');
-            } else {
-                throw new Error('Erro ao carregar descontos');
-            }
+          const editarProdutoForm = document.getElementById('editarProdutoForm');
+          if (editarProdutoForm) {
+            editarProdutoForm.setAttribute('data-produto-id', produtoId);
+          }
+          setupDescontoEvents();
+          openModal('editarProdutoModal');
         } else {
-            throw new Error('Erro ao carregar dados do produto');
+          throw new Error('Erro ao carregar descontos');
         }
+      } else {
+        throw new Error('Erro ao carregar dados do produto');
+      }
     } catch (error) {
-        showFlashMessage('error', 'Erro ao carregar dados do produto');
+      showFlashMessage('error', 'Erro ao carregar dados do produto');
     }
- }
+  }
 
   function setupDescontoEvents() {
     const btnAdicionarDesconto = document.getElementById('btnAdicionarDesconto');
@@ -1996,139 +2017,139 @@ document.addEventListener('DOMContentLoaded', function () {
   });
   // ===== FUNÇÃO PARA CONVERTER FORMATO BRASILEIRO PARA NÚMERO =====
   function converterValorBrasileiro(valorString) {
-      if (!valorString || valorString === '') return 0;
-      
-      // Remove todos os pontos (separadores de milhar) e substitui vírgula por ponto
-      const valorLimpo = valorString.toString().replace(/\./g, '').replace(',', '.');
-      
-      // Converte para número
-      const valorNumerico = parseFloat(valorLimpo);
-      
-      // Retorna 0 se não for um número válido, senão retorna o número
-      return isNaN(valorNumerico) ? 0 : valorNumerico;
+    if (!valorString || valorString === '') return 0;
+
+    // Remove todos os pontos (separadores de milhar) e substitui vírgula por ponto
+    const valorLimpo = valorString.toString().replace(/\./g, '').replace(',', '.');
+
+    // Converte para número
+    const valorNumerico = parseFloat(valorLimpo);
+
+    // Retorna 0 se não for um número válido, senão retorna o número
+    return isNaN(valorNumerico) ? 0 : valorNumerico;
   }
-  
+
   // ===== EVENT LISTENERS PARA PRODUTOS =====
   document.getElementById('addProduto')?.addEventListener('click', () => {
-      const produtoForm = document.getElementById('produtoForm');
-      if (produtoForm) produtoForm.reset();
-  
-      if (document.getElementById('produtoEstoqueTipo')) document.getElementById('produtoEstoqueTipo').value = 'loja';
-      if (document.getElementById('produtoUnidade')) document.getElementById('produtoUnidade').value = 'kg';
-      openModal('produtoModal');
+    const produtoForm = document.getElementById('produtoForm');
+    if (produtoForm) produtoForm.reset();
+
+    if (document.getElementById('produtoEstoqueTipo')) document.getElementById('produtoEstoqueTipo').value = 'loja';
+    if (document.getElementById('produtoUnidade')) document.getElementById('produtoUnidade').value = 'kg';
+    openModal('produtoModal');
   });
-  
+
   const produtoForm = document.getElementById('produtoForm');
   if (produtoForm) {
-      produtoForm.addEventListener('submit', async function (e) {
-          e.preventDefault();
-  
-          const estoqueTipo = document.getElementById('produtoEstoqueTipo')?.value || 'loja';
-          const estoqueQuantidade = parseFloat(document.getElementById('produtoEstoque')?.value) || 0;
-  
-          // CONVERTER VALORES DO PADRÃO BRASILEIRO PARA NÚMERO
-          const formData = {
-              nome: document.getElementById('produtoNome')?.value || '',
-              tipo: document.getElementById('produtoTipo')?.value || '',
-              marca: document.getElementById('produtoMarca')?.value || '',
-              unidade: document.getElementById('produtoUnidade')?.value || 'kg',
-              valor_unitario: converterValorBrasileiro(document.getElementById('produtoValor')?.value),
-              estoque_loja: estoqueTipo === 'loja' ? estoqueQuantidade : 0,
-              estoque_deposito: estoqueTipo === 'deposito' ? estoqueQuantidade : 0,
-              estoque_fabrica: estoqueTipo === 'fabrica' ? estoqueQuantidade : 0
-          };
-  
-          // Converter outros campos monetários
-          const valorCompra = converterValorBrasileiro(document.getElementById('produtoValorCompra')?.value);
-          const valorTotal = converterValorBrasileiro(document.getElementById('produtoValorTotalCompra')?.value);
-          const icms = parseFloat(document.getElementById('produtoICMS')?.value);
-          const estoqueMinimo = parseFloat(document.getElementById('produtoEstoqueMinimo')?.value);
-  
-          if (valorCompra > 0) formData.valor_unitario_compra = valorCompra;
-          if (valorTotal > 0) formData.valor_total_compra = valorTotal;
-          if (!isNaN(icms)) formData.imcs = icms;
-          if (!isNaN(estoqueMinimo)) formData.estoque_minimo = estoqueMinimo;
-  
-          // Validação
-          if (formData.valor_unitario <= 0) {
-              showFlashMessage('error', 'O valor unitário deve ser maior que zero');
-              return;
-          }
-  
-          try {
-              const response = await fetchWithErrorHandling('/admin/produtos', {
-                  method: 'POST',
-                  headers: {
-                      'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify(formData)
-              });
-  
-              if (response.success) {
-                  showFlashMessage('success', 'Produto cadastrado com sucesso');
-                  closeModal('produtoModal');
-                  loadProdutosData();
-              } else {
-                  showFlashMessage('error', response.message || 'Erro ao cadastrar produto');
-              }
-          } catch (error) {
-              showFlashMessage('error', 'Erro ao cadastrar produto');
-          }
-      });
+    produtoForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const estoqueTipo = document.getElementById('produtoEstoqueTipo')?.value || 'loja';
+      const estoqueQuantidade = parseFloat(document.getElementById('produtoEstoque')?.value) || 0;
+
+      // CONVERTER VALORES DO PADRÃO BRASILEIRO PARA NÚMERO
+      const formData = {
+        nome: document.getElementById('produtoNome')?.value || '',
+        tipo: document.getElementById('produtoTipo')?.value || '',
+        marca: document.getElementById('produtoMarca')?.value || '',
+        unidade: document.getElementById('produtoUnidade')?.value || 'kg',
+        valor_unitario: converterValorBrasileiro(document.getElementById('produtoValor')?.value),
+        estoque_loja: estoqueTipo === 'loja' ? estoqueQuantidade : 0,
+        estoque_deposito: estoqueTipo === 'deposito' ? estoqueQuantidade : 0,
+        estoque_fabrica: estoqueTipo === 'fabrica' ? estoqueQuantidade : 0
+      };
+
+      // Converter outros campos monetários
+      const valorCompra = converterValorBrasileiro(document.getElementById('produtoValorCompra')?.value);
+      const valorTotal = converterValorBrasileiro(document.getElementById('produtoValorTotalCompra')?.value);
+      const icms = parseFloat(document.getElementById('produtoICMS')?.value);
+      const estoqueMinimo = parseFloat(document.getElementById('produtoEstoqueMinimo')?.value);
+
+      if (valorCompra > 0) formData.valor_unitario_compra = valorCompra;
+      if (valorTotal > 0) formData.valor_total_compra = valorTotal;
+      if (!isNaN(icms)) formData.imcs = icms;
+      if (!isNaN(estoqueMinimo)) formData.estoque_minimo = estoqueMinimo;
+
+      // Validação
+      if (formData.valor_unitario <= 0) {
+        showFlashMessage('error', 'O valor unitário deve ser maior que zero');
+        return;
+      }
+
+      try {
+        const response = await fetchWithErrorHandling('/admin/produtos', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+
+        if (response.success) {
+          showFlashMessage('success', 'Produto cadastrado com sucesso');
+          closeModal('produtoModal');
+          loadProdutosData();
+        } else {
+          showFlashMessage('error', response.message || 'Erro ao cadastrar produto');
+        }
+      } catch (error) {
+        showFlashMessage('error', 'Erro ao cadastrar produto');
+      }
+    });
   }
 
   const editarProdutoForm = document.getElementById('editarProdutoForm');
   if (editarProdutoForm) {
-      editarProdutoForm.addEventListener('submit', async function (e) {
-          e.preventDefault();
-  
-          const produtoId = this.getAttribute('data-produto-id');
-          if (!produtoId) return;
-  
-          const descontos = [];
-          document.querySelectorAll('#descontosContainer .desconto-item').forEach(item => {
-              descontos.push(item.dataset.id);
-          });
-  
-          // CONVERTER VALORES DO PADRÃO BRASILEIRO PARA NÚMERO
-          const formData = {
-              codigo: document.getElementById('editCodigo')?.value || '',
-              nome: document.getElementById('editNome')?.value || '',
-              tipo: document.getElementById('editTipo')?.value || '',
-              marca: document.getElementById('editMarca')?.value || '',
-              valor_unitario: converterValorBrasileiro(document.getElementById('editValor')?.value),
-              valor_unitario_compra: converterValorBrasileiro(document.getElementById('editValorCompra')?.value),
-              valor_total_compra: converterValorBrasileiro(document.getElementById('editValorTotalCompra')?.value),
-              imcs: parseFloat(document.getElementById('editICMS')?.value) || 0,
-              estoque_loja: parseFloat(document.getElementById('editEstoqueLoja')?.value) || 0,
-              estoque_deposito: parseFloat(document.getElementById('editEstoqueDeposito')?.value) || 0,
-              estoque_fabrica: parseFloat(document.getElementById('editEstoqueFabrica')?.value) || 0,
-              estoque_minimo: parseFloat(document.getElementById('editEstoqueMinimo')?.value) || 0,
-              estoque_maximo: parseFloat(document.getElementById('editEstoqueMaximo')?.value) || 0,
-              ativo: document.getElementById('editAtivo')?.value === 'true',
-              descontos: descontos
-          };
-  
-          try {
-              const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`, {
-                  method: 'PUT',
-                  headers: {
-                      'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify(formData)
-              });
-  
-              if (response.success) {
-                  showFlashMessage('success', 'Produto atualizado com sucesso');
-                  closeModal('editarProdutoModal');
-                  loadProdutosData();
-              } else {
-                  showFlashMessage('error', response.message || 'Erro ao atualizar produto');
-              }
-          } catch (error) {
-              showFlashMessage('error', 'Erro ao atualizar produto');
-          }
+    editarProdutoForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const produtoId = this.getAttribute('data-produto-id');
+      if (!produtoId) return;
+
+      const descontos = [];
+      document.querySelectorAll('#descontosContainer .desconto-item').forEach(item => {
+        descontos.push(item.dataset.id);
       });
+
+      // CONVERTER VALORES DO PADRÃO BRASILEIRO PARA NÚMERO
+      const formData = {
+        codigo: document.getElementById('editCodigo')?.value || '',
+        nome: document.getElementById('editNome')?.value || '',
+        tipo: document.getElementById('editTipo')?.value || '',
+        marca: document.getElementById('editMarca')?.value || '',
+        valor_unitario: converterValorBrasileiro(document.getElementById('editValor')?.value),
+        valor_unitario_compra: converterValorBrasileiro(document.getElementById('editValorCompra')?.value),
+        valor_total_compra: converterValorBrasileiro(document.getElementById('editValorTotalCompra')?.value),
+        imcs: parseFloat(document.getElementById('editICMS')?.value) || 0,
+        estoque_loja: parseFloat(document.getElementById('editEstoqueLoja')?.value) || 0,
+        estoque_deposito: parseFloat(document.getElementById('editEstoqueDeposito')?.value) || 0,
+        estoque_fabrica: parseFloat(document.getElementById('editEstoqueFabrica')?.value) || 0,
+        estoque_minimo: parseFloat(document.getElementById('editEstoqueMinimo')?.value) || 0,
+        estoque_maximo: parseFloat(document.getElementById('editEstoqueMaximo')?.value) || 0,
+        ativo: document.getElementById('editAtivo')?.value === 'true',
+        descontos: descontos
+      };
+
+      try {
+        const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+
+        if (response.success) {
+          showFlashMessage('success', 'Produto atualizado com sucesso');
+          closeModal('editarProdutoModal');
+          loadProdutosData();
+        } else {
+          showFlashMessage('error', response.message || 'Erro ao atualizar produto');
+        }
+      } catch (error) {
+        showFlashMessage('error', 'Erro ao atualizar produto');
+      }
+    });
   }
 
   const transferenciaForm = document.getElementById('transferenciaForm');
@@ -3133,64 +3154,64 @@ document.addEventListener('DOMContentLoaded', function () {
   // Variáveis globais para controle de paginação
   let currentCaixaPage = 1;
   const caixasPerPage = 30;
-  
+
   async function loadCaixasData(page = 1) {
-      try {
-          const status = document.getElementById('caixaStatus')?.value || '';
-          const operadorId = document.getElementById('caixaOperador')?.value || '';
-          const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
-          const dataFim = document.getElementById('caixaDataFim')?.value || '';
-  
-          // Monta query string dinamicamente
-          const params = new URLSearchParams();
-          if (status) params.append('status', status);
-          if (operadorId) params.append('operador_id', operadorId);
-          if (dataInicio) params.append('data_inicio', dataInicio);
-          if (dataFim) params.append('data_fim', dataFim);
-          
-          // NOVO: Adiciona parâmetros de paginação
-          params.append('page', page.toString());
-          params.append('per_page', caixasPerPage.toString());
-  
-          let url = '/admin/caixas';
-          if ([...params].length > 0) {
-              url += `?${params.toString()}`;
-          }
-          
-          const data = await fetchWithErrorHandling(url);
-  
-          if (data.success) {
-              const caixasTable = document.querySelector('#caixasTable tbody');
-              if (caixasTable) {
-                  caixasTable.innerHTML = '';
-  
-                  data.data.forEach(caixa => {
-                      const row = document.createElement('tr');
-  
-                      const dataAbertura = formatDateTime(caixa.data_abertura);
-                      const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
-  
-                      const valorEntradas = formatarMoeda(caixa.total_vendas);
-                      const valorSaidas = formatarMoeda(caixa.total_despesas);
-                      const valorConfirmado = caixa.valor_confirmado ? formatarMoeda(caixa.valor_confirmado) : '-';
-  
-                      let statusClass = '';
-                      let statusText = '';
-                      if (caixa.status === 'aberto') {
-                          statusClass = 'badge-success';
-                          statusText = 'Aberto';
-                      } else if (caixa.status === 'fechado') {
-                          statusClass = 'badge-primary';
-                          statusText = 'Fechado';
-                      } else if (caixa.status === 'analise' || caixa.status === 'em_analise') {
-                          statusClass = 'badge-warning';
-                          statusText = 'Em Análise';
-                      } else if (caixa.status === 'rejeitado' || caixa.status === 'recusado') {
-                          statusClass = 'badge-danger';
-                          statusText = 'Rejeitado';
-                      }
-  
-                      row.innerHTML = `
+    try {
+      const status = document.getElementById('caixaStatus')?.value || '';
+      const operadorId = document.getElementById('caixaOperador')?.value || '';
+      const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
+      const dataFim = document.getElementById('caixaDataFim')?.value || '';
+
+      // Monta query string dinamicamente
+      const params = new URLSearchParams();
+      if (status) params.append('status', status);
+      if (operadorId) params.append('operador_id', operadorId);
+      if (dataInicio) params.append('data_inicio', dataInicio);
+      if (dataFim) params.append('data_fim', dataFim);
+
+      // NOVO: Adiciona parâmetros de paginação
+      params.append('page', page.toString());
+      params.append('per_page', caixasPerPage.toString());
+
+      let url = '/admin/caixas';
+      if ([...params].length > 0) {
+        url += `?${params.toString()}`;
+      }
+
+      const data = await fetchWithErrorHandling(url);
+
+      if (data.success) {
+        const caixasTable = document.querySelector('#caixasTable tbody');
+        if (caixasTable) {
+          caixasTable.innerHTML = '';
+
+          data.data.forEach(caixa => {
+            const row = document.createElement('tr');
+
+            const dataAbertura = formatDateTime(caixa.data_abertura);
+            const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
+
+            const valorEntradas = formatarMoeda(caixa.total_vendas);
+            const valorSaidas = formatarMoeda(caixa.total_despesas);
+            const valorConfirmado = caixa.valor_confirmado ? formatarMoeda(caixa.valor_confirmado) : '-';
+
+            let statusClass = '';
+            let statusText = '';
+            if (caixa.status === 'aberto') {
+              statusClass = 'badge-success';
+              statusText = 'Aberto';
+            } else if (caixa.status === 'fechado') {
+              statusClass = 'badge-primary';
+              statusText = 'Fechado';
+            } else if (caixa.status === 'analise' || caixa.status === 'em_analise') {
+              statusClass = 'badge-warning';
+              statusText = 'Em Análise';
+            } else if (caixa.status === 'rejeitado' || caixa.status === 'recusado') {
+              statusClass = 'badge-danger';
+              statusText = 'Rejeitado';
+            }
+
+            row.innerHTML = `
                           <td>${caixa.id}</td>
                           <td>${caixa.operador?.nome || '-'}</td>
                           <td>${dataAbertura}</td>
@@ -3218,47 +3239,47 @@ document.addEventListener('DOMContentLoaded', function () {
                               </div>
                           </td>
                       `;
-                      caixasTable.appendChild(row);
-                  });
-  
-                  setupCaixaActions();
-                  
-                  // NOVO: Atualiza controles de paginação
-                  updatePaginationControls(data.pagination);
-              }
-          }
-      } catch (error) {
-          showFlashMessage('error', 'Erro ao carregar lista de caixas');
+            caixasTable.appendChild(row);
+          });
+
+          setupCaixaActions();
+
+          // NOVO: Atualiza controles de paginação
+          updatePaginationControls(data.pagination);
+        }
       }
+    } catch (error) {
+      showFlashMessage('error', 'Erro ao carregar lista de caixas');
+    }
   }
-  
+
   // NOVO: Função para atualizar controles de paginação
   function updatePaginationControls(pagination) {
-      let paginationContainer = document.getElementById('caixasPagination');
-      
-      // Remove o container existente se houver
-      if (paginationContainer) {
-          paginationContainer.remove();
-      }
-      
-      // Cria novo container de paginação
-      paginationContainer = document.createElement('div');
-      paginationContainer.id = 'caixasPagination';
-      paginationContainer.className = 'pagination-container';
-      
-      const totalPages = pagination.pages;
-      const currentPage = pagination.page;
-      const totalItems = pagination.total;
-      
-      if (totalPages <= 1) {
-          // Não mostra paginação se só tiver uma página
-          paginationContainer.innerHTML = `
+    let paginationContainer = document.getElementById('caixasPagination');
+
+    // Remove o container existente se houver
+    if (paginationContainer) {
+      paginationContainer.remove();
+    }
+
+    // Cria novo container de paginação
+    paginationContainer = document.createElement('div');
+    paginationContainer.id = 'caixasPagination';
+    paginationContainer.className = 'pagination-container';
+
+    const totalPages = pagination.pages;
+    const currentPage = pagination.page;
+    const totalItems = pagination.total;
+
+    if (totalPages <= 1) {
+      // Não mostra paginação se só tiver uma página
+      paginationContainer.innerHTML = `
               <div class="pagination-info">
                   Mostrando ${pagination.total} caixas
               </div>
           `;
-      } else {
-          paginationContainer.innerHTML = `
+    } else {
+      paginationContainer.innerHTML = `
               <div class="pagination-info">
                   Mostrando ${((currentPage - 1) * caixasPerPage) + 1} - ${Math.min(currentPage * caixasPerPage, totalItems)} de ${totalItems} caixas
               </div>
@@ -3280,48 +3301,48 @@ document.addEventListener('DOMContentLoaded', function () {
                   </button>
               </div>
           `;
-      }
-      
-      // Adiciona o container após a tabela
-      const tableContainer = document.querySelector('#caixas .table-responsive');
-      if (tableContainer) {
-          tableContainer.after(paginationContainer);
-      }
-      
-      // Adiciona event listeners aos botões de paginação
-      document.querySelectorAll('.pagination-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-              if (!btn.disabled) {
-                  const page = parseInt(btn.getAttribute('data-page'));
-                  currentCaixaPage = page;
-                  loadCaixasData(page);
-              }
-          });
+    }
+
+    // Adiciona o container após a tabela
+    const tableContainer = document.querySelector('#caixas .table-responsive');
+    if (tableContainer) {
+      tableContainer.after(paginationContainer);
+    }
+
+    // Adiciona event listeners aos botões de paginação
+    document.querySelectorAll('.pagination-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        if (!btn.disabled) {
+          const page = parseInt(btn.getAttribute('data-page'));
+          currentCaixaPage = page;
+          loadCaixasData(page);
+        }
       });
+    });
   }
-  
+
   // Atualize a função de refresh para resetar para página 1
   document.getElementById('refreshCaixas')?.addEventListener('click', () => {
-      document.getElementById('caixaStatus').value = '';
-      document.getElementById('caixaOperador').value = '';
-      document.getElementById('caixaDataInicio').value = '';
-      document.getElementById('caixaDataFim').value = '';
-      currentCaixaPage = 1;
-      loadCaixasData(1);
+    document.getElementById('caixaStatus').value = '';
+    document.getElementById('caixaOperador').value = '';
+    document.getElementById('caixaDataInicio').value = '';
+    document.getElementById('caixaDataFim').value = '';
+    currentCaixaPage = 1;
+    loadCaixasData(1);
   });
-  
+
   // Atualize o evento de filtro para resetar para página 1
   document.getElementById('filterCaixas')?.addEventListener('click', () => {
-      currentCaixaPage = 1;
-      loadCaixasData(1);
+    currentCaixaPage = 1;
+    loadCaixasData(1);
   });
-  
+
   // Função para inicializar tudo quando a página carregar
   function initializeCaixasPage() {
-      currentCaixaPage = 1;
-      loadOperadores().then(() => {
-          loadCaixasData(1);
-      });
+    currentCaixaPage = 1;
+    loadOperadores().then(() => {
+      loadCaixasData(1);
+    });
   }
 
   // Aguarda o DOM estar completamente carregado

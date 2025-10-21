@@ -948,12 +948,10 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Rodapé -->
-            <footer>
-                <p>© 2025 Sistema de Gestão | Versão 2.1.0 | Atualizado em: <span id="updateTime"></span></p>
-            </footer>
+                <!-- Rodapé -->
+                <footer>
+                    <p>© 2025 Sistema de Gestão | Versão 2.1.0 | Atualizado em: <span id="updateTime"></span></p>
+                </footer>
         </main>
     </div>
 
@@ -1928,6 +1926,167 @@
             </div>
         </div>
     </div>
+    <!-- Modal Listar Lotes -->
+    <div id="listarLotesModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-boxes"></i>
+                        <span>Lotes de Estoque - <span id="lotesProdutoNome"></span></span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="lotes-summary mb-4">
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <label>Quantidade Total em Lotes:</label>
+                                <span id="lotesQuantidadeTotal" class="summary-value">0.000</span>
+                            </div>
+                            <div class="summary-item">
+                                <label>Valor Total em Lotes:</label>
+                                <span id="lotesValorTotal" class="summary-value">R$ 0,00</span>
+                            </div>
+                            <div class="summary-item">
+                                <label>Estoque Atual:</label>
+                                <span id="lotesEstoqueAtual" class="summary-value">0.000</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table id="lotesTable" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Data Entrada</th>
+                                    <th>Qtd. Inicial</th>
+                                    <th>Qtd. Disponível</th>
+                                    <th>Valor Unitário</th>
+                                    <th>Valor Total</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Dados serão preenchidos via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline close-modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Editar/Adicionar Lote -->
+    <div id="editarLoteModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-edit"></i>
+                        <span id="editarLoteModalTitle">Adicionar Lote</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <form id="editarLoteForm">
+                    <input type="hidden" id="loteId">
+                    <input type="hidden" id="loteProdutoId">
+
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="loteQuantidadeInicial">Quantidade Inicial *</label>
+                            <input type="number" id="loteQuantidadeInicial" class="form-control" step="0.001"
+                                min="0.001" required>
+                            <small class="text-muted">Quantidade total do lote quando foi criado</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="loteQuantidadeDisponivel">Quantidade Disponível *</label>
+                            <input type="number" id="loteQuantidadeDisponivel" class="form-control" step="0.001" min="0"
+                                required>
+                            <small class="text-muted">Quantidade atual disponível no lote</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="loteValorUnitario">Valor Unitário de Compra *</label>
+                            <input type="number" id="loteValorUnitario" class="form-control" step="0.01" min="0.01"
+                                required>
+                            <small class="text-muted">Valor pago por unidade na compra</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="loteDataEntrada">Data de Entrada *</label>
+                            <input type="datetime-local" id="loteDataEntrada" class="form-control" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="loteObservacao">Observações</label>
+                            <textarea id="loteObservacao" class="form-control" rows="3"
+                                placeholder="Informações adicionais sobre o lote..."></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="calculated-values">
+                                <div class="calc-item">
+                                    <label>Valor Total do Lote:</label>
+                                    <span id="loteValorTotalCalculado" class="calc-value">R$ 0,00</span>
+                                </div>
+                                <div class="calc-item">
+                                    <label>Diferença de Quantidade:</label>
+                                    <span id="loteDiferencaQuantidade" class="calc-value">0.000</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i>
+                            <span id="editarLoteSubmitText">Salvar Lote</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmar Exclusão de Lote -->
+    <div id="confirmarExclusaoLoteModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Confirmar Exclusão</span>
+                    </h3>
+                    <button class="close-modal" aria-label="Fechar">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirmarExclusaoLoteTexto">Tem certeza que deseja excluir este lote?</p>
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <strong>Atenção:</strong> Esta ação não pode ser desfeita.
+                        Certifique-se de que o lote está vazio (quantidade disponível = 0) antes de excluir.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" id="confirmarExclusaoLoteBtn">
+                        <i class="fas fa-trash"></i>
+                        <span>Confirmar Exclusão</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
     <!-- Modal de Visualização do Caixa -->
     <div id="visualizarCaixaModal" class="modal">
         <div class="modal-overlay"></div>
@@ -2333,6 +2492,7 @@
         <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
         <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/script_lotes.js') }}"></script>
 </body>
 
 </html>
