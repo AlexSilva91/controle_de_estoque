@@ -50,7 +50,7 @@ from app.models.entities import (
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
 from app.crud import (
-    TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao, calcular_formas_pagamento,
+    TipoEstoque, atualizar_desconto, atualizar_estoque_produto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao, calcular_formas_pagamento,
     criar_desconto, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
     TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao,
     criar_desconto, criar_ou_atualizar_lote, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
@@ -7464,7 +7464,6 @@ def api_gerar_pdf_relatorio():
         logger.error(f"Erro ao gerar PDF: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
     
-    
 @admin_bp.route('/api/produtos/ativos', methods=['GET'])
 @login_required
 @admin_required
@@ -7480,10 +7479,10 @@ def obter_produtos_ativos():
                 'marca': produto.marca,
                 'codigo': produto.codigo,
                 'unidade': produto.unidade.value if produto.unidade else None,
-                'estoque_loja': float(produto.estoque_loja) if produto.estoque_loja else 0.0,
-                'estoque_deposito': float(produto.estoque_deposito) if produto.estoque_deposito else 0.0,
-                'estoque_fabrica': float(produto.estoque_fabrica) if produto.estoque_fabrica else 0.0,
-                'valor_unitario': float(produto.valor_unitario) if produto.valor_unitario else 0.0
+                'estoque_loja': format_number(produto.estoque_loja, is_weight=True) if produto.estoque_loja else '0,000',
+                'estoque_deposito': format_number(produto.estoque_deposito, is_weight=True) if produto.estoque_deposito else '0,000',
+                'estoque_fabrica': format_number(produto.estoque_fabrica, is_weight=True) if produto.estoque_fabrica else '0,000',
+                'valor_unitario': format_currency(produto.valor_unitario) if produto.valor_unitario else 'R$ 0,00'
             })
         return jsonify(resultado)
     except Exception as e:
@@ -7536,9 +7535,9 @@ def obter_todos_lotes():
                 'produto_nome': lote.produto.nome if lote.produto else 'N/A',
                 'produto_marca': lote.produto.marca if lote.produto else None,
                 'produto_codigo': lote.produto.codigo if lote.produto else None,
-                'quantidade_inicial': float(lote.quantidade_inicial),
-                'quantidade_disponivel': float(lote.quantidade_disponivel),
-                'valor_unitario_compra': float(lote.valor_unitario_compra),
+                'quantidade_inicial': format_number(lote.quantidade_inicial, is_weight=True),
+                'quantidade_disponivel': format_number(lote.quantidade_disponivel, is_weight=True),
+                'valor_unitario_compra': format_currency(lote.valor_unitario_compra),
                 'data_entrada': lote.data_entrada.isoformat() if lote.data_entrada else None,
                 'observacao': lote.observacao,
                 'status': status_lote,
@@ -7565,9 +7564,9 @@ def obter_lotes_produto(produto_id):
             resultado.append({
                 'id': lote.id,
                 'produto_id': lote.produto_id,
-                'quantidade_inicial': float(lote.quantidade_inicial),
-                'quantidade_disponivel': float(lote.quantidade_disponivel),
-                'valor_unitario_compra': float(lote.valor_unitario_compra),
+                'quantidade_inicial': format_number(lote.quantidade_inicial, is_weight=True),
+                'quantidade_disponivel': format_number(lote.quantidade_disponivel, is_weight=True),
+                'valor_unitario_compra': format_currency(lote.valor_unitario_compra),
                 'data_entrada': lote.data_entrada.isoformat() if lote.data_entrada else None,
                 'observacao': lote.observacao,
                 'sincronizado': lote.sincronizado
@@ -7591,9 +7590,9 @@ def obter_lote(lote_id):
             'produto_id': lote.produto_id,
             'produto_nome': lote.produto.nome if lote.produto else 'N/A',
             'produto_marca': lote.produto.marca if lote.produto else None,
-            'quantidade_inicial': float(lote.quantidade_inicial),
-            'quantidade_disponivel': float(lote.quantidade_disponivel),
-            'valor_unitario_compra': float(lote.valor_unitario_compra),
+            'quantidade_inicial': format_number(lote.quantidade_inicial, is_weight=True),
+            'quantidade_disponivel': format_number(lote.quantidade_disponivel, is_weight=True),
+            'valor_unitario_compra': format_currency(lote.valor_unitario_compra),
             'data_entrada': lote.data_entrada.isoformat() if lote.data_entrada else None,
             'observacao': lote.observacao,
             'sincronizado': lote.sincronizado
@@ -7614,13 +7613,13 @@ def criar_lote():
         if not data.get('produto_id'):
             return jsonify({'error': 'ID do produto é obrigatório'}), 400
         
-        if not data.get('quantidade_inicial') or float(data['quantidade_inicial']) <= 0:
+        if not data.get('quantidade_inicial') or float(data['quantidade_inicial'].replace(',', '.')) <= 0:
             return jsonify({'error': 'Quantidade inicial deve ser maior que zero'}), 400
         
-        if not data.get('quantidade_disponivel') or float(data['quantidade_disponivel']) < 0:
+        if not data.get('quantidade_disponivel') or float(data['quantidade_disponivel'].replace(',', '.')) < 0:
             return jsonify({'error': 'Quantidade disponível não pode ser negativa'}), 400
         
-        if not data.get('valor_unitario_compra') or float(data['valor_unitario_compra']) <= 0:
+        if not data.get('valor_unitario_compra') or float(data['valor_unitario_compra'].replace(',', '.')) <= 0:
             return jsonify({'error': 'Valor unitário de compra deve ser maior que zero'}), 400
         
         # Verificar se o produto existe
@@ -7631,9 +7630,9 @@ def criar_lote():
         # Criar novo lote
         novo_lote = LoteEstoque(
             produto_id=data['produto_id'],
-            quantidade_inicial=data['quantidade_inicial'],
-            quantidade_disponivel=data['quantidade_disponivel'],
-            valor_unitario_compra=data['valor_unitario_compra'],
+            quantidade_inicial=float(data['quantidade_inicial'].replace(',', '.')),
+            quantidade_disponivel=float(data['quantidade_disponivel'].replace(',', '.')),
+            valor_unitario_compra=float(data['valor_unitario_compra'].replace(',', '.')),
             data_entrada=datetime.fromisoformat(data['data_entrada']) if data.get('data_entrada') else datetime.now(),
             observacao=data.get('observacao', '')
         )
@@ -7663,24 +7662,24 @@ def atualizar_lote(lote_id):
         data = request.get_json()
         
         # Validações
-        if 'quantidade_inicial' in data and float(data['quantidade_inicial']) <= 0:
+        if 'quantidade_inicial' in data and float(data['quantidade_inicial'].replace(',', '.')) <= 0:
             return jsonify({'error': 'Quantidade inicial deve ser maior que zero'}), 400
         
-        if 'quantidade_disponivel' in data and float(data['quantidade_disponivel']) < 0:
+        if 'quantidade_disponivel' in data and float(data['quantidade_disponivel'].replace(',', '.')) < 0:
             return jsonify({'error': 'Quantidade disponível não pode ser negativa'}), 400
         
-        if 'valor_unitario_compra' in data and float(data['valor_unitario_compra']) <= 0:
+        if 'valor_unitario_compra' in data and float(data['valor_unitario_compra'].replace(',', '.')) <= 0:
             return jsonify({'error': 'Valor unitário de compra deve ser maior que zero'}), 400
         
         # Atualizar campos
         if 'quantidade_inicial' in data:
-            lote.quantidade_inicial = data['quantidade_inicial']
+            lote.quantidade_inicial = float(data['quantidade_inicial'].replace(',', '.'))
         
         if 'quantidade_disponivel' in data:
-            lote.quantidade_disponivel = data['quantidade_disponivel']
+            lote.quantidade_disponivel = float(data['quantidade_disponivel'].replace(',', '.'))
         
         if 'valor_unitario_compra' in data:
-            lote.valor_unitario_compra = data['valor_unitario_compra']
+            lote.valor_unitario_compra = float(data['valor_unitario_compra'].replace(',', '.'))
         
         if 'data_entrada' in data:
             lote.data_entrada = datetime.fromisoformat(data['data_entrada'])
@@ -7743,41 +7742,18 @@ def obter_produto_id(produto_id):
             'marca': produto.marca,
             'codigo': produto.codigo,
             'unidade': produto.unidade.value if produto.unidade else None,
-            'valor_unitario': float(produto.valor_unitario) if produto.valor_unitario else 0.0,
-            'valor_unitario_compra': float(produto.valor_unitario_compra) if produto.valor_unitario_compra else 0.0,
-            'estoque_loja': float(produto.estoque_loja) if produto.estoque_loja else 0.0,
-            'estoque_deposito': float(produto.estoque_deposito) if produto.estoque_deposito else 0.0,
-            'estoque_fabrica': float(produto.estoque_fabrica) if produto.estoque_fabrica else 0.0,
-            'estoque_minimo': float(produto.estoque_minimo) if produto.estoque_minimo else 0.0,
-            'estoque_maximo': float(produto.estoque_maximo) if produto.estoque_maximo else None,
+            'valor_unitario': format_currency(produto.valor_unitario) if produto.valor_unitario else 'R$ 0,00',
+            'valor_unitario_compra': format_currency(produto.valor_unitario_compra) if produto.valor_unitario_compra else 'R$ 0,00',
+            'estoque_loja': format_number(produto.estoque_loja, is_weight=True) if produto.estoque_loja else '0,000',
+            'estoque_deposito': format_number(produto.estoque_deposito, is_weight=True) if produto.estoque_deposito else '0,000',
+            'estoque_fabrica': format_number(produto.estoque_fabrica, is_weight=True) if produto.estoque_fabrica else '0,000',
+            'estoque_minimo': format_number(produto.estoque_minimo, is_weight=True) if produto.estoque_minimo else '0,000',
+            'estoque_maximo': format_number(produto.estoque_maximo, is_weight=True) if produto.estoque_maximo else None,
             'ativo': produto.ativo
         })
     
     except Exception as e:
         return jsonify({'error': f'Erro ao carregar produto: {str(e)}'}), 500
-
-# Função auxiliar para atualizar estoque do produto
-def atualizar_estoque_produto(produto_id):
-    """Atualiza o estoque do produto baseado nos lotes"""
-    try:
-        produto = Produto.query.get(produto_id)
-        if not produto:
-            return
-        
-        # Calcular estoque total baseado nos lotes
-        lotes = LoteEstoque.query.filter_by(produto_id=produto_id).all()
-        estoque_total = sum(float(lote.quantidade_disponivel) for lote in lotes)
-        
-        # Atualizar estoque da loja (ou outro estoque padrão)
-        produto.estoque_loja = estoque_total
-        produto.sincronizado = False
-        produto.atualizado_em = datetime.now()
-        
-        db.session.commit()
-        
-    except Exception as e:
-        db.session.rollback()
-        print(f"Erro ao atualizar estoque do produto {produto_id}: {str(e)}")
 
 # Rota para estatísticas de lotes
 @admin_bp.route('/api/lotes/estatisticas', methods=['GET'])
@@ -7817,8 +7793,8 @@ def obter_estatisticas_lotes():
             'lotes_ativos': lotes_ativos,
             'lotes_parciais': lotes_parciais,
             'lotes_esgotados': lotes_esgotados,
-            'quantidade_total': float(quantidade_total),
-            'valor_total': float(valor_total)
+            'quantidade_total': format_number(quantidade_total, is_weight=True),
+            'valor_total': format_currency(valor_total)
         })
     
     except Exception as e:

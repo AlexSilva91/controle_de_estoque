@@ -13,6 +13,73 @@ let filtrosLotes = {
 const API_BASE_URL = '/admin/api'; // Altere para o prefixo correto do seu admin_bp
 
 // =============================================
+// FUNÇÕES DE FORMATAÇÃO PARA PADRÃO BRASILEIRO
+// =============================================
+
+// =============================================
+// FUNÇÕES DE FORMATAÇÃO PARA PADRÃO BRASILEIRO
+// =============================================
+
+function converterParaNumero(valor) {
+    if (valor === null || valor === undefined) return 0;
+    if (typeof valor === 'number') return valor;
+    if (typeof valor === 'string') {
+        // Remove R$, espaços e converte de padrão brasileiro para float
+        let valorLimpo = valor.toString()
+            .replace('R$', '')
+            .replace(/\./g, '')  // Remove pontos (separadores de milhar)
+            .replace(',', '.')   // Substitui vírgula por ponto (decimal)
+            .trim();
+        
+        const numero = parseFloat(valorLimpo);
+        return isNaN(numero) ? 0 : numero;
+    }
+    return parseFloat(valor) || 0;
+}
+
+function formatarQuantidade(qtd) {
+    const numero = converterParaNumero(qtd);
+    // Sempre mostra 2 casas decimais, mesmo que sejam zeros
+    return numero.toFixed(2).replace('.', ',');
+}
+
+function formatarValor(valor) {
+    const numero = converterParaNumero(valor);
+    // Formata como moeda brasileira
+    return numero.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+function formatarNumero(numero, casasDecimais = 2) {
+    const num = converterParaNumero(numero);
+    // Formata com número específico de casas decimais
+    return num.toLocaleString('pt-BR', {
+        minimumFractionDigits: casasDecimais,
+        maximumFractionDigits: casasDecimais
+    });
+}
+
+function formatarData(dataString) {
+    const data = new Date(dataString);
+    return data.toLocaleDateString('pt-BR') + ' ' + data.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// Função para converter string formatada para número
+function converterParaNumero(valor) {
+    if (typeof valor === 'number') return valor;
+    if (typeof valor === 'string') {
+        // Converte de padrão brasileiro (1.234,56) para float
+        return parseFloat(valor.replace('.', '').replace(',', '.'));
+    }
+    return parseFloat(valor) || 0;
+}
+
+// =============================================
 // FUNÇÕES PARA A ABA DE LOTES (VISÃO GERAL)
 // =============================================
 
@@ -175,19 +242,25 @@ function aplicarFiltrosLotes() {
     atualizarResumoLotes(lotesFiltrados);
 }
 
-function atualizarTabelaLotes(lotes) {
-    const tbody = document.querySelector('#lotesTable tbody');
-    if (!tbody) return;
+function atualizarTabelaLotesProduto(lotes) {
+    // Usar a tabela específica do modal (se existir) ou a tabela principal
+    const tbody = document.querySelector('#listarLotesModal #lotesTable tbody') ||
+        document.querySelector('#lotesTable tbody');
+
+    if (!tbody) {
+        console.error('Tabela de lotes não encontrada');
+        return;
+    }
 
     tbody.innerHTML = '';
 
     if (lotes.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="9" class="text-center text-muted py-4">
+                <td colspan="8" class="text-center text-muted py-4">
                     <i class="fas fa-box-open fa-2x mb-2"></i>
                     <br>
-                    Nenhum lote encontrado
+                    Nenhum lote cadastrado para este produto
                 </td>
             </tr>
         `;
@@ -196,29 +269,34 @@ function atualizarTabelaLotes(lotes) {
 
     lotes.forEach(lote => {
         const tr = document.createElement('tr');
-        const statusClass = `badge-lote ${lote.status}`;
-        const statusText = lote.status === 'ativo' ? 'Ativo' :
-            lote.status === 'parcial' ? 'Parcial' : 'Esgotado';
 
-        const valorTotal = parseFloat(lote.quantidade_inicial) * parseFloat(lote.valor_unitario_compra);
-        const percentualUtilizado = ((parseFloat(lote.quantidade_inicial) - parseFloat(lote.quantidade_disponivel)) / parseFloat(lote.quantidade_inicial)) * 100;
+        // Converter valores para número antes de calcular
+        const quantidadeInicial = converterParaNumero(lote.quantidade_inicial);
+        const quantidadeDisponivel = converterParaNumero(lote.quantidade_disponivel);
+        const valorUnitario = converterParaNumero(lote.valor_unitario_compra);
+
+        // Determinar status do lote
+        let statusClass = 'ativo';
+        let statusText = 'Ativo';
+
+        if (quantidadeDisponivel === 0) {
+            statusClass = 'esgotado';
+            statusText = 'Esgotado';
+        } else if (quantidadeDisponivel < quantidadeInicial) {
+            statusClass = 'parcial';
+            statusText = 'Parcial';
+        }
+
+        const valorTotal = quantidadeInicial * valorUnitario;
 
         tr.innerHTML = `
             <td>${lote.id}</td>
-            <td>
-                <strong>${lote.produto_nome || 'N/A'}</strong>
-                ${lote.produto_marca ? `<br><small class="text-muted">${lote.produto_marca}</small>` : ''}
-                ${lote.produto_codigo ? `<br><small class="text-info">Cód: ${lote.produto_codigo}</small>` : ''}
-            </td>
             <td>${formatarData(lote.data_entrada)}</td>
-            <td>${formatarQuantidade(lote.quantidade_inicial)}</td>
-            <td>
-                ${formatarQuantidade(lote.quantidade_disponivel)}
-                ${lote.status === 'parcial' ? `<br><small class="text-warning">(${percentualUtilizado.toFixed(1)}% utilizado)</small>` : ''}
-            </td>
-            <td>R$ ${formatarValor(lote.valor_unitario_compra)}</td>
+            <td>${formatarQuantidade(quantidadeInicial)}</td>
+            <td>${formatarQuantidade(quantidadeDisponivel)}</td>
+            <td>R$ ${formatarValor(valorUnitario)}</td>
             <td>R$ ${formatarValor(valorTotal)}</td>
-            <td><span class="${statusClass}">${statusText}</span></td>
+            <td><span class="badge-lote ${statusClass}">${statusText}</span></td>
             <td>
                 <div class="lote-actions">
                     <button class="btn-lote-action edit" data-lote-id="${lote.id}" title="Editar">
@@ -271,8 +349,11 @@ function atualizarResumoLotes(lotes) {
     let lotesParciais = 0;
 
     lotes.forEach(lote => {
-        quantidadeTotal += parseFloat(lote.quantidade_disponivel);
-        valorTotal += parseFloat(lote.quantidade_disponivel) * parseFloat(lote.valor_unitario_compra);
+        const quantidadeDisponivel = converterParaNumero(lote.quantidade_disponivel);
+        const valorUnitario = converterParaNumero(lote.valor_unitario_compra);
+        
+        quantidadeTotal += quantidadeDisponivel;
+        valorTotal += quantidadeDisponivel * valorUnitario;
 
         if (lote.status === 'esgotado') {
             lotesEsgotados++;
@@ -389,26 +470,31 @@ function atualizarTabelaLotesProduto(lotes) {
     lotes.forEach(lote => {
         const tr = document.createElement('tr');
 
+        // Converter valores para número antes de calcular
+        const quantidadeInicial = converterParaNumero(lote.quantidade_inicial);
+        const quantidadeDisponivel = converterParaNumero(lote.quantidade_disponivel);
+        const valorUnitario = converterParaNumero(lote.valor_unitario_compra);
+
         // Determinar status do lote
         let statusClass = 'ativo';
         let statusText = 'Ativo';
 
-        if (parseFloat(lote.quantidade_disponivel) === 0) {
+        if (quantidadeDisponivel === 0) {
             statusClass = 'esgotado';
             statusText = 'Esgotado';
-        } else if (parseFloat(lote.quantidade_disponivel) < parseFloat(lote.quantidade_inicial)) {
+        } else if (quantidadeDisponivel < quantidadeInicial) {
             statusClass = 'parcial';
             statusText = 'Parcial';
         }
 
-        const valorTotal = parseFloat(lote.quantidade_inicial) * parseFloat(lote.valor_unitario_compra);
+        const valorTotal = quantidadeInicial * valorUnitario;
 
         tr.innerHTML = `
             <td>${lote.id}</td>
             <td>${formatarData(lote.data_entrada)}</td>
-            <td>${formatarQuantidade(lote.quantidade_inicial)}</td>
-            <td>${formatarQuantidade(lote.quantidade_disponivel)}</td>
-            <td>R$ ${formatarValor(lote.valor_unitario_compra)}</td>
+            <td>${formatarQuantidade(quantidadeInicial)}</td>
+            <td>${formatarQuantidade(quantidadeDisponivel)}</td>
+            <td>R$ ${formatarValor(valorUnitario)}</td>
             <td>R$ ${formatarValor(valorTotal)}</td>
             <td><span class="badge-lote ${statusClass}">${statusText}</span></td>
             <td>
@@ -450,8 +536,11 @@ function atualizarResumoLotesProduto(lotes) {
     let valorTotal = 0;
 
     lotes.forEach(lote => {
-        quantidadeTotal += parseFloat(lote.quantidade_disponivel);
-        valorTotal += parseFloat(lote.quantidade_disponivel) * parseFloat(lote.valor_unitario_compra);
+        const quantidadeDisponivel = converterParaNumero(lote.quantidade_disponivel);
+        const valorUnitario = converterParaNumero(lote.valor_unitario_compra);
+        
+        quantidadeTotal += quantidadeDisponivel;
+        valorTotal += quantidadeDisponivel * valorUnitario;
     });
 
     const quantidadeTotalEl = document.getElementById('lotesQuantidadeTotal');
@@ -499,9 +588,11 @@ function carregarDadosLote(loteId) {
             document.getElementById('loteId').value = lote.id;
             // Priorizar o contexto atual, mas usar o produto_id do lote se não houver contexto
             document.getElementById('loteProdutoId').value = lotesProdutoAtual || lote.produto_id;
-            document.getElementById('loteQuantidadeInicial').value = lote.quantidade_inicial;
-            document.getElementById('loteQuantidadeDisponivel').value = lote.quantidade_disponivel;
-            document.getElementById('loteValorUnitario').value = lote.valor_unitario_compra;
+            
+            // Usar valores convertidos para preencher o formulário
+            document.getElementById('loteQuantidadeInicial').value = converterParaNumero(lote.quantidade_inicial);
+            document.getElementById('loteQuantidadeDisponivel').value = converterParaNumero(lote.quantidade_disponivel);
+            document.getElementById('loteValorUnitario').value = converterParaNumero(lote.valor_unitario_compra);
 
             // Formatar data para o input datetime-local
             const dataEntrada = new Date(lote.data_entrada);
@@ -826,23 +917,11 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 // =============================================
-// FUNÇÕES AUXILIARES
+// FUNÇÕES AUXILIARES ADICIONAIS
 // =============================================
 
-function formatarQuantidade(qtd) {
-    return parseFloat(qtd).toFixed(3);
-}
-
-function formatarValor(valor) {
-    return parseFloat(valor).toFixed(2).replace('.', ',');
-}
-
-function formatarData(dataString) {
-    const data = new Date(dataString);
-    return data.toLocaleDateString('pt-BR') + ' ' + data.toLocaleTimeString('pt-BR', {
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+function formatarPercentual(valor, casasDecimais = 1) {
+    return formatarNumero(valor, casasDecimais);
 }
 
 // Função para navegar entre abas (se não existir)

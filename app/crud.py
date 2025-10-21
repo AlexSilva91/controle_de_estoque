@@ -3191,3 +3191,25 @@ def criar_ou_atualizar_lote(db: Session, produto_id, quantidade, valor_unitario_
         )
         db.add(novo_lote)
         return novo_lote
+
+def atualizar_estoque_produto(db: Session, produto_id):
+    """Atualiza o estoque do produto baseado nos lotes"""
+    try:
+        produto = Produto.query.get(produto_id)
+        if not produto:
+            return
+        
+        # Calcular estoque total baseado nos lotes
+        lotes = LoteEstoque.query.filter_by(produto_id=produto_id).all()
+        estoque_total = sum(float(lote.quantidade_disponivel) for lote in lotes)
+        
+        # Atualizar estoque da loja (ou outro estoque padrão)
+        produto.estoque_loja = estoque_total
+        produto.sincronizado = False
+        produto.atualizado_em = datetime.now()
+        
+        db.commit()
+        
+    except Exception as e:
+        db.rollback()
+        print(f"Erro ao atualizar estoque do produto {produto_id}: {str(e)}")
