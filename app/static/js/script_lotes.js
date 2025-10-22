@@ -351,9 +351,6 @@ function atualizarTabelaLotes(lotes) {
                     <button class="btn-lote-action edit" data-lote-id="${lote.id}" title="Editar">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn-lote-action delete" data-lote-id="${lote.id}" title="Excluir">
-                        <i class="fas fa-trash"></i>
-                    </button>
                 </div>
             </td>
         `;
@@ -595,9 +592,6 @@ function atualizarTabelaLotesProduto(lotes) {
                     <button class="btn-lote-action edit" data-lote-id="${lote.id}" title="Editar">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn-lote-action delete" data-lote-id="${lote.id}" title="Excluir">
-                        <i class="fas fa-trash"></i>
-                    </button>
                 </div>
             </td>
         `;
@@ -803,38 +797,6 @@ function confirmarExclusaoLote(loteId) {
         })
         .catch(error => {
             mostrarFlashMessage('Erro ao carregar dados do lote', 'error');
-        });
-}
-
-function excluirLote(loteId) {
-    fetch(`${API_BASE_URL}/lotes/${loteId}`, {
-        method: 'DELETE',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-        .then(response => {
-            if (response.ok) {
-                mostrarFlashMessage('Lote excluído com sucesso', 'success');
-                fecharModal('confirmarExclusaoLoteModal');
-
-                // Recarregar dados conforme o contexto
-                if (lotesProdutoAtual) {
-                    // Se estamos no modal de produto específico
-                    carregarLotesProduto(lotesProdutoAtual);
-                    carregarResumoProduto(lotesProdutoAtual);
-                } else {
-                    // Se estamos na aba geral de lotes
-                    carregarTodosLotes(1);
-                }
-            } else {
-                return response.json().then(data => {
-                    throw new Error(data.error || 'Erro ao excluir lote');
-                });
-            }
-        })
-        .catch(error => {
-            mostrarFlashMessage(error.message || 'Erro ao excluir lote', 'error');
         });
 }
 

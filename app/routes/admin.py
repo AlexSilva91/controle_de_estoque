@@ -7681,33 +7681,6 @@ def atualizar_lote(lote_id):
         db.session.rollback()
         return jsonify({'error': f'Erro ao atualizar lote: {str(e)}'}), 500
 
-@admin_bp.route('/api/lotes/<int:lote_id>', methods=['DELETE'])
-@login_required
-@admin_required
-def desativar_lote(lote_id):
-    """Desativa um lote (em vez de excluir)"""
-    try:
-        lote = LoteEstoque.query.get_or_404(lote_id)
-        
-        # Verificar se o lote pode ser desativado
-        if float(lote.quantidade_disponivel) > 0:
-            return jsonify({
-                'error': 'Não é possível desativar lote com quantidade disponível maior que zero'
-            }), 400
-        
-        # Atualiza status para inativo
-        lote.ativo = False
-        db.session.commit()
-        
-        # Atualizar estoque do produto (caso o lote inativo afete o total disponível)
-        atualizar_estoque_produto(db, lote.produto_id)
-        
-        return jsonify({'message': 'Lote desativado com sucesso'})
-    
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': f'Erro ao desativar lote: {str(e)}'}), 500
-
 @admin_bp.route('/api/produtos/<int:produto_id>', methods=['GET'])
 @login_required
 @admin_required
