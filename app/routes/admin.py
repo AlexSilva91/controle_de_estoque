@@ -50,15 +50,15 @@ from app.models.entities import (
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
 from app.crud import (
-    TipoEstoque, atualizar_desconto, atualizar_estoque_produto, atualizar_estoque_produto_apos_lote, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao, calcular_formas_pagamento,
+    TipoEstoque, atualizar_desconto, atualizar_estoque_produto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao, calcular_formas_pagamento,
     criar_desconto, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
     TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao,
     criar_desconto, criar_ou_atualizar_lote, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
-    get_transferencias,get_user_by_cpf, get_user_by_id, get_usuarios, create_user, obter_caixas_completo,
-    registrar_transferencia, transferir_todo_saldo, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
-    registrar_movimentacao, get_cliente, get_clientes, create_cliente, 
+    get_transferencias, get_user_by_id, get_usuarios, create_user, obter_caixas_completo,
+    transferir_todo_saldo, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
+    registrar_movimentacao, get_cliente, create_cliente, 
     update_cliente, delete_cliente, create_nota_fiscal, get_nota_fiscal, 
-    get_notas_fiscais, create_lancamento_financeiro, get_lancamento_financeiro,
+    get_notas_fiscais, create_lancamento_financeiro,
     get_lancamentos_financeiros, update_lancamento_financeiro, 
     delete_lancamento_financeiro, get_clientes_all, get_caixas_abertos
 )
@@ -139,8 +139,6 @@ def get_dashboard_metrics():
         inicio_mes = datetime.combine(primeiro_dia_mes, datetime.min.time())
         fim_dia = datetime.combine(hoje, datetime.max.time())
         
-        # CÁLCULO DE ENTRADAS DO MÊS (igual ao do PDF)
-        # 1. Vendas (pagamentos de notas fiscais)
         vendas_mes = db.session.query(
             func.sum(PagamentoNotaFiscal.valor)
         ).join(
@@ -1197,7 +1195,6 @@ def criar_produto():
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao criar produto: {str(e)}")
-        print(e)
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/produtos/<int:produto_id>', methods=['PUT'])
@@ -2455,93 +2452,6 @@ def detalhar_nota_fiscal(nota_id):
     except Exception as e:
         logger.error(f"Erro ao detalhar nota fiscal: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
-    
-@admin_bp.route('/transferencias', methods=['POST'])
-@login_required
-@admin_required
-def criar_transferencia():
-    try:
-        data = request.get_json()
-        # Campos obrigatórios básicos
-        print(data)
-        
-        required_keys = [
-            'produto_id', 'estoque_origem', 'estoque_destino', 
-            'quantidade', 'valor_unitario_destino'
-        ]
-        
-        if not all(k in data and data[k] not in [None, ''] for k in required_keys):
-            logger.warning("Dados incompletos para a transferência")
-            return jsonify({'success': False, 'message': 'Dados incompletos para a transferência'}), 400
-
-        # Validações e conversões
-        produto_id = int(data['produto_id'])
-        quantidade = Decimal(str(data['quantidade']))
-        estoque_origem = TipoEstoque(data['estoque_origem'])
-        estoque_destino = TipoEstoque(data['estoque_destino'])
-        valor_unitario_destino = Decimal(str(data['valor_unitario_destino']))
-        observacao = data.get('observacao', '')
-        converter_unidade = data.get('converter_unidade', False)
-        
-        if quantidade <= 0:
-            logger.warning("Quantidade inválida para transferência")
-            return jsonify({'success': False, 'message': 'Quantidade deve ser maior que zero'}), 400
-        
-        if estoque_origem == estoque_destino:
-            logger.warning("Estoque de origem e destino são iguais")
-            return jsonify({'success': False, 'message': 'Estoque de origem e destino devem ser diferentes'}), 400
-
-        # Validar conversão se solicitada
-        if converter_unidade:
-            if not data.get('unidade_destino'):
-                logger.warning("Unidade de destino não fornecida para conversão")
-                return jsonify({'success': False, 'message': 'Unidade de destino é obrigatória para conversão'}), 400
-            if not data.get('quantidade_destino'):
-                logger.warning("Quantidade de destino não fornecida para conversão")
-                return jsonify({'success': False, 'message': 'Quantidade de destino é obrigatória para conversão'}), 400
-
-        transferencia_data = {
-            'produto_id': produto_id,
-            'usuario_id': current_user.id,
-            'estoque_origem': estoque_origem,
-            'estoque_destino': estoque_destino,
-            'quantidade': quantidade,
-            'valor_unitario_destino': valor_unitario_destino,
-            'observacao': observacao,
-            'converter_unidade': converter_unidade
-        }
-
-        # Adicionar dados de conversão se aplicável
-        if converter_unidade:
-            transferencia_data['unidade_destino'] = data['unidade_destino']
-            transferencia_data['quantidade_destino'] = Decimal(str(data['quantidade_destino']))
-
-        transferencia = registrar_transferencia(db.session, transferencia_data)
-
-        # Determinar nome do produto para resposta
-        produto_nome = transferencia.produto.nome
-        if transferencia.produto_destino_id and transferencia.produto_destino_id != transferencia.produto_id:
-            produto_destino = db.session.query(Produto).get(transferencia.produto_destino_id)
-            produto_nome = f"{produto_nome} → {produto_destino.nome} ({produto_destino.unidade.value})"
-        logger.info(f"Transferência {transferencia.id} registrada por usuário {current_user.nome}")
-        return jsonify({
-            'success': True,
-            'message': 'Transferência realizada com sucesso',
-            'transferencia': {
-                'id': transferencia.id,
-                'data': transferencia.data.strftime('%d/%m/%Y %H:%M'),
-                'produto': produto_nome,
-                'origem': transferencia.estoque_origem.value,
-                'destino': transferencia.estoque_destino.value,
-                'quantidade_origem': f"{transferencia.quantidade:.2f} {transferencia.unidade_origem}",
-                'quantidade_destino': f"{transferencia.quantidade_destino:.2f} {transferencia.unidade_destino}" if transferencia.quantidade_destino else None,
-                'usuario': transferencia.usuario.nome
-            }
-        })
-    except Exception as e:
-        logger.error(f"Erro ao registrar transferência: {str(e)}")
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 400
     
 @admin_bp.route('/transferencias')
 @login_required
@@ -7620,7 +7530,6 @@ def obter_lotes_produto(produto_id):
         })
     
     except Exception as e:
-        print(e)
         return jsonify({'error': f'Erro ao carregar lotes do produto: {str(e)}'}), 500
 
 @admin_bp.route('/api/lotes/<int:lote_id>', methods=['GET'])
@@ -7653,7 +7562,6 @@ def criar_lote():
     """Cria um novo lote de estoque - SEM VALIDAÇÕES"""
     try:
         data = request.get_json()
-        print("Dados recebidos para criar lote:", data)  # Debug
         
         # Verificar apenas se o produto existe
         if not data.get('produto_id'):
@@ -7686,7 +7594,6 @@ def criar_lote():
     
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao criar lote: {str(e)}")  # Debug
         return jsonify({'error': f'Erro ao criar lote: {str(e)}'}), 500
 
 @admin_bp.route('/api/lotes/<int:lote_id>', methods=['PUT'])
@@ -7697,8 +7604,6 @@ def atualizar_lote(lote_id):
     try:
         lote = LoteEstoque.query.get_or_404(lote_id)
         data = request.get_json()
-        
-        print(f"Atualizando lote {lote_id} com dados:", data)  # Debug
         
         # Flag para verificar se houve alterações no lote
         alteracoes_lote = False
@@ -7774,7 +7679,6 @@ def atualizar_lote(lote_id):
     
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao atualizar lote {lote_id}: {str(e)}")
         return jsonify({'error': f'Erro ao atualizar lote: {str(e)}'}), 500
 
 @admin_bp.route('/api/lotes/<int:lote_id>', methods=['DELETE'])

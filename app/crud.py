@@ -773,141 +773,6 @@ def get_movimentacoes(db: Session, skip: int = 0, limit: int = 100):
             .offset(skip).limit(limit).all()
 
 # ===== Transferência Estoque =====
-def registrar_transferencia(db: Session, transf: dict):
-    try:
-        produto_orig = db.query(Produto).filter(Produto.id == transf['produto_id']).first()
-        if not produto_orig:
-            raise ValueError("Produto não encontrado")
-
-        usuario = db.query(Usuario).filter(Usuario.id == transf['usuario_id']).first()
-        if not usuario:
-            raise ValueError("Usuário não encontrado")
-
-        estoque_origem = transf['estoque_origem']
-        quantidade_origem = Decimal(str(transf['quantidade']))
-        converter_unidade = transf.get('converter_unidade', False)
-
-        # Verificar estoque disponível
-        estoque_disponivel = {
-            TipoEstoque.loja: produto_orig.estoque_loja,
-            TipoEstoque.deposito: produto_orig.estoque_deposito,
-            TipoEstoque.fabrica: produto_orig.estoque_fabrica,
-        }.get(estoque_origem, Decimal('0'))
-
-        if estoque_disponivel < quantidade_origem:
-            raise ValueError(f"Estoque insuficiente no {estoque_origem.value}. Disponível: {estoque_disponivel}")
-
-        # Inicializar produto_destino
-        produto_destino = produto_orig
-        quantidade_destino = quantidade_origem
-        unidade_destino = None
-        valor_unitario_destino = Decimal(str(transf.get('valor_unitario_destino', produto_orig.valor_unitario)))
-
-        # Lógica de conversão
-        if converter_unidade:
-            unidade_destino = transf.get('unidade_destino')
-            quantidade_destino = Decimal(str(transf.get('quantidade_destino', quantidade_origem)))
-
-            if unidade_destino and unidade_destino != produto_orig.unidade.value:
-                # Tenta buscar produto existente com unidade de destino
-                produto_destino = db.query(Produto).filter(
-                    Produto.nome == produto_orig.nome,
-                    Produto.unidade == unidade_destino,
-                    Produto.ativo == True
-                ).first()
-
-                # Se não existir, cria um novo produto
-                if not produto_destino:
-                    codigo_base = produto_orig.codigo or f"{produto_orig.nome.lower().replace(' ', '_')}"
-                    codigo_novo = f"{codigo_base}_{unidade_destino}"
-                    contador = 1
-                    while db.query(Produto).filter(Produto.codigo == codigo_novo).first():
-                        codigo_novo = f"{codigo_base}_{unidade_destino}_{contador}"
-                        contador += 1
-
-                    produto_destino = Produto(
-                        codigo=codigo_novo,
-                        nome=produto_orig.nome,
-                        tipo=produto_orig.tipo,
-                        marca=produto_orig.marca,
-                        unidade=unidade_destino,
-                        valor_unitario=valor_unitario_destino,
-                        peso_kg_por_saco=produto_orig.peso_kg_por_saco,
-                        pacotes_por_saco=produto_orig.pacotes_por_saco,
-                        pacotes_por_fardo=produto_orig.pacotes_por_fardo,
-                        estoque_loja=0,
-                        estoque_deposito=0,
-                        estoque_fabrica=0,
-                        estoque_minimo=produto_orig.estoque_minimo,
-                        estoque_maximo=produto_orig.estoque_maximo,
-                        ativo=True
-                    )
-                    db.add(produto_destino)
-                    db.flush()  # para obter ID
-
-        # --------- CORREÇÃO: Lógica de atualização de estoque ---------
-        
-        # 1. SEMPRE subtrai do estoque de origem
-        if estoque_origem == TipoEstoque.loja:
-            produto_orig.estoque_loja -= quantidade_origem
-        elif estoque_origem == TipoEstoque.deposito:
-            produto_orig.estoque_deposito -= quantidade_origem
-        elif estoque_origem == TipoEstoque.fabrica:
-            produto_orig.estoque_fabrica -= quantidade_origem
-
-        # 2. SEMPRE adiciona ao estoque de destino
-        estoque_destino = transf['estoque_destino']
-        
-        # Se for o MESMO produto (sem conversão de unidade)
-        if produto_destino.id == produto_orig.id:
-            if estoque_destino == TipoEstoque.loja:
-                produto_destino.estoque_loja += quantidade_destino
-            elif estoque_destino == TipoEstoque.deposito:
-                produto_destino.estoque_deposito += quantidade_destino
-            elif estoque_destino == TipoEstoque.fabrica:
-                produto_destino.estoque_fabrica += quantidade_destino
-        else:
-            # Se for produto DIFERENTE (com conversão de unidade)
-            if estoque_destino == TipoEstoque.loja:
-                produto_destino.estoque_loja += quantidade_destino
-            elif estoque_destino == TipoEstoque.deposito:
-                produto_destino.estoque_deposito += quantidade_destino
-            elif estoque_destino == TipoEstoque.fabrica:
-                produto_destino.estoque_fabrica += quantidade_destino
-
-        # Atualizar valor unitário apenas se for produto diferente
-        if produto_destino.id != produto_orig.id:
-            produto_destino.valor_unitario = valor_unitario_destino
-
-        # Registrar transferência
-        transferencia = TransferenciaEstoque(
-            produto_id=produto_orig.id,
-            produto_destino_id=produto_destino.id if produto_destino.id != produto_orig.id else None,
-            usuario_id=transf['usuario_id'],
-            estoque_origem=estoque_origem,
-            estoque_destino=estoque_destino,
-            quantidade=quantidade_origem,
-            quantidade_destino=quantidade_destino if converter_unidade else None,
-            unidade_origem=produto_orig.unidade.value,
-            unidade_destino=unidade_destino if converter_unidade else None,
-            peso_kg_por_saco=produto_orig.peso_kg_por_saco if converter_unidade else None,
-            pacotes_por_saco=produto_orig.pacotes_por_saco if converter_unidade else None,
-            pacotes_por_fardo=produto_orig.pacotes_por_fardo if converter_unidade else None,
-            observacao=transf.get('observacao', ''),
-            data=datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
-        )
-
-        db.add(transferencia)
-        db.commit()
-        db.refresh(transferencia)
-
-        return transferencia
-
-    except Exception as e:
-        db.rollback()
-        print(f"Erro ao registrar transferência: {str(e)}")
-        raise e
-
 def get_transferencia_by_id(db: Session, transf_id: int):
     return db.query(entities.TransferenciaEstoque).filter(entities.TransferenciaEstoque.id == transf_id).first()
 
@@ -3205,22 +3070,17 @@ def atualizar_estoque_produto(db, produto_id, lote_id_atualizado=None):
         lotes = LoteEstoque.query.filter_by(produto_id=produto_id).all()
         novo_estoque_total = sum(float(lote.quantidade_disponivel) for lote in lotes)
         
-        print(f"Atualizando estoque produto {produto_id}: {novo_estoque_total}")  # Debug
-        
         # Atualiza apenas se houver diferença
         if abs(float(produto.estoque_loja or 0) - novo_estoque_total) > 0.001:
             produto.estoque_loja = novo_estoque_total
             produto.atualizado_em = datetime.now()
             
             db.session.commit()
-            print(f"Estoque do produto {produto_id} atualizado para: {novo_estoque_total}")
         else:
-            print(f"Estoque do produto {produto_id} não mudou significativamente")
             db.session.rollback()  # Evita commit desnecessário
         
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao atualizar estoque do produto {produto_id}: {str(e)}")
 
 def atualizar_estoque_produto_apos_lote(db: Session, produto_id, lote_id_atualizado=None):
     """
@@ -3246,7 +3106,6 @@ def atualizar_estoque_produto_apos_lote(db: Session, produto_id, lote_id_atualiz
             lotes = LoteEstoque.query.filter_by(produto_id=produto_id).all()
             novo_estoque_total = sum(float(lote.quantidade_disponivel) for lote in lotes)
             
-            print(f"Estoque atual: {estoque_atual}, Novo estoque: {novo_estoque_total}")  # Debug
             
             # Atualiza apenas se houver diferença
             if abs(estoque_atual - novo_estoque_total) > 0.001:  # Considera diferenças > 0.001
@@ -3255,9 +3114,9 @@ def atualizar_estoque_produto_apos_lote(db: Session, produto_id, lote_id_atualiz
                 produto.atualizado_em = datetime.now()
                 
                 db.commit()
-                print(f"Estoque do produto {produto_id} atualizado de {estoque_atual} para {novo_estoque_total}")  # Debug
             else:
-                print(f"Estoque do produto {produto_id} não mudou significativamente")  # Debug
+                logger.info(f"Estoque do produto {produto_id} não mudou significativamente")
+
         else:
             # Fallback: recalcula tudo (para casos onde não sabemos qual lote mudou)
             lotes = LoteEstoque.query.filter_by(produto_id=produto_id).all()
@@ -3269,8 +3128,8 @@ def atualizar_estoque_produto_apos_lote(db: Session, produto_id, lote_id_atualiz
                 produto.atualizado_em = datetime.now()
                 
                 db.commit()
-                print(f"Estoque do produto {produto_id} atualizado para: {novo_estoque_total}")
+                logger.info(f"Estoque do produto {produto_id} atualizado para: {novo_estoque_total}")
         
     except Exception as e:
         db.rollback()
-        print(f"Erro ao atualizar estoque do produto {produto_id}: {str(e)}")
+        logger.info(f"Erro ao atualizar estoque do produto {produto_id}: {str(e)}")

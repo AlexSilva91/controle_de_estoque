@@ -6,11 +6,8 @@ from sqlalchemy import desc
 from app.crud import (
     abrir_caixa, 
     get_caixa_aberto, 
-    get_ultimo_caixa_fechado, 
     get_user_by_cpf, 
     verify_password,
-    get_user_by_id,
-    update_user
 )
 from app.database import SessionLocal
 from app.models.entities import Caixa, StatusCaixa, Usuario

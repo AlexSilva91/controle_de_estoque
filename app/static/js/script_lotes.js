@@ -156,7 +156,6 @@ function carregarTodosLotes(pagina = 1) {
             if (lotesTable) lotesTable.classList.remove('loading-lotes');
         })
         .catch(error => {
-            console.error('Erro ao carregar lotes:', error);
             mostrarFlashMessage('Erro ao carregar lotes', 'error');
             if (lotesTable) lotesTable.classList.remove('loading-lotes');
         });
@@ -510,7 +509,6 @@ function carregarResumoProduto(produtoId) {
             }
         })
         .catch(error => {
-            console.error('Erro ao carregar resumo do produto:', error);
             mostrarFlashMessage('Erro ao carregar dados do produto', 'error');
         });
 }
@@ -534,7 +532,6 @@ function carregarLotesProduto(produtoId, pagina = 1) {
             }
         })
         .catch(error => {
-            console.error('Erro ao carregar lotes:', error);
             mostrarFlashMessage('Erro ao carregar lotes', 'error');
         });
 }
@@ -545,7 +542,7 @@ function atualizarTabelaLotesProduto(lotes) {
         document.querySelector('#lotesTable tbody');
 
     if (!tbody) {
-        console.error('Tabela de lotes não encontrada');
+
         return;
     }
 
@@ -753,7 +750,6 @@ function carregarDadosLote(loteId) {
             calcularValoresLote();
         })
         .catch(error => {
-            console.error('Erro ao carregar dados do lote:', error);
             mostrarFlashMessage('Erro ao carregar dados do lote', 'error');
         });
 }
@@ -806,7 +802,6 @@ function confirmarExclusaoLote(loteId) {
             abrirModal('confirmarExclusaoLoteModal');
         })
         .catch(error => {
-            console.error('Erro ao carregar dados do lote:', error);
             mostrarFlashMessage('Erro ao carregar dados do lote', 'error');
         });
 }
@@ -839,7 +834,6 @@ function excluirLote(loteId) {
             }
         })
         .catch(error => {
-            console.error('Erro ao excluir lote:', error);
             mostrarFlashMessage(error.message || 'Erro ao excluir lote', 'error');
         });
 }
@@ -903,7 +897,6 @@ function salvarLote() {
             return response.json();
         })
         .then(data => {
-            console.log('Resposta da API:', data);
             mostrarFlashMessage('Lote atualizado com sucesso', 'success');
             fecharModal('editarLoteModal');
 
@@ -916,7 +909,6 @@ function salvarLote() {
             }
         })
         .catch(error => {
-            console.error('Erro ao atualizar lote:', error);
             mostrarFlashMessage(error.message || 'Erro ao atualizar lote', 'error');
         })
         .finally(() => {
@@ -1012,12 +1004,8 @@ function switchToTab(tabName) {
     }
 }
 
-// Função para mostrar mensagens flash (se não existir)
 function mostrarFlashMessage(mensagem, tipo = 'info') {
-    // Implementação básica - adapte conforme seu sistema
-    console.log(`[${tipo.toUpperCase()}] ${mensagem}`);
-    // Aqui você pode integrar com seu sistema de flash messages existente
-    // Exemplo básico:
+
     const flashContainer = document.querySelector('.flash-messages');
     if (flashContainer) {
         const flashMessage = document.createElement('div');
