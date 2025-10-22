@@ -16,10 +16,6 @@ const API_BASE_URL = '/admin/api'; // Altere para o prefixo correto do seu admin
 // FUNÇÕES DE FORMATAÇÃO PARA PADRÃO BRASILEIRO
 // =============================================
 
-// =============================================
-// FUNÇÕES DE FORMATAÇÃO PARA PADRÃO BRASILEIRO
-// =============================================
-
 function converterParaNumero(valor) {
     if (valor === null || valor === undefined) return 0;
     if (typeof valor === 'number') return valor;
@@ -45,20 +41,24 @@ function formatarQuantidade(qtd) {
 
 function formatarValor(valor) {
     const numero = converterParaNumero(valor);
-    // Formata como moeda brasileira
-    return numero.toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    });
+    
+    // Formata com separadores de milhar e 2 casas decimais
+    const partes = numero.toFixed(2).split('.');
+    const inteiro = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    const decimal = partes[1];
+    
+    return `${inteiro},${decimal}`;
 }
 
 function formatarNumero(numero, casasDecimais = 2) {
     const num = converterParaNumero(numero);
+    
     // Formata com número específico de casas decimais
-    return num.toLocaleString('pt-BR', {
-        minimumFractionDigits: casasDecimais,
-        maximumFractionDigits: casasDecimais
-    });
+    const partes = num.toFixed(casasDecimais).split('.');
+    const inteiro = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    const decimal = partes[1];
+    
+    return `${inteiro},${decimal}`;
 }
 
 function formatarData(dataString) {
@@ -69,14 +69,37 @@ function formatarData(dataString) {
     });
 }
 
-// Função para converter string formatada para número
-function converterParaNumero(valor) {
-    if (typeof valor === 'number') return valor;
-    if (typeof valor === 'string') {
-        // Converte de padrão brasileiro (1.234,56) para float
-        return parseFloat(valor.replace('.', '').replace(',', '.'));
+// =============================================
+// FUNÇÕES PARA MODAIS
+// =============================================
+
+function abrirModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.style.justifyContent = 'center';
+        modal.style.alignItems = 'center';
+        document.body.style.overflow = 'hidden';
+
+        // Adicionar animação de entrada
+        const modalDialog = modal.querySelector('.modal-dialog');
+        if (modalDialog) {
+            modalDialog.style.animation = 'modalSlideIn 0.3s ease-out';
+        }
     }
-    return parseFloat(valor) || 0;
+}
+
+function fecharModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+
+        // Limpar contexto se for o modal de edição
+        if (modalId === 'editarLoteModal') {
+            loteEditando = null;
+        }
+    }
 }
 
 // =============================================
@@ -242,25 +265,19 @@ function aplicarFiltrosLotes() {
     atualizarResumoLotes(lotesFiltrados);
 }
 
-function atualizarTabelaLotesProduto(lotes) {
-    // Usar a tabela específica do modal (se existir) ou a tabela principal
-    const tbody = document.querySelector('#listarLotesModal #lotesTable tbody') ||
-        document.querySelector('#lotesTable tbody');
-
-    if (!tbody) {
-        console.error('Tabela de lotes não encontrada');
-        return;
-    }
+function atualizarTabelaLotes(lotes) {
+    const tbody = document.querySelector('#lotesTable tbody');
+    if (!tbody) return;
 
     tbody.innerHTML = '';
 
     if (lotes.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="text-center text-muted py-4">
+                <td colspan="9" class="text-center text-muted py-4">
                     <i class="fas fa-box-open fa-2x mb-2"></i>
                     <br>
-                    Nenhum lote cadastrado para este produto
+                    Nenhum lote encontrado
                 </td>
             </tr>
         `;
@@ -269,34 +286,34 @@ function atualizarTabelaLotesProduto(lotes) {
 
     lotes.forEach(lote => {
         const tr = document.createElement('tr');
+        const statusClass = `badge-lote ${lote.status}`;
+        const statusText = lote.status === 'ativo' ? 'Ativo' :
+            lote.status === 'parcial' ? 'Parcial' : 'Esgotado';
 
         // Converter valores para número antes de calcular
         const quantidadeInicial = converterParaNumero(lote.quantidade_inicial);
         const quantidadeDisponivel = converterParaNumero(lote.quantidade_disponivel);
         const valorUnitario = converterParaNumero(lote.valor_unitario_compra);
 
-        // Determinar status do lote
-        let statusClass = 'ativo';
-        let statusText = 'Ativo';
-
-        if (quantidadeDisponivel === 0) {
-            statusClass = 'esgotado';
-            statusText = 'Esgotado';
-        } else if (quantidadeDisponivel < quantidadeInicial) {
-            statusClass = 'parcial';
-            statusText = 'Parcial';
-        }
-
         const valorTotal = quantidadeInicial * valorUnitario;
+        const percentualUtilizado = ((quantidadeInicial - quantidadeDisponivel) / quantidadeInicial) * 100;
 
         tr.innerHTML = `
             <td>${lote.id}</td>
+            <td>
+                <strong>${lote.produto_nome || 'N/A'}</strong>
+                ${lote.produto_marca ? `<br><small class="text-muted">${lote.produto_marca}</small>` : ''}
+                ${lote.produto_codigo ? `<br><small class="text-info">Cód: ${lote.produto_codigo}</small>` : ''}
+            </td>
             <td>${formatarData(lote.data_entrada)}</td>
             <td>${formatarQuantidade(quantidadeInicial)}</td>
-            <td>${formatarQuantidade(quantidadeDisponivel)}</td>
+            <td>
+                ${formatarQuantidade(quantidadeDisponivel)}
+                ${lote.status === 'parcial' ? `<br><small class="text-warning">(${formatarNumero(percentualUtilizado, 1)}% utilizado)</small>` : ''}
+            </td>
             <td>R$ ${formatarValor(valorUnitario)}</td>
             <td>R$ ${formatarValor(valorTotal)}</td>
-            <td><span class="badge-lote ${statusClass}">${statusText}</span></td>
+            <td><span class="${statusClass}">${statusText}</span></td>
             <td>
                 <div class="lote-actions">
                     <button class="btn-lote-action edit" data-lote-id="${lote.id}" title="Editar">
@@ -324,18 +341,6 @@ function atualizarTabelaLotesProduto(lotes) {
         btn.addEventListener('click', (e) => {
             const loteId = e.currentTarget.getAttribute('data-lote-id');
             confirmarExclusaoLote(loteId);
-        });
-    });
-
-    document.querySelectorAll('.btn-lote-action.view').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const loteId = e.currentTarget.getAttribute('data-lote-id');
-            const lote = todosLotes.find(l => l.id == loteId);
-            if (lote) {
-                // Navegar para a aba de produtos e focar no produto
-                switchToTab('produtos');
-                mostrarFlashMessage(`Produto: ${lote.produto_nome}`, 'info');
-            }
         });
     });
 }
@@ -515,14 +520,14 @@ function atualizarTabelaLotesProduto(lotes) {
     // Adicionar event listeners aos botões específicos do modal
     const modal = document.getElementById('listarLotesModal');
     if (modal) {
-        modal.querySelectorAll('.btn-edit-lote').forEach(btn => {
+        modal.querySelectorAll('.btn-lote-action.edit').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const loteId = e.currentTarget.getAttribute('data-lote-id');
                 abrirModalEditarLote(loteId);
             });
         });
 
-        modal.querySelectorAll('.btn-delete-lote').forEach(btn => {
+        modal.querySelectorAll('.btn-lote-action.delete').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const loteId = e.currentTarget.getAttribute('data-lote-id');
                 confirmarExclusaoLote(loteId);
@@ -725,45 +730,23 @@ function salvarLote() {
         produtoId = lotesProdutoAtual;
     }
 
-    // Validação crítica do produto_id
-    if (!produtoId) {
-        mostrarFlashMessage('ID do produto é obrigatório. Selecione um produto específico ou abra o modal através da aba de produtos.', 'error');
-        return;
-    }
-
+    // Preparar dados para envio - ENVIAR TODOS OS CAMPOS COM VALORES PADRÃO
     const dados = {
         produto_id: parseInt(produtoId),
         quantidade_inicial: parseFloat(formData.get('loteQuantidadeInicial')) || 0,
         quantidade_disponivel: parseFloat(formData.get('loteQuantidadeDisponivel')) || 0,
         valor_unitario_compra: parseFloat(formData.get('loteValorUnitario')) || 0,
-        data_entrada: formData.get('loteDataEntrada'),
         observacao: formData.get('loteObservacao') || ''
     };
 
-    // Validações adicionais
-    if (!dados.quantidade_inicial || dados.quantidade_inicial <= 0) {
-        mostrarFlashMessage('Quantidade inicial deve ser maior que zero', 'error');
-        return;
-    }
-
-    if (dados.quantidade_disponivel < 0) {
-        mostrarFlashMessage('Quantidade disponível não pode ser negativa', 'error');
-        return;
-    }
-
-    if (dados.quantidade_disponivel > dados.quantidade_inicial) {
-        mostrarFlashMessage('Quantidade disponível não pode ser maior que a quantidade inicial', 'error');
-        return;
-    }
-
-    if (!dados.valor_unitario_compra || dados.valor_unitario_compra <= 0) {
-        mostrarFlashMessage('Valor unitário de compra deve ser maior que zero', 'error');
-        return;
-    }
-
-    if (!dados.data_entrada) {
-        mostrarFlashMessage('Data de entrada é obrigatória', 'error');
-        return;
+    // Data de entrada - usar atual se não fornecida
+    const dataEntrada = formData.get('loteDataEntrada');
+    if (dataEntrada) {
+        dados.data_entrada = dataEntrada;
+    } else {
+        // Se não há data, usar data atual
+        const now = new Date();
+        dados.data_entrada = now.toISOString().slice(0, 16); // Formato YYYY-MM-DDTHH:mm
     }
 
     const loteId = formData.get('loteId');
@@ -796,7 +779,7 @@ function salvarLote() {
                 return response.json();
             } else {
                 return response.json().then(data => {
-                    throw new Error(data.error || 'Erro ao salvar lote');
+                    throw new Error(data.error || `Erro ${response.status}: ${response.statusText}`);
                 });
             }
         })
@@ -809,11 +792,9 @@ function salvarLote() {
 
             // Recarregar dados conforme o contexto
             if (lotesProdutoAtual) {
-                // Se estamos no modal de produto específico
                 carregarLotesProduto(lotesProdutoAtual);
                 carregarResumoProduto(lotesProdutoAtual);
             } else {
-                // Se estamos na aba geral de lotes
                 carregarTodosLotes();
             }
         })
@@ -891,6 +872,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // Event listeners para fechar modais
+    document.querySelectorAll('.close-modal, .modal-overlay').forEach(element => {
+        element.addEventListener('click', function (e) {
+            e.preventDefault();
+            const modal = this.closest('.modal');
+            if (modal) {
+                fecharModal(modal.id);
+            }
+        });
+    });
+
     // Inicializar aba de lotes se estiver ativa
     if (document.querySelector('#lotes.tab-content.active')) {
         inicializarAbaLotes();
@@ -902,16 +894,6 @@ document.addEventListener('DOMContentLoaded', function () {
             setTimeout(() => {
                 inicializarAbaLotes();
             }, 100);
-        }
-    });
-
-    // Fechar modal quando clicar no overlay
-    document.addEventListener('click', function (e) {
-        if (e.target.classList.contains('modal-overlay')) {
-            const modal = e.target.closest('.modal');
-            if (modal) {
-                fecharModal(modal.id);
-            }
         }
     });
 });
@@ -960,36 +942,6 @@ function mostrarFlashMessage(mensagem, tipo = 'info') {
         flashMessage.querySelector('.close-flash').addEventListener('click', function () {
             flashMessage.remove();
         });
-    }
-}
-
-// Funções de modal (se não existirem)
-function abrirModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.style.display = 'flex';
-        modal.style.justifyContent = 'center';
-        modal.style.alignItems = 'center';
-        document.body.style.overflow = 'hidden';
-
-        // Adicionar animação de entrada
-        const modalDialog = modal.querySelector('.modal-dialog');
-        if (modalDialog) {
-            modalDialog.style.animation = 'modalSlideIn 0.3s ease-out';
-        }
-    }
-}
-
-function fecharModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.style.display = 'none';
-        document.body.style.overflow = 'auto';
-
-        // Limpar contexto se for o modal de edição
-        if (modalId === 'editarLoteModal') {
-            loteEditando = null;
-        }
     }
 }
 

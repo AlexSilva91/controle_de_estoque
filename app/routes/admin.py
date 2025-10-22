@@ -50,7 +50,7 @@ from app.models.entities import (
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
 from app.crud import (
-    TipoEstoque, atualizar_desconto, atualizar_estoque_produto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao, calcular_formas_pagamento,
+    TipoEstoque, atualizar_desconto, atualizar_estoque_produto, atualizar_estoque_produto_apos_lote, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao, calcular_formas_pagamento,
     criar_desconto, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
     TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao,
     criar_desconto, criar_ou_atualizar_lote, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
@@ -7605,43 +7605,35 @@ def obter_lote(lote_id):
 @login_required
 @admin_required
 def criar_lote():
-    """Cria um novo lote de estoque"""
+    """Cria um novo lote de estoque - SEM VALIDAÇÕES"""
     try:
         data = request.get_json()
+        print("Dados recebidos para criar lote:", data)  # Debug
         
-        # Validações básicas
+        # Verificar apenas se o produto existe
         if not data.get('produto_id'):
             return jsonify({'error': 'ID do produto é obrigatório'}), 400
         
-        if not data.get('quantidade_inicial') or float(data['quantidade_inicial'].replace(',', '.')) <= 0:
-            return jsonify({'error': 'Quantidade inicial deve ser maior que zero'}), 400
-        
-        if not data.get('quantidade_disponivel') or float(data['quantidade_disponivel'].replace(',', '.')) < 0:
-            return jsonify({'error': 'Quantidade disponível não pode ser negativa'}), 400
-        
-        if not data.get('valor_unitario_compra') or float(data['valor_unitario_compra'].replace(',', '.')) <= 0:
-            return jsonify({'error': 'Valor unitário de compra deve ser maior que zero'}), 400
-        
-        # Verificar se o produto existe
         produto = Produto.query.get(data['produto_id'])
         if not produto:
             return jsonify({'error': 'Produto não encontrado'}), 404
         
-        # Criar novo lote
+        # Criar novo lote com valores padrão para campos não fornecidos
         novo_lote = LoteEstoque(
             produto_id=data['produto_id'],
-            quantidade_inicial=float(data['quantidade_inicial'].replace(',', '.')),
-            quantidade_disponivel=float(data['quantidade_disponivel'].replace(',', '.')),
-            valor_unitario_compra=float(data['valor_unitario_compra'].replace(',', '.')),
-            data_entrada=datetime.fromisoformat(data['data_entrada']) if data.get('data_entrada') else datetime.now(),
-            observacao=data.get('observacao', '')
+            quantidade_inicial=float(data.get('quantidade_inicial', 0).replace(',', '.')) if data.get('quantidade_inicial') else 0,
+            quantidade_disponivel=float(data.get('quantidade_disponivel', data.get('quantidade_inicial', 0)).replace(',', '.')) if data.get('quantidade_disponivel') or data.get('quantidade_inicial') else 0,
+            valor_unitario_compra=float(data.get('valor_unitario_compra', 0).replace(',', '.')) if data.get('valor_unitario_compra') else 0,
+            data_entrada=datetime.fromisoformat(data['data_entrada'].replace('Z', '+00:00')) if data.get('data_entrada') else datetime.now(),
+            observacao=data.get('observacao', ''),
+            sincronizado=False
         )
         
         db.session.add(novo_lote)
         db.session.commit()
         
         # Atualizar estoque do produto
-        atualizar_estoque_produto(produto.id)
+        atualizar_estoque_produto(db, produto.id)
         
         return jsonify({
             'message': 'Lote criado com sucesso',
@@ -7650,54 +7642,84 @@ def criar_lote():
     
     except Exception as e:
         db.session.rollback()
+        print(f"Erro ao criar lote: {str(e)}")  # Debug
         return jsonify({'error': f'Erro ao criar lote: {str(e)}'}), 500
 
 @admin_bp.route('/api/lotes/<int:lote_id>', methods=['PUT'])
 @login_required
 @admin_required
 def atualizar_lote(lote_id):
-    """Atualiza um lote existente"""
+    """Atualiza um lote existente - SEM VALIDAÇÕES"""
     try:
         lote = LoteEstoque.query.get_or_404(lote_id)
         data = request.get_json()
         
-        # Validações
-        if 'quantidade_inicial' in data and float(data['quantidade_inicial'].replace(',', '.')) <= 0:
-            return jsonify({'error': 'Quantidade inicial deve ser maior que zero'}), 400
+        print(f"Atualizando lote {lote_id} com dados:", data)  # Debug
         
-        if 'quantidade_disponivel' in data and float(data['quantidade_disponivel'].replace(',', '.')) < 0:
-            return jsonify({'error': 'Quantidade disponível não pode ser negativa'}), 400
+        # Flag para verificar se houve alterações no lote
+        alteracoes_lote = False
+        # Flag para verificar se precisa atualizar estoque do produto
+        precisa_atualizar_estoque = False
         
-        if 'valor_unitario_compra' in data and float(data['valor_unitario_compra'].replace(',', '.')) <= 0:
-            return jsonify({'error': 'Valor unitário de compra deve ser maior que zero'}), 400
+        # Atualizar APENAS os campos que foram fornecidos - SEM VALIDAÇÕES
+        if 'quantidade_inicial' in data and data['quantidade_inicial'] is not None:
+            quantidade_inicial = float(str(data['quantidade_inicial']).replace(',', '.'))
+            if lote.quantidade_inicial != quantidade_inicial:
+                lote.quantidade_inicial = quantidade_inicial
+                alteracoes_lote = True
         
-        # Atualizar campos
-        if 'quantidade_inicial' in data:
-            lote.quantidade_inicial = float(data['quantidade_inicial'].replace(',', '.'))
+        if 'quantidade_disponivel' in data and data['quantidade_disponivel'] is not None:
+            quantidade_disponivel = float(str(data['quantidade_disponivel']).replace(',', '.'))
+            if lote.quantidade_disponivel != quantidade_disponivel:
+                lote.quantidade_disponivel = quantidade_disponivel
+                alteracoes_lote = True
+                precisa_atualizar_estoque = True
         
-        if 'quantidade_disponivel' in data:
-            lote.quantidade_disponivel = float(data['quantidade_disponivel'].replace(',', '.'))
+        if 'valor_unitario_compra' in data and data['valor_unitario_compra'] is not None:
+            valor_unitario = float(str(data['valor_unitario_compra']).replace(',', '.'))
+            if lote.valor_unitario_compra != valor_unitario:
+                lote.valor_unitario_compra = valor_unitario
+                alteracoes_lote = True
         
-        if 'valor_unitario_compra' in data:
-            lote.valor_unitario_compra = float(data['valor_unitario_compra'].replace(',', '.'))
-        
-        if 'data_entrada' in data:
-            lote.data_entrada = datetime.fromisoformat(data['data_entrada'])
+        if 'data_entrada' in data and data['data_entrada']:
+            try:
+                nova_data = datetime.fromisoformat(data['data_entrada'].replace('Z', '+00:00'))
+                if lote.data_entrada != nova_data:
+                    lote.data_entrada = nova_data
+                    alteracoes_lote = True
+            except ValueError as e:
+                return jsonify({'error': f'Formato de data inválido: {str(e)}'}), 400
         
         if 'observacao' in data:
-            lote.observacao = data['observacao']
+            nova_observacao = data['observacao'] or ''
+            if lote.observacao != nova_observacao:
+                lote.observacao = nova_observacao
+                alteracoes_lote = True
         
-        lote.sincronizado = False
-        
-        db.session.commit()
-        
-        # Atualizar estoque do produto
-        atualizar_estoque_produto(lote.produto_id)
-        
-        return jsonify({'message': 'Lote atualizado com sucesso'})
+        # Apenas commitar se houve alterações no lote
+        if alteracoes_lote:
+            lote.sincronizado = False
+            lote.atualizado_em = datetime.now()
+            db.session.commit()
+            
+            # Atualizar estoque do produto APENAS se a quantidade disponível mudou
+            if precisa_atualizar_estoque:
+                atualizar_estoque_produto(db, lote.produto_id)
+            
+            return jsonify({
+                'message': 'Lote atualizado com sucesso',
+                'alteracoes': alteracoes_lote,
+                'estoque_atualizado': precisa_atualizar_estoque
+            })
+        else:
+            return jsonify({
+                'message': 'Nenhuma alteração detectada',
+                'alteracoes': False
+            })
     
     except Exception as e:
         db.session.rollback()
+        print(f"Erro ao atualizar lote {lote_id}: {str(e)}")
         return jsonify({'error': f'Erro ao atualizar lote: {str(e)}'}), 500
 
 @admin_bp.route('/api/lotes/<int:lote_id>', methods=['DELETE'])

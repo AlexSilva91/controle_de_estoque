@@ -3193,7 +3193,7 @@ def criar_ou_atualizar_lote(db: Session, produto_id, quantidade, valor_unitario_
         return novo_lote
 
 def atualizar_estoque_produto(db: Session, produto_id):
-    """Atualiza o estoque do produto baseado nos lotes"""
+    """Atualiza o estoque do produto baseado nos lotes - SEM VALIDAÇÕES"""
     try:
         produto = Produto.query.get(produto_id)
         if not produto:
@@ -3203,12 +3203,66 @@ def atualizar_estoque_produto(db: Session, produto_id):
         lotes = LoteEstoque.query.filter_by(produto_id=produto_id).all()
         estoque_total = sum(float(lote.quantidade_disponivel) for lote in lotes)
         
-        # Atualizar estoque da loja (ou outro estoque padrão)
+        # Atualizar estoque da loja
         produto.estoque_loja = estoque_total
         produto.sincronizado = False
         produto.atualizado_em = datetime.now()
         
         db.commit()
+        print(f"Estoque do produto {produto_id} atualizado para: {estoque_total}")
+        
+    except Exception as e:
+        db.rollback()
+        print(f"Erro ao atualizar estoque do produto {produto_id}: {str(e)}")
+
+def atualizar_estoque_produto_apos_lote(db: Session, produto_id, lote_id_atualizado=None):
+    """
+    Atualiza o estoque do produto considerando APENAS as mudanças no lote específico
+    de forma mais eficiente
+    """
+    try:
+        produto = Produto.query.get(produto_id)
+        if not produto:
+            return
+        
+        # Se temos um lote específico que foi atualizado, calculamos de forma mais inteligente
+        if lote_id_atualizado:
+            # Busca o lote que foi atualizado
+            lote_atualizado = LoteEstoque.query.get(lote_id_atualizado)
+            if not lote_atualizado:
+                return
+            
+            # Busca o estoque atual do produto ANTES da atualização
+            estoque_atual = produto.estoque_loja or 0
+            
+            # Busca todos os lotes para calcular o novo estoque total
+            lotes = LoteEstoque.query.filter_by(produto_id=produto_id).all()
+            novo_estoque_total = sum(float(lote.quantidade_disponivel) for lote in lotes)
+            
+            print(f"Estoque atual: {estoque_atual}, Novo estoque: {novo_estoque_total}")  # Debug
+            
+            # Atualiza apenas se houver diferença
+            if abs(estoque_atual - novo_estoque_total) > 0.001:  # Considera diferenças > 0.001
+                produto.estoque_loja = novo_estoque_total
+                produto.sincronizado = False
+                produto.atualizado_em = datetime.now()
+                
+                db.commit()
+                print(f"Estoque do produto {produto_id} atualizado de {estoque_atual} para {novo_estoque_total}")  # Debug
+            else:
+                print(f"Estoque do produto {produto_id} não mudou significativamente")  # Debug
+        else:
+            # Fallback: recalcula tudo (para casos onde não sabemos qual lote mudou)
+            lotes = LoteEstoque.query.filter_by(produto_id=produto_id).all()
+            novo_estoque_total = sum(float(lote.quantidade_disponivel) for lote in lotes)
+            
+            if produto.estoque_loja != novo_estoque_total:
+                produto.estoque_loja = novo_estoque_total
+                produto.sincronizado = False
+                produto.atualizado_em = datetime.now()
+                
+                db.commit()
+                print(f"Estoque do produto {produto_id} atualizado para: {novo_estoque_total}")
         
     except Exception as e:
         db.rollback()
