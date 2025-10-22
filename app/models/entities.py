@@ -474,7 +474,7 @@ class LoteEstoque(Base):
     valor_unitario_compra = Column(DECIMAL(12, 2), nullable=False)
     data_entrada = Column(DateTime, default=datetime.now, nullable=False)
     observacao = Column(Text, nullable=True)
-    sincronizado = Column(Boolean, default=False, nullable=False)
+    ativo = Column(Boolean, default=False, nullable=False)
 
     produto = relationship("Produto", back_populates="lotes")
 

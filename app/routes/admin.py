@@ -7492,13 +7492,15 @@ def obter_produtos_ativos():
 @login_required
 @admin_required
 def obter_todos_lotes():
-    """Retorna todos os lotes com informações do produto"""
+    """Retorna todos os lotes com informações do produto - COM PAGINAÇÃO"""
     try:
-        # Parâmetros de filtro
+        # Parâmetros de filtro e paginação
         produto_id = request.args.get('produto_id')
         status = request.args.get('status')
         data_inicio = request.args.get('data_inicio')
         data_fim = request.args.get('data_fim')
+        pagina = request.args.get('pagina', 1, type=int)
+        por_pagina = request.args.get('por_pagina', 10, type=int)
         
         # Query base com join no produto
         query = LoteEstoque.query.join(Produto).options(joinedload(LoteEstoque.produto))
@@ -7507,17 +7509,32 @@ def obter_todos_lotes():
         if produto_id:
             query = query.filter(LoteEstoque.produto_id == produto_id)
         
+        if status:
+            if status == 'ativo':
+                query = query.filter(LoteEstoque.quantidade_disponivel == LoteEstoque.quantidade_inicial)
+            elif status == 'parcial':
+                query = query.filter(
+                    LoteEstoque.quantidade_disponivel > 0,
+                    LoteEstoque.quantidade_disponivel < LoteEstoque.quantidade_inicial
+                )
+            elif status == 'esgotado':
+                query = query.filter(LoteEstoque.quantidade_disponivel == 0)
+        
         if data_inicio:
             query = query.filter(LoteEstoque.data_entrada >= data_inicio)
         
         if data_fim:
             query = query.filter(LoteEstoque.data_entrada <= data_fim)
         
-        # Executar query
-        lotes = query.order_by(LoteEstoque.data_entrada.desc()).all()
+        # Executar query com paginação
+        lotes_paginados = query.order_by(LoteEstoque.data_entrada.desc()).paginate(
+            page=pagina, 
+            per_page=por_pagina, 
+            error_out=False
+        )
         
         resultado = []
-        for lote in lotes:
+        for lote in lotes_paginados.items:
             # Calcular status do lote
             quantidade_disponivel = float(lote.quantidade_disponivel)
             quantidade_inicial = float(lote.quantidade_inicial)
@@ -7540,11 +7557,20 @@ def obter_todos_lotes():
                 'valor_unitario_compra': format_currency(lote.valor_unitario_compra),
                 'data_entrada': lote.data_entrada.isoformat() if lote.data_entrada else None,
                 'observacao': lote.observacao,
-                'status': status_lote,
-                'sincronizado': lote.sincronizado
+                'status': status_lote
             })
         
-        return jsonify(resultado)
+        return jsonify({
+            'lotes': resultado,
+            'paginacao': {
+                'pagina_atual': lotes_paginados.page,
+                'total_paginas': lotes_paginados.pages,
+                'total_lotes': lotes_paginados.total,
+                'por_pagina': por_pagina,
+                'tem_anterior': lotes_paginados.has_prev,
+                'tem_proxima': lotes_paginados.has_next
+            }
+        })
     
     except Exception as e:
         return jsonify({'error': f'Erro ao carregar lotes: {str(e)}'}), 500
@@ -7553,14 +7579,24 @@ def obter_todos_lotes():
 @login_required
 @admin_required
 def obter_lotes_produto(produto_id):
-    """Retorna todos os lotes de um produto específico"""
+    """Retorna todos os lotes de um produto específico - COM PAGINAÇÃO"""
     try:
-        lotes = LoteEstoque.query.filter_by(produto_id=produto_id)\
-                                .order_by(LoteEstoque.data_entrada.desc())\
-                                .all()
+        # Parâmetros de paginação
+        pagina = request.args.get('pagina', 1, type=int)
+        por_pagina = request.args.get('por_pagina', 10, type=int)
+        
+        query = LoteEstoque.query.filter_by(produto_id=produto_id)\
+                                .order_by(LoteEstoque.data_entrada.desc())
+        
+        # Executar query com paginação
+        lotes_paginados = query.paginate(
+            page=pagina, 
+            per_page=por_pagina, 
+            error_out=False
+        )
         
         resultado = []
-        for lote in lotes:
+        for lote in lotes_paginados.items:
             resultado.append({
                 'id': lote.id,
                 'produto_id': lote.produto_id,
@@ -7568,13 +7604,23 @@ def obter_lotes_produto(produto_id):
                 'quantidade_disponivel': format_number(lote.quantidade_disponivel, is_weight=True),
                 'valor_unitario_compra': format_currency(lote.valor_unitario_compra),
                 'data_entrada': lote.data_entrada.isoformat() if lote.data_entrada else None,
-                'observacao': lote.observacao,
-                'sincronizado': lote.sincronizado
+                'observacao': lote.observacao
             })
         
-        return jsonify(resultado)
+        return jsonify({
+            'lotes': resultado,
+            'paginacao': {
+                'pagina_atual': lotes_paginados.page,
+                'total_paginas': lotes_paginados.pages,
+                'total_lotes': lotes_paginados.total,
+                'por_pagina': por_pagina,
+                'tem_anterior': lotes_paginados.has_prev,
+                'tem_proxima': lotes_paginados.has_next
+            }
+        })
     
     except Exception as e:
+        print(e)
         return jsonify({'error': f'Erro ao carregar lotes do produto: {str(e)}'}), 500
 
 @admin_bp.route('/api/lotes/<int:lote_id>', methods=['GET'])
@@ -7594,8 +7640,7 @@ def obter_lote(lote_id):
             'quantidade_disponivel': format_number(lote.quantidade_disponivel, is_weight=True),
             'valor_unitario_compra': format_currency(lote.valor_unitario_compra),
             'data_entrada': lote.data_entrada.isoformat() if lote.data_entrada else None,
-            'observacao': lote.observacao,
-            'sincronizado': lote.sincronizado
+            'observacao': lote.observacao
         })
     
     except Exception as e:
@@ -7625,8 +7670,7 @@ def criar_lote():
             quantidade_disponivel=float(data.get('quantidade_disponivel', data.get('quantidade_inicial', 0)).replace(',', '.')) if data.get('quantidade_disponivel') or data.get('quantidade_inicial') else 0,
             valor_unitario_compra=float(data.get('valor_unitario_compra', 0).replace(',', '.')) if data.get('valor_unitario_compra') else 0,
             data_entrada=datetime.fromisoformat(data['data_entrada'].replace('Z', '+00:00')) if data.get('data_entrada') else datetime.now(),
-            observacao=data.get('observacao', ''),
-            sincronizado=False
+            observacao=data.get('observacao', '')
         )
         
         db.session.add(novo_lote)
@@ -7649,7 +7693,7 @@ def criar_lote():
 @login_required
 @admin_required
 def atualizar_lote(lote_id):
-    """Atualiza um lote existente - SEM VALIDAÇÕES"""
+    """Atualiza um lote existente"""
     try:
         lote = LoteEstoque.query.get_or_404(lote_id)
         data = request.get_json()
@@ -7661,23 +7705,35 @@ def atualizar_lote(lote_id):
         # Flag para verificar se precisa atualizar estoque do produto
         precisa_atualizar_estoque = False
         
-        # Atualizar APENAS os campos que foram fornecidos - SEM VALIDAÇÕES
+        # Função auxiliar para converter valores
+        def converter_valor(valor):
+            if valor is None:
+                return None
+            if isinstance(valor, (int, float)):
+                return float(valor)
+            if isinstance(valor, str):
+                # Remove possíveis formatações e converte
+                valor_limpo = valor.replace('R$', '').replace('.', '').replace(',', '.').strip()
+                return float(valor_limpo) if valor_limpo else 0.0
+            return float(valor)
+        
+        # Atualizar APENAS os campos que foram fornecidos
         if 'quantidade_inicial' in data and data['quantidade_inicial'] is not None:
-            quantidade_inicial = float(str(data['quantidade_inicial']).replace(',', '.'))
-            if lote.quantidade_inicial != quantidade_inicial:
+            quantidade_inicial = converter_valor(data['quantidade_inicial'])
+            if abs(float(lote.quantidade_inicial) - quantidade_inicial) > 0.001:
                 lote.quantidade_inicial = quantidade_inicial
                 alteracoes_lote = True
         
         if 'quantidade_disponivel' in data and data['quantidade_disponivel'] is not None:
-            quantidade_disponivel = float(str(data['quantidade_disponivel']).replace(',', '.'))
-            if lote.quantidade_disponivel != quantidade_disponivel:
+            quantidade_disponivel = converter_valor(data['quantidade_disponivel'])
+            if abs(float(lote.quantidade_disponivel) - quantidade_disponivel) > 0.001:
                 lote.quantidade_disponivel = quantidade_disponivel
                 alteracoes_lote = True
                 precisa_atualizar_estoque = True
         
         if 'valor_unitario_compra' in data and data['valor_unitario_compra'] is not None:
-            valor_unitario = float(str(data['valor_unitario_compra']).replace(',', '.'))
-            if lote.valor_unitario_compra != valor_unitario:
+            valor_unitario = converter_valor(data['valor_unitario_compra'])
+            if abs(float(lote.valor_unitario_compra or 0) - valor_unitario) > 0.001:
                 lote.valor_unitario_compra = valor_unitario
                 alteracoes_lote = True
         
@@ -7698,13 +7754,12 @@ def atualizar_lote(lote_id):
         
         # Apenas commitar se houve alterações no lote
         if alteracoes_lote:
-            lote.sincronizado = False
             lote.atualizado_em = datetime.now()
             db.session.commit()
             
             # Atualizar estoque do produto APENAS se a quantidade disponível mudou
             if precisa_atualizar_estoque:
-                atualizar_estoque_produto(db, lote.produto_id)
+                atualizar_estoque_produto(db, lote.produto_id, lote_id)
             
             return jsonify({
                 'message': 'Lote atualizado com sucesso',
@@ -7725,30 +7780,29 @@ def atualizar_lote(lote_id):
 @admin_bp.route('/api/lotes/<int:lote_id>', methods=['DELETE'])
 @login_required
 @admin_required
-def excluir_lote(lote_id):
-    """Exclui um lote"""
+def desativar_lote(lote_id):
+    """Desativa um lote (em vez de excluir)"""
     try:
         lote = LoteEstoque.query.get_or_404(lote_id)
         
-        # Verificar se o lote pode ser excluído (quantidade disponível = 0)
+        # Verificar se o lote pode ser desativado
         if float(lote.quantidade_disponivel) > 0:
             return jsonify({
-                'error': 'Não é possível excluir lote com quantidade disponível maior que zero'
+                'error': 'Não é possível desativar lote com quantidade disponível maior que zero'
             }), 400
         
-        produto_id = lote.produto_id
-        
-        db.session.delete(lote)
+        # Atualiza status para inativo
+        lote.ativo = False
         db.session.commit()
         
-        # Atualizar estoque do produto
-        atualizar_estoque_produto(produto_id)
+        # Atualizar estoque do produto (caso o lote inativo afete o total disponível)
+        atualizar_estoque_produto(db, lote.produto_id)
         
-        return jsonify({'message': 'Lote excluído com sucesso'})
+        return jsonify({'message': 'Lote desativado com sucesso'})
     
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Erro ao excluir lote: {str(e)}'}), 500
+        return jsonify({'error': f'Erro ao desativar lote: {str(e)}'}), 500
 
 @admin_bp.route('/api/produtos/<int:produto_id>', methods=['GET'])
 @login_required

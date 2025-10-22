@@ -2,15 +2,22 @@
 let lotesProdutoAtual = null;
 let loteEditando = null;
 let todosLotes = [];
+let paginacaoAtual = {
+    pagina: 1,
+    totalPaginas: 1,
+    totalLotes: 0,
+    porPagina: 10
+};
 let filtrosLotes = {
     produto: '',
     status: '',
     dataInicio: '',
-    dataFim: ''
+    dataFim: '',
+    busca: ''
 };
 
 // URL base da API - AJUSTE CONFORME SEU BLUEPRINT
-const API_BASE_URL = '/admin/api'; // Altere para o prefixo correto do seu admin_bp
+const API_BASE_URL = '/admin/api';
 
 // =============================================
 // FUNÇÕES DE FORMATAÇÃO PARA PADRÃO BRASILEIRO
@@ -26,7 +33,7 @@ function converterParaNumero(valor) {
             .replace(/\./g, '')  // Remove pontos (separadores de milhar)
             .replace(',', '.')   // Substitui vírgula por ponto (decimal)
             .trim();
-        
+
         const numero = parseFloat(valorLimpo);
         return isNaN(numero) ? 0 : numero;
     }
@@ -41,23 +48,23 @@ function formatarQuantidade(qtd) {
 
 function formatarValor(valor) {
     const numero = converterParaNumero(valor);
-    
+
     // Formata com separadores de milhar e 2 casas decimais
     const partes = numero.toFixed(2).split('.');
     const inteiro = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     const decimal = partes[1];
-    
+
     return `${inteiro},${decimal}`;
 }
 
 function formatarNumero(numero, casasDecimais = 2) {
     const num = converterParaNumero(numero);
-    
+
     // Formata com número específico de casas decimais
     const partes = num.toFixed(casasDecimais).split('.');
     const inteiro = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     const decimal = partes[1];
-    
+
     return `${inteiro},${decimal}`;
 }
 
@@ -113,18 +120,23 @@ function inicializarAbaLotes() {
     configurarEventListenersLotes();
 }
 
-function carregarTodosLotes() {
+function carregarTodosLotes(pagina = 1) {
     // Mostrar loading
     const lotesTable = document.getElementById('lotesTable');
     if (lotesTable) lotesTable.classList.add('loading-lotes');
 
-    // Construir URL com filtros
+    // Construir URL com filtros e paginação
     let url = `${API_BASE_URL}/lotes?`;
     const params = new URLSearchParams();
 
     if (filtrosLotes.produto) params.append('produto_id', filtrosLotes.produto);
+    if (filtrosLotes.status) params.append('status', filtrosLotes.status);
     if (filtrosLotes.dataInicio) params.append('data_inicio', filtrosLotes.dataInicio);
     if (filtrosLotes.dataFim) params.append('data_fim', filtrosLotes.dataFim);
+
+    // Parâmetros de paginação
+    params.append('pagina', pagina);
+    params.append('por_pagina', paginacaoAtual.porPagina);
 
     url += params.toString();
 
@@ -133,10 +145,14 @@ function carregarTodosLotes() {
             if (!response.ok) throw new Error('Erro na resposta do servidor');
             return response.json();
         })
-        .then(lotes => {
-            todosLotes = lotes;
+        .then(data => {
+            todosLotes = data.lotes || [];
+            paginacaoAtual = data.paginacao || paginacaoAtual;
+
             aplicarFiltrosLotes();
-            atualizarResumoLotes(lotes);
+            atualizarResumoLotes(todosLotes);
+            atualizarControlesPaginacao();
+
             if (lotesTable) lotesTable.classList.remove('loading-lotes');
         })
         .catch(error => {
@@ -174,14 +190,8 @@ function configurarEventListenersLotes() {
     // Filtros
     const filtrarLotesBtn = document.getElementById('filtrarLotes');
     if (filtrarLotesBtn) {
-        filtrarLotesBtn.addEventListener('click', aplicarFiltrosLotes);
-    }
-
-    // Botão novo lote
-    const addLoteBtn = document.getElementById('addLote');
-    if (addLoteBtn) {
-        addLoteBtn.addEventListener('click', () => {
-            abrirModalNovoLote();
+        filtrarLotesBtn.addEventListener('click', () => {
+            carregarTodosLotes(1);
         });
     }
 
@@ -189,7 +199,7 @@ function configurarEventListenersLotes() {
     const refreshLotesBtn = document.getElementById('refreshLotes');
     if (refreshLotesBtn) {
         refreshLotesBtn.addEventListener('click', () => {
-            carregarTodosLotes();
+            carregarTodosLotes(1);
         });
     }
 
@@ -197,6 +207,7 @@ function configurarEventListenersLotes() {
     const searchLoteInput = document.getElementById('searchLote');
     if (searchLoteInput) {
         searchLoteInput.addEventListener('input', (e) => {
+            filtrosLotes.busca = e.target.value;
             aplicarFiltrosLotes();
         });
     }
@@ -206,7 +217,7 @@ function configurarEventListenersLotes() {
     if (filtroProduto) {
         filtroProduto.addEventListener('change', (e) => {
             filtrosLotes.produto = e.target.value;
-            aplicarFiltrosLotes();
+            carregarTodosLotes(1);
         });
     }
 
@@ -214,7 +225,7 @@ function configurarEventListenersLotes() {
     if (filtroStatus) {
         filtroStatus.addEventListener('change', (e) => {
             filtrosLotes.status = e.target.value;
-            aplicarFiltrosLotes();
+            carregarTodosLotes(1);
         });
     }
 
@@ -222,7 +233,7 @@ function configurarEventListenersLotes() {
     if (filtroDataInicio) {
         filtroDataInicio.addEventListener('change', (e) => {
             filtrosLotes.dataInicio = e.target.value;
-            aplicarFiltrosLotes();
+            carregarTodosLotes(1);
         });
     }
 
@@ -230,22 +241,45 @@ function configurarEventListenersLotes() {
     if (filtroDataFim) {
         filtroDataFim.addEventListener('change', (e) => {
             filtrosLotes.dataFim = e.target.value;
-            aplicarFiltrosLotes();
+            carregarTodosLotes(1);
+        });
+    }
+
+    // Botão limpar filtros
+    const limparFiltrosBtn = document.getElementById('limparFiltrosLotes');
+    if (limparFiltrosBtn) {
+        limparFiltrosBtn.addEventListener('click', () => {
+            limparFiltrosLotes();
         });
     }
 }
 
+function limparFiltrosLotes() {
+    // Limpar valores dos inputs
+    document.getElementById('filtroProdutoLote').value = '';
+    document.getElementById('filtroStatusLote').value = '';
+    document.getElementById('filtroDataInicioLote').value = '';
+    document.getElementById('filtroDataFimLote').value = '';
+    document.getElementById('searchLote').value = '';
+
+    // Limpar variáveis
+    filtrosLotes = {
+        produto: '',
+        status: '',
+        dataInicio: '',
+        dataFim: '',
+        busca: ''
+    };
+
+    // Recarregar na página 1
+    carregarTodosLotes(1);
+}
+
 function aplicarFiltrosLotes() {
-    const statusFiltro = document.getElementById('filtroStatusLote')?.value || '';
-    const buscaFiltro = document.getElementById('searchLote')?.value.toLowerCase() || '';
+    const buscaFiltro = filtrosLotes.busca.toLowerCase();
 
     let lotesFiltrados = todosLotes.filter(lote => {
-        // Filtro por status
-        if (statusFiltro && lote.status !== statusFiltro) {
-            return false;
-        }
-
-        // Filtro por busca (nome do produto)
+        // Filtro por busca (nome do produto, marca, código)
         if (buscaFiltro) {
             const produtoNome = lote.produto_nome?.toLowerCase() || '';
             const produtoMarca = lote.produto_marca?.toLowerCase() || '';
@@ -299,7 +333,6 @@ function atualizarTabelaLotes(lotes) {
         const percentualUtilizado = ((quantidadeInicial - quantidadeDisponivel) / quantidadeInicial) * 100;
 
         tr.innerHTML = `
-            <td>${lote.id}</td>
             <td>
                 <strong>${lote.produto_nome || 'N/A'}</strong>
                 ${lote.produto_marca ? `<br><small class="text-muted">${lote.produto_marca}</small>` : ''}
@@ -356,7 +389,7 @@ function atualizarResumoLotes(lotes) {
     lotes.forEach(lote => {
         const quantidadeDisponivel = converterParaNumero(lote.quantidade_disponivel);
         const valorUnitario = converterParaNumero(lote.valor_unitario_compra);
-        
+
         quantidadeTotal += quantidadeDisponivel;
         valorTotal += quantidadeDisponivel * valorUnitario;
 
@@ -381,16 +414,67 @@ function atualizarResumoLotes(lotes) {
     if (lotesEsgotadosEl) lotesEsgotadosEl.textContent = lotesEsgotados;
 }
 
-function abrirModalNovoLote() {
-    // Limpar formulário e abrir modal para novo lote
-    limparFormularioLote();
-    const modalTitle = document.getElementById('editarLoteModalTitle');
-    const submitText = document.getElementById('editarLoteSubmitText');
+function atualizarControlesPaginacao() {
+    const paginacaoContainer = document.getElementById('paginacaoLotes');
+    if (!paginacaoContainer) return;
 
-    if (modalTitle) modalTitle.textContent = 'Adicionar Lote';
-    if (submitText) submitText.textContent = 'Criar Lote';
+    const { pagina_atual, total_paginas, total_lotes, tem_anterior, tem_proxima } = paginacaoAtual;
 
-    abrirModal('editarLoteModal');
+    let html = `
+        <div class="paginacao-info">
+            Página ${pagina_atual} de ${total_paginas} 
+            (${total_lotes || 0} lotes)
+        </div>
+        <div class="paginacao-botoes">
+    `;
+
+    // Botão anterior
+    if (tem_anterior) {
+        html += `<button class="btn-pagina btn-pagina-anterior" data-pagina="${pagina_atual - 1}">
+                    <i class="fas fa-chevron-left"></i> Anterior
+                 </button>`;
+    } else {
+        html += `<button class="btn-pagina btn-pagina-anterior" disabled>
+                    <i class="fas fa-chevron-left"></i> Anterior
+                 </button>`;
+    }
+
+    // Números das páginas
+    const inicio = Math.max(1, pagina_atual - 2);
+    const fim = Math.min(total_paginas, pagina_atual + 2);
+
+    for (let i = inicio; i <= fim; i++) {
+        if (i === pagina_atual) {
+            html += `<button class="btn-pagina btn-pagina-atual" disabled>${i}</button>`;
+        } else {
+            html += `<button class="btn-pagina" data-pagina="${i}">${i}</button>`;
+        }
+    }
+
+    // Botão próximo
+    if (tem_proxima) {
+        html += `<button class="btn-pagina btn-pagina-proximo" data-pagina="${pagina_atual + 1}">
+                    Próximo <i class="fas fa-chevron-right"></i>
+                 </button>`;
+    } else {
+        html += `<button class="btn-pagina btn-pagina-proximo" disabled>
+                    Próximo <i class="fas fa-chevron-right"></i>
+                 </button>`;
+    }
+
+    html += `</div>`;
+
+    paginacaoContainer.innerHTML = html;
+
+    // Adicionar event listeners
+    paginacaoContainer.querySelectorAll('.btn-pagina:not(:disabled)').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const pagina = parseInt(e.target.getAttribute('data-pagina'));
+            if (pagina && !isNaN(pagina)) {
+                carregarTodosLotes(pagina);
+            }
+        });
+    });
 }
 
 // =============================================
@@ -431,15 +515,23 @@ function carregarResumoProduto(produtoId) {
         });
 }
 
-function carregarLotesProduto(produtoId) {
-    fetch(`${API_BASE_URL}/produtos/${produtoId}/lotes`)
+function carregarLotesProduto(produtoId, pagina = 1) {
+    const url = `${API_BASE_URL}/produtos/${produtoId}/lotes?pagina=${pagina}&por_pagina=${paginacaoAtual.porPagina}`;
+
+    fetch(url)
         .then(response => {
             if (!response.ok) throw new Error('Erro ao carregar lotes do produto');
             return response.json();
         })
-        .then(lotes => {
-            atualizarTabelaLotesProduto(lotes);
-            atualizarResumoLotesProduto(lotes);
+        .then(data => {
+            atualizarTabelaLotesProduto(data.lotes || []);
+            atualizarResumoLotesProduto(data.lotes || []);
+
+            // Atualizar paginação para o modal específico
+            if (data.paginacao) {
+                paginacaoAtual = data.paginacao;
+                atualizarControlesPaginacaoModal();
+            }
         })
         .catch(error => {
             console.error('Erro ao carregar lotes:', error);
@@ -495,7 +587,6 @@ function atualizarTabelaLotesProduto(lotes) {
         const valorTotal = quantidadeInicial * valorUnitario;
 
         tr.innerHTML = `
-            <td>${lote.id}</td>
             <td>${formatarData(lote.data_entrada)}</td>
             <td>${formatarQuantidade(quantidadeInicial)}</td>
             <td>${formatarQuantidade(quantidadeDisponivel)}</td>
@@ -543,7 +634,7 @@ function atualizarResumoLotesProduto(lotes) {
     lotes.forEach(lote => {
         const quantidadeDisponivel = converterParaNumero(lote.quantidade_disponivel);
         const valorUnitario = converterParaNumero(lote.valor_unitario_compra);
-        
+
         quantidadeTotal += quantidadeDisponivel;
         valorTotal += quantidadeDisponivel * valorUnitario;
     });
@@ -555,33 +646,87 @@ function atualizarResumoLotesProduto(lotes) {
     if (valorTotalEl) valorTotalEl.textContent = `R$ ${formatarValor(valorTotal)}`;
 }
 
+function atualizarControlesPaginacaoModal() {
+    const paginacaoContainer = document.getElementById('paginacaoLotesModal');
+    if (!paginacaoContainer || !lotesProdutoAtual) return;
+
+    const { pagina_atual, total_paginas, tem_anterior, tem_proxima } = paginacaoAtual;
+
+    let html = `
+        <div class="paginacao-info">
+            Página ${pagina_atual} de ${total_paginas}
+        </div>
+        <div class="paginacao-botoes">
+    `;
+
+    // Botão anterior
+    if (tem_anterior) {
+        html += `<button class="btn-pagina btn-pagina-anterior" data-pagina="${pagina_atual - 1}">
+                    <i class="fas fa-chevron-left"></i>
+                 </button>`;
+    }
+
+    // Botão próximo
+    if (tem_proxima) {
+        html += `<button class="btn-pagina btn-pagina-proximo" data-pagina="${pagina_atual + 1}">
+                    <i class="fas fa-chevron-right"></i>
+                 </button>`;
+    }
+
+    html += `</div>`;
+
+    paginacaoContainer.innerHTML = html;
+
+    // Adicionar event listeners
+    paginacaoContainer.querySelectorAll('.btn-pagina').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const pagina = parseInt(e.target.getAttribute('data-pagina'));
+            if (pagina && !isNaN(pagina)) {
+                carregarLotesProduto(lotesProdutoAtual, pagina);
+            }
+        });
+    });
+}
+
 // =============================================
-// FUNÇÕES COMPARTILHADAS PARA EDIÇÃO/CRIAÇÃO
+// FUNÇÕES COMPARTILHADAS PARA EDIÇÃO
 // =============================================
 
-function abrirModalEditarLote(loteId = null) {
+// =============================================
+// FUNÇÕES COMPARTILHADAS PARA EDIÇÃO
+// =============================================
+
+function abrirModalEditarLote(loteId) {
+    if (!loteId) {
+        mostrarFlashMessage('ID do lote não fornecido', 'error');
+        return;
+    }
+
     loteEditando = loteId;
     const modalTitle = document.getElementById('editarLoteModalTitle');
     const submitText = document.getElementById('editarLoteSubmitText');
 
-    if (loteId) {
-        if (modalTitle) modalTitle.textContent = 'Editar Lote';
-        if (submitText) submitText.textContent = 'Atualizar Lote';
-        carregarDadosLote(loteId);
-    } else {
-        if (modalTitle) modalTitle.textContent = 'Adicionar Lote';
-        if (submitText) submitText.textContent = 'Criar Lote';
-        limparFormularioLote();
+    if (modalTitle) modalTitle.textContent = 'Editar Lote';
+    if (submitText) submitText.textContent = 'Atualizar Lote';
 
-        // Debug: verificar se o contexto está sendo preservado
-        console.log('Abrindo modal para novo lote - Contexto:', {
-            lotesProdutoAtual: lotesProdutoAtual,
-            campoProdutoId: document.getElementById('loteProdutoId').value
-        });
+    carregarDadosLote(loteId);
+    abrirModal('editarLoteModal');
+
+    // 🔒 Bloqueia campos que não devem ser alterados
+    const quantidadeInicial = document.getElementById('loteQuantidadeInicial');
+    const dataEntrada = document.getElementById('loteDataEntrada');
+
+    if (quantidadeInicial) quantidadeInicial.readOnly = true;
+    if (dataEntrada) {
+        dataEntrada.readOnly = true;
+        dataEntrada.disabled = true; // evita abrir o calendário
     }
 
-    abrirModal('editarLoteModal');
+    // 💅 Opcional: deixar visualmente desabilitados (cinza)
+    if (quantidadeInicial) quantidadeInicial.classList.add('campo-desativado');
+    if (dataEntrada) dataEntrada.classList.add('campo-desativado');
 }
+
 
 function carregarDadosLote(loteId) {
     fetch(`${API_BASE_URL}/lotes/${loteId}`)
@@ -591,9 +736,8 @@ function carregarDadosLote(loteId) {
         })
         .then(lote => {
             document.getElementById('loteId').value = lote.id;
-            // Priorizar o contexto atual, mas usar o produto_id do lote se não houver contexto
-            document.getElementById('loteProdutoId').value = lotesProdutoAtual || lote.produto_id;
-            
+            document.getElementById('loteProdutoId').value = lote.produto_id;
+
             // Usar valores convertidos para preencher o formulário
             document.getElementById('loteQuantidadeInicial').value = converterParaNumero(lote.quantidade_inicial);
             document.getElementById('loteQuantidadeDisponivel').value = converterParaNumero(lote.quantidade_disponivel);
@@ -614,29 +758,6 @@ function carregarDadosLote(loteId) {
         });
 }
 
-function limparFormularioLote() {
-    document.getElementById('loteId').value = '';
-    // Manter o produto_id do contexto atual se existir
-    const produtoIdAtual = lotesProdutoAtual || '';
-    document.getElementById('loteProdutoId').value = produtoIdAtual;
-
-    document.getElementById('loteQuantidadeInicial').value = '';
-    document.getElementById('loteQuantidadeDisponivel').value = '';
-    document.getElementById('loteValorUnitario').value = '';
-    document.getElementById('loteDataEntrada').value = '';
-    document.getElementById('loteObservacao').value = '';
-
-    // Definir data atual como padrão
-    const agora = new Date();
-    const dataFormatada = agora.toISOString().slice(0, 16);
-    document.getElementById('loteDataEntrada').value = dataFormatada;
-
-    calcularValoresLote();
-
-    // Debug
-    console.log('Formulário limpo - produtoId:', produtoIdAtual);
-}
-
 function calcularValoresLote() {
     const quantidadeInicial = parseFloat(document.getElementById('loteQuantidadeInicial').value) || 0;
     const quantidadeDisponivel = parseFloat(document.getElementById('loteQuantidadeDisponivel').value) || 0;
@@ -651,13 +772,17 @@ function calcularValoresLote() {
     if (valorTotalEl) valorTotalEl.textContent = `R$ ${formatarValor(valorTotal)}`;
     if (diferencaQuantidadeEl) diferencaQuantidadeEl.textContent = formatarQuantidade(diferencaQuantidade);
 
-    // Adicionar classe de warning se quantidade disponível > quantidade inicial
+    // Validação e feedback visual
     const quantidadeDisponivelInput = document.getElementById('loteQuantidadeDisponivel');
-    if (quantidadeDisponivelInput) {
+    const submitBtn = document.querySelector('#editarLoteForm button[type="submit"]');
+
+    if (quantidadeDisponivelInput && submitBtn) {
         if (quantidadeDisponivel > quantidadeInicial) {
             quantidadeDisponivelInput.classList.add('is-invalid');
+            submitBtn.disabled = true;
         } else {
             quantidadeDisponivelInput.classList.remove('is-invalid');
+            submitBtn.disabled = false;
         }
     }
 }
@@ -705,7 +830,7 @@ function excluirLote(loteId) {
                     carregarResumoProduto(lotesProdutoAtual);
                 } else {
                     // Se estamos na aba geral de lotes
-                    carregarTodosLotes();
+                    carregarTodosLotes(1);
                 }
             } else {
                 return response.json().then(data => {
@@ -721,51 +846,46 @@ function excluirLote(loteId) {
 
 function salvarLote() {
     const formData = new FormData(document.getElementById('editarLoteForm'));
+    const loteId = formData.get('loteId');
 
-    // Obter o produto_id - priorizar o contexto atual ou o valor do formulário
-    let produtoId = formData.get('loteProdutoId');
-
-    // Se não há produto_id no formulário, usar o contexto atual
-    if (!produtoId && lotesProdutoAtual) {
-        produtoId = lotesProdutoAtual;
+    // VALIDAÇÃO: Garantir que temos um ID de lote para edição
+    if (!loteId) {
+        mostrarFlashMessage('ID do lote não encontrado. Apenas edição é permitida.', 'error');
+        return;
     }
 
-    // Preparar dados para envio - ENVIAR TODOS OS CAMPOS COM VALORES PADRÃO
+    // Preparar dados para envio - CONVERTER CORRETAMENTE OS VALORES
     const dados = {
-        produto_id: parseInt(produtoId),
         quantidade_inicial: parseFloat(formData.get('loteQuantidadeInicial')) || 0,
         quantidade_disponivel: parseFloat(formData.get('loteQuantidadeDisponivel')) || 0,
         valor_unitario_compra: parseFloat(formData.get('loteValorUnitario')) || 0,
         observacao: formData.get('loteObservacao') || ''
     };
 
-    // Data de entrada - usar atual se não fornecida
-    const dataEntrada = formData.get('loteDataEntrada');
-    if (dataEntrada) {
-        dados.data_entrada = dataEntrada;
-    } else {
-        // Se não há data, usar data atual
-        const now = new Date();
-        dados.data_entrada = now.toISOString().slice(0, 16); // Formato YYYY-MM-DDTHH:mm
+    // VALIDAÇÃO: quantidade_disponivel não pode ser maior que quantidade_inicial
+    if (dados.quantidade_disponivel > dados.quantidade_inicial) {
+        mostrarFlashMessage('Quantidade disponível não pode ser maior que quantidade inicial', 'error');
+        return;
     }
 
-    const loteId = formData.get('loteId');
-    const url = loteId ? `${API_BASE_URL}/lotes/${loteId}` : `${API_BASE_URL}/lotes`;
-    const method = loteId ? 'PUT' : 'POST';
+    // Data de entrada
+    const dataEntrada = formData.get('loteDataEntrada');
+    if (dataEntrada) {
+        // Garantir que a data está no formato correto
+        const dataObj = new Date(dataEntrada);
+        if (!isNaN(dataObj.getTime())) {
+            dados.data_entrada = dataObj.toISOString().slice(0, 16); // Formato YYYY-MM-DDTHH:mm
+        }
+    }
+
+    const url = `${API_BASE_URL}/lotes/${loteId}`;
+    const method = 'PUT';
 
     // Mostrar loading
     const submitBtn = document.querySelector('#editarLoteForm button[type="submit"]');
     const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando...';
     submitBtn.disabled = true;
-
-    // Debug
-    console.log('Enviando dados para API:', {
-        url: url,
-        method: method,
-        dados: dados,
-        loteId: loteId
-    });
 
     fetch(url, {
         method: method,
@@ -775,19 +895,16 @@ function salvarLote() {
         body: JSON.stringify(dados)
     })
         .then(response => {
-            if (response.ok) {
-                return response.json();
-            } else {
+            if (!response.ok) {
                 return response.json().then(data => {
                     throw new Error(data.error || `Erro ${response.status}: ${response.statusText}`);
                 });
             }
+            return response.json();
         })
         .then(data => {
-            mostrarFlashMessage(
-                loteId ? 'Lote atualizado com sucesso' : 'Lote criado com sucesso',
-                'success'
-            );
+            console.log('Resposta da API:', data);
+            mostrarFlashMessage('Lote atualizado com sucesso', 'success');
             fecharModal('editarLoteModal');
 
             // Recarregar dados conforme o contexto
@@ -795,12 +912,12 @@ function salvarLote() {
                 carregarLotesProduto(lotesProdutoAtual);
                 carregarResumoProduto(lotesProdutoAtual);
             } else {
-                carregarTodosLotes();
+                carregarTodosLotes(1);
             }
         })
         .catch(error => {
-            console.error('Erro ao salvar lote:', error);
-            mostrarFlashMessage(error.message || 'Erro ao salvar lote', 'error');
+            console.error('Erro ao atualizar lote:', error);
+            mostrarFlashMessage(error.message || 'Erro ao atualizar lote', 'error');
         })
         .finally(() => {
             // Restaurar botão
@@ -816,35 +933,16 @@ function salvarLote() {
 // =============================================
 
 document.addEventListener('DOMContentLoaded', function () {
-    // Botão novo lote na aba geral
-    const addLoteBtn = document.getElementById('addLote');
-    if (addLoteBtn) {
-        addLoteBtn.addEventListener('click', () => {
-            // Na aba geral, não temos um produto específico
-            lotesProdutoAtual = null;
-            abrirModalNovoLote();
-        });
-    }
-
     // Botão refresh lotes na aba geral
     const refreshLotesBtn = document.getElementById('refreshLotes');
     if (refreshLotesBtn) {
         refreshLotesBtn.addEventListener('click', () => {
-            carregarTodosLotes();
-        });
-    }
-
-    // Botão novo lote no modal de produto
-    const btnNovoLote = document.getElementById('btnNovoLote');
-    if (btnNovoLote) {
-        btnNovoLote.addEventListener('click', () => {
-            // No modal de produto, temos o contexto definido
-            abrirModalEditarLote();
+            carregarTodosLotes(1);
         });
     }
 
     // Botão refresh lotes no modal de produto
-    const refreshLotesModalBtn = document.getElementById('refreshLotes');
+    const refreshLotesModalBtn = document.getElementById('refreshLotesModal');
     if (refreshLotesModalBtn) {
         refreshLotesModalBtn.addEventListener('click', () => {
             if (lotesProdutoAtual) {
@@ -943,11 +1041,4 @@ function mostrarFlashMessage(mensagem, tipo = 'info') {
             flashMessage.remove();
         });
     }
-}
-
-// Adicionar função para selecionar produto quando estiver na aba geral
-function selecionarProdutoParaLote(produtoId, produtoNome) {
-    lotesProdutoAtual = produtoId;
-    document.getElementById('loteProdutoId').value = produtoId;
-    mostrarFlashMessage(`Produto selecionado: ${produtoNome}`, 'success');
 }

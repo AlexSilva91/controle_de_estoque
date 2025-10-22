@@ -1956,11 +1956,15 @@
                         </div>
                     </div>
 
+                    <!-- Controles de Paginação do Modal -->
+                    <div class="paginacao-container modal-paginacao" id="paginacaoLotesModal">
+                        <!-- Os controles serão inseridos aqui via JavaScript -->
+                    </div>
+
                     <div class="table-responsive">
                         <table id="lotesTable" class="data-table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
                                     <th>Data Entrada</th>
                                     <th>Qtd. Inicial</th>
                                     <th>Qtd. Disponível</th>
@@ -1996,39 +2000,41 @@
                     <button class="close-modal" aria-label="Fechar">&times;</button>
                 </div>
                 <form id="editarLoteForm">
-                    <input type="hidden" id="loteId">
-                    <input type="hidden" id="loteProdutoId">
+                    <!-- CORREÇÃO: Adicionar name aos campos hidden -->
+                    <input type="hidden" id="loteId" name="loteId">
+                    <input type="hidden" id="loteProdutoId" name="loteProdutoId">
 
                     <div class="modal-body">
                         <div class="form-group">
                             <label for="loteQuantidadeInicial">Quantidade Inicial *</label>
-                            <input type="number" id="loteQuantidadeInicial" class="form-control" step="0.001"
-                                min="0.001" required>
+                            <input type="number" id="loteQuantidadeInicial" name="loteQuantidadeInicial"
+                                class="form-control" step="0.001" min="0.001" required>
                             <small class="text-muted">Quantidade total do lote quando foi criado</small>
                         </div>
 
                         <div class="form-group">
                             <label for="loteQuantidadeDisponivel">Quantidade Disponível *</label>
-                            <input type="number" id="loteQuantidadeDisponivel" class="form-control" step="0.001" min="0"
-                                required>
+                            <input type="number" id="loteQuantidadeDisponivel" name="loteQuantidadeDisponivel"
+                                class="form-control" step="0.001" min="0" required>
                             <small class="text-muted">Quantidade atual disponível no lote</small>
                         </div>
 
                         <div class="form-group">
                             <label for="loteValorUnitario">Valor Unitário de Compra *</label>
-                            <input type="number" id="loteValorUnitario" class="form-control" step="0.01" min="0.01"
-                                required>
+                            <input type="number" id="loteValorUnitario" name="loteValorUnitario" class="form-control"
+                                step="0.01" min="0.01" required>
                             <small class="text-muted">Valor pago por unidade na compra</small>
                         </div>
 
                         <div class="form-group">
                             <label for="loteDataEntrada">Data de Entrada *</label>
-                            <input type="datetime-local" id="loteDataEntrada" class="form-control" required>
+                            <input type="datetime-local" id="loteDataEntrada" name="loteDataEntrada"
+                                class="form-control" required>
                         </div>
 
                         <div class="form-group">
                             <label for="loteObservacao">Observações</label>
-                            <textarea id="loteObservacao" class="form-control" rows="3"
+                            <textarea id="loteObservacao" name="loteObservacao" class="form-control" rows="3"
                                 placeholder="Informações adicionais sobre o lote..."></textarea>
                         </div>
 

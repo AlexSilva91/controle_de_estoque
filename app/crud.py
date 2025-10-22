@@ -3151,6 +3151,7 @@ def transferir_todo_saldo(conta_origem_id, conta_destino_id, usuario_id, session
 
     except Exception as e:
         raise ValueError(f'Erro ao realizar transferência total: {str(e)}')
+    
 def criar_ou_atualizar_lote(db: Session, produto_id, quantidade, valor_unitario_compra, data_entrada=None, observacao=None):
     """
     Cria ou atualiza um lote para o produto na data especificada.
@@ -3176,7 +3177,7 @@ def criar_ou_atualizar_lote(db: Session, produto_id, quantidade, valor_unitario_
         lote_existente.quantidade_disponivel += quantidade
         if observacao:
             lote_existente.observacao = observacao
-        lote_existente.sincronizado = False
+        
         return lote_existente
     else:
         # Cria novo lote
@@ -3186,33 +3187,39 @@ def criar_ou_atualizar_lote(db: Session, produto_id, quantidade, valor_unitario_
             quantidade_disponivel=quantidade,
             valor_unitario_compra=valor_unitario_compra,
             data_entrada=data_entrada,
-            observacao=observacao,
-            sincronizado=False
+            observacao=observacao
         )
         db.add(novo_lote)
         return novo_lote
 
-def atualizar_estoque_produto(db: Session, produto_id):
-    """Atualiza o estoque do produto baseado nos lotes - SEM VALIDAÇÕES"""
+def atualizar_estoque_produto(db, produto_id, lote_id_atualizado=None):
+    """
+    Atualiza o estoque do produto considerando APENAS as mudanças no lote específico
+    """
     try:
         produto = Produto.query.get(produto_id)
         if not produto:
             return
         
-        # Calcular estoque total baseado nos lotes
+        # Busca todos os lotes para calcular o novo estoque total
         lotes = LoteEstoque.query.filter_by(produto_id=produto_id).all()
-        estoque_total = sum(float(lote.quantidade_disponivel) for lote in lotes)
+        novo_estoque_total = sum(float(lote.quantidade_disponivel) for lote in lotes)
         
-        # Atualizar estoque da loja
-        produto.estoque_loja = estoque_total
-        produto.sincronizado = False
-        produto.atualizado_em = datetime.now()
+        print(f"Atualizando estoque produto {produto_id}: {novo_estoque_total}")  # Debug
         
-        db.commit()
-        print(f"Estoque do produto {produto_id} atualizado para: {estoque_total}")
+        # Atualiza apenas se houver diferença
+        if abs(float(produto.estoque_loja or 0) - novo_estoque_total) > 0.001:
+            produto.estoque_loja = novo_estoque_total
+            produto.atualizado_em = datetime.now()
+            
+            db.session.commit()
+            print(f"Estoque do produto {produto_id} atualizado para: {novo_estoque_total}")
+        else:
+            print(f"Estoque do produto {produto_id} não mudou significativamente")
+            db.session.rollback()  # Evita commit desnecessário
         
     except Exception as e:
-        db.rollback()
+        db.session.rollback()
         print(f"Erro ao atualizar estoque do produto {produto_id}: {str(e)}")
 
 def atualizar_estoque_produto_apos_lote(db: Session, produto_id, lote_id_atualizado=None):

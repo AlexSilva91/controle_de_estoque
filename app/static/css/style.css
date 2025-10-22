@@ -3461,3 +3461,7 @@ canvas {
 #editarLoteModal .modal-body::-webkit-scrollbar-thumb:hover {
   background: var(--primary-dark);
 }
+
+.campo-desativado {
+  cursor: not-allowed;
+}
