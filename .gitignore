@@ -2,7 +2,7 @@
 .env.prod
 __pycache__
 migrations
-
+venv/
 nfce_bobina_corrigido.pdf
 backup_mariadb.sql
 backup_controle_estoque_2025-07-30.sql
