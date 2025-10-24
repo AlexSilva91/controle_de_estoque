@@ -2499,17 +2499,40 @@ function closeExpenseModal() {
     expenseForm.reset();
 }
 
+function parseBrazilianNumber(value) {
+    if (!value) return 0;
+
+    value = value.trim();
+    if (value.includes(',')) {
+        value = value.replace(/\./g, '');
+        value = value.replace(',', '.');
+    } else {
+        const partes = value.split('.');
+        if (partes.length > 1 && partes[partes.length - 1].length !== 3) {
+
+            value = value.replace(',', '.');
+        } else {
+            value = value.replace(/\./g, '');
+        }
+    }
+
+    const number = parseFloat(value);
+    return isNaN(number) ? 0 : number;
+}
+
 async function saveExpense() {
     const description = document.getElementById('expense-description')?.value.trim();
-    const amount = document.getElementById('expense-amount')?.value;
+    const amountStr = document.getElementById('expense-amount')?.value.trim();
     const note = document.getElementById('expense-note')?.value.trim();
+
+    const amount = parseBrazilianNumber(amountStr);
 
     if (!description) {
         showMessage('Descrição da despesa é obrigatória', 'error');
         return;
     }
 
-    if (!amount || parseFloat(amount) <= 0) {
+    if (!amount || amount <= 0) {
         showMessage('Valor da despesa deve ser maior que zero', 'error');
         return;
     }
@@ -2542,6 +2565,7 @@ async function saveExpense() {
         console.error('Erro ao salvar despesa:', error);
     }
 }
+
 async function gerarOrcamentoPDF() {
     try {
         // Preparar dados para o orçamento
