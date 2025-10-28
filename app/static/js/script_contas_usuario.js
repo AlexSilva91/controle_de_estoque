@@ -252,17 +252,19 @@ function atualizarCardsOperadores() {
         card.setAttribute('data-usuario-id', usuario.id.toString());
         card.setAttribute('data-conta-id', conta.id.toString());
 
-        const saldoTotal = parseFloat(conta.saldo_total || 0);
-        const classeSaldo = saldoTotal >= 0 ? 'positivo' : 'negativo';
+        // Usar o campo raw para comparação numérica correta
+        const saldoTotalRaw = conta.saldo_total_raw || 0;
+        const saldoTotalFormatado = conta.saldo_total || 'R$ 0,00';
+        const classeSaldo = saldoTotalRaw >= 0 ? 'positivo' : 'negativo';
 
         // Formatar saldos por forma de pagamento
         const saldosFormaPagamento = conta.saldos_por_forma_pagamento || {};
 
         const formasPagamentoHTML = Object.entries(saldosFormaPagamento)
             .map(([forma, saldo]) => {
-                const saldoFormatado = parseFloat(saldo).toFixed(2);
+                const saldoFormatado = saldo;
                 const formaLabel = formasPagamento.find(fp => fp.value === forma)?.label || forma;
-                return `<span class="badge badge-primary" title="${formaLabel}">${formaLabel}: R$ ${saldoFormatado}</span>`;
+                return `<span class="badge badge-primary" title="${formaLabel}">${formaLabel}: ${saldoFormatado}</span>`;
             })
             .join('');
 
@@ -272,7 +274,7 @@ function atualizarCardsOperadores() {
             </div>
             <div class="metric-info">
                 <h3>${usuario.nome}</h3>
-                <div class="value valor-saldo ${classeSaldo}">R$ ${saldoTotal.toFixed(2)}</div>
+                <div class="value valor-saldo ${classeSaldo}">${saldoTotalFormatado}</div>
                 <div class="formas-pagamento">
                     ${formasPagamentoHTML || '<span class="text-muted">Nenhum saldo específico</span>'}
                 </div>
@@ -531,7 +533,7 @@ function abrirModalTransferencia(usuarioId) {
         if (usuario) {
             const option = document.createElement('option');
             option.value = contaItem.id;
-            option.textContent = `${usuario.nome} (Saldo: R$ ${parseFloat(contaItem.saldo_total || 0).toFixed(2)})`;
+            option.textContent = `${usuario.nome}:(${contaItem.saldo_total || 0})`;
 
             const optionOrigem = option.cloneNode(true);
             const optionDestino = option.cloneNode(true);
@@ -569,8 +571,8 @@ function atualizarSaldoOrigem() {
     if (contaId) {
         const conta = contas.find(c => c.id == contaId);
         if (conta) {
-            const saldo = parseFloat(conta.saldo_total || 0).toFixed(2);
-            saldoInfo.innerHTML = `<small class="text-info">Saldo disponível: R$ ${saldo}</small>`;
+            const saldo = conta.saldo_total || 0;
+            saldoInfo.innerHTML = `<small class="text-info">Saldo disponível: ${saldo}</small>`;
         }
     } else {
         saldoInfo.innerHTML = '';
@@ -584,8 +586,8 @@ function atualizarSaldoDestino() {
     if (contaId) {
         const conta = contas.find(c => c.id == contaId);
         if (conta) {
-            const saldo = parseFloat(conta.saldo_total || 0).toFixed(2);
-            saldoInfo.innerHTML = `<small class="text-info">Saldo atual: R$ ${saldo}</small>`;
+            const saldo = conta.saldo_total || 0;
+            saldoInfo.innerHTML = `<small class="text-info">Saldo atual: ${saldo}</small>`;
         }
     } else {
         saldoInfo.innerHTML = '';

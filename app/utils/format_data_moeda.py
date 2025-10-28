@@ -14,6 +14,17 @@ def format_currency(value):
         value = 0
     return "{:,.2f}".format(float(value)).replace(",", "X").replace(".", ",").replace("X", ".")
 
+def format_number_money(value, decimal_places=2):
+    """Formata números no padrão brasileiro (XX.XXX,XX)"""
+    if value is None:
+        value = 0
+    
+    value_float = float(value)
+    formatted = "{:,.{}f}".format(value_float, decimal_places)
+    formatted = formatted.replace(",", "X").replace(".", ",").replace("X", ".")
+    
+    return formatted
+
 def format_number(value, is_weight=False):
     """
     Formata números no padrão brasileiro

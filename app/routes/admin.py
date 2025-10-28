@@ -1,6 +1,7 @@
 import csv
 from functools import wraps
 import io
+import locale
 import math
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 from zoneinfo import ZoneInfo
@@ -70,6 +71,8 @@ import logging
 from app.utils.format_data_moeda import formatar_data_br, format_number
 from app.utils.nfce import generate_caixa_financeiro_pdf
 from app.utils.signature import SignatureLine
+
+locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 logger = logging.getLogger(__name__)
@@ -7145,31 +7148,34 @@ def get_conta(conta_id):
 @login_required
 @admin_required
 def api_listar_contas_usuario():
-    """Retorna lista de contas com saldos para o dashboard"""
+    """Retorna lista de contas com saldos formatados para o dashboard"""
     try:
         contas = Conta.query.all()
         contas_data = []
         
         for conta in contas:
-            # Construir dados da conta no formato esperado pelo frontend
             saldos_por_forma_pagamento = {}
             for saldo in conta.saldos_forma_pagamento:
-                saldos_por_forma_pagamento[saldo.forma_pagamento.value] = float(saldo.saldo)
-            
+                valor = float(saldo.saldo)
+                saldos_por_forma_pagamento[saldo.forma_pagamento.value] = locale.currency(valor, grouping=True)
+
             conta_data = {
                 'id': conta.id,
                 'usuario_id': conta.usuario_id,
-                'saldo_total': float(conta.saldo_total) if conta.saldo_total else 0.00,
+                'saldo_total': locale.currency(float(conta.saldo_total), grouping=True) if conta.saldo_total else "R$ 0,00",
                 'saldos_por_forma_pagamento': saldos_por_forma_pagamento,
                 'atualizado_em': conta.atualizado_em.isoformat() if conta.atualizado_em else None
             }
             contas_data.append(conta_data)
-        
+
+        print(contas_data)
         logger.info(f"Retornando {len(contas_data)} contas para o dashboard")
+
         return jsonify({
             'success': True,
             'contas': contas_data
         })
+
     except Exception as e:
         logger.error(f"Erro ao listar contas para dashboard: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
