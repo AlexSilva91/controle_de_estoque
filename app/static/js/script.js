@@ -4920,7 +4920,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             </div>
                             <div class="detail-item">
                                 <label>Saldo Total:</label>
-                                <span class="valor-saldo">R$ ${usuario.conta.saldo_total.toFixed(2)}</span>
+                                <span class="valor-saldo">${usuario.conta.saldo_total}</span>
                             </div>
                             <div class="detail-item">
                                 <label>Atualizado em:</label>
@@ -4933,7 +4933,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                         ${Object.entries(usuario.conta.saldos_por_forma).map(([forma, saldo]) => `
                                             <div class="saldo-item">
                                                 <span class="forma-pagamento">${formatFormaPagamento(forma)}:</span>
-                                                <span class="valor-saldo ${saldo >= 0 ? 'positivo' : 'negativo'}">R$ ${saldo.toFixed(2)}</span>
+                                                <span class="valor-saldo ${saldo >= 'R$ 0,00' ? 'positivo' : 'negativo'}">${saldo}</span>
                                             </div>
                                         `).join('')}
                                     </div>

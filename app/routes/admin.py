@@ -2190,11 +2190,11 @@ def get_usuario(usuario_id):
         if usuario.conta:
             saldos_por_forma = {}
             for saldo in usuario.conta.saldos_forma_pagamento:
-                saldos_por_forma[saldo.forma_pagamento.value] = float(saldo.saldo)
+                saldos_por_forma[saldo.forma_pagamento.value] = locale.currency(float(saldo.saldo), grouping=True)
             
             conta_info = {
                 'id': usuario.conta.id,
-                'saldo_total': float(usuario.conta.saldo_total) if usuario.conta.saldo_total else 0.00,
+                'saldo_total': locale.currency(float(usuario.conta.saldo_total), grouping=True) if usuario.conta.saldo_total else 0.00,
                 'saldos_por_forma': saldos_por_forma,
                 'atualizado_em': usuario.conta.atualizado_em.strftime('%d/%m/%Y %H:%M') if usuario.conta.atualizado_em else None
             }
@@ -7220,7 +7220,7 @@ def api_listar_movimentacoes_conta_usuario(conta_id):
                 'id': mov.id,
                 'tipo': mov.tipo.value,
                 'forma_pagamento': mov.forma_pagamento.value,
-                'valor': float(mov.valor),
+                'valor': locale.currency(float(mov.valor), grouping=True),
                 'descricao': mov.descricao,
                 'data': mov.data.isoformat() if mov.data else None,
                 'usuario_id': mov.usuario_id,

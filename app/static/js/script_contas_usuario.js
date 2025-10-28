@@ -346,7 +346,7 @@ function mostrarDetalhesUsuario(usuarioId) {
 
     // Atualizar informações básicas
     document.getElementById('detalhesUsuarioNome').textContent = usuario.nome;
-    document.getElementById('detalhesSaldoTotal').textContent = `R$ ${parseFloat(conta.saldo_total || 0).toFixed(2)}`;
+    document.getElementById('detalhesSaldoTotal').textContent = `${conta.saldo_total || 0}`;
     document.getElementById('detalhesAtualizadoEm').textContent =
         conta.atualizado_em ? new Date(conta.atualizado_em).toLocaleString('pt-BR') : '-';
 
@@ -361,7 +361,7 @@ function mostrarDetalhesUsuario(usuarioId) {
         saldoItem.className = 'detail-item';
         saldoItem.innerHTML = `
             <label>${formaLabel}</label>
-            <div class="value monetary">R$ ${parseFloat(saldo).toFixed(2)}</div>
+            <div class="value monetary">${saldo}</div>
         `;
         saldosContainer.appendChild(saldoItem);
     });
@@ -419,7 +419,7 @@ async function carregarHistoricoMovimentacoes(contaId) {
                 <td>${dataFormatada}</td>
                 <td><span class="badge ${tipoClasse}">${tipoTexto}</span></td>
                 <td>${formasPagamento.find(fp => fp.value === mov.forma_pagamento)?.label || mov.forma_pagamento}</td>
-                <td class="monetary">R$ ${parseFloat(mov.valor || 0).toFixed(2)}</td>
+                <td class="monetary">${mov.valor || 0}</td>
                 <td>${mov.descricao || '-'}</td>
             `;
             tbody.appendChild(tr);
@@ -1067,7 +1067,7 @@ function preencherTabelaRelatorio(dados) {
             <td class="monetary">R$ ${parseFloat(item.entradas || 0).toFixed(2)}</td>
             <td class="monetary">R$ ${parseFloat(item.saidas || 0).toFixed(2)}</td>
             <td class="monetary valor-saldo ${classeSaldo}">
-                R$ ${saldo.toFixed(2)}
+                R$ ${saldo}
             </td>
             <td>${dataFormatada}</td>
         `;
