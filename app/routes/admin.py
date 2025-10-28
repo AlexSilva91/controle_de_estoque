@@ -920,7 +920,7 @@ def relatorio_produtos_pdf():
                               style=[('LINEBELOW', (0, 0), (-1, -1), 1, colors.black)]))
         elements.append(Spacer(1, 12))
 
-        # -------------------- Tabela --------------------
+        # -------------------- Tabela de Produtos --------------------
         table_data = [[
             Paragraph("Código", styles['Normal']),
             Paragraph("Nome", styles['Normal']),
@@ -982,6 +982,130 @@ def relatorio_produtos_pdf():
         produto_table.setStyle(table_style)
         elements.append(produto_table)
 
+        # -------------------- Tabela de Lotes Separada --------------------
+        elements.append(Spacer(1, 20))
+        
+        # Cabeçalho para lotes
+        lotes_header_style = ParagraphStyle(
+            'LotesHeader',
+            parent=styles['Heading2'],
+            fontSize=14,
+            alignment=TA_LEFT,
+            spaceAfter=10,
+            textColor=colors.HexColor("#2E8B57")
+        )
+        elements.append(Paragraph("📋 Lotes com Estoque Disponível", lotes_header_style))
+        elements.append(Spacer(1, 8))
+
+        # Tabela de lotes
+        lotes_table_data = [[
+            Paragraph("Produto", styles['Normal']),
+            Paragraph("Lote ID", styles['Normal']),
+            Paragraph("Qtd Inicial", styles['Normal']),
+            Paragraph("Qtd Disponível", styles['Normal']),
+            Paragraph("Valor Compra", styles['Normal']),
+            Paragraph("Data Entrada", styles['Normal']),
+            Paragraph("Observação", styles['Normal'])
+        ]]
+
+        # Coletar todos os lotes com quantidade disponível > 0
+        lotes_com_estoque = []
+        for produto in produtos:
+            # Filtrar lotes com quantidade disponível > 0
+            lotes_ativos = [lote for lote in produto.lotes if lote.quantidade_disponivel > 0]
+            lotes_com_estoque.extend(lotes_ativos)
+
+        # Ordenar lotes por produto e data de entrada
+        lotes_com_estoque.sort(key=lambda x: (x.produto.nome, x.data_entrada))
+
+        # Estilo para células de lotes
+        lote_cell_style = ParagraphStyle(
+            'LoteCell',
+            fontSize=6,
+            leading=8,
+            alignment=TA_CENTER,
+            wordWrap='CJK'
+        )
+        lote_cell_left = ParagraphStyle(
+            'LoteCellLeft',
+            parent=lote_cell_style,
+            alignment=TA_LEFT
+        )
+
+        for lote in lotes_com_estoque:
+            # Formatar data
+            data_entrada = lote.data_entrada.strftime("%d/%m/%Y") if lote.data_entrada else "N/A"
+            
+            # Formatar valores
+            valor_compra = formatarMoeda(lote.valor_unitario_compra) if lote.valor_unitario_compra else "N/A"
+            
+            lotes_table_data.append([
+                Paragraph(lote.produto.nome, lote_cell_left),
+                Paragraph(str(lote.id), lote_cell_style),
+                Paragraph(f"{float(lote.quantidade_inicial):,.3f}", lote_cell_style),
+                Paragraph(f"{float(lote.quantidade_disponivel):,.3f}", lote_cell_style),
+                Paragraph(valor_compra, lote_cell_style),
+                Paragraph(data_entrada, lote_cell_style),
+                Paragraph(lote.observacao or "-", lote_cell_left),
+            ])
+
+        # Se não há lotes com estoque, adicionar mensagem
+        if not lotes_com_estoque:
+            lotes_table_data.append([
+                Paragraph("Nenhum lote com estoque disponível encontrado", 
+                         ParagraphStyle('Empty', fontSize=8, alignment=TA_CENTER))
+            ])
+
+        # Larguras para tabela de lotes
+        lote_col_widths = [40*mm, 15*mm, 20*mm, 20*mm, 20*mm, 20*mm, 35*mm]
+
+        lotes_table = Table(lotes_table_data, colWidths=lote_col_widths, repeatRows=1)
+
+        lotes_table_style = TableStyle([
+            ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 7),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2E8B57")),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONT', (0, 1), (-1, -1), 'Helvetica', 6),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ])
+
+        # Linhas zebradas para lotes
+        for i in range(1, len(lotes_table_data)):
+            if i % 2 == 0:
+                lotes_table_style.add('BACKGROUND', (0, i), (-1, i), colors.whitesmoke)
+
+        lotes_table.setStyle(lotes_table_style)
+        elements.append(lotes_table)
+
+        # -------------------- Resumo Estatístico --------------------
+        if lotes_com_estoque:
+            elements.append(Spacer(1, 15))
+            
+            # Calcular totais
+            total_lotes = len(lotes_com_estoque)
+            total_estoque_disponivel = sum(float(lote.quantidade_disponivel) for lote in lotes_com_estoque)
+            total_valor_estoque = sum(float(lote.quantidade_disponivel) * float(lote.valor_unitario_compra) 
+                                    for lote in lotes_com_estoque if lote.valor_unitario_compra)
+            
+            resumo_style = ParagraphStyle(
+                'Resumo',
+                parent=styles['Normal'],
+                fontSize=8,
+                alignment=TA_LEFT,
+                textColor=colors.HexColor("#555555")
+            )
+            
+            resumo_text = [
+                f"<b>Resumo de Lotes:</b>",
+                f"Total de Lotes com Estoque: {total_lotes}",
+                f"Quantidade Total Disponível: {total_estoque_disponivel:,.3f}",
+                f"Valor Total em Estoque: {formatarMoeda(total_valor_estoque)}"
+            ]
+            
+            elements.append(Paragraph("<br/>".join(resumo_text), resumo_style))
+
         # -------------------- Rodapé --------------------
         elements.append(Spacer(1, 15))
         rodape = datetime.now().strftime("Gerado em %d/%m/%Y às %H:%M")
@@ -998,18 +1122,6 @@ def relatorio_produtos_pdf():
     except Exception as e:
         logger.error(f"Erro ao gerar PDF de produtos: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
-
-def to_decimal_or_none(value):
-    """Converte para Decimal com 2 casas decimais e segurança contra erros de precisão."""
-    if value is None:
-        return None
-    try:
-        value = str(value).strip()
-        if value == '':
-            return None
-        return Decimal(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-    except (InvalidOperation, ValueError, TypeError):
-        return None
 
 
 @admin_bp.route('/produtos', methods=['POST'])
