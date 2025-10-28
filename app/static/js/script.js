@@ -5198,11 +5198,13 @@ document.addEventListener('DOMContentLoaded', function () {
         selectOrigem.innerHTML = `
                 <option value="">Selecione a conta de origem</option>
                 ${usuariosComConta.map(usuario => {
-          const saldoTotal = usuario.conta && usuario.conta.saldo_total ?
-            usuario.conta.saldo_total.toFixed(2) : '0.00';
+          const saldoTotal = usuario.conta
+            ? (usuario.conta.saldo_total_formatado || usuario.conta.saldo_total || 'R$ 0,00')
+            : 'R$ 0,00';
+
           return `
                         <option value="${usuario.conta.id}" data-usuario-id="${usuario.id}">
-                            ${usuario.nome} (Saldo: R$ ${saldoTotal})
+                            ${usuario.nome} (Saldo: ${saldoTotal})
                         </option>
                     `;
         }).join('')}
@@ -5216,7 +5218,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <option value="">Selecione a forma de pagamento</option>
                 <option value="pix_fabiano">PIX Fabiano</option>
                 <option value="pix_maquineta">PIX Maquineta</option>
-                <option value="pix_edfrance">PIX Edfrance</option>
+                <option value="pix_edfrance">PIX Edfranci</option>
                 <option value="pix_loja">PIX Loja</option>
                 <option value="dinheiro">Dinheiro</option>
                 <option value="cartao_credito">Cartão de Crédito</option>

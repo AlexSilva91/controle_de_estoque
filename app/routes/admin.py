@@ -2135,20 +2135,27 @@ def listar_usuarios():
                           search not in usuario.email.lower()):
                 continue
                 
-            # Informações da conta
             conta_info = None
             if usuario.conta:
                 saldos_por_forma = {}
+                saldos_por_forma_formatado = {}
+
                 for saldo in usuario.conta.saldos_forma_pagamento:
-                    saldos_por_forma[saldo.forma_pagamento.value] = float(saldo.saldo)
-                
+                    valor = float(saldo.saldo)
+                    saldos_por_forma[saldo.forma_pagamento.value] = valor
+                    saldos_por_forma_formatado[saldo.forma_pagamento.value] = locale.currency(valor, grouping=True)
+
+                saldo_total = float(usuario.conta.saldo_total) if usuario.conta.saldo_total else 0.00
+
                 conta_info = {
                     'id': usuario.conta.id,
-                    'saldo_total': float(usuario.conta.saldo_total) if usuario.conta.saldo_total else 0.00,
+                    'saldo_total': saldo_total,  # numérico, para cálculos JS
+                    'saldo_total_formatado': locale.currency(saldo_total, grouping=True),  # string formatada
                     'saldos_por_forma': saldos_por_forma,
+                    'saldos_por_forma_formatado': saldos_por_forma_formatado,
                     'atualizado_em': usuario.conta.atualizado_em.strftime('%d/%m/%Y %H:%M') if usuario.conta.atualizado_em else None
                 }
-                
+
             result.append({
                 'id': usuario.id,
                 'nome': usuario.nome,
@@ -2156,7 +2163,7 @@ def listar_usuarios():
                 'status': 'Ativo' if usuario.status else 'Inativo',
                 'ultimo_acesso': usuario.ultimo_acesso.strftime('%d/%m/%Y %H:%M') if usuario.ultimo_acesso else 'Nunca',
                 'cpf': usuario.cpf,
-                'conta': conta_info  # Incluir informações completas da conta
+                'conta': conta_info
             })
         
         return jsonify({'success': True, 'usuarios': result})
