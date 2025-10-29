@@ -176,12 +176,33 @@
             <div class="content-wrapper">
                 <!-- Dashboard -->
                 <div id="dashboard" class="tab-content active">
-                    <div class="action-bar">
-                        <button class="btn btn-primary" id="refreshData">
+                    <div class="action-bar" style="display: flex; align-items: center; justify-content: flex-start; gap: 10px; flex-wrap: nowrap;">
+
+                        <!-- Data Inicial -->
+                        <input type="date" id="startDate" class="form-control" style="width: 150px;" />
+                    
+                        <!-- Data Final -->
+                        <input type="date" id="endDate" class="form-control" style="width: 150px;" />
+                    
+                        <!-- Botão Filtrar -->
+                        <button class="btn btn-success" id="filterData" style="white-space: nowrap;">
+                            <i class="fas fa-filter"></i>
+                            <span>Filtrar</span>
+                        </button>
+                    
+                        <!-- Botão Limpar -->
+                        <button class="btn btn-secondary" id="clearFilter" style="white-space: nowrap;">
+                            <i class="fas fa-times"></i>
+                            <span>Limpar</span>
+                        </button>
+                        <!-- Botão Atualizar -->
+                        <button class="btn btn-primary" id="refreshData" style="white-space: nowrap;">
                             <i class="fas fa-sync-alt"></i>
                             <span>Atualizar Dados</span>
                         </button>
+                    
                     </div>
+                    
 
                     <div class="metrics-grid">
                         <!-- Métricas serão preenchidas via JavaScript -->
