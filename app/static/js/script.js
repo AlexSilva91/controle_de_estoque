@@ -368,9 +368,62 @@ document.addEventListener('DOMContentLoaded', function () {
       if (caixasChart) caixasChart.destroy();
       if (vendasDiariasChart) vendasDiariasChart.destroy();
       if (produtosMaiorFluxoChart) produtosMaiorFluxoChart.destroy();
-
-      const vendasMensaisData = await fetchWithErrorHandling('/admin/dashboard/vendas-mensais');
-      if (vendasMensaisData.success) {
+      
+      // ===== INSERIR FILTRO AO LADO DO TÍTULO =====
+      (function inserirFiltroTitulo() {
+        const titulos = document.querySelectorAll('h2, h3, h4');
+        let tituloAlvo = null;
+        titulos.forEach(t => {
+          if (t.textContent.trim().toLowerCase().includes('vendas vs despesas')) {
+            tituloAlvo = t;
+          }
+        });
+      
+        if (tituloAlvo && !document.getElementById('filtroVendasContainer')) {
+          const filtroDiv = document.createElement('div');
+          filtroDiv.id = 'filtroVendasContainer';
+          filtroDiv.style.display = 'flex';
+          filtroDiv.style.gap = '8px';
+          filtroDiv.style.alignItems = 'center';
+          filtroDiv.style.marginLeft = '12px';
+      
+          filtroDiv.innerHTML = `
+            <span style="color:#ccc;">Filtros:</span>
+            <input type="date" id="dataInicio" style="padding:4px;background:#222;color:#eee;border:1px solid #555;border-radius:4px;">
+            <input type="date" id="dataFim" style="padding:4px;background:#222;color:#eee;border:1px solid #555;border-radius:4px;">
+            <button id="btnFiltrar" style="padding:4px 10px;background:#00695c;color:#fff;border:none;border-radius:4px;cursor:pointer;">Filtrar</button>
+            <button id="btnLimpar" style="padding:4px 10px;background:#424242;color:#fff;border:none;border-radius:4px;cursor:pointer;">Limpar</button>
+          `;
+      
+          // coloca o filtro na mesma linha do título
+          const wrapper = document.createElement('div');
+          wrapper.style.display = 'flex';
+          wrapper.style.alignItems = 'center';
+          wrapper.style.justifyContent = 'space-between';
+          wrapper.appendChild(tituloAlvo.cloneNode(true));
+          wrapper.appendChild(filtroDiv);
+          tituloAlvo.replaceWith(wrapper);
+        }
+      })();
+      
+      // ===== FUNÇÃO PARA ATUALIZAR O GRÁFICO =====
+      async function atualizarGraficoVendas() {
+        const dataInicio = document.getElementById('dataInicio')?.value;
+        const dataFim = document.getElementById('dataFim')?.value;
+      
+        let url = '/admin/dashboard/vendas-mensais';
+        if (dataInicio && dataFim) {
+          url += `?data_inicio=${dataInicio}&data_fim=${dataFim}`;
+        } else {
+          // quando sem filtro, rota deve retornar todos os dados do banco
+          url += '?todos=true';
+        }
+      
+        const vendasMensaisData = await fetchWithErrorHandling(url);
+        if (!vendasMensaisData.success) return;
+      
+        if (vendasDespesasChart) vendasDespesasChart.destroy();
+      
         const vendasDespesasCtx = document.getElementById('vendasDespesasChart').getContext('2d');
         vendasDespesasChart = new Chart(vendasDespesasCtx, {
           type: 'bar',
@@ -398,9 +451,7 @@ document.addEventListener('DOMContentLoaded', function () {
             plugins: {
               legend: {
                 position: 'top',
-                labels: {
-                  color: '#e0e0e0'
-                }
+                labels: { color: '#e0e0e0' }
               },
               tooltip: {
                 callbacks: {
@@ -413,24 +464,26 @@ document.addEventListener('DOMContentLoaded', function () {
             scales: {
               y: {
                 beginAtZero: true,
-                grid: {
-                  color: 'rgba(255, 255, 255, 0.1)'
-                },
-                ticks: {
-                  callback: function (value) {
-                    return formatMoney(value);
-                  }
-                }
+                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                ticks: { callback: value => formatMoney(value) }
               },
-              x: {
-                grid: {
-                  color: 'rgba(255, 255, 255, 0.1)'
-                }
-              }
+              x: { grid: { color: 'rgba(255, 255, 255, 0.1)' } }
             }
           }
         });
       }
+      
+      // ===== EVENTOS DOS BOTÕES =====
+      document.getElementById('btnFiltrar')?.addEventListener('click', atualizarGraficoVendas);
+      document.getElementById('btnLimpar')?.addEventListener('click', () => {
+        document.getElementById('dataInicio').value = '';
+        document.getElementById('dataFim').value = '';
+        atualizarGraficoVendas();
+      });
+      
+      // ===== EXECUÇÃO INICIAL =====
+      await atualizarGraficoVendas();
+      
 
       const vendasDiariasData = await fetchWithErrorHandling('/admin/dashboard/vendas-diarias');
       if (vendasDiariasData.success) {
@@ -642,6 +695,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
           }
         });
+        
         // Gráfico de Produtos com Maior Fluxo
         const produtosFluxoData = await fetchWithErrorHandling('/admin/dashboard/produtos-maior-fluxo');
         if (produtosFluxoData.success) {

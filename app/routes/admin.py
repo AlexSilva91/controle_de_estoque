@@ -344,83 +344,86 @@ def get_vendas_diarias():
 @admin_required
 def get_vendas_mensais():
     try:
+        data_inicio_str = request.args.get('data_inicio')
+        data_fim_str = request.args.get('data_fim')
+
         hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
         meses = []
         vendas = []
         despesas = []
-        
-        # Obter dados dos últimos 6 meses
-        for i in range(5, -1, -1):
-            mes = hoje.month - i
-            ano = hoje.year
-            if mes <= 0:
-                mes += 12
-                ano -= 1
-            
+
+        if data_inicio_str and data_fim_str:
+            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d')
+            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d')
+            meses_intervalo = []
+            atual = data_inicio
+
+            while atual <= data_fim:
+                meses_intervalo.append((atual.year, atual.month))
+                # Avança um mês
+                if atual.month == 12:
+                    atual = atual.replace(year=atual.year + 1, month=1)
+                else:
+                    atual = atual.replace(month=atual.month + 1)
+        else:
+            # Últimos 6 meses
+            meses_intervalo = []
+            for i in range(5, -1, -1):
+                mes = hoje.month - i
+                ano = hoje.year
+                if mes <= 0:
+                    mes += 12
+                    ano -= 1
+                meses_intervalo.append((ano, mes))
+
+        for ano, mes in meses_intervalo:
             primeiro_dia = datetime(ano, mes, 1)
             ultimo_dia = datetime(ano, mes + 1, 1) - timedelta(days=1) if mes < 12 else datetime(ano, 12, 31)
             ultimo_dia = ultimo_dia.replace(hour=23, minute=59, second=59, microsecond=999999)
-            
-            # CÁLCULO DE ENTRADAS DO MÊS (igual ao do /dashboard/metrics)
-            # 1. Vendas (pagamentos de notas fiscais)
+
             vendas_mes = db.session.query(
                 func.sum(PagamentoNotaFiscal.valor)
-            ).join(
-                NotaFiscal,
-                PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
-            ).join(
-                Caixa,
-                NotaFiscal.caixa_id == Caixa.id
+            ).join(NotaFiscal, PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+            ).join(Caixa, NotaFiscal.caixa_id == Caixa.id
             ).filter(
                 NotaFiscal.status == StatusNota.emitida,
                 Caixa.data_abertura >= primeiro_dia,
                 Caixa.data_abertura <= ultimo_dia
             ).scalar() or 0
 
-            # 2. Contas recebidas (pagamentos de contas a receber)
             contas_recebidas_mes = db.session.query(
                 func.sum(PagamentoContaReceber.valor_pago)
-            ).join(
-                Caixa,
-                PagamentoContaReceber.caixa_id == Caixa.id
+            ).join(Caixa, PagamentoContaReceber.caixa_id == Caixa.id
             ).filter(
                 Caixa.data_abertura >= primeiro_dia,
                 Caixa.data_abertura <= ultimo_dia
             ).scalar() or 0
 
-            # 3. Estornos (saida_estorno) para deduzir
             estornos_mes = db.session.query(
                 func.sum(Financeiro.valor)
-            ).join(
-                Caixa,
-                Financeiro.caixa_id == Caixa.id
+            ).join(Caixa, Financeiro.caixa_id == Caixa.id
             ).filter(
                 Financeiro.tipo == TipoMovimentacao.saida_estorno,
                 Caixa.data_abertura >= primeiro_dia,
                 Caixa.data_abertura <= ultimo_dia
             ).scalar() or 0
 
-            # Entradas líquidas = (vendas + contas recebidas) - estornos
-            entradas_brutas_mes = float(vendas_mes) + float(contas_recebidas_mes)
-            entradas_liquidas_mes = entradas_brutas_mes - float(estornos_mes)
-            
-            # CÁLCULO DE DESPESAS DO MÊS (igual ao do /dashboard/metrics)
+            entradas_liquidas_mes = (float(vendas_mes) + float(contas_recebidas_mes)) - float(estornos_mes)
+
             saidas_mes = db.session.query(
                 func.sum(Financeiro.valor)
-            ).join(
-                Caixa,
-                Financeiro.caixa_id == Caixa.id
+            ).join(Caixa, Financeiro.caixa_id == Caixa.id
             ).filter(
                 Financeiro.tipo == TipoMovimentacao.saida,
                 Financeiro.categoria == CategoriaFinanceira.despesa,
                 Caixa.data_abertura >= primeiro_dia,
                 Caixa.data_abertura <= ultimo_dia
             ).scalar() or 0
-            
+
             meses.append(f"{primeiro_dia.strftime('%m/%Y')}")
-            vendas.append(entradas_liquidas_mes)  # Usar entradas líquidas como "vendas"
+            vendas.append(entradas_liquidas_mes)
             despesas.append(float(saidas_mes))
-        
+
         return jsonify({
             'success': True,
             'meses': meses,
@@ -430,7 +433,7 @@ def get_vendas_mensais():
     except Exception as e:
         logger.error(f"Erro na consulta de vendas mensais: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
-    
+
 @admin_bp.route('/dashboard/movimentacoes')
 @login_required
 @admin_required
