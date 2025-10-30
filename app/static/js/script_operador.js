@@ -3908,6 +3908,34 @@ function applyManualDiscount() {
     }
 }
 // ==================== FUNÇÕES PARA MÚLTIPLAS FORMAS DE PAGAMENTO ====================
+function updateRemainingSubtotal() {
+    const subtotalElement = document.getElementById('subtotal-value');
+    const selectedPaymentsList = document.querySelector('.selected-payments-list');
+
+    if (!subtotalElement || !selectedPaymentsList) return;
+
+    // Obtém o valor original do subtotal (guarde em data-original se ainda não existir)
+    if (!subtotalElement.dataset.originalValue) {
+        const originalText = subtotalElement.textContent.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
+        subtotalElement.dataset.originalValue = parseFloat(originalText) || 0;
+    }
+
+    const originalSubtotal = parseFloat(subtotalElement.dataset.originalValue);
+
+    // Soma os pagamentos já inseridos
+    let totalPayments = 0;
+    selectedPaymentsList.querySelectorAll('input[name="payment_amounts[]"]').forEach(input => {
+        const value = parseFloat(input.value.replace(',', '.')) || 0;
+        totalPayments += value;
+    });
+
+    // Calcula o restante
+    const remaining = Math.max(originalSubtotal - totalPayments, 0);
+
+    // Atualiza o subtotal exibido
+    subtotalElement.textContent = formatCurrency(remaining);
+}
+
 function addPaymentMethod() {
     const paymentMethodSelect = document.querySelector('.payment-method-select');
     const paymentAmountInput = document.querySelector('.payment-amount');
@@ -3955,6 +3983,7 @@ function addPaymentMethod() {
 
     // Calcula o total novamente
     calculateSaleTotal();
+    updateRemainingSubtotal();
 }
 
 // ==================== INICIALIZAÇÃO ADICIONAL ====================
