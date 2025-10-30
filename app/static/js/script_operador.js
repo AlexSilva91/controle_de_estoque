@@ -3911,10 +3911,9 @@ function applyManualDiscount() {
 function updateRemainingSubtotal() {
     const subtotalElement = document.getElementById('subtotal-value');
     const selectedPaymentsList = document.querySelector('.selected-payments-list');
-
     if (!subtotalElement || !selectedPaymentsList) return;
 
-    // Obtém o valor original do subtotal (guarde em data-original se ainda não existir)
+    // Captura valor original se ainda não definido
     if (!subtotalElement.dataset.originalValue) {
         const originalText = subtotalElement.textContent.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
         subtotalElement.dataset.originalValue = parseFloat(originalText) || 0;
@@ -3922,7 +3921,7 @@ function updateRemainingSubtotal() {
 
     const originalSubtotal = parseFloat(subtotalElement.dataset.originalValue);
 
-    // Soma os pagamentos já inseridos
+    // Soma os pagamentos existentes
     let totalPayments = 0;
     selectedPaymentsList.querySelectorAll('input[name="payment_amounts[]"]').forEach(input => {
         const value = parseFloat(input.value.replace(',', '.')) || 0;
@@ -3932,16 +3931,31 @@ function updateRemainingSubtotal() {
     // Calcula o restante
     const remaining = Math.max(originalSubtotal - totalPayments, 0);
 
-    // Atualiza o subtotal exibido
+    // Atualiza exibição
     subtotalElement.textContent = formatCurrency(remaining);
+
+    // Guarda o valor atual em data-current-value
+    subtotalElement.dataset.currentValue = remaining.toFixed(2);
 }
 
 function addPaymentMethod() {
     const paymentMethodSelect = document.querySelector('.payment-method-select');
     const paymentAmountInput = document.querySelector('.payment-amount');
     const selectedPaymentsList = document.querySelector('.selected-payments-list');
+    const subtotalElement = document.getElementById('subtotal-value');
 
-    if (!paymentMethodSelect || !paymentAmountInput || !selectedPaymentsList) return;
+    if (!paymentMethodSelect || !paymentAmountInput || !selectedPaymentsList || !subtotalElement) return;
+
+    // Garante valor atualizado
+    updateRemainingSubtotal();
+
+    const currentSubtotal = parseFloat(subtotalElement.dataset.currentValue || 0);
+
+    // Impede adicionar se subtotal zerado
+    if (currentSubtotal <= 0) {
+        showMessage('O subtotal já foi totalmente pago.', 'error');
+        return;
+    }
 
     const method = paymentMethodSelect.value;
     const amountText = paymentAmountInput.value.replace(/\./g, '').replace(',', '.');
@@ -3957,6 +3971,13 @@ function addPaymentMethod() {
         return;
     }
 
+    // Verifica se valor excede o restante
+    if (amount > currentSubtotal) {
+        showMessage('O valor digitado é maior que o valor restante do subtotal.', 'error');
+        return;
+    }
+
+    // Cria item de pagamento
     const paymentItem = document.createElement('div');
     paymentItem.className = 'payment-item';
     paymentItem.innerHTML = `
@@ -3971,18 +3992,17 @@ function addPaymentMethod() {
 
     selectedPaymentsList.appendChild(paymentItem);
 
-    // Adiciona listener para o botão de remover
+    // Remove pagamento
     paymentItem.querySelector('.btn-remove-payment').addEventListener('click', function () {
         paymentItem.remove();
         calculateSaleTotal();
         updateRemainingSubtotal();
     });
 
-    // Limpa os campos
+    // Limpa campos
     paymentMethodSelect.value = '';
     paymentAmountInput.value = '';
 
-    // Calcula o total novamente
     calculateSaleTotal();
     updateRemainingSubtotal();
 }
