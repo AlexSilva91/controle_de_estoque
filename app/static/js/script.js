@@ -363,67 +363,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
   async function updateCharts() {
     try {
+      // Destruir gráficos existentes
       if (vendasDespesasChart) vendasDespesasChart.destroy();
       if (formasPagamentoChart) formasPagamentoChart.destroy();
       if (caixasChart) caixasChart.destroy();
       if (vendasDiariasChart) vendasDiariasChart.destroy();
       if (produtosMaiorFluxoChart) produtosMaiorFluxoChart.destroy();
       
-      // ===== INSERIR FILTRO AO LADO DO TÍTULO =====
-      (function inserirFiltroTitulo() {
-        const titulos = document.querySelectorAll('h2, h3, h4');
-        let tituloAlvo = null;
-        titulos.forEach(t => {
-          if (t.textContent.trim().toLowerCase().includes('vendas vs despesas')) {
-            tituloAlvo = t;
-          }
-        });
+      // Obter datas dos filtros principais
+      const startDate = document.getElementById('startDate')?.value;
+      const endDate = document.getElementById('endDate')?.value;
       
-        if (tituloAlvo && !document.getElementById('filtroVendasContainer')) {
-          const filtroDiv = document.createElement('div');
-          filtroDiv.id = 'filtroVendasContainer';
-          filtroDiv.style.display = 'flex';
-          filtroDiv.style.gap = '8px';
-          filtroDiv.style.alignItems = 'center';
-          filtroDiv.style.marginLeft = '12px';
-      
-          filtroDiv.innerHTML = `
-            <span style="color:#ccc;">Filtros:</span>
-            <input type="date" id="dataInicio" style="padding:4px;background:#222;color:#eee;border:1px solid #555;border-radius:4px;">
-            <input type="date" id="dataFim" style="padding:4px;background:#222;color:#eee;border:1px solid #555;border-radius:4px;">
-            <button id="btnFiltrar" style="padding:4px 10px;background:#00695c;color:#fff;border:none;border-radius:4px;cursor:pointer;">Filtrar</button>
-            <button id="btnLimpar" style="padding:4px 10px;background:#424242;color:#fff;border:none;border-radius:4px;cursor:pointer;">Limpar</button>
-          `;
-      
-          // coloca o filtro na mesma linha do título
-          const wrapper = document.createElement('div');
-          wrapper.style.display = 'flex';
-          wrapper.style.alignItems = 'center';
-          wrapper.style.justifyContent = 'space-between';
-          wrapper.appendChild(tituloAlvo.cloneNode(true));
-          wrapper.appendChild(filtroDiv);
-          tituloAlvo.replaceWith(wrapper);
-        }
-      })();
-      
-      // ===== FUNÇÃO PARA ATUALIZAR O GRÁFICO =====
-      async function atualizarGraficoVendas() {
-        const dataInicio = document.getElementById('dataInicio')?.value;
-        const dataFim = document.getElementById('dataFim')?.value;
-      
-        let url = '/admin/dashboard/vendas-mensais';
-        if (dataInicio && dataFim) {
-          url += `?data_inicio=${dataInicio}&data_fim=${dataFim}`;
+      // ===== FUNÇÃO PARA CONSTRUIR URL COM FILTROS =====
+      function buildUrl(baseUrl) {
+        const url = new URL(baseUrl, window.location.origin);
+        if (startDate && endDate) {
+          url.searchParams.append('data_inicio', startDate);
+          url.searchParams.append('data_fim', endDate);
         } else {
-          // quando sem filtro, rota deve retornar todos os dados do banco
-          url += '?todos=true';
+          url.searchParams.append('todos', 'true');
         }
+        return url.toString();
+      }
+
+      // ===== ATUALIZAR TODOS OS GRÁFICOS COM FILTROS =====
       
-        const vendasMensaisData = await fetchWithErrorHandling(url);
-        if (!vendasMensaisData.success) return;
-      
-        if (vendasDespesasChart) vendasDespesasChart.destroy();
-      
+      // 1. Gráfico Vendas vs Despesas
+      const vendasMensaisData = await fetchWithErrorHandling(buildUrl('/admin/dashboard/vendas-mensais'));
+      if (vendasMensaisData.success) {
         const vendasDespesasCtx = document.getElementById('vendasDespesasChart').getContext('2d');
         vendasDespesasChart = new Chart(vendasDespesasCtx, {
           type: 'bar',
@@ -472,23 +439,11 @@ document.addEventListener('DOMContentLoaded', function () {
           }
         });
       }
-      
-      // ===== EVENTOS DOS BOTÕES =====
-      document.getElementById('btnFiltrar')?.addEventListener('click', atualizarGraficoVendas);
-      document.getElementById('btnLimpar')?.addEventListener('click', () => {
-        document.getElementById('dataInicio').value = '';
-        document.getElementById('dataFim').value = '';
-        atualizarGraficoVendas();
-      });
-      
-      // ===== EXECUÇÃO INICIAL =====
-      await atualizarGraficoVendas();
-      
 
-      const vendasDiariasData = await fetchWithErrorHandling('/admin/dashboard/vendas-diarias');
+      // 2. Gráfico Formas de Pagamento
+      const vendasDiariasData = await fetchWithErrorHandling(buildUrl('/admin/dashboard/vendas-diarias'));
       if (vendasDiariasData.success) {
         const formasPagamentoMap = new Map();
-
         vendasDiariasData.dados.forEach(dia => {
           dia.formas_pagamento.forEach(fp => {
             const forma = fp.forma.replace('pix_', '').replace(/_/g, ' ').replace('cartao', 'cartão');
@@ -538,9 +493,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 position: 'right',
                 labels: {
                   color: '#e0e0e0',
-                  font: {
-                    size: 12
-                  }
+                  font: { size: 12 }
                 }
               },
               tooltip: {
@@ -559,6 +512,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       }
 
+      // 3. Gráfico Totais por Caixa
       if (vendasDiariasData?.success) {
         const caixasCtx = document.getElementById('caixasChart').getContext('2d');
         caixasChart = new Chart(caixasCtx, {
@@ -578,12 +532,7 @@ document.addEventListener('DOMContentLoaded', function () {
           options: {
             responsive: true,
             plugins: {
-              legend: {
-                display: false,
-                labels: {
-                  color: '#e0e0e0'
-                }
-              },
+              legend: { display: false },
               tooltip: {
                 callbacks: {
                   label: function (context) {
@@ -595,28 +544,18 @@ document.addEventListener('DOMContentLoaded', function () {
             scales: {
               y: {
                 beginAtZero: true,
-                grid: {
-                  color: 'rgba(255, 255, 255, 0.1)'
-                },
-                ticks: {
-                  callback: function (value) {
-                    return formatMoney(value);
-                  }
-                }
+                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                ticks: { callback: value => formatMoney(value) }
               },
-              x: {
-                grid: {
-                  color: 'rgba(255, 255, 255, 0.1)'
-                }
-              }
+              x: { grid: { color: 'rgba(255, 255, 255, 0.1)' } }
             }
           }
         });
       }
 
+      // 4. Gráfico Vendas Diárias
       if (vendasDiariasData?.success) {
         const vendasDiariasCtx = document.getElementById('vendasDiariasChart').getContext('2d');
-
         const labels = vendasDiariasData.dados.map(item => item.data);
         const vendas = vendasDiariasData.dados.map(item =>
           parseFloat(item.total_vendas.replace(/[^\d,]/g, '').replace(',', '.'))
@@ -637,11 +576,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 borderColor: chartColors.greenBorder,
                 borderWidth: 3,
                 tension: 0.4,
-                fill: false,
-                pointBackgroundColor: '#fff',
-                pointBorderColor: chartColors.greenBorder,
-                pointRadius: 5,
-                pointHoverRadius: 7
+                fill: false
               },
               {
                 label: 'Despesas (R$)',
@@ -650,11 +585,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 borderColor: chartColors.redBorder,
                 borderWidth: 3,
                 tension: 0.4,
-                fill: false,
-                pointBackgroundColor: '#fff',
-                pointBorderColor: chartColors.redBorder,
-                pointRadius: 5,
-                pointHoverRadius: 7
+                fill: false
               }
             ]
           },
@@ -663,9 +594,7 @@ document.addEventListener('DOMContentLoaded', function () {
             plugins: {
               legend: {
                 position: 'top',
-                labels: {
-                  color: '#e0e0e0'
-                }
+                labels: { color: '#e0e0e0' }
               },
               tooltip: {
                 callbacks: {
@@ -678,254 +607,119 @@ document.addEventListener('DOMContentLoaded', function () {
             scales: {
               y: {
                 beginAtZero: true,
-                grid: {
-                  color: 'rgba(255, 255, 255, 0.1)'
-                },
-                ticks: {
-                  callback: function (value) {
-                    return formatMoney(value);
+                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                ticks: { callback: value => formatMoney(value) }
+              },
+              x: { grid: { color: 'rgba(255, 255, 255, 0.1)' } }
+            }
+          }
+        });
+      }
+
+      // 5. Gráfico Produtos com Maior Fluxo
+      const produtosFluxoData = await fetchWithErrorHandling(buildUrl('/admin/dashboard/produtos-maior-fluxo'));
+      if (produtosFluxoData.success) {
+        const produtosFluxoCtx = document.getElementById('ProdutosMaiorFluxoChart').getContext('2d');
+        
+        const margensLucro = produtosFluxoData.valores_venda.map((venda, index) => {
+          const compra = produtosFluxoData.valores_compra[index] || 0;
+          return venda - compra;
+        });
+
+        const percentuaisMargem = produtosFluxoData.valores_venda.map((venda, index) => {
+          const compra = produtosFluxoData.valores_compra[index] || 0;
+          return compra > 0 ? ((venda - compra) / compra * 100).toFixed(2) : '∞';
+        });
+
+        const isMobile = window.innerWidth <= 768;
+        
+        produtosMaiorFluxoChart = new Chart(produtosFluxoCtx, {
+          type: 'bar',
+          data: {
+            labels: produtosFluxoData.produtos,
+            datasets: [
+              {
+                label: 'Valor de Venda (R$)',
+                data: produtosFluxoData.valores_venda,
+                backgroundColor: 'rgba(76, 175, 80, 0.8)',
+                borderColor: 'rgb(76, 175, 80)',
+                borderWidth: 1,
+                order: 1,
+                barPercentage: isMobile ? 0.4 : 0.7
+              },
+              {
+                label: 'Valor de Compra (R$)',
+                data: produtosFluxoData.valores_compra,
+                backgroundColor: 'rgba(244, 67, 54, 0.8)',
+                borderColor: 'rgb(244, 67, 54)',
+                borderWidth: 1,
+                order: 2,
+                barPercentage: isMobile ? 0.4 : 0.7
+              },
+              {
+                label: 'Margem de Lucro (R$)',
+                data: margensLucro,
+                backgroundColor: 'rgba(33, 150, 243, 0.9)',
+                borderColor: 'rgb(33, 150, 243)',
+                borderWidth: 3,
+                type: 'line',
+                order: 0
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: { color: '#e0e0e0' }
+              },
+              tooltip: {
+                callbacks: {
+                  label: function (context) {
+                    return `${context.dataset.label}: ${formatMoney(context.raw)}`;
+                  },
+                  afterLabel: function (context) {
+                    if (context.dataset.label === 'Margem de Lucro (R$)') {
+                      return `Margem Percentual: ${percentuaisMargem[context.dataIndex]}%`;
+                    }
+                    return null;
                   }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                ticks: {
+                  callback: value => formatMoney(value),
+                  color: '#e0e0e0'
                 }
               },
               x: {
-                grid: {
-                  color: 'rgba(255, 255, 255, 0.1)'
-                }
+                grid: { display: false },
+                ticks: { color: '#e0e0e0' }
               }
             }
           }
         });
-        
-        // Gráfico de Produtos com Maior Fluxo
-        const produtosFluxoData = await fetchWithErrorHandling('/admin/dashboard/produtos-maior-fluxo');
-        if (produtosFluxoData.success) {
-          const produtosFluxoCtx = document.getElementById('ProdutosMaiorFluxoChart').getContext('2d');
-
-          // Calcular margem de lucro para cada produto
-          const margensLucro = produtosFluxoData.valores_venda.map((venda, index) => {
-            const compra = produtosFluxoData.valores_compra[index] || 0;
-            return venda - compra;
-          });
-
-          // Calcular percentual de margem para tooltip
-          const percentuaisMargem = produtosFluxoData.valores_venda.map((venda, index) => {
-            const compra = produtosFluxoData.valores_compra[index] || 0;
-            return compra > 0 ? ((venda - compra) / compra * 100).toFixed(2) : '∞';
-          });
-
-          // Destruir gráfico anterior se existir
-          if (produtosMaiorFluxoChart) {
-            produtosMaiorFluxoChart.destroy();
-          }
-
-          // Verificar tamanho da tela para ajustes específicos
-          const isMobile = window.innerWidth <= 768;
-          const isTablet = window.innerWidth > 768 && window.innerWidth <= 1024;
-
-          produtosMaiorFluxoChart = new Chart(produtosFluxoCtx, {
-            type: 'bar',
-            data: {
-              labels: produtosFluxoData.produtos,
-              datasets: [
-                {
-                  label: 'Valor de Venda (R$)',
-                  data: produtosFluxoData.valores_venda,
-                  backgroundColor: 'rgba(76, 175, 80, 0.8)',
-                  borderColor: 'rgb(76, 175, 80)',
-                  borderWidth: 1,
-                  order: 1,
-                  barPercentage: isMobile ? 0.4 : 0.7,
-                  categoryPercentage: isMobile ? 0.6 : 0.8,
-                  borderRadius: 4,
-                  hoverBackgroundColor: 'rgba(76, 175, 80, 1)'
-                },
-                {
-                  label: 'Valor de Compra (R$)',
-                  data: produtosFluxoData.valores_compra,
-                  backgroundColor: 'rgba(244, 67, 54, 0.8)',
-                  borderColor: 'rgb(244, 67, 54)',
-                  borderWidth: 1,
-                  order: 2,
-                  barPercentage: isMobile ? 0.4 : 0.7,
-                  categoryPercentage: isMobile ? 0.6 : 0.8,
-                  borderRadius: 4,
-                  hoverBackgroundColor: 'rgba(244, 67, 54, 1)'
-                },
-                {
-                  label: 'Margem de Lucro (R$)',
-                  data: margensLucro,
-                  backgroundColor: 'rgba(33, 150, 243, 0.9)',
-                  borderColor: 'rgb(33, 150, 243)',
-                  borderWidth: 3,
-                  type: 'line',
-                  order: 0,
-                  pointStyle: 'circle',
-                  pointRadius: isMobile ? 3 : 6,
-                  pointHoverRadius: isMobile ? 5 : 8,
-                  pointBackgroundColor: 'rgb(33, 150, 243)',
-                  pointBorderColor: '#ffffff',
-                  pointBorderWidth: 2,
-                  tension: 0.3,
-                  fill: false
-                }
-              ]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              layout: {
-                padding: {
-                  top: 20,
-                  right: isMobile ? 10 : 20,
-                  bottom: isMobile ? 15 : 25,
-                  left: isMobile ? 10 : 20
-                }
-              },
-              plugins: {
-                legend: {
-                  position: 'top',
-                  labels: {
-                    color: '#e0e0e0',
-                    boxWidth: 16,
-                    padding: 20,
-                    font: {
-                      size: isMobile ? 10 : 14,
-                      weight: '500'
-                    },
-                    usePointStyle: true,
-                    pointStyle: 'rectRounded'
-                  }
-                },
-                tooltip: {
-                  mode: 'index',
-                  intersect: false,
-                  backgroundColor: 'rgba(30, 30, 46, 0.95)',
-                  titleColor: '#ffffff',
-                  bodyColor: '#e0e0e0',
-                  borderColor: 'rgba(255, 255, 255, 0.1)',
-                  borderWidth: 1,
-                  cornerRadius: 6,
-                  callbacks: {
-                    label: function (context) {
-                      return `${context.dataset.label}: ${formatMoney(context.raw)}`;
-                    },
-                    afterLabel: function (context) {
-                      if (context.dataset.label === 'Margem de Lucro (R$)') {
-                        return `Margem Percentual: ${percentuaisMargem[context.dataIndex]}%`;
-                      }
-                      return null;
-                    }
-                  },
-                  titleFont: {
-                    size: isMobile ? 12 : 14,
-                    weight: 'bold'
-                  },
-                  bodyFont: {
-                    size: isMobile ? 11 : 13
-                  },
-                  padding: 12,
-                  boxWidth: 12,
-                  boxHeight: 12,
-                  displayColors: true
-                },
-                title: {
-                  display: true,
-                  text: 'Top 10 Produtos - Maior Fluxo (Últimos 30 Dias)',
-                  color: '#e0e0e0',
-                  font: {
-                    size: isMobile ? 14 : 18,
-                    weight: '600'
-                  },
-                  padding: {
-                    top: 5,
-                    bottom: isMobile ? 15 : 25
-                  }
-                }
-              },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  grid: {
-                    color: 'rgba(255, 255, 255, 0.1)',
-                    drawBorder: false
-                  },
-                  ticks: {
-                    callback: function (value) {
-                      return formatMoney(value);
-                    },
-                    color: '#e0e0e0',
-                    font: {
-                      size: isMobile ? 10 : 12
-                    },
-                    maxTicksLimit: isMobile ? 5 : 7,
-                    padding: 10
-                  },
-                  title: {
-                    display: true,
-                    text: 'Valores em Reais (R$)',
-                    color: '#e0e0e0',
-                    font: {
-                      size: isMobile ? 11 : 13,
-                      weight: '500'
-                    },
-                    padding: {
-                      top: 10,
-                      bottom: 10
-                    }
-                  }
-                },
-                x: {
-                  grid: {
-                    display: false,
-                    drawBorder: false
-                  },
-                  ticks: {
-                    color: '#e0e0e0',
-                    maxRotation: isMobile ? 60 : 45,
-                    minRotation: isMobile ? 60 : 45,
-                    font: {
-                      size: isMobile ? 10 : 12
-                    },
-                    padding: 8,
-                    callback: function (value, index) {
-                      const label = this.getLabelForValue(value);
-                      if (isMobile && label.length > 12) {
-                        return label.substring(0, 10) + '...';
-                      }
-                      return label;
-                    }
-                  }
-                }
-              },
-              interaction: {
-                mode: 'index',
-                intersect: false
-              },
-              animation: {
-                duration: 800,
-                easing: 'easeOutQuart'
-              }
-            }
-          });
-
-          // Adicionar event listener para redimensionamento da janela - CORRIGIDO
-          let resizeTimeout;
-          window.addEventListener('resize', function () {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(function () {
-              // Apenas atualizar o gráfico existente, não recriar
-              if (produtosMaiorFluxoChart) {
-                produtosMaiorFluxoChart.resize();
-                produtosMaiorFluxoChart.update();
-              }
-            }, 250);
-          });
-        }
       }
+
     } catch (error) {
       showFlashMessage('error', 'Erro ao atualizar gráficos');
     }
   }
+
+  // Event Listeners para os filtros principais
+  document.getElementById('filterData')?.addEventListener('click', loadDashboardData);
+  document.getElementById('clearFilter')?.addEventListener('click', () => {
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
+    loadDashboardData();
+  });
+  document.getElementById('refreshData')?.addEventListener('click', loadDashboardData);
 
   async function loadMovimentacoes() {
     try {

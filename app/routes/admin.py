@@ -225,14 +225,32 @@ def get_dashboard_metrics():
 @admin_required
 def get_vendas_diarias():
     try:
+        data_inicio_str = request.args.get('data_inicio')
+        data_fim_str = request.args.get('data_fim')
+        todos = request.args.get('todos') == 'true'
+
         hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
-        primeiro_dia_mes = datetime(hoje.year, hoje.month, 1).date()
+        
+        if data_inicio_str and data_fim_str and not todos:
+            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+            
+            if data_fim > hoje:
+                data_fim = hoje
+        else:
+            data_inicio = hoje - timedelta(days=6)
+            data_fim = hoje
+
         dados_diarios = []
 
-        # 1. Vendas dos últimos 30 dias por caixa
-        data_inicio_30_dias = hoje - timedelta(days=30)
-        
-        vendas_ultimos_30_dias = db.session.query(
+        if data_inicio_str and data_fim_str and not todos:
+            periodo_caixa_inicio = data_inicio
+            periodo_caixa_fim = data_fim
+        else:
+            periodo_caixa_inicio = hoje - timedelta(days=30)
+            periodo_caixa_fim = hoje
+
+        vendas_periodo = db.session.query(
             Caixa.id.label('caixa_id'),
             Caixa.data_abertura,
             func.sum(Financeiro.valor).label('total_vendas')
@@ -241,71 +259,47 @@ def get_vendas_diarias():
         ).filter(
             Financeiro.tipo == TipoMovimentacao.entrada,
             Financeiro.categoria == CategoriaFinanceira.venda,
-            Financeiro.data >= data_inicio_30_dias,
-            Financeiro.data <= hoje
+            Financeiro.data >= periodo_caixa_inicio,
+            Financeiro.data <= periodo_caixa_fim
         ).group_by(
             Caixa.id, Caixa.data_abertura
         ).order_by(
             Caixa.data_abertura.asc()
         ).all()
 
-        # 2. Total de vendas no mês
-        total_vendas_mes = db.session.query(
-            func.sum(Financeiro.valor)
-        ).filter(
-            Financeiro.tipo == TipoMovimentacao.entrada,
-            Financeiro.categoria == CategoriaFinanceira.venda,
-            Financeiro.data >= primeiro_dia_mes,
-            Financeiro.data <= hoje
-        ).scalar() or 0
-
-        # 3. Total de despesas no mês
-        total_despesas_mes = db.session.query(
-            func.sum(Financeiro.valor)
-        ).filter(
-            Financeiro.tipo == TipoMovimentacao.saida,
-            Financeiro.categoria == CategoriaFinanceira.despesa,
-            Financeiro.data >= primeiro_dia_mes,
-            Financeiro.data <= hoje
-        ).scalar() or 0
-
-        # 4. Dados diários (últimos 7 dias)
-        for i in range(6, -1, -1):
-            data = hoje - timedelta(days=i)
-            
-            # Total de vendas do dia
+        current_date = data_inicio
+        
+        while current_date <= data_fim:
             total_vendas = db.session.query(
                 func.sum(Financeiro.valor)
             ).filter(
                 Financeiro.tipo == TipoMovimentacao.entrada,
                 Financeiro.categoria == CategoriaFinanceira.venda,
-                func.date(Financeiro.data) == data
+                func.date(Financeiro.data) == current_date
             ).scalar() or 0
 
-            # Total de despesas do dia
             total_despesas = db.session.query(
                 func.sum(Financeiro.valor)
             ).filter(
                 Financeiro.tipo == TipoMovimentacao.saida,
                 Financeiro.categoria == CategoriaFinanceira.despesa,
-                func.date(Financeiro.data) == data
+                func.date(Financeiro.data) == current_date
             ).scalar() or 0
 
-            # Formas de pagamento
             formas_pagamento = db.session.query(
                 PagamentoNotaFiscal.forma_pagamento,
                 func.sum(PagamentoNotaFiscal.valor).label('total')
             ).join(
                 NotaFiscal, NotaFiscal.id == PagamentoNotaFiscal.nota_fiscal_id
             ).filter(
-                func.date(NotaFiscal.data_emissao) == data,
+                func.date(NotaFiscal.data_emissao) == current_date,
                 NotaFiscal.status == StatusNota.emitida
             ).group_by(
                 PagamentoNotaFiscal.forma_pagamento
             ).all()
 
             dados_diarios.append({
-                'data': data.strftime('%d/%m'),
+                'data': current_date.strftime('%d/%m'),
                 'total_vendas': format_currency(total_vendas),
                 'total_despesas': format_currency(total_despesas),
                 'saldo_dia': format_currency(total_vendas - total_despesas),
@@ -315,6 +309,26 @@ def get_vendas_diarias():
                 ]
             })
 
+            current_date += timedelta(days=1)
+
+        total_vendas_periodo = db.session.query(
+            func.sum(Financeiro.valor)
+        ).filter(
+            Financeiro.tipo == TipoMovimentacao.entrada,
+            Financeiro.categoria == CategoriaFinanceira.venda,
+            Financeiro.data >= data_inicio,
+            Financeiro.data <= data_fim
+        ).scalar() or 0
+
+        total_despesas_periodo = db.session.query(
+            func.sum(Financeiro.valor)
+        ).filter(
+            Financeiro.tipo == TipoMovimentacao.saida,
+            Financeiro.categoria == CategoriaFinanceira.despesa,
+            Financeiro.data >= data_inicio,
+            Financeiro.data <= data_fim
+        ).scalar() or 0
+
         return jsonify({
             'success': True,
             'dados': dados_diarios,
@@ -323,17 +337,18 @@ def get_vendas_diarias():
                     'data_abertura': caixa.data_abertura.strftime('%d/%m/%Y'),
                     'total_vendas': format_currency(caixa.total_vendas or 0)
                 }
-                for caixa in vendas_ultimos_30_dias
+                for caixa in vendas_periodo
             ],
             'resumo_mensal': {
-                'total_vendas': format_currency(total_vendas_mes),
-                'total_despesas': format_currency(total_despesas_mes),
-                'saldo_mensal': format_currency(total_vendas_mes - total_despesas_mes)
+                'total_vendas': format_currency(total_vendas_periodo),
+                'total_despesas': format_currency(total_despesas_periodo),
+                'saldo_mensal': format_currency(total_vendas_periodo - total_despesas_periodo)
             },
             'periodo': {
-                'inicio': (hoje - timedelta(days=6)).strftime('%d/%m/%Y'),
-                'fim': hoje.strftime('%d/%m/%Y')
-            }
+                'inicio': data_inicio.strftime('%d/%m/%Y'),
+                'fim': data_fim.strftime('%d/%m/%Y')
+            },
+            'com_filtro': bool(data_inicio_str and data_fim_str and not todos)
         })
     except Exception as e:
         logger.error(f"Erro na consulta de vendas diárias: {str(e)}")
@@ -464,10 +479,22 @@ def get_movimentacoes():
 @admin_required
 def produtos_maior_fluxo():
     try:
-        # Data de 30 dias atrás
-        data_inicio = datetime.now() - timedelta(days=30)
+        # Obter filtros de data
+        data_inicio_str = request.args.get('data_inicio')
+        data_fim_str = request.args.get('data_fim')
+        todos = request.args.get('todos') == 'true'
+
+        if data_inicio_str and data_fim_str and not todos:
+            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d')
+            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d')
+            # Garantir que data_fim inclua todo o dia
+            data_fim = data_fim.replace(hour=23, minute=59, second=59, microsecond=999999)
+        else:
+            # Comportamento padrão: últimos 30 dias
+            data_inicio = datetime.now() - timedelta(days=30)
+            data_fim = datetime.now()
         
-        # Consulta para obter os produtos com maior saída usando NotaFiscalItem
+        # Consulta para obter os produtos com maior saída no período
         produtos_fluxo = db.session.query(
             Produto.nome,
             Produto.valor_unitario_compra,
@@ -480,7 +507,8 @@ def produtos_maior_fluxo():
             NotaFiscal, NotaFiscal.id == NotaFiscalItem.nota_id
         ).filter(
             NotaFiscal.status == StatusNota.emitida,
-            NotaFiscal.data_emissao >= data_inicio
+            NotaFiscal.data_emissao >= data_inicio,
+            NotaFiscal.data_emissao <= data_fim
         ).group_by(
             Produto.id, Produto.nome, Produto.valor_unitario_compra
         ).order_by(
@@ -497,7 +525,6 @@ def produtos_maior_fluxo():
             produtos.append(produto.nome)
             quantidades.append(float(produto.total_saida))
             valores_venda.append(float(produto.valor_total_venda))
-            # Usar o valor total de compra calculado na query
             valor_compra = float(produto.valor_total_compra or 0)
             valores_compra.append(valor_compra)
         
@@ -506,7 +533,11 @@ def produtos_maior_fluxo():
             'produtos': produtos,
             'quantidades': quantidades,
             'valores_venda': valores_venda,
-            'valores_compra': valores_compra
+            'valores_compra': valores_compra,
+            'periodo': {
+                'inicio': data_inicio.strftime('%d/%m/%Y'),
+                'fim': data_fim.strftime('%d/%m/%Y')
+            }
         })
         
     except Exception as e:
