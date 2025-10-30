@@ -319,14 +319,221 @@ document.addEventListener('DOMContentLoaded', function () {
         if (tabId === 'contas-receber') loadContasReceber();
       });
     });
-
+    
     const logoutBtn = document.getElementById('logoutBtn');
+
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
-        if (confirm('Tem certeza que deseja sair do sistema?')) {
-          window.location.href = '/logout';
+        renderLogoutModal();
+      });
+    }
+
+    function renderLogoutModal() {
+      // Criar o overlay do modal
+      const modalOverlay = document.createElement('div');
+      modalOverlay.id = 'logoutModal';
+      modalOverlay.className = 'modal active';
+      modalOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 2000;
+        padding: 20px;
+      `;
+
+      // Criar o container do modal
+      const modalDialog = document.createElement('div');
+      modalDialog.className = 'modal-dialog';
+      modalDialog.style.cssText = `
+        background: var(--bg-2);
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        max-width: 400px;
+        width: 100%;
+        overflow: hidden;
+      `;
+
+      // Criar header do modal
+      const modalHeader = document.createElement('div');
+      modalHeader.style.cssText = `
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 24px 0;
+        margin-bottom: 16px;
+      `;
+
+      const modalTitle = document.createElement('h3');
+      modalTitle.textContent = 'Confirmar Saída';
+      modalTitle.style.cssText = `
+        margin: 0;
+        color: var(--text-1);
+        font-size: 1.25rem;
+        font-weight: 600;
+      `;
+
+      const closeButton = document.createElement('button');
+      closeButton.className = 'modal-close';
+      closeButton.innerHTML = '&times;';
+      closeButton.style.cssText = `
+        background: none;
+        border: none;
+        color: var(--text-3);
+        font-size: 24px;
+        cursor: pointer;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+      `;
+
+      // Criar body do modal
+      const modalBody = document.createElement('div');
+      modalBody.style.cssText = `
+        padding: 0 24px;
+        text-align: center;
+      `;
+
+      const modalIcon = document.createElement('i');
+      modalIcon.className = 'fas fa-sign-out-alt';
+      modalIcon.style.cssText = `
+        font-size: 48px;
+        color: var(--danger);
+        margin-bottom: 16px;
+        display: block;
+      `;
+
+      const modalText = document.createElement('p');
+      modalText.textContent = 'Tem certeza que deseja sair do sistema?';
+      modalText.style.cssText = `
+        color: var(--text-2);
+        margin: 0;
+        font-size: 1.1rem;
+        line-height: 1.5;
+      `;
+
+      // Criar footer do modal
+      const modalFooter = document.createElement('div');
+      modalFooter.style.cssText = `
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        padding: 24px;
+        margin-top: 20px;
+        background: rgba(255, 255, 255, 0.02);
+        border-top: 1px solid var(--border);
+      `;
+
+      const cancelButton = document.createElement('button');
+      cancelButton.id = 'cancelLogout';
+      cancelButton.className = 'btn btn-secondary';
+      cancelButton.textContent = 'Cancelar';
+      cancelButton.style.cssText = `
+        padding: 10px 24px;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        background: var(--bg-3);
+        color: var(--text-1);
+      `;
+
+      const confirmButton = document.createElement('button');
+      confirmButton.id = 'confirmLogout';
+      confirmButton.className = 'btn btn-danger';
+      confirmButton.textContent = 'Sair';
+      confirmButton.style.cssText = `
+        padding: 10px 24px;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        background: var(--danger);
+        color: white;
+      `;
+
+      // Adicionar estilos de hover simples (apenas mudança de cor)
+      closeButton.addEventListener('mouseenter', () => {
+        closeButton.style.background = 'rgba(255, 255, 255, 0.1)';
+        closeButton.style.color = 'var(--text-1)';
+      });
+      closeButton.addEventListener('mouseleave', () => {
+        closeButton.style.background = 'none';
+        closeButton.style.color = 'var(--text-3)';
+      });
+
+      cancelButton.addEventListener('mouseenter', () => {
+        cancelButton.style.filter = 'brightness(1.1)';
+      });
+      cancelButton.addEventListener('mouseleave', () => {
+        cancelButton.style.filter = 'none';
+      });
+
+      confirmButton.addEventListener('mouseenter', () => {
+        confirmButton.style.filter = 'brightness(1.1)';
+      });
+      confirmButton.addEventListener('mouseleave', () => {
+        confirmButton.style.filter = 'none';
+      });
+
+      // Montar a estrutura do modal
+      modalHeader.appendChild(modalTitle);
+      modalHeader.appendChild(closeButton);
+
+      modalBody.appendChild(modalIcon);
+      modalBody.appendChild(modalText);
+
+      modalFooter.appendChild(cancelButton);
+      modalFooter.appendChild(confirmButton);
+
+      modalDialog.appendChild(modalHeader);
+      modalDialog.appendChild(modalBody);
+      modalDialog.appendChild(modalFooter);
+
+      modalOverlay.appendChild(modalDialog);
+
+      // Adicionar o modal ao body
+      document.body.appendChild(modalOverlay);
+
+      // Adicionar event listeners
+      function closeModal() {
+        document.body.removeChild(modalOverlay);
+      }
+
+      closeButton.addEventListener('click', closeModal);
+      cancelButton.addEventListener('click', closeModal);
+
+      confirmButton.addEventListener('click', () => {
+        window.location.href = '/logout';
+      });
+
+      // Fechar modal clicando fora
+      modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) {
+          closeModal();
         }
       });
+
+      // Fechar modal com ESC
+      const handleEscKey = (e) => {
+        if (e.key === 'Escape') {
+          closeModal();
+          document.removeEventListener('keydown', handleEscKey);
+        }
+      };
+      document.addEventListener('keydown', handleEscKey);
+
+      // Foco no botão cancelar para acessibilidade
+      cancelButton.focus();
     }
   }
 
