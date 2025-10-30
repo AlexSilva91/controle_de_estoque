@@ -3975,6 +3975,7 @@ function addPaymentMethod() {
     paymentItem.querySelector('.btn-remove-payment').addEventListener('click', function () {
         paymentItem.remove();
         calculateSaleTotal();
+        updateRemainingSubtotal();
     });
 
     // Limpa os campos
