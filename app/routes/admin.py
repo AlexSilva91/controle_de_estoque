@@ -156,7 +156,6 @@ def get_dashboard_metrics():
             Caixa.data_abertura <= fim_dia
         ).scalar() or 0
 
-        # 2. Contas recebidas (pagamentos de contas a receber)
         contas_recebidas_mes = db.session.query(
             func.sum(PagamentoContaReceber.valor_pago)
         ).join(
@@ -179,11 +178,9 @@ def get_dashboard_metrics():
             Caixa.data_abertura <= fim_dia
         ).scalar() or 0
 
-        # Entradas líquidas = (vendas + contas recebidas) - estornos
         entradas_brutas_mes = float(vendas_mes) + float(contas_recebidas_mes)
         entradas_liquidas_mes = entradas_brutas_mes - float(estornos_mes)
 
-        # CÁLCULO DE SAÍDAS DO MÊS (igual ao do PDF) - somente despesas
         saidas_mes = db.session.query(
             func.sum(Financeiro.valor)
         ).join(
