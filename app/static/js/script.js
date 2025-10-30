@@ -13,20 +13,24 @@ document.addEventListener('DOMContentLoaded', function () {
   Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
 
   const chartColors = {
-    green: 'rgba(102, 187, 106, 0.7)',
-    greenBorder: 'rgba(102, 187, 106, 1)',
-    red: 'rgba(239, 83, 80, 0.7)',
-    redBorder: 'rgba(239, 83, 80, 1)',
-    blue: 'rgba(66, 165, 245, 0.7)',
-    blueBorder: 'rgba(66, 165, 245, 1)',
-    yellow: 'rgba(255, 213, 79, 0.7)',
-    yellowBorder: 'rgba(255, 213, 79, 1)',
-    purple: 'rgba(171, 71, 188, 0.7)',
-    purpleBorder: 'rgba(171, 71, 188, 1)',
-    orange: 'rgba(255, 167, 38, 0.7)',
-    orangeBorder: 'rgba(255, 167, 38, 1)',
-    teal: 'rgba(38, 166, 154, 0.7)',
-    tealBorder: 'rgba(38, 166, 154, 1)'
+      green: 'rgba(0, 245, 160, 0.8)',
+      greenBorder: 'rgba(0, 255, 170, 1)',
+      red: 'rgba(255, 65, 108, 0.8)',
+      redBorder: 'rgba(255, 100, 138, 1)',
+      blue: 'rgba(0, 150, 255, 0.8)',
+      blueBorder: 'rgba(0, 180, 255, 1)',
+      yellow: 'rgba(255, 220, 0, 0.8)',
+      yellowBorder: 'rgba(255, 235, 60, 1)',
+      purple: 'rgba(147, 51, 234, 0.8)',
+      purpleBorder: 'rgba(168, 85, 247, 1)',
+      orange: 'rgba(255, 105, 0, 0.8)',
+      orangeBorder: 'rgba(255, 140, 50, 1)',
+      teal: 'rgba(0, 212, 191, 0.8)',
+      tealBorder: 'rgba(0, 230, 210, 1)',
+      pink: 'rgba(255, 0, 128, 0.8)',
+      pinkBorder: 'rgba(255, 50, 150, 1)',
+      cyan: 'rgba(0, 255, 255, 0.8)',
+      cyanBorder: 'rgba(50, 255, 255, 1)'
   };
 
   function formatMoney(value) {
