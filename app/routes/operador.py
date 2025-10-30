@@ -927,7 +927,7 @@ def api_despesas_hoje():
     """API que retorna as despesas do dia atual."""
     try:
         despesas = listar_despesas_dia_atual_formatado(db.session)
-        print(despesas)
+
         return jsonify({"sucesso": True, "despesas": despesas}), 200
     except Exception as e:
         print(e)
