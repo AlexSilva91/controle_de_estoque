@@ -2652,6 +2652,33 @@ async function loadDaySales() {
     }
 }
 
+async function carregarDespesasDoDia() {
+    try {
+        const response = await fetch('/operador/api/despesas/hoje');
+        const data = await response.json();
+
+        const tbody = document.querySelector('#day-expenses-table tbody');
+        tbody.innerHTML = '';
+
+        if (data.sucesso && data.despesas.length > 0) {
+            data.despesas.forEach(d => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${d.id}</td>
+                    <td>${d.descricao}</td>
+                    <td>${formatCurrency(d.valor)}</td>
+                    <td>${d.data}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">Nenhuma despesa encontrada</td></tr>`;
+        }
+    } catch (error) {
+        console.error('Erro ao carregar despesas:', error);
+    }
+}
+
 function removerVendasDuplicadas(vendas) {
     const vendasUnicas = [];
     const idsVistos = new Set();
@@ -2709,7 +2736,7 @@ function renderDaySales(vendas) {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${sale.id}</td>
-                <td>${new Date(sale.data_emissao).toLocaleString('pt-BR')}</td>
+                <td>${sale.data_emissao}</td>
                 <td>${sale.cliente?.nome || 'Consumidor Final'}</td>
                 <td>${formatCurrency(sale.valor_total)}</td>
                 <td>${formatPaymentMethods(sale.pagamentos)}</td>
@@ -2749,6 +2776,7 @@ function renderDaySales(vendas) {
             return;
         }
     });
+    carregarDespesasDoDia();
 }
 
 

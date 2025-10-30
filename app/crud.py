@@ -14,6 +14,7 @@ from typing import List, Optional, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 from datetime import datetime
+from sqlalchemy import and_
 from typing import Dict, List, Any, Optional
 from decimal import Decimal
 from sqlalchemy.orm import selectinload, joinedload
@@ -3133,3 +3134,37 @@ def atualizar_estoque_produto_apos_lote(db: Session, produto_id, lote_id_atualiz
     except Exception as e:
         db.rollback()
         logger.info(f"Erro ao atualizar estoque do produto {produto_id}: {str(e)}")
+        
+def listar_despesas_dia_atual(db: Session):
+    """Retorna lista de despesas do dia atual (horário de São Paulo)."""
+    tz = ZoneInfo("America/Sao_Paulo")
+    agora = datetime.now(tz)
+    inicio_dia = datetime(agora.year, agora.month, agora.day, 0, 0, 0, tzinfo=tz)
+    fim_dia = inicio_dia + timedelta(days=1)
+
+    despesas = (
+        db.query(Financeiro)
+        .filter(
+            and_(
+                Financeiro.categoria == CategoriaFinanceira.despesa,
+                Financeiro.data >= inicio_dia,
+                Financeiro.data < fim_dia
+            )
+        )
+        .order_by(Financeiro.data.desc())
+        .all()
+    )
+
+    return despesas
+
+def listar_despesas_dia_atual_formatado(db: Session):
+    despesas = listar_despesas_dia_atual(db)
+    return [
+        {
+            "id": d.id,
+            "descricao": d.descricao,
+            "valor": float(d.valor),
+            "data": d.data.strftime("%d/%m/%Y, %H:%M"),
+        }
+        for d in despesas
+    ]

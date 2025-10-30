@@ -48,6 +48,7 @@ from app.crud import (
     TipoMovimentacao,
     buscar_pagamentos_notas_fiscais,
     estornar_venda,
+    listar_despesas_dia_atual_formatado,
     listar_despesas_do_dia,
     obter_detalhes_vendas_dia,
     registrar_venda_completa,
@@ -876,7 +877,7 @@ def obter_vendas_hoje():
             
             resultado.append({
                 'id': venda.id,
-                'data_emissao': venda.data_emissao.astimezone(tz).isoformat(),
+                'data_emissao': venda.data_emissao.strftime("%d/%m/%Y, %H:%M"),
                 'cliente': {
                     'id': venda.cliente.id if venda.cliente else None,
                     'nome': venda.cliente.nome if venda.cliente else 'Consumidor Final'
@@ -918,7 +919,20 @@ def obter_vendas_hoje():
             'success': False,
             'message': 'Erro interno ao processar vendas'
         }), 500
-        
+    
+@operador_bp.route('/api/despesas/hoje', methods=['GET'])
+@login_required
+@operador_required
+def api_despesas_hoje():
+    """API que retorna as despesas do dia atual."""
+    try:
+        despesas = listar_despesas_dia_atual_formatado(db.session)
+        print(despesas)
+        return jsonify({"sucesso": True, "despesas": despesas}), 200
+    except Exception as e:
+        print(e)
+        return jsonify({"sucesso": False, "erro": str(e)}), 500
+
 @operador_bp.route('/api/vendas/resumo-diario', methods=['GET'])
 @login_required
 @operador_required
