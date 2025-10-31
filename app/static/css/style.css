@@ -593,115 +593,177 @@ body {
   padding: var(--space-lg);
 }
 
-/* Grid de Métricas */
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
-  gap: var(--space-md);
-  margin-bottom: var(--space-lg);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-lg);
+  padding: var(--space-lg);
+  width: 100%;
+  box-sizing: border-box;
 }
 
+/* CARD BASE */
 .metric-card {
+  position: relative;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-lg);
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  padding: var(--space-md);
-  background-color: var(--card-bg);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-sm);
   transition: all 0.3s ease;
-  border: 1px solid var(--border-color);
-  position: relative;
   overflow: hidden;
+  cursor: pointer;
+  min-height: 120px;
 }
 
 .metric-card::before {
-  content: '';
+  content: "";
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 4px;
-  height: 100%;
-  background: var(--gradient-primary);
+  inset: 0;
+  background: radial-gradient(circle at 120% 120%, rgba(255,255,255,0.08), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.metric-card:hover::before {
+  opacity: 1;
 }
 
 .metric-card:hover {
-  transform: translateY(-5px);
-  box-shadow: var(--shadow-lg);
-  border-color: var(--primary-color);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  border-color: var(--primary-light);
 }
 
-.metric-card.revenue::before {
-  background: var(--gradient-secondary);
-}
-
-.metric-card.expense::before {
-  background: var(--gradient-accent);
-}
-
-.metric-card.balance::before {
-  background: var(--gradient-primary);
-}
-
+/* ÍCONE */
 .metric-icon {
+  flex-shrink: 0;
+  width: clamp(50px, 12vw, 64px);
+  height: clamp(50px, 12vw, 64px);
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: clamp(40px, 10vw, 48px);
-  height: clamp(40px, 10vw, 48px);
-  border-radius: 50%;
-  font-size: var(--font-size-lg);
-  color: white;
+  font-size: clamp(1.2rem, 3vw, 1.6rem);
+  color: var(--text-light);
   background: var(--gradient-primary);
-  flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(108,92,231,0.4);
+  transition: all 0.3s ease;
 }
 
-.metric-card.revenue .metric-icon {
-  background: var(--gradient-secondary);
+.metric-card:hover .metric-icon {
+  box-shadow: 0 0 16px rgba(108,92,231,0.6);
+  transform: scale(1.05);
 }
 
-.metric-card.expense .metric-icon {
-  background: var(--gradient-accent);
-}
-
-.metric-card.balance .metric-icon {
-  background: var(--gradient-primary);
-}
-
+/* TEXTO */
 .metric-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   flex: 1;
   min-width: 0;
 }
 
 .metric-info h3 {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-muted);
-  margin-bottom: var(--space-xs);
+  font-size: clamp(14px, 2vw, 16px);
+  color: var(--text-secondary);
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .metric-info .value {
-  font-size: var(--font-size-xl);
+  font-size: clamp(18px, 3.5vw, 26px);
   font-weight: var(--font-weight-bold);
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.metric-card.revenue .value {
-  color: var(--secondary-color);
-}
-
-.metric-card.expense .value {
-  color: var(--accent-color);
-}
-
-.metric-card.balance .value {
   color: var(--primary-light);
+  margin-top: 6px;
+  text-shadow: 0 0 6px rgba(108,92,231,0.4);
+  white-space: nowrap;
+}
+
+/* VARIAÇÕES DE COR */
+.metric-card[data-tipo-financeiro="entrada"] .metric-icon {
+  background: var(--gradient-secondary);
+  box-shadow: 0 0 10px rgba(0,206,201,0.4);
+}
+
+.metric-card[data-tipo-financeiro="saida"] .metric-icon {
+  background: var(--gradient-accent);
+  box-shadow: 0 0 10px rgba(253,121,168,0.4);
+}
+
+.metric-card[data-unidade="kg"] .metric-icon {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.metric-card[data-unidade="saco"] .metric-icon {
+  background: linear-gradient(135deg, #10b981, #047857);
+}
+
+.metric-card[data-unidade="unidade"] .metric-icon {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+}
+
+/* EFEITO DE BRILHO DISCRETO */
+.metric-card::after {
+  content: "";
+  position: absolute;
+  top: -100%;
+  left: -100%;
+  width: 300%;
+  height: 300%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.06), transparent);
+  transform: rotate(25deg);
+  transition: opacity 0.6s ease;
+  opacity: 0;
+}
+
+.metric-card:hover::after {
+  opacity: 1;
+  animation: shine 1.2s ease-in-out;
+}
+
+@keyframes shine {
+  from { transform: translateX(-50%) rotate(25deg); }
+  to { transform: translateX(50%) rotate(25deg); }
+}
+
+/* RESPONSIVIDADE FINA */
+@media (max-width: 768px) {
+  .metrics-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .metric-card {
+    flex-direction: column;
+    text-align: center;
+    padding: var(--space-md);
+  }
+
+  .metric-icon {
+    margin-bottom: var(--space-sm);
+  }
+
+  .metric-info h3 {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 480px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-card {
+    min-height: auto;
+  }
 }
 
 /* Botões */
