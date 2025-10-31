@@ -1113,6 +1113,9 @@ tr:hover td {
 }
 
 /* Modal */
+/* ===============================
+   Container Modal
+================================ */
 .modal {
   position: fixed;
   top: 0;
@@ -1126,17 +1129,19 @@ tr:hover td {
   padding: var(--space-md);
 }
 
+/* Overlay com blur e transparência */
 .modal-overlay {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(5px);
+  background: rgba(15, 15, 26, 0.85); /* fundo escuro semi-transparente */
+  backdrop-filter: blur(8px); /* blur mais perceptível */
   z-index: -1;
 }
 
+/* Dialog principal */
 .modal-dialog {
   width: 100%;
   max-width: min(90vw, 600px);
@@ -1144,23 +1149,25 @@ tr:hover td {
   overflow-y: auto;
   background-color: var(--card-bg);
   border-radius: var(--border-radius);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
   border: 1px solid var(--border-color);
-  animation: modalFadeIn 0.3s ease;
+  animation: modalFadeIn 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transform: translateY(-10px);
+  transition: transform 0.3s ease;
 }
 
-.modal-sm {
-  max-width: min(90vw, 400px);
-}
+/* Tamanhos específicos */
+.modal-sm { max-width: min(90vw, 400px); }
+.modal-lg { max-width: min(90vw, 800px); }
 
-.modal-lg {
-  max-width: min(90vw, 800px);
-}
-
+/* Conteúdo do modal */
 .modal-content {
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
+/* Header */
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -1170,6 +1177,8 @@ tr:hover td {
   background-color: var(--bg-tertiary);
   flex-wrap: wrap;
   gap: var(--space-sm);
+  border-top-left-radius: var(--border-radius);
+  border-top-right-radius: var(--border-radius);
 }
 
 .modal-title {
@@ -1187,6 +1196,7 @@ tr:hover td {
   color: var(--primary-light);
 }
 
+/* Botão fechar */
 .close-modal {
   background: none;
   border: none;
@@ -1197,15 +1207,20 @@ tr:hover td {
 }
 
 .close-modal:hover {
-  color: var(--text-primary);
+  color: var(--primary-light);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 0 10px rgba(108,92,231,0.4);
 }
 
+/* Corpo do modal */
 .modal-body {
   padding: var(--space-lg);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
 }
 
+/* Footer */
 .modal-footer {
   display: flex;
   justify-content: flex-end;
@@ -1214,23 +1229,71 @@ tr:hover td {
   border-top: 1px solid var(--border-color);
   background-color: var(--bg-tertiary);
   flex-wrap: wrap;
+  border-bottom-left-radius: var(--border-radius);
+  border-bottom-right-radius: var(--border-radius);
 }
 
+/* Animação */
 @keyframes modalFadeIn {
   from {
     opacity: 0;
     transform: translateY(-20px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-/* Estilos específicos para modais de caixa */
+/* Modais específicos */
 .caixa-modal .modal-dialog {
   max-width: min(90vw, 900px);
+}
+
+/* ===============================
+   RESPONSIVIDADE
+================================ */
+@media (max-width: 1024px) {
+  .modal-dialog {
+    max-width: 85vw;
+    padding: var(--space-sm);
+  }
+  .modal-body {
+    padding: var(--space-md);
+  }
+  .modal-header, .modal-footer {
+    padding: var(--space-sm);
+  }
+}
+
+@media (max-width: 768px) {
+  .modal-dialog {
+    max-width: 90vw;
+  }
+  .modal-title {
+    font-size: var(--font-size-md);
+  }
+  .modal-body {
+    font-size: var(--font-size-sm);
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-dialog {
+    max-width: 95vw;
+  }
+  .modal-title {
+    font-size: var(--font-size-sm);
+  }
+  .modal-body {
+    font-size: 0.875rem;
+    padding: var(--space-sm);
+  }
+  .modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
 }
 
 .info-grid {
@@ -1329,14 +1392,63 @@ tr:hover td {
   border-left: 3px solid var(--warning-color);
 }
 
-/* Footer */
+/* ===============================
+   Estrutura geral da página
+================================ */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Conteúdo principal */
+main {
+  flex: 1; /* expande para ocupar o espaço restante */
+}
+
+/* ===============================
+   Footer delicado
+================================ */
 footer {
-  padding: var(--space-md) 0;
+  padding: var(--space-sm) 0;
   text-align: center;
   font-size: var(--font-size-xs);
-  color: var(--text-muted);
+  color: var(--text-3);
   border-top: 1px solid var(--border-color);
-  background-color: var(--bg-tertiary);
+  background-color: var(--bg-2);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Links discretos no footer */
+footer a {
+  color: var(--text-3);
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+footer a:hover {
+  color: var(--primary-light);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  footer {
+    font-size: var(--font-size-xxs, 0.65rem);
+    padding: var(--space-xs) 0;
+  }
+}
+
+@media (max-width: 480px) {
+  footer {
+    font-size: 0.6rem;
+    padding: 4px 0;
+  }
 }
 
 /* Perfil do Usuário */
@@ -3860,4 +3972,243 @@ td {
 /* REMOVER QUALQUER KEYFRAME RESTANTE */
 @keyframes dummy {
   /* Keyframes vazios para substituir qualquer existente */
+}
+/* ===============================
+   Sidebar Base
+================================ */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  max-width: 280px;
+  height: 100%;
+  background: var(--sidebar-bg);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-md) 0;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.5);
+  transition: transform 0.3s ease, width 0.3s ease;
+  z-index: 1000;
+  overflow-y: auto;
+}
+
+/* ===============================
+   Cabeçalho Sidebar
+================================ */
+.sidebar-header {
+  padding: 0 var(--space-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-lg);
+}
+
+.logo-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.logo {
+  font-size: clamp(18px, 2.5vw, 24px);
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-light);
+  letter-spacing: 1px;
+}
+
+.logo-subtitle {
+  font-size: clamp(12px, 2vw, 14px);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.close-sidebar-mobile {
+  background: transparent;
+  border: none;
+  color: var(--text-light);
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: none;
+}
+
+/* ===============================
+   Navegação
+================================ */
+.sidebar-nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar-nav li {
+  margin: 0;
+}
+
+.sidebar-nav a.nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: clamp(12px, 2vw, 16px);
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-nav a.nav-link i {
+  font-size: clamp(14px, 2.5vw, 18px);
+}
+
+.sidebar-nav a.nav-link:hover {
+  color: var(--primary-light);
+  background: rgba(255,255,255,0.05);
+  border-left-color: var(--primary-color);
+}
+
+.sidebar-nav li.active a.nav-link {
+  color: var(--primary-light);
+  font-weight: var(--font-weight-semibold);
+  border-left-color: var(--primary-color);
+  background: rgba(255,255,255,0.08);
+}
+
+/* ===============================
+   Footer
+================================ */
+.sidebar-footer {
+  padding: var(--space-md);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.user-info-mobile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.user-avatar-mobile i {
+  font-size: clamp(24px, 4vw, 32px);
+  color: var(--primary-color);
+}
+
+.user-details-mobile {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-name {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  font-size: clamp(12px, 2vw, 14px);
+}
+
+.user-role {
+  font-size: clamp(10px, 1.8vw, 12px);
+  color: var(--text-muted);
+}
+
+.logout-btn-mobile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--accent-color);
+  color: var(--text-light);
+  border: none;
+  width: 100%;
+  padding: var(--space-xs);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-weight: var(--font-weight-semibold);
+  transition: all 0.3s ease;
+}
+
+.logout-btn-mobile:hover {
+  background: var(--accent-dark);
+}
+
+/* ===============================
+   RESPONSIVIDADE
+================================ */
+
+/* Tablet e mobile */
+@media (max-width: 1024px) {
+  .sidebar {
+    transform: translateX(-100%);
+    width: 240px;
+  }
+  .sidebar.show {
+    transform: translateX(0);
+  }
+  .close-sidebar-mobile {
+    display: block;
+  }
+}
+
+/* Tablets pequenos */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 220px;
+  }
+  .sidebar-nav a.nav-link {
+    font-size: clamp(11px, 2vw, 14px);
+    padding: var(--space-xs) var(--space-sm);
+  }
+  .logo {
+    font-size: clamp(16px, 4vw, 20px);
+  }
+  .logo-subtitle {
+    font-size: clamp(10px, 2vw, 12px);
+  }
+  .user-avatar-mobile i {
+    font-size: clamp(20px, 4vw, 24px);
+  }
+}
+
+/* Mobile pequeno */
+@media (max-width: 480px) {
+  .sidebar {
+    width: 100%;
+  }
+  .sidebar-nav a.nav-link {
+    font-size: clamp(10px, 3vw, 12px);
+    padding: var(--space-xs);
+    justify-content: flex-start;
+  }
+  .sidebar-footer {
+    padding: var(--space-xs);
+  }
+  .user-info-mobile {
+    gap: var(--space-xs);
+  }
+  .user-name, .user-role {
+    font-size: clamp(9px, 2.5vw, 11px);
+  }
+  .logout-btn-mobile {
+    font-size: clamp(10px, 2.5vw, 12px);
+    padding: var(--space-xs);
+  }
+}
+
+/* Scroll interno suave */
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
 }
