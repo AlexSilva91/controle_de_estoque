@@ -669,6 +669,26 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         const formasPagamentoCtx = document.getElementById('formasPagamentoChart').getContext('2d');
+
+        // Função que retorna posição/alinhamento da legenda
+        function getLegendConfig() {
+          const isSmall = window.innerWidth <= 600;
+          return {
+            position: isSmall ? 'bottom' : 'right',
+            align: isSmall ? 'center' : 'init'
+          };
+        }
+
+        // Função que gera o texto da legenda (sempre com valor)
+        function generateLegendText(chart, index) {
+          const dataset = chart.data.datasets[0];
+          const value = dataset.data[index] || 0;
+          const label = chart.data.labels[index] || '';
+          return `${label}: ${formatMoney(value)}`;
+        }
+
+        let legendCfg = getLegendConfig();
+
         formasPagamentoChart = new Chart(formasPagamentoCtx, {
           type: 'doughnut',
           data: {
@@ -698,13 +718,42 @@ document.addEventListener('DOMContentLoaded', function () {
           },
           options: {
             responsive: true,
+            maintainAspectRatio: false,
             cutout: '70%',
             plugins: {
               legend: {
-                position: 'right',
+                position: legendCfg.position,
+                align: legendCfg.align,
                 labels: {
                   color: '#e0e0e0',
-                  font: { size: 12 }
+                  font: { size: 12, weight: 'bold' },
+                  boxWidth: 20,
+                  generateLabels: function (chart) {
+                    const dataset = chart.data.datasets[0];
+                    const meta = chart.getDatasetMeta(0);
+                    const labels = chart.data.labels;
+                    return labels.map((label, i) => {
+                      const arc = meta.data[i];
+                      const hidden = arc && arc.hidden === true;
+                      return {
+                        text: generateLegendText(chart, i),
+                        fillStyle: dataset.backgroundColor[i],
+                        strokeStyle: dataset.borderColor[i],
+                        lineWidth: dataset.borderWidth,
+                        fontColor: '#e0e0e0',
+                        hidden: hidden,
+                        index: i,
+                        datasetIndex: 0
+                      };
+                    });
+                  }
+                },
+                onClick: function (evt, legendItem, legend) {
+                  const index = legendItem.index;
+                  const chart = legend.chart;
+                  const meta = chart.getDatasetMeta(legendItem.datasetIndex);
+                  meta.data[index].hidden = !meta.data[index].hidden;
+                  chart.update();
                 }
               },
               tooltip: {
