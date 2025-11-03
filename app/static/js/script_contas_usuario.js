@@ -338,13 +338,15 @@ function fecharDetalhesUsuario() {
     usuarioSelecionado = null;
 }
 
-async function carregarHistoricoMovimentacoes(contaId) {
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/contas-usuario/${contaId}/movimentacoes`);
+let paginaAtual = 1;
+const itensPorPagina = 20;
 
-        if (!response.ok) {
-            throw new Error(`Erro HTTP: ${response.status}`);
-        }
+async function carregarHistoricoMovimentacoes(contaId, page = 1) {
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/api/contas-usuario/${contaId}/movimentacoes?page=${page}&per_page=${itensPorPagina}`
+        );
+        if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
 
         const data = await response.json();
         const movimentacoes = data.movimentacoes || [];
@@ -364,10 +366,8 @@ async function carregarHistoricoMovimentacoes(contaId) {
                 saida: { classe: 'badge-danger', texto: 'Saída' },
                 transferencia: { classe: 'badge-warning', texto: 'Transferência' }
             };
-
             const tipoClasse = tipoMap[mov.tipo]?.classe || 'badge-secondary';
             const tipoTexto = tipoMap[mov.tipo]?.texto || 'Desconhecido';
-
             tr.innerHTML = `
                 <td>${dataFormatada}</td>
                 <td><span class="badge ${tipoClasse}">${tipoTexto}</span></td>
@@ -377,10 +377,31 @@ async function carregarHistoricoMovimentacoes(contaId) {
             `;
             tbody.appendChild(tr);
         });
-    } catch (error) {
+
+        // Atualiza botões de navegação
+        renderizarPaginacao(data.pages, data.page, contaId);
+    } catch {
         const tbody = document.querySelector('#historicoMovimentacoes tbody');
         tbody.innerHTML = '<tr><td colspan="5" class="no-data-message">Erro ao carregar histórico</td></tr>';
     }
+}
+
+function renderizarPaginacao(totalPaginas, paginaAtual, contaId) {
+    const container = document.querySelector('#paginacao');
+    container.innerHTML = '';
+    if (totalPaginas <= 1) return;
+
+    const prev = document.createElement('button');
+    prev.textContent = 'Anterior';
+    prev.disabled = paginaAtual <= 1;
+    prev.onclick = () => carregarHistoricoMovimentacoes(contaId, paginaAtual - 1);
+
+    const next = document.createElement('button');
+    next.textContent = 'Próxima';
+    next.disabled = paginaAtual >= totalPaginas;
+    next.onclick = () => carregarHistoricoMovimentacoes(contaId, paginaAtual + 1);
+
+    container.append(prev, document.createTextNode(` Página ${paginaAtual} de ${totalPaginas} `), next);
 }
 
 // Funções de Modal

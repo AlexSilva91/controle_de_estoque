@@ -4193,3 +4193,48 @@ td {
 .sidebar::-webkit-scrollbar-track {
   background: transparent;
 }
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  margin-top: var(--space-md);
+}
+
+.pagination-controls button {
+  background: var(--gradient-primary);
+  color: var(--text-light);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background 0.3s ease, transform 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.pagination-controls button:hover:not(:disabled) {
+  background: var(--gradient-secondary);
+  transform: translateY(-2px);
+}
+
+.pagination-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+}
+
+.pagination-controls span {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}

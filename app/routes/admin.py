@@ -7206,9 +7206,6 @@ def api_listar_contas_usuario():
             }
             contas_data.append(conta_data)
 
-        print(contas_data)
-        logger.info(f"Retornando {len(contas_data)} contas para o dashboard")
-
         return jsonify({
             'success': True,
             'contas': contas_data
@@ -7222,54 +7219,53 @@ def api_listar_contas_usuario():
 @login_required
 @admin_required
 def api_listar_movimentacoes_conta_usuario(conta_id):
-    """Retorna histórico de movimentações de uma conta para o dashboard"""
     try:
-        # Verificar se a conta existe
         conta = Conta.query.get(conta_id)
         if not conta:
             return jsonify({'success': False, 'error': 'Conta não encontrada'}), 404
-            
-        # Parâmetros de filtro
+
         data_inicio = request.args.get('data_inicio')
         data_fim = request.args.get('data_fim')
-        
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 20))
+
         query = MovimentacaoConta.query.filter_by(conta_id=conta_id)
-        
-        # Aplicar filtros de data se fornecidos
+
         if data_inicio:
             try:
                 data_inicio_dt = datetime.fromisoformat(data_inicio)
                 query = query.filter(MovimentacaoConta.data >= data_inicio_dt)
             except ValueError:
                 return jsonify({'success': False, 'error': 'Formato de data início inválido'}), 400
-        
+
         if data_fim:
             try:
                 data_fim_dt = datetime.fromisoformat(data_fim)
                 query = query.filter(MovimentacaoConta.data <= data_fim_dt)
             except ValueError:
                 return jsonify({'success': False, 'error': 'Formato de data fim inválido'}), 400
-        
-        movimentacoes = query.order_by(MovimentacaoConta.data.desc()).limit(100).all()
-        
-        movimentacoes_data = []
-        for mov in movimentacoes:
-            mov_data = {
-                'id': mov.id,
-                'tipo': mov.tipo.value,
-                'forma_pagamento': mov.forma_pagamento.value,
-                'valor': locale.currency(float(mov.valor), grouping=True),
-                'descricao': mov.descricao,
-                'data': mov.data.isoformat() if mov.data else None,
-                'usuario_id': mov.usuario_id,
-                'caixa_id': mov.caixa_id
-            }
-            movimentacoes_data.append(mov_data)
-        
-        logger.info(f"Retornando {len(movimentacoes_data)} movimentações para conta {conta_id}")
+
+        pagination = query.order_by(MovimentacaoConta.data.desc()).paginate(page=page, per_page=per_page, error_out=False)
+        movimentacoes = pagination.items
+
+        movimentacoes_data = [{
+            'id': mov.id,
+            'tipo': mov.tipo.value,
+            'forma_pagamento': mov.forma_pagamento.value,
+            'valor': locale.currency(float(mov.valor), grouping=True),
+            'descricao': mov.descricao,
+            'data': mov.data.isoformat() if mov.data else None,
+            'usuario_id': mov.usuario_id,
+            'caixa_id': mov.caixa_id
+        } for mov in movimentacoes]
+
         return jsonify({
             'success': True,
-            'movimentacoes': movimentacoes_data
+            'movimentacoes': movimentacoes_data,
+            'page': pagination.page,
+            'per_page': pagination.per_page,
+            'total': pagination.total,
+            'pages': pagination.pages
         })
     except Exception as e:
         logger.error(f"Erro ao listar movimentações da conta {conta_id}: {str(e)}")
