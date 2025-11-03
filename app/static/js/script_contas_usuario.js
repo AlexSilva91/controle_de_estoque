@@ -7,7 +7,6 @@ let usuarioSelecionado = null;
 
 // Inicialização da aplicação
 document.addEventListener('DOMContentLoaded', function () {
-    console.log('Inicializando aplicação...');
     inicializarApp();
     configurarEventListeners();
     carregarDadosIniciais();
@@ -15,13 +14,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // Funções de inicialização
 function inicializarApp() {
-    console.log('Configurando navegação...');
-    // Inicializar datas padrão
     inicializarDatasPadrao();
 }
 
 function configurarEventListeners() {
-    console.log('Configurando event listeners...');
     // Filtros
     document.getElementById('btnFiltrar').addEventListener('click', aplicarFiltros);
     document.getElementById('searchInput').addEventListener('input', filtrarOperadores);
@@ -106,7 +102,6 @@ function configurarModais() {
 // Funções de API
 async function carregarDadosIniciais() {
     try {
-        console.log('Carregando dados iniciais...');
         mostrarLoading(true);
 
         await Promise.all([
@@ -114,24 +109,11 @@ async function carregarDadosIniciais() {
             carregarContas(),
             carregarFormasPagamento()
         ]);
-
-        console.log('Usuários carregados:', usuarios.length);
-        console.log('Contas carregadas:', contas.length);
-
-        // Debug: verificar estrutura dos dados
-        if (usuarios.length > 0) {
-            console.log('Primeiro usuário:', usuarios[0]);
-        }
-        if (contas.length > 0) {
-            console.log('Primeira conta:', contas[0]);
-        }
-
         atualizarCardsOperadores();
         atualizarFiltros();
 
         mostrarMensagem('Dados carregados com sucesso!', 'success');
     } catch (error) {
-        console.error('Erro ao carregar dados iniciais:', error);
         mostrarMensagem('Erro ao carregar dados: ' + error.message, 'error');
     } finally {
         mostrarLoading(false);
@@ -140,7 +122,6 @@ async function carregarDadosIniciais() {
 
 async function carregarUsuarios() {
     try {
-        console.log('Buscando usuários...');
         const response = await fetch(`${API_BASE_URL}/usuarios`);
 
         if (!response.ok) {
@@ -148,19 +129,16 @@ async function carregarUsuarios() {
         }
 
         const data = await response.json();
-        console.log('Resposta da API usuarios:', data);
 
         if (data.success && data.usuarios) {
             usuarios = data.usuarios.map(usuario => ({
                 ...usuario,
                 id: parseInt(usuario.id) // Garantir que id é número
             }));
-            console.log(`Encontrados ${usuarios.length} usuários`);
         } else {
             throw new Error(data.message || 'Estrutura de dados inválida');
         }
     } catch (error) {
-        console.error('Erro ao carregar usuários:', error);
         usuarios = [];
         throw error;
     }
@@ -168,7 +146,6 @@ async function carregarUsuarios() {
 
 async function carregarContas() {
     try {
-        console.log('Buscando contas...');
         const response = await fetch(`${API_BASE_URL}/api/contas-usuario`);
 
         if (!response.ok) {
@@ -176,20 +153,17 @@ async function carregarContas() {
         }
 
         const data = await response.json();
-        console.log('Resposta da API contas:', data);
 
         if (data.success && data.contas) {
             contas = data.contas.map(conta => ({
                 ...conta,
                 id: parseInt(conta.id),
-                usuario_id: parseInt(conta.usuario_id) // Garantir que usuario_id é número
+                usuario_id: parseInt(conta.usuario_id)
             }));
-            console.log(`Encontradas ${contas.length} contas`);
         } else {
             throw new Error(data.error || 'Estrutura de dados inválida');
         }
     } catch (error) {
-        console.error('Erro ao carregar contas:', error);
         contas = [];
         throw error;
     }
@@ -206,15 +180,12 @@ async function carregarFormasPagamento() {
         { value: 'cartao_credito', label: 'Cartão de Crédito' },
         { value: 'cartao_debito', label: 'Cartão de Débito' }
     ];
-    console.log('Formas de pagamento carregadas:', formasPagamento.length);
 }
 
 // Funções de exibição
 function atualizarCardsOperadores() {
     const grid = document.getElementById('operadoresGrid');
     grid.innerHTML = '';
-
-    console.log('Atualizando cards com:', contas.length, 'contas e', usuarios.length, 'usuários');
 
     if (contas.length === 0) {
         grid.innerHTML = '<div class="no-data-message">Nenhuma conta encontrada</div>';
@@ -231,19 +202,12 @@ function atualizarCardsOperadores() {
             usuariosSemConta.push(usuario.nome);
         }
     });
-
-    if (usuariosSemConta.length > 0) {
-        console.log('Usuários sem conta encontrados:', usuariosSemConta);
-    }
-
     contas.forEach(conta => {
         // Converter para número para garantir comparação correta
         const usuarioId = parseInt(conta.usuario_id);
         const usuario = usuarios.find(u => parseInt(u.id) === usuarioId);
 
         if (!usuario) {
-            console.log('Usuário não encontrado para conta:', conta.id, 'usuario_id:', conta.usuario_id);
-            console.log('IDs de usuários disponíveis:', usuarios.map(u => `${u.id} (${typeof u.id})`));
             return;
         }
 
@@ -310,8 +274,6 @@ function atualizarCardsOperadores() {
         cardsCriados++;
     });
 
-    console.log(`Criados ${cardsCriados} cards de operadores`);
-
     if (cardsCriados === 0) {
         grid.innerHTML = '<div class="no-data-message">Nenhum operador com conta encontrado</div>';
     }
@@ -332,12 +294,6 @@ function mostrarDetalhesUsuario(usuarioId) {
     const usuario = usuarios.find(u => parseInt(u.id) === usuarioIdNum);
 
     if (!conta || !usuario) {
-        console.error('Conta ou usuário não encontrado:', {
-            usuarioId,
-            usuarioIdNum,
-            conta: conta ? conta.id : 'não encontrada',
-            usuario: usuario ? usuario.id : 'não encontrado'
-        });
         mostrarMensagem('Erro ao carregar detalhes do usuário', 'error');
         return;
     }
@@ -384,7 +340,6 @@ function fecharDetalhesUsuario() {
 
 async function carregarHistoricoMovimentacoes(contaId) {
     try {
-        console.log('Carregando histórico para conta:', contaId);
         const response = await fetch(`${API_BASE_URL}/api/contas-usuario/${contaId}/movimentacoes`);
 
         if (!response.ok) {
@@ -395,8 +350,6 @@ async function carregarHistoricoMovimentacoes(contaId) {
         const movimentacoes = data.movimentacoes || [];
         const tbody = document.querySelector('#historicoMovimentacoes tbody');
         tbody.innerHTML = '';
-
-        console.log('Movimentações encontradas:', movimentacoes.length);
 
         if (movimentacoes.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="no-data-message">Nenhuma movimentação encontrada</td></tr>';
@@ -425,7 +378,6 @@ async function carregarHistoricoMovimentacoes(contaId) {
             tbody.appendChild(tr);
         });
     } catch (error) {
-        console.error('Erro ao carregar histórico:', error);
         const tbody = document.querySelector('#historicoMovimentacoes tbody');
         tbody.innerHTML = '<tr><td colspan="5" class="no-data-message">Erro ao carregar histórico</td></tr>';
     }
@@ -439,17 +391,9 @@ function abrirModalEntrada(usuarioId) {
     const usuario = usuarios.find(u => parseInt(u.id) === usuarioIdNum);
 
     if (!conta || !usuario) {
-        console.error('Conta ou usuário não encontrado para modal de entrada:', {
-            usuarioId,
-            usuarioIdNum,
-            contasDisponiveis: contas.map(c => `${c.id}-${c.usuario_id}`),
-            usuariosDisponiveis: usuarios.map(u => `${u.id}-${u.nome}`)
-        });
         mostrarMensagem('Conta ou usuário não encontrado', 'error');
         return;
     }
-
-    console.log('Abrindo modal de entrada para:', usuario.nome, 'Conta ID:', conta.id);
 
     document.getElementById('entradaContaId').value = conta.id;
 
@@ -478,15 +422,9 @@ function abrirModalSaida(usuarioId) {
     const usuario = usuarios.find(u => parseInt(u.id) === usuarioIdNum);
 
     if (!conta || !usuario) {
-        console.error('Conta ou usuário não encontrado para modal de saída:', {
-            usuarioId,
-            usuarioIdNum
-        });
         mostrarMensagem('Conta ou usuário não encontrado', 'error');
         return;
     }
-
-    console.log('Abrindo modal de saída para:', usuario.nome, 'Conta ID:', conta.id);
 
     document.getElementById('saidaContaId').value = conta.id;
 
@@ -514,12 +452,9 @@ function abrirModalTransferencia(usuarioId) {
     const conta = contas.find(c => parseInt(c.usuario_id) === usuarioIdNum);
 
     if (!conta) {
-        console.error('Conta não encontrada para transferência:', usuarioIdNum);
         mostrarMensagem('Conta não encontrada', 'error');
         return;
     }
-
-    console.log('Abrindo modal de transferência para conta:', conta.id);
 
     // Preencher selects de contas
     const selectOrigem = document.getElementById('transferenciaContaOrigem');
@@ -658,7 +593,6 @@ async function confirmarEntrada() {
         await carregarDadosIniciais();
 
     } catch (error) {
-        console.error('Erro ao registrar entrada:', error);
         mostrarMensagem(error.message, 'error');
     } finally {
         mostrarLoading(false);
@@ -711,7 +645,6 @@ async function confirmarSaida() {
         await carregarDadosIniciais();
 
     } catch (error) {
-        console.error('Erro ao registrar saída:', error);
         mostrarMensagem(error.message, 'error');
     } finally {
         mostrarLoading(false);
@@ -726,8 +659,6 @@ async function realizarTransferencia() {
         valor: parseFloat(document.getElementById('transferenciaValor').value),
         descricao: document.getElementById('transferenciaDescricao').value
     };
-
-    console.log('Dados da transferência:', dados);
 
     // Validações
     if (!dados.conta_origem_id || !dados.conta_destino_id || !dados.forma_pagamento || !dados.valor) {
@@ -776,7 +707,6 @@ async function realizarTransferencia() {
         await carregarDadosIniciais();
 
     } catch (error) {
-        console.error('Erro na transferência:', error);
         mostrarMensagem(error.message, 'error');
     } finally {
         mostrarLoading(false);
@@ -791,7 +721,6 @@ async function gerarRelatorioIndividual(usuarioId) {
         const usuario = usuarios.find(u => parseInt(u.id) === usuarioIdNum);
 
         if (!conta || !usuario) {
-            console.error('Conta ou usuário não encontrado para relatório:', usuarioIdNum);
             mostrarMensagem('Conta ou usuário não encontrado', 'error');
             return;
         }
@@ -806,8 +735,6 @@ async function gerarRelatorioIndividual(usuarioId) {
             data_inicio: primeiroDiaMes,
             data_fim: hoje
         };
-
-        console.log('Gerando relatório individual com filtros:', filtros);
 
         const response = await fetch(`${API_BASE_URL}/api/relatorios/movimentacoes-contas-usuario/pdf`, {
             method: 'POST',
@@ -837,7 +764,6 @@ async function gerarRelatorioIndividual(usuarioId) {
         mostrarMensagem('PDF gerado com sucesso!', 'success');
 
     } catch (error) {
-        console.error('Erro ao gerar PDF individual:', error);
         mostrarMensagem(error.message, 'error');
     } finally {
         mostrarLoading(false);
@@ -850,8 +776,6 @@ function aplicarFiltros() {
     const usuarioId = document.getElementById('filterUsuario').value;
     const dataInicio = document.getElementById('filterDataInicio').value;
     const dataFim = document.getElementById('filterDataFim').value;
-
-    console.log('Aplicando filtros:', { contaId, usuarioId, dataInicio, dataFim });
 
     // Aplicar filtros nos cards
     const cards = document.querySelectorAll('.metric-card');
@@ -912,8 +836,6 @@ function filtrarOperadores() {
 }
 
 function atualizarFiltros() {
-    console.log('Atualizando filtros...');
-
     // Atualizar filtro de contas
     const selectConta = document.getElementById('filterConta');
     selectConta.innerHTML = '<option value="">Todas as contas</option>';
@@ -995,13 +917,11 @@ function atualizarFiltros() {
         relatorioUsuario.appendChild(optionUsuario);
     });
 
-    console.log('Filtros atualizados com sucesso');
 }
 
 // Funções de relatório
 async function gerarRelatorio() {
     try {
-        console.log('Gerando relatório...');
         mostrarLoading(true);
 
         const filtros = {
@@ -1010,8 +930,6 @@ async function gerarRelatorio() {
             data_inicio: document.getElementById('relatorioDataInicio').value || null,
             data_fim: document.getElementById('relatorioDataFim').value || null
         };
-
-        console.log('Filtros do relatório:', filtros);
 
         // Remover filtros vazios
         Object.keys(filtros).forEach(key => {
@@ -1026,7 +944,6 @@ async function gerarRelatorio() {
         }
 
         const data = await response.json();
-        console.log('Dados do relatório:', data);
 
         if (!data.success) {
             throw new Error(data.error || 'Erro ao gerar relatório');
@@ -1036,7 +953,6 @@ async function gerarRelatorio() {
         mostrarMensagem('Relatório gerado com sucesso!', 'success');
 
     } catch (error) {
-        console.error('Erro ao gerar relatório:', error);
         mostrarMensagem(error.message, 'error');
     } finally {
         mostrarLoading(false);
@@ -1046,8 +962,6 @@ async function gerarRelatorio() {
 function preencherTabelaRelatorio(dados) {
     const tbody = document.querySelector('#tabelaRelatorio tbody');
     tbody.innerHTML = '';
-
-    console.log('Preenchendo tabela com:', dados.length, 'registros');
 
     if (dados.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="no-data-message">Nenhum dado encontrado para os filtros aplicados</td></tr>';
@@ -1073,13 +987,10 @@ function preencherTabelaRelatorio(dados) {
         `;
         tbody.appendChild(tr);
     });
-
-    console.log('Tabela preenchida com', dados.length, 'registros');
 }
 
 async function exportarPDF() {
     try {
-        console.log('Exportando PDF...');
         mostrarLoading(true);
 
         const filtros = {
@@ -1088,8 +999,6 @@ async function exportarPDF() {
             conta_id: document.getElementById('relatorioConta').value,
             usuario_id: document.getElementById('relatorioUsuario').value
         };
-
-        console.log('Filtros para PDF:', filtros);
 
         // Remover filtros vazios
         Object.keys(filtros).forEach(key => {
@@ -1124,7 +1033,6 @@ async function exportarPDF() {
         mostrarMensagem('PDF gerado com sucesso!', 'success');
 
     } catch (error) {
-        console.error('Erro ao exportar PDF:', error);
         mostrarMensagem(error.message, 'error');
     } finally {
         mostrarLoading(false);
@@ -1230,8 +1138,6 @@ function inicializarDatasPadrao() {
     document.getElementById('filterDataFim').value = hoje;
     document.getElementById('relatorioDataInicio').value = primeiroDiaMes;
     document.getElementById('relatorioDataFim').value = hoje;
-
-    console.log('Datas padrão inicializadas:', { primeiroDiaMes, hoje });
 }
 
 // Adicionar estilos CSS para loading spinner se não existirem
