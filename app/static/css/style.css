@@ -4238,3 +4238,154 @@ td {
   color: var(--text-primary);
   font-weight: var(--font-weight-semibold);
 }
+
+/* CONTAINER DE CONTEÚDO - GRID 2 COLUNAS */
+#contaInfo .account-details {
+  display: grid;
+  grid-template-columns: 320px 1fr; /* coluna esquerda fixa, direita flex */
+  grid-auto-rows: auto;
+  gap: var(--space-md) var(--space-lg);
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: var(--space-lg);
+}
+
+/* COLUNA ESQUERDA: primeiros 3 detail-item */
+#contaInfo .account-details > .detail-item:nth-of-type(-n+3) {
+  grid-column: 1;
+}
+
+/* COLUNA DIREITA: blocos de saldos */
+#contaInfo .account-details > .saldos-forma-pagamento,
+#contaInfo .account-details > .no-saldos {
+  grid-column: 2;
+  grid-row: 1 / span 3; /* ocupa altura da esquerda */
+  align-self: start;
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* ESTÉTICA DOS ITENS */
+#contaInfo .detail-item {
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  transition: background 0.2s ease;
+}
+#contaInfo .detail-item:hover {
+  background: var(--card-hover);
+}
+#contaInfo .detail-item label {
+  justify-content: space-between;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-muted);
+}
+#contaInfo .detail-item span {
+  justify-content: space-between;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-light);
+}
+
+/* SALDOS */
+#contaInfo .saldos-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+#contaInfo .saldo-item {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--border-radius-sm);
+  padding: var(--space-xs) var(--space-sm);
+}
+
+#contaInfo .forma-pagamento {
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-sm);
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm); 
+}
+
+#contaInfo .saldos-forma-pagamento > label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-muted);
+  margin-bottom: var(--space-xs);
+} 
+
+#contaInfo .saldos-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+#contaInfo .saldo-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--border-radius-sm);
+  padding: var(--space-xs) var(--space-sm);
+  gap: var(--space-sm);
+}
+
+#contaInfo .forma-pagamento {
+  color: var(--text-light);
+  font-weight: var(--font-weight-medium);
+  flex-shrink: 0;
+}
+
+#contaInfo .valor-saldo {
+  text-align: right;
+  white-space: nowrap;
+}
+
+#contaInfo .valor-saldo.positivo {
+  color: var(--success-color);
+  font-weight: var(--font-weight-semibold);
+}
+
+#contaInfo .valor-saldo.negativo {
+  color: var(--danger-color);
+  font-weight: var(--font-weight-semibold);
+}
+
+#contaInfo .valor-saldo-total.positivo {
+  color: var(--success-color);
+  font-weight: var(--font-weight-semibold);
+}
+
+#contaInfo .valor-saldo-total.negativo {
+  color: var(--danger-color);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* RESPONSIVO */
+@media (max-width: 900px) {
+  #contaInfo .account-details {
+    grid-template-columns: 1fr;
+  }
+  #contaInfo .account-details > .saldos-forma-pagamento,
+  #contaInfo .account-details > .no-saldos {
+    grid-row: auto;
+    grid-column: 1;
+  }
+}

@@ -5028,7 +5028,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             </div>
                             <div class="detail-item">
                                 <label>Saldo Total:</label>
-                                <span class="valor-saldo">${usuario.conta.saldo_total}</span>
+                                <span class="valor-saldo-total">${usuario.conta.saldo_total}</span>
                             </div>
                             <div class="detail-item">
                                 <label>Atualizado em:</label>
@@ -5152,7 +5152,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const saldoAtual = document.getElementById('saldoAtualValor');
 
         if (saldoAtual) {
-          saldoAtual.textContent = `R$ ${conta.saldo_total.toFixed(2)}`;
+          // Formata o saldo para padrão brasileiro
+          const saldoFormatado = new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+          }).format(conta.saldo_total);
+
+          saldoAtual.textContent = saldoFormatado;
         }
       }
     } catch (error) {
@@ -5160,8 +5166,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
-  // Função para processar entrada/saída
-  // Função para processar entrada/saída - CORRIGIDA
   window.processarMovimentacao = async function () {
 
     // Capturar tipo ANTES do try para usar no catch
