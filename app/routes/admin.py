@@ -3259,6 +3259,9 @@ def gerar_pdf_caixas_detalhado():
             total_geral_contas_recebidas = 0
             total_pagamentos_consolidado = {}  # Para consolidar formas de pagamento
 
+            # NOVO: Calcular estornos por forma de pagamento
+            estornos_por_forma_global = {}
+
             for caixa in caixas:
                 # Busca pagamentos de notas fiscais (VENDAS)
                 pagamentos_notas = session.query(
@@ -3313,6 +3316,26 @@ def gerar_pdf_caixas_detalhado():
                 
                 estornos_valor = float(estornos)
                 total_geral_estornos += estornos_valor
+                
+                # NOVO: Buscar informações sobre os estornos para distribuir por forma de pagamento
+                # Como Financeiro não tem forma_pagamento, vamos distribuir proporcionalmente
+                if estornos_valor > 0:
+                    # Calcular proporção de cada forma de pagamento no caixa
+                    total_caixa_formas = sum([float(total) for _, total in pagamentos_notas] + [float(total) for _, total in pagamentos_contas])
+                    
+                    if total_caixa_formas > 0:
+                        # Distribuir estornos proporcionalmente às formas de pagamento
+                        for forma, total in pagamentos_notas:
+                            if total:
+                                proporcao = float(total) / total_caixa_formas
+                                estorno_forma = estornos_valor * proporcao
+                                estornos_por_forma_global[forma.value] = estornos_por_forma_global.get(forma.value, 0) + estorno_forma
+                        
+                        for forma, total in pagamentos_contas:
+                            if total:
+                                proporcao = float(total) / total_caixa_formas
+                                estorno_forma = estornos_valor * proporcao
+                                estornos_por_forma_global[forma.value] = estornos_por_forma_global.get(forma.value, 0) + estorno_forma
                 
                 # Entradas líquidas (entradas brutas - estornos)
                 entradas_liquidas = caixa_entradas_bruto - estornos_valor
@@ -3380,7 +3403,7 @@ def gerar_pdf_caixas_detalhado():
             elements.append(Spacer(1, 8))
             elements.append(detalhes_entradas_table)
 
-            # NOVO: Totais por Forma de Pagamento como COLUNAS
+            # NOVO: Totais por Forma de Pagamento com ESTORNOS DEDUZIDOS
             if total_pagamentos_consolidado:
                 elements.append(Spacer(1, 12))
                 
@@ -3391,57 +3414,95 @@ def gerar_pdf_caixas_detalhado():
                 
                 # Preparar cabeçalho das colunas
                 formas_colunas = []
-                valores_colunas = []
+                valores_brutos_colunas = []
+                estornos_colunas = []
+                valores_liquidos_colunas = []
                 
                 # Ordenar formas de pagamento por valor (maior para menor)
                 formas_ordenadas = sorted(total_pagamentos_consolidado.items(), key=lambda x: x[1], reverse=True)
                 
-                for forma, valor in formas_ordenadas:
-                    if valor > 0:
+                total_geral_bruto = 0
+                total_geral_estornos_formas = 0
+                total_geral_liquido = 0
+                
+                for forma, valor_bruto in formas_ordenadas:
+                    if valor_bruto > 0:
                         forma_nome = forma.replace("_", " ").title()
-                        formas_colunas.append(forma_nome)
-                        valores_colunas.append(formatarMoeda(valor))
+                        
+                        # Calcular estorno para esta forma
+                        estorno_forma = estornos_por_forma_global.get(forma, 0)
+                        
+                        # Calcular valor líquido (bruto - estornos)
+                        valor_liquido = valor_bruto - estorno_forma
+                        
+                        # Só mostrar se pelo menos um dos valores for relevante
+                        if valor_bruto > 0 or estorno_forma > 0 or valor_liquido > 0:
+                            formas_colunas.append(forma_nome)
+                            valores_brutos_colunas.append(formatarMoeda(valor_bruto))
+                            estornos_colunas.append(formatarMoeda(estorno_forma))
+                            valores_liquidos_colunas.append(formatarMoeda(valor_liquido))
+                            
+                            total_geral_bruto += valor_bruto
+                            total_geral_estornos_formas += estorno_forma
+                            total_geral_liquido += valor_liquido
                 
-                # Adicionar coluna de TOTAL
-                formas_colunas.append("TOTAL")
-                total_formas = sum(valor for _, valor in formas_ordenadas if valor > 0)
-                valores_colunas.append(formatarMoeda(total_formas))
+                # Adicionar totais
+                formas_colunas.append("TOTAL GERAL")
+                valores_brutos_colunas.append(formatarMoeda(total_geral_bruto))
+                estornos_colunas.append(formatarMoeda(total_geral_estornos_formas))
+                valores_liquidos_colunas.append(formatarMoeda(total_geral_liquido))
                 
-                # Criar tabela com formas de pagamento como colunas
-                formas_data = [formas_colunas, valores_colunas]
+                # Criar tabela com detalhes de estornos
+                formas_data = [
+                    ["Forma de Pagamento"] + formas_colunas,
+                    ["Valor Bruto"] + valores_brutos_colunas,
+                    ["Estornos"] + estornos_colunas,
+                    ["Valor Líquido"] + valores_liquidos_colunas
+                ]
                 
                 # Calcular largura das colunas dinamicamente
                 num_colunas = len(formas_colunas)
-                largura_coluna = 160 * mm / num_colunas  # Distribui igualmente as 160mm disponíveis
-                
-                formas_pagamento_table = Table(formas_data, colWidths=[23*mm, 23*mm, 23*mm, 23*mm, 23*mm, 23*mm])
-                formas_pagamento_style = TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#4682B4")),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                    ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 9),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('FONT', (0, 1), (-1, 1), 'Helvetica', 9),
-                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    ('BACKGROUND', (-1, 0), (-1, -1), colors.lightgrey),
-                    ('FONT', (-1, 0), (-1, -1), 'Helvetica-Bold', 9),
-                ])
-                formas_pagamento_table.setStyle(formas_pagamento_style)
-                elements.append(formas_pagamento_table)
-                
-                # Observação sobre estornos
-                observacao_style = ParagraphStyle(
-                    'Observacao',
-                    parent=styles['Normal'],
-                    fontSize=9,
-                    textColor=colors.grey,
-                    leftIndent=10
-                )
-                elements.append(Spacer(1, 8))
-                elements.append(Paragraph(
-                    f"* Observação: Valor total de Estornos R$ {total_geral_estornos:,.2f} já deduzido das Entradas Líquidas.",
-                    observacao_style
-                ))
+                if num_colunas > 0:
+                    largura_total_disponivel = 180 * mm
+                    largura_primeira_coluna = 40 * mm
+                    largura_colunas_dados = (largura_total_disponivel - largura_primeira_coluna) / num_colunas
+                    
+                    col_widths = [largura_primeira_coluna] + [largura_colunas_dados] * num_colunas
+                    
+                    formas_pagamento_table = Table(formas_data, colWidths=col_widths)
+                    formas_pagamento_style = TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#4682B4")),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                        ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 8),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('FONT', (0, 1), (-1, -1), 'Helvetica', 8),
+                        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('BACKGROUND', (-1, 0), (-1, -1), colors.lightgrey),
+                        ('FONT', (-1, 0), (-1, -1), 'Helvetica-Bold', 8),
+                        # Cor para estornos (vermelho)
+                        ('TEXTCOLOR', (0, 2), (-1, 2), colors.red),
+                        ('FONT', (0, 2), (-1, 2), 'Helvetica-Bold', 8),
+                        # Cor para valor líquido (verde)
+                        ('TEXTCOLOR', (0, 3), (-1, 3), colors.darkgreen),
+                        ('FONT', (0, 3), (-1, 3), 'Helvetica-Bold', 8),
+                    ])
+                    formas_pagamento_table.setStyle(formas_pagamento_style)
+                    elements.append(formas_pagamento_table)
+                    
+                    # Observação sobre estornos
+                    observacao_style = ParagraphStyle(
+                        'Observacao',
+                        parent=styles['Normal'],
+                        fontSize=8,
+                        textColor=colors.grey,
+                        alignment=TA_CENTER
+                    )
+                    elements.append(Spacer(1, 8))
+                    elements.append(Paragraph(
+                        "* Valores líquidos já descontados os estornos específicos de cada forma de pagamento",
+                        observacao_style
+                    ))
             
             elements.append(Spacer(1, 18))
 
