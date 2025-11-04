@@ -19,7 +19,11 @@ function inicializarApp() {
 
 function configurarEventListeners() {
     // Filtros
-    document.getElementById('btnFiltrar').addEventListener('click', aplicarFiltros);
+    document.getElementById('btnFiltrar')?.addEventListener('click', () => {
+        carregarContas();
+        aplicarFiltros();
+    });
+
     document.getElementById('searchInput').addEventListener('input', filtrarOperadores);
 
     // Transferências
@@ -146,11 +150,17 @@ async function carregarUsuarios() {
 
 async function carregarContas() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/contas-usuario`);
+        const dataInicioInput = document.getElementById('filterDataInicio');
+        const dataFimInput = document.getElementById('filterDataFim');
 
-        if (!response.ok) {
-            throw new Error(`Erro HTTP: ${response.status}`);
-        }
+        let params = [];
+        if (dataInicioInput?.value) params.push(`data_inicio=${dataInicioInput.value}`);
+        if (dataFimInput?.value) params.push(`data_fim=${dataFimInput.value}`);
+
+        const query = params.length ? `?${params.join('&')}` : '';
+
+        const response = await fetch(`${API_BASE_URL}/api/contas-usuario${query}`);
+        if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
 
         const data = await response.json();
 
@@ -160,14 +170,18 @@ async function carregarContas() {
                 id: parseInt(conta.id),
                 usuario_id: parseInt(conta.usuario_id)
             }));
+
+            atualizarCardsOperadores(); // atualiza os cards em tempo de execução
         } else {
             throw new Error(data.error || 'Estrutura de dados inválida');
         }
     } catch (error) {
         contas = [];
-        throw error;
+        atualizarCardsOperadores();
+        console.error('Erro ao carregar contas:', error);
     }
 }
+
 
 async function carregarFormasPagamento() {
     // Carregar formas de pagamento do enum

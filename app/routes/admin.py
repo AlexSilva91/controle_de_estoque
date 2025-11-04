@@ -7188,32 +7188,51 @@ def get_conta(conta_id):
 def api_listar_contas_usuario():
     """Retorna lista de contas com saldos formatados para o dashboard"""
     try:
+        data_inicio = request.args.get("data_inicio")
+        data_fim = request.args.get("data_fim")
+
+        # Caso haja filtro por datas, filtra movimentações e recalcula saldos
         contas = Conta.query.all()
         contas_data = []
-        
+
         for conta in contas:
+            # Filtro por data se fornecido
+            movimentacoes_query = conta.movimentacoes
+            if data_inicio:
+                movimentacoes_query = [m for m in movimentacoes_query if m.data >= datetime.fromisoformat(data_inicio)]
+            if data_fim:
+                data_fim_dt = datetime.fromisoformat(data_fim)
+                data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+                movimentacoes_query = [m for m in movimentacoes_query if m.data <= data_fim_dt]
+
+            # Recalcula o saldo total e por forma de pagamento no intervalo
             saldos_por_forma_pagamento = {}
-            for saldo in conta.saldos_forma_pagamento:
-                valor = float(saldo.saldo)
-                saldos_por_forma_pagamento[saldo.forma_pagamento.value] = locale.currency(valor, grouping=True)
+            total = 0.0
+
+            for mov in movimentacoes_query:
+                valor = float(mov.valor)
+                if mov.tipo == "saida":
+                    valor *= -1
+                total += valor
+                saldos_por_forma_pagamento[mov.forma_pagamento.value] = saldos_por_forma_pagamento.get(mov.forma_pagamento.value, 0.0) + valor
 
             conta_data = {
                 'id': conta.id,
                 'usuario_id': conta.usuario_id,
-                'saldo_total': locale.currency(float(conta.saldo_total), grouping=True) if conta.saldo_total else "R$ 0,00",
-                'saldos_por_forma_pagamento': saldos_por_forma_pagamento,
+                'saldo_total_raw': total,
+                'saldo_total': locale.currency(total, grouping=True),
+                'saldos_por_forma_pagamento': {
+                    k: locale.currency(v, grouping=True) for k, v in saldos_por_forma_pagamento.items()
+                },
                 'atualizado_em': conta.atualizado_em.isoformat() if conta.atualizado_em else None
             }
             contas_data.append(conta_data)
 
-        return jsonify({
-            'success': True,
-            'contas': contas_data
-        })
-
+        return jsonify({'success': True, 'contas': contas_data})
     except Exception as e:
         logger.error(f"Erro ao listar contas para dashboard: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @admin_bp.route('/api/contas-usuario/<int:conta_id>/movimentacoes', methods=['GET'])
 @login_required
