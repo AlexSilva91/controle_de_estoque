@@ -778,7 +778,6 @@ async function realizarTransferencia() {
 
 async function gerarRelatorioIndividual(usuarioId) {
     try {
-        // Converter para número para garantir comparação correta
         const usuarioIdNum = parseInt(usuarioId);
         const conta = contas.find(c => parseInt(c.usuario_id) === usuarioIdNum);
         const usuario = usuarios.find(u => parseInt(u.id) === usuarioIdNum);
@@ -790,38 +789,29 @@ async function gerarRelatorioIndividual(usuarioId) {
 
         mostrarLoading(true);
 
-        const hoje = new Date().toISOString().split('T')[0];
-        const primeiroDiaMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+        // Pega exatamente o que está nos inputs de filtro
+        const dataInicio = document.getElementById('filterDataInicio').value || null;
+        const dataFim = document.getElementById('filterDataFim').value || null;
 
         const filtros = {
             conta_id: conta.id,
-            data_inicio: primeiroDiaMes,
-            data_fim: hoje
+            data_inicio: dataInicio,
+            data_fim: dataFim
         };
 
         const response = await fetch(`${API_BASE_URL}/api/relatorios/movimentacoes-contas-usuario/pdf`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(filtros)
         });
 
-        if (!response.ok) {
-            throw new Error(`Erro HTTP: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
 
         const blob = await response.blob();
+        if (blob.size === 0) throw new Error('PDF vazio gerado');
 
-        if (blob.size === 0) {
-            throw new Error('PDF vazio gerado');
-        }
-
-        // Abrir PDF em nova aba
         const url = window.URL.createObjectURL(blob);
         window.open(url, '_blank');
-
-        // Limpar URL após um tempo
         setTimeout(() => window.URL.revokeObjectURL(url), 1000);
 
         mostrarMensagem('PDF gerado com sucesso!', 'success');

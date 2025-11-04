@@ -7211,7 +7211,7 @@ def api_listar_contas_usuario():
 
             for mov in movimentacoes_query:
                 valor = float(mov.valor)
-                if mov.tipo == "saida":
+                if mov.tipo in ("saida", "transferencia"):
                     valor *= -1
                 total += valor
                 saldos_por_forma_pagamento[mov.forma_pagamento.value] = saldos_por_forma_pagamento.get(mov.forma_pagamento.value, 0.0) + valor
@@ -7365,33 +7365,42 @@ def api_gerar_pdf_relatorio():
     try:
         from flask import send_file
         import io
+        import locale
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.pagesizes import letter
         from reportlab.lib import colors
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import inch
+        from datetime import datetime
+
+        # Configura formatação monetária brasileira
+        try:
+            locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+        except locale.Error:
+            locale.setlocale(locale.LC_ALL, '')  # fallback
+
+        def formatar_real(valor):
+            try:
+                return locale.currency(valor, grouping=True, symbol=True)
+            except Exception:
+                return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
         data_req = request.get_json()
-
         data_inicio = data_req.get('data_inicio')
         data_fim = data_req.get('data_fim')
         conta_id = data_req.get('conta_id')
 
-        # Buscar a conta para obter informações adicionais
         conta = None
         if conta_id:
             conta = Conta.query.get(conta_id)
             if not conta:
                 return jsonify({'success': False, 'error': 'Conta não encontrada'}), 404
 
-        # BUSCAR TODAS AS MOVIMENTAÇÕES DA CONTA
         query = MovimentacaoConta.query.filter_by(conta_id=conta_id)
 
-        # Aplicar filtros de data CORRETAMENTE (incluindo todo o dia)
         if data_inicio:
             try:
                 data_inicio_dt = datetime.fromisoformat(data_inicio)
-                # Incluir todo o dia desde 00:00:00
                 query = query.filter(MovimentacaoConta.data >= data_inicio_dt)
             except ValueError:
                 return jsonify({'success': False, 'error': 'Formato de data início inválido'}), 400
@@ -7399,16 +7408,13 @@ def api_gerar_pdf_relatorio():
         if data_fim:
             try:
                 data_fim_dt = datetime.fromisoformat(data_fim)
-                # Incluir todo o dia até 23:59:59
                 data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
                 query = query.filter(MovimentacaoConta.data <= data_fim_dt)
             except ValueError:
                 return jsonify({'success': False, 'error': 'Formato de data fim inválido'}), 400
 
-        # BUSCAR TODOS OS REGISTROS SEM LIMITE
         movimentacoes = query.order_by(MovimentacaoConta.data.desc()).all()
 
-        # DEBUG: Log para verificar o que está sendo buscado
         logger.info(f"PDF - Conta {conta_id}: {len(movimentacoes)} movimentações encontradas")
         for mov in movimentacoes:
             logger.info(f"Mov {mov.id}: {mov.data} | {mov.tipo.value} | {mov.valor} | {mov.descricao}")
@@ -7418,7 +7424,6 @@ def api_gerar_pdf_relatorio():
         elements = []
         styles = getSampleStyleSheet()
 
-        # Título
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
@@ -7426,36 +7431,38 @@ def api_gerar_pdf_relatorio():
             spaceAfter=20,
             textColor=colors.HexColor('#6c5ce7')
         )
-        
+
         titulo = f"Relatório de Movimentações - Conta {conta_id}"
         if conta and conta.usuario:
             titulo += f" - {conta.usuario.nome}"
-            
         elements.append(Paragraph(titulo, title_style))
 
-        # Informações da conta
         if conta:
-            info_conta = []
-            info_conta.append(f"Saldo Atual: R$ {float(conta.saldo_total):.2f}")
-                
+            info_conta = [f"Saldo Atual: {formatar_real(float(conta.saldo_total))}"]
             elements.append(Paragraph(" | ".join(info_conta), styles['Normal']))
 
-        # Período
-        periodo_text = f"Período: {data_inicio} a {data_fim}" if data_inicio and data_fim else "Período: Todos"
-        elements.append(Paragraph(periodo_text, styles['Normal']))
+        if data_inicio and data_fim:
+            try:
+                data_inicio_fmt = datetime.fromisoformat(data_inicio).strftime('%d/%m/%Y')
+                data_fim_fmt = datetime.fromisoformat(data_fim).strftime('%d/%m/%Y')
+                periodo_text = f"Período: {data_inicio_fmt} a {data_fim_fmt}"
+            except ValueError:
+                periodo_text = f"Período: {data_inicio} a {data_fim}"
+        else:
+            periodo_text = "Período: Todos"
 
+        elements.append(Paragraph(periodo_text, styles['Normal']))
         elements.append(Spacer(1, 12))
 
         if movimentacoes:
-            table_data = [['Data', 'Usuário', 'Tipo', 'Forma Pagamento', 'Valor (R$)', 'Descrição']]
+            table_data = [['Data', 'Usuário', 'Tipo', 'Forma Pagamento', 'Valor', 'Descrição']]
             total_entradas = 0
             total_saidas = 0
             total_transferencias = 0
 
             for mov in movimentacoes:
                 valor = float(mov.valor)
-                
-                # Classificar CORRETAMENTE por tipo
+
                 if mov.tipo.value == 'entrada':
                     total_entradas += valor
                     tipo_exibicao = 'ENTRADA'
@@ -7476,12 +7483,11 @@ def api_gerar_pdf_relatorio():
                     mov.usuario.nome if mov.usuario else '-',
                     tipo_exibicao,
                     mov.forma_pagamento.value.replace('_', ' ').title(),
-                    f"R$ {valor:.2f}",
+                    formatar_real(valor),
                     Paragraph(mov.descricao or '-', styles['Normal'])
                 ])
 
-            # Ajuste de largura das colunas
-            col_widths = [1.2*inch, 1.5*inch, 1.0*inch, 1.2*inch, 1*inch, 2.1*inch]
+            col_widths = [1.2*inch, 1.5*inch, 1.0*inch, 1.3*inch, 1.0*inch, 2.0*inch]
 
             table = Table(table_data, colWidths=col_widths, repeatRows=1)
             table.setStyle(TableStyle([
@@ -7499,15 +7505,16 @@ def api_gerar_pdf_relatorio():
             ]))
             elements.append(table)
 
-            # Totais detalhados
             elements.append(Spacer(1, 12))
             saldo_total = total_entradas - total_saidas - total_transferencias
-            
-            totais_data = [
-                [f'Entradas: R$ {total_entradas:.2f}', f'Saídas: R$ {total_saidas:.2f}', f' Transferências: R$ {total_transferencias:.2f} ']
-            ]
 
-            totais_table = Table(totais_data, colWidths=[1.5*inch, 1.3*inch, 1.8*inch])
+            totais_data = [[
+                f'Entradas: {formatar_real(total_entradas)}',
+                f'Saídas: {formatar_real(total_saidas)}',
+                f'Transferências: {formatar_real(total_transferencias)}'
+            ]]
+
+            totais_table = Table(totais_data, colWidths=[1.8*inch, 1.8*inch, 2.0*inch])
             totais_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2d3748')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -7517,16 +7524,16 @@ def api_gerar_pdf_relatorio():
             ]))
             elements.append(totais_table)
 
-            # Resumo
             elements.append(Spacer(1, 8))
-            resumo_text = f"Total de movimentações: {len(movimentacoes)}"
+            resumo_text = f"Total de movimentações: {len(movimentacoes)} | Saldo final: {formatar_real(saldo_total)}"
             elements.append(Paragraph(resumo_text, styles['Normal']))
-            
-            # Estatísticas por tipo
+
             elements.append(Spacer(1, 4))
-            estatisticas_text = f"Entradas: {sum(1 for m in movimentacoes if m.tipo.value == 'entrada')} | "
-            estatisticas_text += f"Saídas: {sum(1 for m in movimentacoes if m.tipo.value == 'saida')} | "
-            estatisticas_text += f"Transferências: {sum(1 for m in movimentacoes if m.tipo.value == 'transferencia')} | "
+            estatisticas_text = (
+                f"Entradas: {sum(1 for m in movimentacoes if m.tipo.value == 'entrada')} | "
+                f"Saídas: {sum(1 for m in movimentacoes if m.tipo.value == 'saida')} | "
+                f"Transferências: {sum(1 for m in movimentacoes if m.tipo.value == 'transferencia')}"
+            )
             elements.append(Paragraph(estatisticas_text, styles['Normal']))
 
         else:
