@@ -349,12 +349,40 @@ async function carregarHistoricoMovimentacoes(contaId, page = 1) {
         if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
 
         const data = await response.json();
-        const movimentacoes = data.movimentacoes || [];
+        let movimentacoes = data.movimentacoes || [];
         const tbody = document.querySelector('#historicoMovimentacoes tbody');
         tbody.innerHTML = '';
 
+        // --- FILTRO DE DATAS (mantém comportamento atual, sem bug de fuso) ---
+        const dataInicioInput = document.getElementById('filterDataInicio');
+        const dataFimInput = document.getElementById('filterDataFim');
+
+        let dataInicio = null;
+        let dataFim = null;
+
+        if (dataInicioInput?.value) {
+            const [ano, mes, dia] = dataInicioInput.value.split('-').map(Number);
+            dataInicio = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+        }
+        if (dataFimInput?.value) {
+            const [ano, mes, dia] = dataFimInput.value.split('-').map(Number);
+            dataFim = new Date(ano, mes - 1, dia, 23, 59, 59, 999);
+        }
+
+        if (dataInicio || dataFim) {
+            movimentacoes = movimentacoes.filter(mov => {
+                if (!mov.data) return false;
+                const dataMov = new Date(mov.data);
+                if (dataInicio && dataMov < dataInicio) return false;
+                if (dataFim && dataMov > dataFim) return false;
+                return true;
+            });
+        }
+        // --------------------------------------------------------------------
+
         if (movimentacoes.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="no-data-message">Nenhuma movimentação encontrada</td></tr>';
+            renderizarPaginacao(data.pages, data.page, contaId);
             return;
         }
 
