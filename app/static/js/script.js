@@ -257,24 +257,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ===== NAVEGAÇÃO =====
   function setupNavigation() {
-    const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+    const mobileMenuToggle = document.getElementById('mobileMenuToggleInHeader');
     const sidebar = document.querySelector('.sidebar');
 
-    if (mobileMenuToggle && sidebar) {
-      mobileMenuToggle.addEventListener('click', function () {
+   if (mobileMenuToggle && sidebar) {
+      mobileMenuToggle.addEventListener('click', function (e) {
+        e.stopPropagation();
         this.classList.toggle('active');
         sidebar.classList.toggle('active');
       });
-    }
 
-    document.querySelectorAll('.sidebar-nav li').forEach(item => {
-      item.addEventListener('click', function () {
-        if (window.innerWidth <= 768 && mobileMenuToggle && sidebar) {
-          mobileMenuToggle.classList.remove('active');
+      // Fecha o menu ao clicar fora dele
+      document.addEventListener('click', function (e) {
+        const clickedInsideSidebar = sidebar.contains(e.target);
+        const clickedToggle = mobileMenuToggle.contains(e.target);
+
+        if (!clickedInsideSidebar && !clickedToggle) {
           sidebar.classList.remove('active');
+          mobileMenuToggle.classList.remove('active');
         }
       });
-    });
+    }
     document.querySelector('.sidebar-nav li[data-tab="contas-receber"]').addEventListener('click', function (e) {
       e.preventDefault();
       openModal('contasReceberModal');

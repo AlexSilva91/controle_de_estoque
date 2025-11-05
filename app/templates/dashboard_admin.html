@@ -17,13 +17,6 @@
 <body>
     <!-- Estrutura principal do dashboard -->
     <div class="dashboard-container">
-        <!-- Botão de menu mobile (fora da estrutura principal para melhor acessibilidade) -->
-        <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Menu">
-            <span class="menu-bar"></span>
-            <span class="menu-bar"></span>
-            <span class="menu-bar"></span>
-        </button>
-
         <!-- Mensagens flash (posicionadas no topo para maior visibilidade) -->
         <div class="flash-messages">
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -151,11 +144,12 @@
             <!-- Cabeçalho -->
             <header class="main-header">
                 <div class="header-left">
-                    <button class="mobile-menu-toggle-in-header" id="mobileMenuToggleInHeader"
-                        aria-label="Menu"></button>
+                    <button class="mobile-menu-toggle-in-header" id="mobileMenuToggleInHeader" aria-label="Menu">
+                        <i class="fas fa-bars"></i>
+                    </button>
                     <div class="header-title">
                         <h1 id="page-title">Dashboard</h1>
-                        <div class="breadcrumb">Home / Dashboard</div>
+                        <nav class="breadcrumb">Home / Dashboard</nav>
                     </div>
                 </div>
 
@@ -171,6 +165,7 @@
                     </div>
                 </div>
             </header>
+
 
             <!-- Conteúdo das abas -->
             <div class="content-wrapper">
