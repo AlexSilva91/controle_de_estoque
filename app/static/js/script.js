@@ -323,13 +323,11 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
     
-    const logoutBtn = document.getElementById('logoutBtn');
-
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', () => {
+    document.querySelectorAll('#logoutBtn').forEach(btn => {
+      btn.addEventListener('click', () => {
         renderLogoutModal();
       });
-    }
+    });
 
     function renderLogoutModal() {
       // Criar o overlay do modal
