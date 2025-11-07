@@ -7932,12 +7932,14 @@ def atualizar_lote(lote_id):
                 atualizar_estoque_produto(db, lote.produto_id, lote_id)
             
             return jsonify({
+                'sucess': True,
                 'message': 'Lote atualizado com sucesso',
                 'alteracoes': alteracoes_lote,
                 'estoque_atualizado': precisa_atualizar_estoque
             })
         else:
             return jsonify({
+                'sucess': False,
                 'message': 'Nenhuma alteração detectada',
                 'alteracoes': False
             })
