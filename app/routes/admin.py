@@ -8060,4 +8060,3 @@ def salvar_configuracoes():
             "success": False,
             "message": f"Erro ao salvar configurações: {str(e)}"
         }), 500
-
