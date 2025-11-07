@@ -4583,3 +4583,84 @@ td {
     font-size: var(--font-size-xl);
   }
 }
+#configuracoes .card {
+    width: 100%;
+    max-width: 600px;
+    margin-left: 0;
+    margin-top: var(--space-md);
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-md);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+#configuracoes .card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    background-color: var(--card-hover);
+}
+
+#configuracoes .card .card-body {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: var(--space-md);
+    gap: var(--space-sm);
+}
+
+#configuracoes .card h4 {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    margin-bottom: var(--space-xs);
+    flex: 1 1 100%;
+}
+
+#configuracoes .card p {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin: 0;
+    flex: 1 1 100%;
+}
+
+#configuracoes .card button {
+    border-radius: var(--border-radius-sm);
+    padding: var(--space-xs) var(--space-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: transform 0.1s;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-width: 120px;
+    max-width: 100%;
+    min-height: 36px;
+    max-height: 50px;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+#configuracoes .card button:active {
+    transform: scale(0.97);
+}
+
+#configuracoes .card button.btn-success,
+#configuracoes .card button.btn-danger,
+#configuracoes .card button.btn-secondary {
+    border: none;
+    box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 480px) {
+    #configuracoes .card .card-body {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    #configuracoes .card button {
+        width: 100%;
+        max-width: 100%;
+        justify-content: center;
+    }
+}
