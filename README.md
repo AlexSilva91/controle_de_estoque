@@ -1,29 +1,51 @@
+# 🧾 Sistema de Gestão de Vendas e Caixa
 
-# Sistema de Gestão de Vendas e Caixa
+Sistema web completo para **gerenciamento de vendas, clientes, produtos e controle de caixa**, desenvolvido em **Flask (Python)** com front-end em **HTML, CSS e JavaScript**.  
+Projetado para uso em lojas e pequenos comércios, oferece controle financeiro, relatórios e interface responsiva.
 
-Este projeto é um sistema web para gerenciamento de vendas, clientes, produtos e controle de caixa, desenvolvido com front-end em HTML, CSS, JavaScript e back-end em Flask (Python).
+---
 
-## Funcionalidades
+## 📦 Funcionalidades Principais
 
-- Visualização e atualização dinâmica do saldo do caixa.
-- Cadastro, edição e busca de clientes.
-- Listagem e atualização dinâmica de produtos com estoque.
-- Registro de vendas com múltiplos produtos e métodos de pagamento.
-- Controle de caixa com opção para fechamento.
-- Notificações para feedbacks de operações.
-- Interface com abas para melhor organização das funcionalidades.
+- 💰 **Controle de Caixa**
+  - Abertura, fechamento e saldo em tempo real.
+  - Registro automático de movimentações financeiras.
+  - Controle de permissões para operadores e administradores.
 
-## Tecnologias Utilizadas
+- 👥 **Gestão de Clientes**
+  - Cadastro, edição e busca.
+  - Histórico de vendas por cliente.
 
-- **Front-end:** HTML5, CSS3, JavaScript (ES6)
-- **Back-end:** Python 3.x com Flask
-- **APIs:** Endpoints REST para clientes, produtos, vendas e saldo
-- **Outros:** Fetch API para comunicação assíncrona, FontAwesome para ícones
+- 📦 **Gestão de Produtos e Estoque**
+  - Cadastro e atualização de produtos.
+  - Controle de estoque com atualização automática por venda.
 
-## Estrutura do Projeto
+- 🧾 **Vendas**
+  - Registro de múltiplos produtos por venda.
+  - Suporte a várias formas de pagamento (Dinheiro, Pix, Cartão, etc.).
+  - Emissão de comprovantes e integração futura com NFC-e.
 
-```
+- 🔔 **Notificações**
+  - Feedback visual para ações (cadastro, erro, sucesso).
+  - Sistema de abas para navegação fluida entre módulos.
 
+---
+
+## 🧰 Tecnologias Utilizadas
+
+| Camada | Tecnologias |
+|--------|--------------|
+| **🎨 Front-end** | ![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white) ![CSS3](https://img.shields.io/badge/CSS3-1572B6?logo=css3&logoColor=white) ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black) |
+| **⚙️ Back-end** | ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54) ![Flask](https://img.shields.io/badge/flask-%23000.svg?style=for-the-badge&logo=flask&logoColor=white) |
+| **🗄️ Banco de Dados** | ![MySQL](https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white) |
+| **🔌 APIs** | ![REST](https://img.shields.io/badge/REST-009688?logo=fastapi&logoColor=white) Flask Blueprint (`operador`, `admin`, `auth`) |
+| **🧩 Outros** | ![Fetch API](https://img.shields.io/badge/Fetch_API-303030?logo=javascript&logoColor=white) ![Jinja2](https://img.shields.io/badge/Jinja2-B41717?logo=jinja&logoColor=white) ![ReportLab](https://img.shields.io/badge/ReportLab-FF6F00?logo=python&logoColor=white) ![Gunicorn](https://img.shields.io/badge/gunicorn-%298729.svg?style=for-the-badge&logo=gunicorn&logoColor=white) ![Nginx](https://img.shields.io/badge/nginx-%23009639.svg?style=for-the-badge&logo=nginx&logoColor=white)|
+
+---
+
+## 🗂️ Estrutura do Projeto
+
+```bash
 controle_de_estoque
 ├─ README.md
 ├─ app
@@ -35,12 +57,15 @@ controle_de_estoque
 │  ├─ init_db.py
 │  ├─ models
 │  │  ├─ __init__.py
+│  │  ├─ audit_events.py
+│  │  ├─ audit_mixin.py
 │  │  ├─ base.py
 │  │  └─ entities.py
 │  ├─ routes
 │  │  ├─ __init__.py
 │  │  ├─ admin.py
 │  │  ├─ auth.py
+│  │  ├─ home.py
 │  │  └─ operador.py
 │  ├─ schemas.py
 │  ├─ static
@@ -63,101 +88,140 @@ controle_de_estoque
 │  │  │  ├─ style_login.css
 │  │  │  └─ styles_operador.css
 │  │  └─ js
+│  │     ├─ auditoria.js
 │  │     ├─ script.js
+│  │     ├─ script_contas_usuario.js
 │  │     ├─ script_login.js
+│  │     ├─ script_lotes.js
 │  │     └─ script_operador.js
 │  ├─ templates
+│  │  ├─ auditoria.html
+│  │  ├─ contas_usuario.html
 │  │  ├─ dashboard_admin.html
 │  │  ├─ dashboard_operador.html
-│  │  └─ login.html
+│  │  ├─ errors
+│  │  │  ├─ 400.html
+│  │  │  ├─ 403.html
+│  │  │  ├─ 404.html
+│  │  │  ├─ 500.html
+│  │  │  └─ 503.html
+│  │  ├─ financeiro_historico.html
+│  │  ├─ login.html
+│  │  └─ produtos_unidade.html
 │  └─ utils
+│     ├─ audit.py
 │     ├─ conversor_unidade.py
 │     ├─ converter_endereco.py
 │     ├─ format_data_moeda.py
 │     ├─ nfce.py
 │     ├─ preparar_notas.py
 │     └─ signature.py
+├─ backup_db.py
 ├─ config.py
 ├─ docs
+│  ├─ DOCUMENTACAO_TECNICA.md
 │  └─ DOCUMENTATION.md
 ├─ requirements.txt
 ├─ run.py
 └─ wsgi.py
-
 ```
-
-## Como Executar o Projeto
-
-### Pré-requisitos
-
-- Python 3.x instalado
-- Ambiente virtual configurado (recomendado)
-- Instalar dependências do projeto
-
-### Passos
-
-1. Clone o repositório:
-
-```bash
-git clone https://github.com/seu_usuario/seu_repositorio.git
-cd seu_repositorio
-```
-
-2. Crie e ative um ambiente virtual:
-
-```bash
-python3 -m venv venv
-source venv/bin/activate  # Linux/macOS
-venv\Scripts\activate   # Windows
-```
-
-3. Instale as dependências:
-
-```bash
-pip install -r requirements.txt
-```
-
-4. Execute o servidor Flask:
-
-```bash
-flask run
-```
-
-5. Acesse no navegador:
-
-```
-http://127.0.0.1:5000/
-```
-
-## Uso
-
-- Utilize as abas para navegar entre clientes, produtos e vendas.
-- Cadastre e edite clientes usando o modal disponível.
-- Adicione produtos na venda, defina quantidades e selecione o cliente e forma de pagamento.
-- Registre vendas e acompanhe o saldo do caixa em tempo real.
-- Feche o caixa ao final do expediente para registrar o encerramento.
-
-## Endpoints Disponíveis
-
-- `GET /operador/api/saldo` - Obtém o saldo atual do caixa.
-- `GET /operador/api/clientes` - Lista todos os clientes.
-- `POST /operador/api/clientes` - Cria um novo cliente.
-- `PUT /operador/api/clientes/<id>` - Atualiza um cliente existente.
-- `GET /operador/api/produtos` - Lista todos os produtos.
-- `POST /operador/api/vendas` - Registra uma nova venda.
-- `POST /operador/api/fechar-caixa` - Realiza o fechamento do caixa.
-
-## Considerações Finais
-
-Este sistema é uma base para gerenciamento de vendas e controle de caixa simples, com possibilidade de expansão para novas funcionalidades conforme necessidade.
-
-## Contato
-
-Para dúvidas ou sugestões, abra uma issue ou entre em contato:
-
-- Email: <alexalves9164@gmail.com>
-- GitHub: <https://github.com/AlexSilva91/>
 
 ---
 
-**Licença:** MIT License
+## ⚙️ Instalação e Execução
+
+### ✅ Pré-requisitos
+
+- Python 3.8+
+- Ambiente virtual configurado
+- Dependências listadas em `requirements.txt`
+
+### 🚀 Passos de Execução
+
+1. **Clone o repositório**
+   ```bash
+   git clone git@github.com:AlexSilva91/controle_de_estoque.git
+   cd controle_de_estoque
+   ```
+
+2. **Crie e ative um ambiente virtual**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate     # Linux/macOS
+   venv\Scripts\activate      # Windows
+   ```
+
+3. **Instale as dependências**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Execute o servidor**
+   ```bash
+   flask run # ou python3 wsgi.py
+   ```
+
+5. **Acesse no navegador**
+   ```
+   http://127.0.0.1:5000/
+   ```
+
+---
+
+## 🧭 Uso do Sistema
+
+1. **Login:** Acesse com credenciais de operador ou administrador.  
+2. **Navegação:** Utilize as abas da interface para acessar Clientes, Produtos e Caixa.  
+3. **Clientes:** Cadastre, edite e busque clientes com feedback visual.  
+4. **Produtos:** Gerencie estoque e preços.  
+5. **Vendas:** Adicione produtos à venda, selecione o cliente e forma de pagamento.  
+6. **Caixa:** Monitore o saldo em tempo real e feche o caixa ao final do expediente.  
+
+---
+
+## 🔗 Endpoints da API
+
+| Endpoint | Método | Descrição |
+|-----------|---------|------------|
+| `/operador/api/saldo` | `GET` | Retorna o saldo atual do caixa |
+| `/operador/api/clientes` | `GET` | Lista todos os clientes |
+| `/operador/api/clientes` | `POST` | Cria um novo cliente |
+| `/operador/api/clientes/<id>` | `PUT` | Atualiza cliente existente |
+| `/operador/api/produtos` | `GET` | Lista todos os produtos |
+| `/operador/api/vendas` | `POST` | Registra uma nova venda |
+| `/operador/api/fechar-caixa` | `POST` | Realiza o fechamento do caixa |
+
+---
+
+## 🧩 Boas Práticas e Padrões Adotados
+
+- **Blueprints Flask:** organização modular de rotas e lógicas.  
+- **ORM SQLAlchemy:** abstração de banco relacional com mapeamento de entidades.  
+- **Fetch API:** comunicação assíncrona com endpoints REST.  
+- **Design Responsivo:** interface adaptável via CSS modular.  
+- **Separação de Responsabilidades:** camadas independentes (rotas, modelos, utilitários).
+
+---
+
+## 🧪 Extensões Futuras
+
+- Integração com **NFC-e (Nota Fiscal de Consumidor Eletrônica)**.  
+- Geração de **relatórios em PDF** para vendas e movimentações.  
+- Módulo de **controle de estoque automatizado**.  
+- Dashboards com **gráficos interativos**.  
+- Sistema de **autorização por níveis de acesso** (RBAC).  
+
+---
+
+## 📞 Contato
+
+- **Autor:** Alex da Silva Alves
+- **Email:** <alexalves9164@gmail.com>  
+- **GitHub:** [github.com/AlexSilva91](https://github.com/AlexSilva91)
+
+---
+
+## ⚖️ Licença
+
+Distribuído sob a **MIT License**.  
+Você pode usar, modificar e distribuir livremente com os devidos créditos.
