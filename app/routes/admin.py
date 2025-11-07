@@ -47,7 +47,7 @@ from app.models import db
 from app.utils.audit import calcular_diferencas
 from app.utils.format_data_moeda import format_currency, format_number, to_decimal_or_none
 from app.models.entities import ( 
-    AuditLog, Cliente, Conta, LoteEstoque, MovimentacaoConta, Produto, NotaFiscal, SaldoFormaPagamento, TipoUsuario, UnidadeMedida, StatusNota,
+    AuditLog, Cliente, Configuracao, Conta, LoteEstoque, MovimentacaoConta, Produto, NotaFiscal, SaldoFormaPagamento, TipoUsuario, UnidadeMedida, StatusNota,
     Financeiro, TipoMovimentacao, CategoriaFinanceira, MovimentacaoEstoque, ContaReceber,
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
@@ -8019,3 +8019,45 @@ def obter_estatisticas_lotes():
     
     except Exception as e:
         return jsonify({'error': f'Erro ao carregar estatísticas: {str(e)}'}), 500
+    
+#---------------- CONFIGURAÇÕES -----------------
+@admin_bp.route('/configuracoes', methods=['GET'])
+@login_required
+@admin_required
+def obter_configuracoes():
+    try:
+        config = Configuracao.get_config(db.session)
+        return jsonify({
+            "success": True,
+            "permitir_venda_sem_estoque": config.permitir_venda_sem_estoque
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Erro ao carregar configurações: {str(e)}"
+        }), 500
+
+@admin_bp.route('/configuracoes', methods=['POST'])
+@login_required
+@admin_required
+def salvar_configuracoes():
+    data = request.get_json() or {}
+
+    permitir_venda_sem_estoque = bool(data.get('permitir_venda_sem_estoque', False))
+
+    try:
+        config = Configuracao.get_config(db.session)
+        config.permitir_venda_sem_estoque = permitir_venda_sem_estoque
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Configurações atualizadas com sucesso."
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Erro ao salvar configurações: {str(e)}"
+        }), 500
+

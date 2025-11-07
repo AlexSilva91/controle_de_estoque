@@ -118,6 +118,12 @@
                             <span class="nav-text">Log</span>
                         </a>
                     </li>
+                    <li data-tab="configuracoes">
+                        <a href="#configuracoes" class="nav-link">
+                            <i class="fas fa-cog"></i>
+                            <span class="nav-text">Configurações</span>
+                        </a>
+                    </li>
                 </ul>
             </nav>
 
@@ -331,6 +337,19 @@
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="configuracoes" class="tab-content">
+                    <div class="card">
+                        <div class="card-body" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h4>Permitir Venda sem Estoque</h4>
+                                <p>Controle se o sistema deve permitir vendas quando o estoque estiver zerado.</p>
+                            </div>
+                            <button id="toggleVendaSemEstoque" class="btn btn-secondary">
+                                <i class="fas fa-toggle-off"></i> Desativado
+                            </button>
                         </div>
                     </div>
                 </div>

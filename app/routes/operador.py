@@ -30,7 +30,7 @@ from app.utils.converter_endereco import parse_endereco_string
 from app.utils.format_data_moeda import format_currency, format_number
 from app.utils.nfce import gerar_nfce_pdf_bobina_bytesio
 from app.models.entities import (
-     Caixa, Cliente, ContaReceber, Desconto, Entrega, Financeiro, LoteEstoque, NotaFiscal,
+     Caixa, Cliente, Configuracao, ContaReceber, Desconto, Entrega, Financeiro, LoteEstoque, NotaFiscal,
      NotaFiscalItem, PagamentoNotaFiscal, Produto, TipoDesconto, TipoEstoque, 
      TipoUsuario, produto_desconto_association, NotaFiscal, PagamentoContaReceber
 )
@@ -277,6 +277,9 @@ def api_get_produto(produto_id):
 @operador_required
 def api_registrar_venda():
     # Verificação inicial do conteúdo da requisição
+    config = Configuracao.get_config(db.session)
+    permitir_venda_sem_estoque = config.permitir_venda_sem_estoque
+    
     if not request.is_json:
         logger.error("Requisição sem cabeçalho Content-Type: application/json")
         return jsonify({
@@ -369,10 +372,13 @@ def api_registrar_venda():
                 # Verificar se há estoque suficiente
                 if produto.estoque_loja < quantidade:
                     logger.error(f"Estoque insuficiente para produto: {produto.nome}")
-                    return jsonify({
-                        'success': False,
-                        'message': f'Estoque insuficiente para {produto.nome}. Disponível: {produto.estoque_loja}'
-                    }), 400
+                    if not permitir_venda_sem_estoque:
+                        return jsonify({
+                            'success': False,
+                            'message': f'Estoque insuficiente para {produto.nome}. Disponível: {produto.estoque_loja}'
+                        }), 400
+                    else:
+                        logger.warning(f"Venda sem estoque permitida para produto: {produto.nome}")
 
                 # Verificar se há lotes suficientes
                 lotes_disponiveis = LoteEstoque.query.filter(
@@ -391,10 +397,13 @@ def api_registrar_venda():
 
                 if quantidade_necessaria > 0:
                     logger.error(f"Lotes insuficientes para produto: {produto.nome}")
-                    return jsonify({
-                        'success': False,
-                        'message': f'Lotes insuficientes para {produto.nome}. Quantidade faltante: {quantidade_necessaria}'
-                    }), 400
+                    if not permitir_venda_sem_estoque:
+                        return jsonify({
+                            'success': False,
+                            'message': f'Lotes insuficientes para {produto.nome}. Quantidade faltante: {quantidade_necessaria}'
+                        }), 400
+                    else:
+                        logger.warning(f"Lotes insuficientes, mas venda permitida: {produto.nome}")
 
                 produtos_info[produto_id] = {
                     'produto': produto,

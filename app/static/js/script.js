@@ -335,6 +335,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (tabId === 'caixas') loadCaixasData();
         if (tabId === 'relatorio-saidas') loadRelatorioSaidasData();
         if (tabId === 'contas-receber') loadContasReceber();
+        if (tabId === 'configuracoes') {
+          setTimeout(initializeConfiguracoes, 100);
+        }
       });
     });
     
@@ -585,6 +588,59 @@ document.addEventListener('DOMContentLoaded', function () {
       container.style.display = 'none';
       icon.classList.remove('fa-chevron-up');
       icon.classList.add('fa-chevron-down');
+    }
+  }
+
+  async function initializeConfiguracoes() {
+    const btnToggle = document.getElementById('toggleVendaSemEstoque');
+
+    if (!btnToggle) {
+      return;
+    }
+
+    try {
+      const resp = await fetch('/admin/configuracoes');
+      const config = await resp.json();
+
+      atualizarBotao(config.permitir_venda_sem_estoque);
+    } catch (e) {
+      atualizarBotao(false);
+    }
+
+    btnToggle.addEventListener('click', async () => {
+      const ativo = btnToggle.classList.contains('ativo');
+      const novoStatus = !ativo;
+
+      try {
+        const response = await fetch('/admin/configuracoes', { // Corrigi a URL aqui
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ permitir_venda_sem_estoque: novoStatus })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          atualizarBotao(novoStatus);
+          showFlashMessage('success', 'Configuração atualizada com sucesso!');
+        } else {
+          showFlashMessage('error', data.message || 'Erro ao atualizar configuração');
+        }
+      } catch (error) {
+        showFlashMessage('error', 'Erro ao comunicar com o servidor');
+      }
+    });
+
+    function atualizarBotao(ativo) {
+      btnToggle.classList.remove('btn-success', 'btn-secondary', 'btn-danger', 'ativo');
+
+      if (ativo) {
+        btnToggle.classList.add('btn-success', 'ativo');
+        btnToggle.innerHTML = '<i class="fas fa-toggle-on"></i> Ativado';
+      } else {
+        btnToggle.classList.add('btn-danger');
+        btnToggle.innerHTML = '<i class="fas fa-toggle-off"></i> Desativado';
+      }
     }
   }
 
@@ -5852,6 +5908,11 @@ document.addEventListener('DOMContentLoaded', function () {
   setupVendaRetroativaModal();
   setupClienteActions();
   setupFormasPagamentoEvents();
+
+  const activeTab = document.querySelector('.sidebar-nav li.active');
+  if (activeTab && activeTab.getAttribute('data-tab') === 'configuracoes') {
+    setTimeout(initializeConfiguracoes, 100);
+  }
 
   document.getElementById('confirmarExclusaoBtn')?.addEventListener('click', async function () {
     const id = this.getAttribute('data-id');

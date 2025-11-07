@@ -885,3 +885,19 @@ class AuditLog(Base):
     criado_em = Column(DateTime, default=datetime.now, nullable=False)
 
     usuario = relationship("Usuario")
+    
+class Configuracao(Base):
+    __tablename__ = "configuracoes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    permitir_venda_sem_estoque = Column(Boolean, default=False, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    @classmethod
+    def get_config(cls, session):
+        config = session.query(cls).first()
+        if not config:
+            config = cls()
+            session.add(config)
+            session.commit()
+        return config
