@@ -2,6 +2,7 @@ from babel.dates import format_date
 from babel.numbers import format_currency as babel_format_currency
 from datetime import date
 import locale
+from decimal import Decimal, InvalidOperation
 
 locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 
@@ -33,3 +34,10 @@ def format_number(value, is_weight=False):
     else:
         # Para outros números decimais
         return "{:,.2f}".format(value).replace(",", "X").replace(".", ",").replace("X", ".")
+    
+def to_decimal_or_none(value):
+    """Converte valor para Decimal ou retorna None."""
+    try:
+        return Decimal(str(value)) if value not in (None, '', 'null') else None
+    except (InvalidOperation, ValueError, TypeError):
+        return None

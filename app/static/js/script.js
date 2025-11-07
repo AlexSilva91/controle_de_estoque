@@ -1636,6 +1636,11 @@ document.addEventListener('DOMContentLoaded', function () {
       const url = `/admin/produtos/pdf?search=${encodeURIComponent(searchText)}&incluir_inativos=${incluirInativos}`;
       window.open(url, '_blank');
     });
+    document.getElementById('btnRelatorioEntradas').addEventListener('click', () => {
+
+      const url = `/admin/lotes/pdf`;
+      window.open(url, '_blank');
+    });
   }
 
   async function openEditarProdutoModal(produtoId) {
