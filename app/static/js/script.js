@@ -58,94 +58,109 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
-  function showFlashMessage(type, message) {
-    const flashContainer = document.querySelector('.flash-messages');
-    if (!flashContainer) return;
-
-    const flashId = `flash-${Date.now()}`;
-    const flashMessage = document.createElement('div');
-    flashMessage.className = `flash-message ${type}`;
-    flashMessage.id = flashId;
-
-    flashMessage.innerHTML = `
-      <div>
-        <i class="fas 
-          ${type === 'success' ? 'fa-check-circle' : ''}
-          ${type === 'error' ? 'fa-exclamation-circle' : ''}
-          ${type === 'warning' ? 'fa-exclamation-triangle' : ''}
-          ${type === 'info' ? 'fa-info-circle' : ''}
-        "></i>
-        <span>${message}</span>
-      </div>
-      <button class="close-flash" aria-label="Fechar">&times;</button>
-    `;
-
-    flashContainer.appendChild(flashMessage);
-
-    const closeBtn = flashMessage.querySelector('.close-flash');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        flashMessage.remove();
-      });
-    }
-
-    setTimeout(() => {
-      flashMessage.classList.add('fade-out');
-      setTimeout(() => flashMessage.remove(), 500);
-    }, 5000);
-  }
-
   async function fetchWithErrorHandling(url, options = {}) {
+    const method = (options.method || 'GET').toUpperCase();
+    const showFlash = ['POST', 'PUT', 'DELETE'].includes(method);
+
     try {
       const response = await fetch(url, options);
       const contentType = response.headers.get('content-type');
 
+      // --- ERRO HTTP ---
       if (!response.ok) {
+        let backendMessage = null;
+
         if (contentType && contentType.includes('application/json')) {
           const data = await response.json();
-
-          if (Array.isArray(data.message)) {
-            data.message.forEach(msg => {
-              showFlashMessage('error', msg);
-            });
-          } else if (data.message && typeof data.message === 'object') {
-            for (const [key, value] of Object.entries(data.message)) {
-              if (Array.isArray(value)) {
-                value.forEach(msg => showFlashMessage('error', msg));
-              } else {
-                showFlashMessage('error', value);
-              }
-            }
-          } else if (data.message) {
-            showFlashMessage('error', data.message);
-          } else {
-            showFlashMessage('error', `HTTP error! status: ${response.status}`);
-          }
-
-          throw new Error(data.message || `HTTP error! status: ${response.status}`);
+          backendMessage = extractBackendMessage(data.message);
         } else {
           const text = await response.text();
-          showFlashMessage('error', text || `HTTP error! status: ${response.status}`);
-          throw new Error(text || `HTTP error! status: ${response.status}`);
+          backendMessage = text;
         }
+
+        if (showFlash) {
+          showFlashMessage('error', backendMessage || `Erro HTTP ${response.status}`);
+        }
+
+        throw new Error(backendMessage || `Erro HTTP ${response.status}`);
       }
 
+      // --- RESPOSTA NÃO JSON ---
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
         return text;
       }
 
+      // --- SUCESSO ---
       const data = await response.json();
-      return data;
-    } catch (error) {
-
-      if (error.message && error.message.includes('HTTP error')) {
-        throw error;
+      if (showFlash) {
+        const backendMessage = extractBackendMessage(data.message);
+        showFlashMessage('success', backendMessage || 'Operação realizada com sucesso');
       }
 
-      showFlashMessage('error', error.message || 'Erro ao comunicar com o servidor');
+      return data;
+    } catch (error) {
+      if (showFlash) {
+        showFlashMessage('error', error.message || 'Erro ao comunicar com o servidor');
+      }
       throw error;
     }
+  }
+
+  // Extrai mensagem do backend (string, lista ou objeto)
+  function extractBackendMessage(msg) {
+    if (!msg) return null;
+    if (typeof msg === 'string') return msg;
+    if (Array.isArray(msg)) return msg.join(' ');
+    if (typeof msg === 'object') {
+      return Object.values(msg)
+        .flat()
+        .join(' ');
+    }
+    return null;
+  }
+
+  // --- POPUP FLASH ---
+  function showFlashMessage(type, message) {
+    const flashContainer = document.createElement('div');
+    flashContainer.className = `flash-message ${type}`;
+    flashContainer.textContent = message;
+
+    Object.assign(flashContainer.style, {
+      position: 'fixed',
+      top: '20px',
+      right: '20px',
+      zIndex: '10000',
+      padding: '12px 20px',
+      borderRadius: '8px',
+      color: '#fff',
+      fontWeight: '500',
+      boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+      opacity: '0',
+      transition: 'opacity 0.3s ease, transform 0.3s ease',
+      transform: 'translateY(-10px)',
+    });
+
+    if (type === 'success') {
+      flashContainer.style.backgroundColor = '#28a745';
+    } else if (type === 'error') {
+      flashContainer.style.backgroundColor = '#dc3545';
+    } else {
+      flashContainer.style.backgroundColor = '#6c757d';
+    }
+
+    document.body.appendChild(flashContainer);
+
+    setTimeout(() => {
+      flashContainer.style.opacity = '1';
+      flashContainer.style.transform = 'translateY(0)';
+    }, 50);
+
+    setTimeout(() => {
+      flashContainer.style.opacity = '0';
+      flashContainer.style.transform = 'translateY(-10px)';
+      setTimeout(() => flashContainer.remove(), 300);
+    }, 4000);
   }
 
   function formatPerfil(perfil) {
@@ -1492,10 +1507,10 @@ document.addEventListener('DOMContentLoaded', function () {
           closeModal('clienteModal');
           loadClientesData();
         } else {
-          showFlashMessage('error', response.message || 'Erro ao salvar cliente');
+          showFlashMessage('error', response.message);
         }
       } catch (error) {
-        showFlashMessage('error', 'Erro ao salvar cliente');
+        showFlashMessage('error');
       }
     });
   }
