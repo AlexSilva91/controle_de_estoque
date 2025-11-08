@@ -33,7 +33,8 @@ class StatusCaixa(str, enum.Enum):
     fechado = "fechado"
     em_analise = "em_analise"
     recusado = "recusado"
-
+    aprovado = "aprovado"
+    
 class CategoriaFinanceira(str, enum.Enum):
     venda = "venda"
     compra = "compra"
@@ -276,7 +277,7 @@ class Caixa(Base):
         self.observacoes_admin = observacoes_admin
         self.administrador_id = administrador_id
         self.data_analise = datetime.now()
-        self.status = StatusCaixa.fechado
+        self.status = StatusCaixa.aprovado
         self.sincronizado = False
         
         # Atualiza registro financeiro do fechamento

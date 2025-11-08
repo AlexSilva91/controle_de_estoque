@@ -3104,6 +3104,9 @@ document.addEventListener('DOMContentLoaded', function () {
             } else if (caixa.status === 'rejeitado' || caixa.status === 'recusado') {
               statusClass = 'badge-danger';
               statusText = 'Rejeitado';
+            } else if (caixa.status === 'aprovado') {
+              statusClass = 'badge-success';
+              statusText = 'Aprovado';
             }
 
             row.innerHTML = `
@@ -3589,6 +3592,9 @@ document.addEventListener('DOMContentLoaded', function () {
           } else if (caixa.status === 'rejeitado') {
             statusText = 'Rejeitado';
             statusClass = 'badge-danger';
+          } else if (caixa.status === 'aprovado') {
+            statusText = 'Aprovado';
+            statusClass = 'badge-success';
           }
 
           statusElement.textContent = statusText;

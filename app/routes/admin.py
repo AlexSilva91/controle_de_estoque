@@ -62,7 +62,7 @@ from app.crud import (
     update_cliente, delete_cliente, create_nota_fiscal, get_nota_fiscal, 
     get_notas_fiscais, create_lancamento_financeiro,
     get_lancamentos_financeiros, update_lancamento_financeiro, 
-    delete_lancamento_financeiro, get_clientes_all, get_caixas_abertos
+    delete_lancamento_financeiro, get_clientes_all, get_caixas_abertos, processar_movimentacoes_conta
 )
 from app.schemas import (
     UsuarioCreate, UsuarioUpdate, ProdutoCreate, ProdutoUpdate, MovimentacaoEstoqueCreate,
@@ -4938,18 +4938,17 @@ def gerar_pdf_caixa_financeiro(caixa_id):
 @login_required
 @admin_required
 def aprovar_caixa(caixa_id):
-    """Rota para aprovar o fechamento de um caixa e transferir saldo para o admin"""
+    """Rota para aprovar o fechamento de um caixa, creditar admin e debitar operador"""
     caixa = Caixa.query.get_or_404(caixa_id)
-    
+
     if current_user.tipo != 'admin':
         logger.warning(f"Usuário não autorizado a aprovar caixa: {current_user.nome}")
         return jsonify({'success': False, 'error': 'Apenas administradores podem aprovar caixas'}), 403
-    
+
     data = request.get_json()
     valor_confirmado = data.get('valor_confirmado')
     observacoes = data.get('observacoes')
-    
-    
+
     try:
         # Aprovar o fechamento do caixa
         caixa.aprovar_fechamento(
@@ -4957,43 +4956,63 @@ def aprovar_caixa(caixa_id):
             valor_confirmado=valor_confirmado,
             observacoes_admin=observacoes
         )
-        
-        # TRANSFERIR TODO O SALDO DO OPERADOR PARA O ADMINISTRADOR
+
+        # PROCESSAR O CAIXA NA CONTA DO ADMIN
+        resultado_admin = processar_movimentacoes_conta(
+            caixa_id=caixa.id,
+            usuario_logado_id=current_user.id,
+            session=db.session
+        )
+        print(resultado_admin)
+        # DEDUZIR O MESMO VALOR DA CONTA DO OPERADOR
         operador = caixa.operador
         if operador and operador.conta:
-            # Verificar se o operador tem saldo para transferir
-            if operador.conta.saldo_total > 0:
-                # Buscar a conta do administrador (current_user)
-                admin_conta = current_user.conta
-                if not admin_conta:
-                    # Se o admin não tem conta, criar uma
-                    admin_conta = Conta(usuario_id=current_user.id, saldo_total=0.00)
-                    db.session.add(admin_conta)
-                    db.session.flush()
-                
-                # Transferir todo o saldo do operador para o admin
-                resultado_transferencia = transferir_todo_saldo(
-                    conta_origem_id=operador.conta.id,
-                    conta_destino_id=admin_conta.id,
-                    usuario_id=current_user.id,
-                    session=db.session,
-                    descricao=f"Aprovação do Caixa {caixa_id}"
+            conta_operador = operador.conta
+            total_debitar = resultado_admin['total_creditado']
+
+            # Percorrer cada forma de pagamento processada
+            for forma_str, valor in resultado_admin['saldos_por_forma_pagamento'].items():
+                try:
+                    forma_pagamento = FormaPagamento(forma_str)
+                except ValueError:
+                    continue
+
+                saldo_fp = next(
+                    (s for s in conta_operador.saldos_forma_pagamento if s.forma_pagamento == forma_pagamento),
+                    None
                 )
-                
-            else:
-                logger.info(f"Operador {operador.nome} não possui saldo para transferir")
-        
+                if saldo_fp:
+                    saldo_fp.saldo = max(float(saldo_fp.saldo) - valor, 0)
+                    saldo_fp.sincronizado = False
+
+                    # Criar movimentação de saída
+                    movimentacao = MovimentacaoConta(
+                        conta_id=conta_operador.id,
+                        tipo=TipoMovimentacao.transferencia,
+                        forma_pagamento=forma_pagamento,
+                        valor=valor,
+                        descricao=f"Caixa {caixa_id} aprovado pelo {current_user.nome}",
+                        data=datetime.now(),
+                        usuario_id=current_user.id,
+                        caixa_id=caixa.id
+                    )
+                    db.session.add(movimentacao)
+
+            # Atualizar saldo total da conta do operador
+            conta_operador.saldo_total = max(float(conta_operador.saldo_total) - total_debitar, 0)
+            conta_operador.sincronizado = False
+
         db.session.commit()
         logger.info(f"Caixa {caixa_id} aprovado com sucesso pelo usuário {current_user.nome}")
-        
+
         return jsonify({
             'success': True,
-            'message': 'Caixa aprovado com sucesso e saldo transferido',
+            'message': 'Caixa aprovado com sucesso, saldo do admin creditado e saldo do operador debitado',
             'status': caixa.status.value,
             'valor_confirmado': float(caixa.valor_confirmado) if caixa.valor_confirmado else None,
-            'transferencia_realizada': operador.conta.saldo_total > 0 if operador and operador.conta else False
+            'resultado_admin': resultado_admin
         }), 200
-        
+
     except ValueError as e:
         logger.error(f"Erro ao aprovar caixa {caixa_id}: {str(e)}")
         db.session.rollback()
