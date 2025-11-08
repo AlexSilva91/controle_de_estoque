@@ -3336,43 +3336,153 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
 
-    document.querySelectorAll('.aprovar-caixa').forEach(btn => {
+   document.querySelectorAll('.aprovar-caixa').forEach(btn => {
       btn.addEventListener('click', async function () {
         const caixaId = this.getAttribute('data-id');
 
-        try {
-          const valorConfirmado = prompt('Valor confirmado (opcional):');
-          const observacoes = prompt('Observações (opcional):') || '';
+        // Remove popup existente
+        document.querySelectorAll('.popup-overlay').forEach(p => p.remove());
 
-          if (valorConfirmado === null && observacoes === null) return;
+        // Cria overlay + popup
+        const overlay = document.createElement('div');
+        overlay.className = 'popup-overlay';
+        overlay.innerHTML = `
+          <div class="popup-container">
+            <h2 class="popup-title">Aprovar Caixa</h2>
 
-          if (valorConfirmado && (isNaN(valorConfirmado) || parseFloat(valorConfirmado) <= 0)) {
-            showFlashMessage('error', 'Digite um valor válido ou deixe em branco!');
-            return;
-          }
+            <label class="popup-label">Valor confirmado (opcional)</label>
+            <input type="text" id="valorConfirmado" class="popup-input" placeholder="Ex: 2.100,30" />
 
-          const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/aprovar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              valor_confirmado: valorConfirmado ? parseFloat(valorConfirmado) : null,
-              observacoes: observacoes
-            })
-          });
+            <label class="popup-label">Observações (opcional)</label>
+            <textarea id="observacoes" class="popup-textarea" rows="3" placeholder="Digite aqui..."></textarea>
 
-          if (response.success) {
-            if (response.transferencia_realizada) {
-              showFlashMessage('success', 'Caixa aprovado com sucesso e saldo transferido para sua conta');
-            } else {
-              showFlashMessage('success', 'Caixa aprovado com sucesso (sem saldo para transferir)');
+            <div class="popup-actions">
+              <button class="popup-btn cancelar">Cancelar</button>
+              <button class="popup-btn confirmar">Confirmar</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+
+        // Botão cancelar
+        overlay.querySelector('.cancelar').addEventListener('click', () => overlay.remove());
+
+        // Botão confirmar
+        overlay.querySelector('.confirmar').addEventListener('click', async () => {
+          const valorStr = overlay.querySelector('#valorConfirmado').value.trim();
+          const observacoes = overlay.querySelector('#observacoes').value.trim();
+
+          // Conversão do valor no formato brasileiro para float
+          let valorConfirmado = null;
+          if (valorStr) {
+            const normalizado = valorStr.replace(/\./g, '').replace(',', '.');
+            valorConfirmado = parseFloat(normalizado);
+            if (isNaN(valorConfirmado)) {
+              showFlashMessage('error', 'Digite um valor válido, exemplo: 2.100,30');
+              return;
             }
-            loadCaixasData();
           }
-        } catch (error) {
-          showFlashMessage('error', error.message || 'Erro ao aprovar caixa');
-        }
+
+          try {
+            const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/aprovar`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                valor_confirmado: valorConfirmado,
+                observacoes: observacoes
+              })
+            });
+
+            if (response.success) {
+              overlay.remove();
+              if (response.transferencia_realizada) {
+                showFlashMessage('success', 'Caixa aprovado com sucesso e saldo transferido para sua conta');
+              } else {
+                showFlashMessage('success', 'Caixa aprovado com sucesso (sem saldo para transferir)');
+              }
+              loadCaixasData();
+            }
+          } catch (error) {
+            showFlashMessage('error', error.message || 'Erro ao aprovar caixa');
+          }
+        });
       });
     });
+
+    // Estilo
+    const style = document.createElement('style');
+    style.textContent = `
+    .popup-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    }
+    .popup-container {
+      background: var(--card-bg);
+      color: var(--text-primary);
+      padding: var(--space-lg);
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow-lg);
+      width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+    .popup-title {
+      text-align: center;
+      font-size: var(--font-size-lg);
+      color: var(--primary-light);
+    }
+    .popup-label {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+    .popup-input, .popup-textarea {
+      background: var(--bg-secondary);
+      color: var(--text-light);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius-sm);
+      padding: var(--space-sm);
+      width: 100%;
+      font-size: var(--font-size-md);
+    }
+    .popup-input::placeholder {
+      color: var(--text-muted);
+    }
+    .popup-textarea::placeholder {
+      color: var(--text-muted);
+    }
+    .popup-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-sm);
+    }
+    .popup-btn {
+      cursor: pointer;
+      border: none;
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--border-radius-sm);
+      font-weight: var(--font-weight-medium);
+      transition: 0.2s;
+    }
+    .popup-btn.cancelar {
+      background: var(--danger-dark);
+      color: var(--text-light);
+    }
+    .popup-btn.confirmar {
+      background: var(--success-dark);
+      color: var(--text-light);
+    }
+    .popup-btn:hover {
+      opacity: 0.9;
+    }
+    `;
+    document.head.appendChild(style);
+
 
     document.querySelectorAll('.recusar-caixa').forEach(btn => {
       btn.addEventListener('click', async function () {
