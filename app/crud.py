@@ -147,7 +147,7 @@ def calcular_formas_pagamento(caixa_id, session):
 
     formas_pagamento = {}
     total_entradas = 0.0
-
+    print(f'\npagamentos_contas :{pagamentos_contas}')
     for forma, total in pagamentos_notas:
         valor = float(total)
         formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor
@@ -223,22 +223,24 @@ def calcular_formas_pagamento(caixa_id, session):
         'valor_digital': valor_digital,
         'a_prazo': a_prazo,
         'contas_prazo_recebidas': float(total_contas_prazo_recebidas),
-        'estornos': estornos_valor
+        'estornos': estornos_valor,
+        'a_prazo_recebido': pagamentos_contas
     }
 
 def processar_movimentacoes_conta(caixa_id, usuario_logado_id, session):
     """
-    Processa as movimentações do caixa na conta do usuário logado
-    Salva apenas os valores líquidos finais por forma de pagamento
+    Processa as movimentações do caixa na conta do usuário logado.
+    Inclui valores de vendas e também pagamentos de contas (a_prazo_recebido).
+    Evita duplicação de saldos por forma de pagamento.
     """
     from sqlalchemy import func
-    
-    # Busca o caixa
+    from datetime import datetime
+
+    # --- 1. BUSCA CAIXA E USUÁRIO ---
     caixa = session.query(Caixa).filter_by(id=caixa_id).first()
     if not caixa:
         raise ValueError(f"Caixa ID {caixa_id} não encontrado")
     
-    # Busca o usuário logado e sua conta
     usuario = session.query(Usuario).filter_by(id=usuario_logado_id).first()
     if not usuario:
         raise ValueError(f"Usuário ID {usuario_logado_id} não encontrado")
@@ -247,8 +249,8 @@ def processar_movimentacoes_conta(caixa_id, usuario_logado_id, session):
         raise ValueError(f"Usuário {usuario.nome} não possui conta cadastrada")
     
     conta = usuario.conta
-    
-    # VERIFICA SE JÁ EXISTEM MOVIMENTAÇÕES PARA ESTE CAIXA
+
+    # --- 2. EVITA REPROCESSAMENTO ---
     movimentacoes_existentes = session.query(MovimentacaoConta).filter_by(
         caixa_id=caixa_id,
         conta_id=conta.id
@@ -257,70 +259,80 @@ def processar_movimentacoes_conta(caixa_id, usuario_logado_id, session):
     if movimentacoes_existentes > 0:
         raise ValueError(f"Já existem movimentações processadas para o Caixa {caixa_id} na conta do usuário")
     
-    # Calcula os valores líquidos do caixa
+    # --- 3. CALCULA VALORES DO CAIXA ---
     valores_caixa = calcular_formas_pagamento(caixa_id, session)
-    
-    # Formas de pagamento que devem ser creditadas
+    print(f'\nvalores_caixa: {valores_caixa}\n')
+
+    # --- 4. FORMAS DE PAGAMENTO ---
     formas_creditar = [
-        'dinheiro', 'pix_loja', 'pix_fabiano', 'pix_edfrance', 
+        'dinheiro', 'pix_loja', 'pix_fabiano', 'pix_edfrance',
         'pix_maquineta', 'cartao_debito', 'cartao_credito'
     ]
     
     total_creditos = 0.0
-    
-    # 1. SALVAR VALORES LÍQUIDOS POR FORMA DE PAGAMENTO
+
+    # --- 5. AGREGA TODAS AS FONTES DE CRÉDITO ---
+    creditos_por_forma = {}
+
+    # 5.1. Vendas
     for forma_pagamento_str, valor in valores_caixa['vendas_por_forma_pagamento'].items():
-        # Apenas processa formas de pagamento válidas
         if forma_pagamento_str in formas_creditar and valor > 0:
-            # Converte string para enum FormaPagamento
             try:
                 forma_pagamento = FormaPagamento(forma_pagamento_str)
             except ValueError:
                 continue
-            
-            # Busca ou cria saldo específico para a forma de pagamento
-            saldo_fp = next(
-                (s for s in conta.saldos_forma_pagamento if s.forma_pagamento == forma_pagamento),
-                None
-            )
-            
-            if not saldo_fp:
-                saldo_fp = SaldoFormaPagamento(
-                    conta_id=conta.id,
-                    forma_pagamento=forma_pagamento,
-                    saldo=0.00
-                )
-                session.add(saldo_fp)
-                session.flush()
-            
-            # Atualiza saldo da forma de pagamento com o valor líquido
-            novo_saldo = float(saldo_fp.saldo) + valor
-            saldo_fp.saldo = novo_saldo
-            saldo_fp.sincronizado = False
-            
-            # Cria UMA movimentação para o valor líquido total
-            movimentacao = MovimentacaoConta(
+            creditos_por_forma[forma_pagamento] = creditos_por_forma.get(forma_pagamento, 0.0) + valor
+
+    # 5.2. Contas recebidas (a_prazo_recebido)
+    for forma_pagamento_enum, total in valores_caixa.get('a_prazo_recebido', []):
+        valor = float(total)
+        if valor > 0:
+            creditos_por_forma[forma_pagamento_enum] = creditos_por_forma.get(forma_pagamento_enum, 0.0) + valor
+
+    # --- 6. PROCESSA CADA FORMA DE PAGAMENTO UMA VEZ ---
+    for forma_pagamento, valor in creditos_por_forma.items():
+        # Busca saldo existente
+        saldo_fp = next(
+            (s for s in conta.saldos_forma_pagamento if s.forma_pagamento == forma_pagamento),
+            None
+        )
+
+        # Cria se não existir
+        if not saldo_fp:
+            saldo_fp = SaldoFormaPagamento(
                 conta_id=conta.id,
-                tipo=TipoMovimentacao.entrada,
                 forma_pagamento=forma_pagamento,
-                valor=valor,
-                descricao=f"Crédito líquido - Caixa {caixa_id}",
-                data=datetime.now(),
-                usuario_id=usuario_logado_id,
-                caixa_id=caixa_id
+                saldo=0.00
             )
-            session.add(movimentacao)
-            
-            total_creditos += valor
-            
-    # 3. ATUALIZAR SALDO TOTAL DA CONTA
-    novo_saldo_total = float(conta.saldo_total) + total_creditos
-    conta.saldo_total = max(novo_saldo_total, 0)
+            session.add(saldo_fp)
+            session.flush()
+
+        # Atualiza saldo
+        novo_saldo = float(saldo_fp.saldo) + valor
+        saldo_fp.saldo = novo_saldo
+        saldo_fp.sincronizado = False
+
+        # Cria movimentação consolidada
+        movimentacao = MovimentacaoConta(
+            conta_id=conta.id,
+            tipo=TipoMovimentacao.entrada,
+            forma_pagamento=forma_pagamento,
+            valor=valor,
+            descricao=f"Crédito consolidado - Caixa {caixa_id}",
+            data=datetime.now(),
+            usuario_id=usuario_logado_id,
+            caixa_id=caixa_id
+        )
+        session.add(movimentacao)
+        total_creditos += valor
+
+    # --- 7. ATUALIZA SALDO TOTAL ---
+    conta.saldo_total = float(conta.saldo_total) + total_creditos
     conta.sincronizado = False
-    
-    # Commit das alterações
+
     session.commit()
-    
+
+    # --- 8. RETORNO ---
     return {
         'usuario': usuario.nome,
         'conta_id': conta.id,
@@ -331,7 +343,7 @@ def processar_movimentacoes_conta(caixa_id, usuario_logado_id, session):
             for saldo in conta.saldos_forma_pagamento
         },
         'movimentacoes_processadas': len([
-            mov for mov in conta.movimentacoes 
+            mov for mov in conta.movimentacoes
             if mov.caixa_id == caixa_id
         ])
     }
