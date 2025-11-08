@@ -3064,7 +3064,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (dataInicio) params.append('data_inicio', dataInicio);
       if (dataFim) params.append('data_fim', dataFim);
 
-      // NOVO: Adiciona parâmetros de paginação
+      // Paginação
       params.append('page', page.toString());
       params.append('per_page', caixasPerPage.toString());
 
@@ -3085,64 +3085,82 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const dataAbertura = formatDateTime(caixa.data_abertura);
             const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
-
             const valorEntradas = formatarMoeda(caixa.total_vendas);
             const valorSaidas = formatarMoeda(caixa.total_despesas);
             const valorConfirmado = caixa.valor_confirmado ? formatarMoeda(caixa.valor_confirmado) : '-';
 
+            // Determina classe e texto do status
             let statusClass = '';
             let statusText = '';
-            if (caixa.status === 'aberto') {
-              statusClass = 'badge-success';
-              statusText = 'Aberto';
-            } else if (caixa.status === 'fechado') {
-              statusClass = 'badge-primary';
-              statusText = 'Fechado';
-            } else if (caixa.status === 'analise' || caixa.status === 'em_analise') {
-              statusClass = 'badge-warning';
-              statusText = 'Em Análise';
-            } else if (caixa.status === 'rejeitado' || caixa.status === 'recusado') {
-              statusClass = 'badge-danger';
-              statusText = 'Rejeitado';
-            } else if (caixa.status === 'aprovado') {
-              statusClass = 'badge-success';
-              statusText = 'Aprovado';
+            switch(caixa.status) {
+              case 'aberto':
+                statusClass = 'badge-success';
+                statusText = 'Aberto';
+                break;
+              case 'fechado':
+                statusClass = 'badge-primary';
+                statusText = 'Fechado';
+                break;
+              case 'analise':
+              case 'em_analise':
+                statusClass = 'badge-warning';
+                statusText = 'Em Análise';
+                break;
+              case 'rejeitado':
+              case 'recusado':
+                statusClass = 'badge-danger';
+                statusText = 'Rejeitado';
+                break;
+              case 'aprovado':
+                statusClass = 'badge-success';
+                statusText = 'Aprovado';
+                break;
+              default:
+                statusClass = 'badge-secondary';
+                statusText = caixa.status || '-';
+            }
+
+            // Botão "Aprovar" só aparece se não estiver aprovado
+            let aprovarButton = '';
+            if (caixa.status !== 'aprovado') {
+              aprovarButton = `
+                <button class="btn-icon btn-success aprovar-caixa" data-id="${caixa.id}" title="Transferir Saldo">
+                  <i class="fas fa-check"></i>
+                </button>
+              `;
             }
 
             row.innerHTML = `
-                          <td>${caixa.id}</td>
-                          <td>${caixa.operador?.nome || '-'}</td>
-                          <td>${dataAbertura}</td>
-                          <td>${dataFechamento}</td>
-                          <td>${valorEntradas}</td>
-                          <td>${valorSaidas}</td>
-                          <td><span class="badge ${statusClass}">${statusText}</span></td>
-                          <td>
-                              <div class="table-actions">
-                                  <button class="btn-icon btn-info visualizar-caixa" data-id="${caixa.id}" title="Visualizar">
-                                      <i class="fas fa-eye"></i>
-                                  </button>
-                                  <button class="btn-icon btn-warning reabrir-caixa" data-id="${caixa.id}" title="Reabrir Caixa">
-                                      <i class="fas fa-unlock"></i>
-                                  </button>
-                                  <button class="btn-icon btn-danger fechar-caixa" data-id="${caixa.id}" title="Fechar Caixa">
-                                      <i class="fas fa-lock"></i>
-                                  </button>
-                                  <button class="btn-icon btn-primary venda-retroativa-caixa" data-id="${caixa.id}" title="Venda Retroativa">
-                                      <i class="fas fa-history"></i>
-                                  </button>
-                                  <button class="btn-icon btn-success aprovar-caixa" data-id="${caixa.id}" title="Transferir Saldo">
-                                      <i class="fas fa-check"></i>
-                                  </button>
-                              </div>
-                          </td>
-                      `;
+              <td>${caixa.id}</td>
+              <td>${caixa.operador?.nome || '-'}</td>
+              <td>${dataAbertura}</td>
+              <td>${dataFechamento}</td>
+              <td>${valorEntradas}</td>
+              <td>${valorSaidas}</td>
+              <td><span class="badge ${statusClass}">${statusText}</span></td>
+              <td>
+                <div class="table-actions">
+                  <button class="btn-icon btn-info visualizar-caixa" data-id="${caixa.id}" title="Visualizar">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                  <button class="btn-icon btn-warning reabrir-caixa" data-id="${caixa.id}" title="Reabrir Caixa">
+                    <i class="fas fa-unlock"></i>
+                  </button>
+                  <button class="btn-icon btn-danger fechar-caixa" data-id="${caixa.id}" title="Fechar Caixa">
+                    <i class="fas fa-lock"></i>
+                  </button>
+                  <button class="btn-icon btn-primary venda-retroativa-caixa" data-id="${caixa.id}" title="Venda Retroativa">
+                    <i class="fas fa-history"></i>
+                  </button>
+                  ${aprovarButton}
+                </div>
+              </td>
+            `;
+
             caixasTable.appendChild(row);
           });
 
           setupCaixaActions();
-
-          // NOVO: Atualiza controles de paginação
           updatePaginationControls(data.pagination);
         }
       }
