@@ -4938,89 +4938,138 @@ def gerar_pdf_caixa_financeiro(caixa_id):
 @login_required
 @admin_required
 def aprovar_caixa(caixa_id):
-    """Rota para aprovar o fechamento de um caixa, creditar admin e debitar operador"""
-    caixa = Caixa.query.get_or_404(caixa_id)
-
-    if current_user.tipo != 'admin':
-        logger.warning(f"Usuário não autorizado a aprovar caixa: {current_user.nome}")
-        return jsonify({'success': False, 'error': 'Apenas administradores podem aprovar caixas'}), 403
-
-    data = request.get_json()
-    valor_confirmado = data.get('valor_confirmado')
-    observacoes = data.get('observacoes')
-
+    """Aprova o caixa e transfere automaticamente os valores das formas de pagamento do operador para o admin."""
     try:
-        # Aprovar o fechamento do caixa
-        caixa.aprovar_fechamento(
-            administrador_id=current_user.id,
-            valor_confirmado=valor_confirmado,
-            observacoes_admin=observacoes
-        )
-
-        # PROCESSAR O CAIXA NA CONTA DO ADMIN
-        resultado_admin = processar_movimentacoes_conta(
-            caixa_id=caixa.id,
-            usuario_logado_id=current_user.id,
-            session=db.session
-        )
-        print(resultado_admin)
-        # DEDUZIR O MESMO VALOR DA CONTA DO OPERADOR
+        caixa = Caixa.query.get_or_404(caixa_id)
         operador = caixa.operador
-        if operador and operador.conta:
-            conta_operador = operador.conta
-            total_debitar = resultado_admin['total_creditado']
 
-            # Percorrer cada forma de pagamento processada
-            for forma_str, valor in resultado_admin['saldos_por_forma_pagamento'].items():
+        if not operador or not operador.conta:
+            return jsonify({'success': False, 'error': 'Operador ou conta do operador não encontrado'}), 404
+
+        conta_origem = operador.conta
+        conta_destino = current_user.conta
+
+        if not conta_destino:
+            return jsonify({'success': False, 'error': 'Administrador não possui conta vinculada'}), 400
+
+        # Calcular valores de formas de pagamento do caixa
+        valores_caixa = calcular_formas_pagamento(caixa_id, db.session)
+
+        # Ignora "a prazo"
+        formas_pagamento_validas = [
+            'dinheiro', 'pix_loja', 'pix_fabiano', 'pix_edfrance',
+            'pix_maquineta', 'cartao_debito', 'cartao_credito'
+        ]
+
+        vendas_por_forma = valores_caixa.get('vendas_por_forma_pagamento', {})
+        formas_transferir = {
+            forma: valor
+            for forma, valor in vendas_por_forma.items()
+            if forma in formas_pagamento_validas and valor > 0
+        }
+
+        if not formas_transferir:
+            return jsonify({'success': False, 'error': 'Nenhum valor válido para transferir'}), 400
+
+        with db.session.begin_nested():
+            total_transferido = 0.0
+
+            for forma_str, valor in formas_transferir.items():
                 try:
-                    forma_pagamento = FormaPagamento(forma_str)
+                    forma_pagamento_enum = FormaPagamento(forma_str)
                 except ValueError:
                     continue
 
-                saldo_fp = next(
-                    (s for s in conta_operador.saldos_forma_pagamento if s.forma_pagamento == forma_pagamento),
+                valor = Decimal(str(valor))
+                if valor <= 0:
+                    continue
+
+                # --- Atualiza origem (operador) ---
+                saldo_fp_origem = next(
+                    (s for s in conta_origem.saldos_forma_pagamento if s.forma_pagamento == forma_pagamento_enum),
                     None
                 )
-                if saldo_fp:
-                    saldo_fp.saldo = max(float(saldo_fp.saldo) - valor, 0)
-                    saldo_fp.sincronizado = False
-
-                    # Criar movimentação de saída
-                    movimentacao = MovimentacaoConta(
-                        conta_id=conta_operador.id,
-                        tipo=TipoMovimentacao.transferencia,
-                        forma_pagamento=forma_pagamento,
-                        valor=valor,
-                        descricao=f"Caixa {caixa_id} aprovado pelo {current_user.nome}",
-                        data=datetime.now(),
-                        usuario_id=current_user.id,
-                        caixa_id=caixa.id
+                if not saldo_fp_origem:
+                    saldo_fp_origem = SaldoFormaPagamento(
+                        conta_id=conta_origem.id,
+                        forma_pagamento=forma_pagamento_enum,
+                        saldo=Decimal('0.00')
                     )
-                    db.session.add(movimentacao)
+                    db.session.add(saldo_fp_origem)
 
-            # Atualizar saldo total da conta do operador
-            conta_operador.saldo_total = max(float(conta_operador.saldo_total) - total_debitar, 0)
-            conta_operador.sincronizado = False
+                saldo_fp_origem.saldo = max(saldo_fp_origem.saldo - valor, 0)
+                saldo_fp_origem.sincronizado = False
+
+                # Registrar saída
+                mov_saida = MovimentacaoConta(
+                    conta_id=conta_origem.id,
+                    tipo=TipoMovimentacao.transferencia,
+                    forma_pagamento=forma_pagamento_enum,
+                    valor=valor,
+                    descricao=f"Transferência automática - Caixa {caixa_id} aprovado para {current_user.nome}",
+                    usuario_id=current_user.id,
+                    caixa_id=caixa.id,
+                    data=datetime.now()
+                )
+                db.session.add(mov_saida)
+
+                # --- Atualiza destino (admin) ---
+                saldo_fp_destino = next(
+                    (s for s in conta_destino.saldos_forma_pagamento if s.forma_pagamento == forma_pagamento_enum),
+                    None
+                )
+                if not saldo_fp_destino:
+                    saldo_fp_destino = SaldoFormaPagamento(
+                        conta_id=conta_destino.id,
+                        forma_pagamento=forma_pagamento_enum,
+                        saldo=Decimal('0.00')
+                    )
+                    db.session.add(saldo_fp_destino)
+
+                saldo_fp_destino.saldo += valor
+                saldo_fp_destino.sincronizado = False
+
+                # Registrar entrada
+                mov_entrada = MovimentacaoConta(
+                    conta_id=conta_destino.id,
+                    tipo=TipoMovimentacao.entrada,
+                    forma_pagamento=forma_pagamento_enum,
+                    valor=valor,
+                    descricao=f"Crédito automático - Caixa {caixa_id} do operador {operador.nome}",
+                    usuario_id=current_user.id,
+                    caixa_id=caixa.id,
+                    data=datetime.now()
+                )
+                db.session.add(mov_entrada)
+
+                total_transferido += float(valor)
+
+            # Atualiza saldos totais
+            conta_origem.saldo_total = sum(float(s.saldo) for s in conta_origem.saldos_forma_pagamento)
+            conta_destino.saldo_total = sum(float(s.saldo) for s in conta_destino.saldos_forma_pagamento)
+            conta_origem.sincronizado = False
+            conta_destino.sincronizado = False
+
+            # Atualiza status do caixa
+            caixa.status = StatusCaixa.aprovado
+            caixa.valor_confirmado = total_transferido
+            caixa.aprovado_por_id = current_user.id
+            caixa.data_aprovacao = datetime.now()
 
         db.session.commit()
-        logger.info(f"Caixa {caixa_id} aprovado com sucesso pelo usuário {current_user.nome}")
 
         return jsonify({
             'success': True,
-            'message': 'Caixa aprovado com sucesso, saldo do admin creditado e saldo do operador debitado',
-            'status': caixa.status.value,
-            'valor_confirmado': float(caixa.valor_confirmado) if caixa.valor_confirmado else None,
-            'resultado_admin': resultado_admin
+            'message': f'Caixa {caixa.id} aprovado com sucesso. Transferência total de R$ {total_transferido:.2f}.',
+            'total_transferido': total_transferido,
+            'formas_transferidas': formas_transferir,
+            'status': caixa.status.value
         }), 200
 
-    except ValueError as e:
-        logger.error(f"Erro ao aprovar caixa {caixa_id}: {str(e)}")
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 400
     except Exception as e:
-        logger.error(f"Erro ao aprovar caixa {caixa_id}: {str(e)}")
         db.session.rollback()
-        return jsonify({'success': False, 'error': f'Erro ao aprovar caixa: {str(e)}'}), 500
+        logger.error(f"Erro ao aprovar caixa {caixa_id}: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/caixas/<int:caixa_id>/recusar', methods=['POST'])
 @login_required
