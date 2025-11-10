@@ -3217,7 +3217,13 @@ def gerar_pdf_caixas_detalhado():
                 query = query.filter(Caixa.data_abertura <= dt_fim)
             except ValueError:
                 pass
-
+        
+        formas_prioridade_global = [
+            'dinheiro',
+            'pix_loja', 'pix_fabiano', 'pix_edfrance', 'pix_maquineta',
+            'cartao_credito', 'cartao_debito',
+            'a_prazo'
+        ]
         caixas = query.order_by(Caixa.data_abertura.asc()).all()
 
         # Criar buffer para PDF
@@ -3445,7 +3451,7 @@ def gerar_pdf_caixas_detalhado():
                 valores_liquidos_colunas = []
                 
                 # Ordenar formas de pagamento por valor (maior para menor)
-                formas_ordenadas = sorted(total_pagamentos_consolidado.items(), key=lambda x: x[1], reverse=True)
+                formas_ordenadas = [(f, total_pagamentos_consolidado.get(f, 0)) for f in formas_prioridade_global if f in total_pagamentos_consolidado]
                 
                 total_geral_bruto = 0
                 total_geral_estornos_formas = 0
@@ -3697,8 +3703,7 @@ def gerar_pdf_caixas_detalhado():
                     
                     # *** CORREÇÃO: GARANTIR QUE DINHEIRO SEMPRE APAREÇA PRIMEIRO ***
                     # Lista fixa de formas de pagamento para garantir ordem consistente
-                    formas_prioridade = ['dinheiro', 'pix_loja', 'pix_fabiano', 'pix_edfrance', 'pix_maquineta', 
-                                       'cartao_credito', 'cartao_debito', 'a_prazo']
+                    formas_prioridade = formas_prioridade_global
                     
                     # Primeiro adiciona as formas de pagamento prioritárias
                     for forma in formas_prioridade:
@@ -3817,7 +3822,11 @@ def gerar_pdf_caixas_detalhado():
                     totais_consolidados_formas[forma] = totais_consolidados_formas.get(forma, 0) + valor
             
             # Ordenar formas de pagamento por valor (maior para menor)
-            formas_ordenadas_consolidadas = sorted(totais_consolidados_formas.items(), key=lambda x: x[1], reverse=True)
+            formas_ordenadas_consolidadas = [
+                (f, totais_consolidados_formas.get(f, 0))
+                for f in formas_prioridade_global
+                if f in totais_consolidados_formas
+            ]    
             
             if formas_ordenadas_consolidadas:
                 # Preparar dados para a tabela
