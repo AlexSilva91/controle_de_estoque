@@ -147,7 +147,7 @@ def calcular_formas_pagamento(caixa_id, session):
 
     formas_pagamento = {}
     total_entradas = 0.0
-    print(f'\npagamentos_contas :{pagamentos_contas}')
+    
     for forma, total in pagamentos_notas:
         valor = float(total)
         formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor

@@ -19,24 +19,6 @@
     <div class="dashboard-container">
         <!-- Mensagens flash (posicionadas no topo para maior visibilidade) -->
         <div class="flash-messages">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-            {% for category, message in messages %}
-            <div class="flash-message {{ category }}" id="flash-{{ loop.index }}">
-                <div class="flash-content">
-                    <i class="fas 
-                                    {% if category == 'success' %}fa-check-circle
-                                    {% elif category == 'error' %}fa-exclamation-circle
-                                    {% elif category == 'warning' %}fa-exclamation-triangle
-                                    {% elif category == 'info' %}fa-info-circle{% endif %}">
-                    </i>
-                    <span>{{ message }}</span>
-                </div>
-                <button class="close-flash" aria-label="Fechar">&times;</button>
-            </div>
-            {% endfor %}
-            {% endif %}
-            {% endwith %}
         </div>
 
         <!-- Sidebar -->
@@ -98,6 +80,12 @@
                         <a href="#caixas" class="nav-link">
                             <i class="fas fa-cash-register"></i>
                             <span class="nav-text">Caixas</span>
+                        </a>
+                    </li>
+                    <li data-tab="contas">
+                        <a href="{{ url_for('admin.formas_pagamento') }}" class="nav-link">
+                            <i class="fas fa-money-check-alt"></i>
+                            <span class="nav-text">Resumo Caixas</span>
                         </a>
                     </li>
                     <li data-tab="usuarios">

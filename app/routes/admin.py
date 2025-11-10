@@ -8143,3 +8143,150 @@ def salvar_configuracoes():
             "success": False,
             "message": f"Erro ao salvar configurações: {str(e)}"
         }), 500
+
+@admin_bp.route('/formas-pagamento', methods=['GET'])
+@login_required
+@admin_required
+def formas_pagamento():
+    logger.info(f"Acessando formas de pagamento - Usuário: {current_user.nome}")
+    return render_template('formas_pagamento.html', nome_usuario=current_user.nome)
+
+@admin_bp.route('/caixas/financeiro/todos', methods=['GET'])
+@login_required
+@admin_required
+def get_todos_caixas_financeiro():
+    try:
+        # Parâmetros de filtro
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        forma_pagamento = request.args.get('forma_pagamento')
+        operador_id = request.args.get('operador_id')
+        caixa_id = request.args.get('caixa_id')
+        
+        logger.info(f"Filtros recebidos - data_inicio: {data_inicio}, data_fim: {data_fim}")
+        
+        # Query base para caixas
+        query = db.session.query(Caixa)
+        
+        # Aplicar filtros de data
+        if data_inicio and data_fim:
+            # Filtro por período
+            data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d')
+            data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(Caixa.data_abertura.between(data_inicio_dt, data_fim_dt))
+            logger.info(f"Filtrando por período: {data_inicio} a {data_fim}")
+            
+        elif data_inicio and not data_fim:
+            # Filtro por data específica (apenas um dia)
+            data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d')
+            data_fim_dt = data_inicio_dt + timedelta(days=1)
+            query = query.filter(Caixa.data_abertura.between(data_inicio_dt, data_fim_dt))
+            logger.info(f"Filtrando por data específica: {data_inicio}")
+            
+        elif data_fim and not data_inicio:
+            # Se só tem data_fim, busca tudo até essa data
+            data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(Caixa.data_abertura <= data_fim_dt)
+            logger.info(f"Filtrando até data: {data_fim}")
+        
+        # Outros filtros
+        if operador_id:
+            query = query.filter(Caixa.operador_id == operador_id)
+        
+        if caixa_id:
+            query = query.filter(Caixa.id == caixa_id)
+        
+        caixas = query.order_by(Caixa.data_abertura.desc()).all()
+        logger.info(f"Encontrados {len(caixas)} caixas com os filtros aplicados")
+        
+        resultado = []
+        for caixa in caixas:
+            # Calcular totais para cada caixa
+            totais = calcular_formas_pagamento(caixa.id, db.session)
+            
+            # Filtrar formas de pagamento se especificado
+            vendas_por_forma = totais['vendas_por_forma_pagamento']
+            if forma_pagamento:
+                vendas_por_forma = {
+                    k: v for k, v in vendas_por_forma.items() 
+                    if k == forma_pagamento
+                }
+            
+            # Processar contas a prazo recebidas
+            contas_prazo_recebidas = {}
+            for forma, valor in totais.get('a_prazo_recebido', []):
+                if forma and valor:
+                    forma_str = forma.value
+                    valor_float = float(valor)
+                    contas_prazo_recebidas[forma_str] = contas_prazo_recebidas.get(forma_str, 0) + valor_float
+            
+            caixa_info = {
+                'id': caixa.id,
+                'data_abertura': caixa.data_abertura.isoformat(),
+                'data_fechamento': caixa.data_fechamento.isoformat() if caixa.data_fechamento else None,
+                'operador_nome': caixa.operador.nome if caixa.operador else 'N/A',
+                'status': caixa.status.value,
+                'totais_gerais': {
+                    'entradas': totais['entradas'],
+                    'saidas': totais['saidas'],
+                    'saldo': totais['saldo']
+                },
+                'formas_pagamento': vendas_por_forma,
+                'contas_prazo_recebidas': contas_prazo_recebidas,
+                'total_contas_prazo_recebidas': totais.get('contas_prazo_recebidas', 0)
+            }
+            resultado.append(caixa_info)
+        
+        # Paginação
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        caixas_paginados = resultado[start_idx:end_idx]
+        
+        logger.info(f"Retornados {len(caixas_paginados)} caixas de {len(resultado)} total")
+        
+        return jsonify({
+            'success': True,
+            'caixas': caixas_paginados,
+            'paginacao': {
+                'pagina_atual': page,
+                'por_pagina': per_page,
+                'total': len(resultado),
+                'total_paginas': (len(resultado) + per_page - 1) // per_page
+            },
+            'filtros': {
+                'data_inicio': data_inicio,
+                'data_fim': data_fim,
+                'forma_pagamento': forma_pagamento,
+                'operador_id': operador_id,
+                'caixa_id': caixa_id
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Erro ao buscar caixas: {str(e)}", exc_info=True)
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno ao processar dados dos caixas'
+        }), 500
+    finally:
+        db.session.close()
+
+@admin_bp.route('/caixas/operadores/formas-pagamento', methods=['GET'])
+@login_required
+@admin_required
+def get_operadores_formas_pagamento():
+    try:
+        operadores = db.session.query(Usuario).filter(Usuario.tipo == 'operador').all()
+        return jsonify({
+            'success': True,
+            'operadores': [{'id': op.id, 'nome': op.nome} for op in operadores]
+        })
+    except Exception as e:
+        logger.error(f"Erro ao buscar operadores: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.session.close()

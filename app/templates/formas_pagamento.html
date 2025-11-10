@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formas de Pagamento - Todos os Caixas</title>
+    <link rel="icon" href="{{ url_for('static', filename='assets/logo1.ico') }}" type="image/x-icon">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/formas_pagamento.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <div class="header-text">
+                    <h1>Formas de Pagamento - Todos os Caixas</h1>
+                    <p class="subtitle">Resumo financeiro consolidado</p>
+                </div>
+                <div class="header-actions">
+                    <a href="{{ url_for('admin.dashboard') }}" class="btn-dashboard">
+                        <i class="fas fa-home"></i>
+                        Página Inicial
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Filtros -->
+        <section class="filters-section">
+            <h2>Filtros</h2>
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label for="data-inicio">Data Início</label>
+                    <input type="date" id="data-inicio" class="filter-input">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="data-fim">Data Fim</label>
+                    <input type="date" id="data-fim" class="filter-input">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="forma-pagamento">Forma de Pagamento</label>
+                    <select id="forma-pagamento" class="filter-select">
+                        <option value="">Todas</option>
+                        <option value="dinheiro">Dinheiro</option>
+                        <option value="cartao_credito">Cartão Crédito</option>
+                        <option value="cartao_debito">Cartão Débito</option>
+                        <option value="pix_fabiano">PIX Fabiano</option>
+                        <option value="pix_maquineta">PIX Maquineta</option>
+                        <option value="pix_edfrance">PIX EDFrance</option>
+                        <option value="pix_loja">PIX Loja</option>
+                        <option value="a_prazo">A Prazo</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="operador">Operador</label>
+                    <select id="operador" class="filter-select">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="caixa-id">Caixa ID</label>
+                    <input type="number" id="caixa-id" placeholder="ID do caixa" class="filter-input">
+                </div>
+            </div>
+            
+            <div class="filter-actions">
+                <button id="btn-filtrar" class="btn-primary">
+                    <i class="fas fa-filter"></i> Filtrar
+                </button>
+                <button id="btn-limpar" class="btn-secondary">
+                    <i class="fas fa-broom"></i> Limpar
+                </button>
+            </div>
+        </section>
+
+        <!-- Tabela de Caixas -->
+        <section class="table-section">
+            <h2>Caixas e Formas de Pagamento</h2>
+            
+            <div class="table-container">
+                <table class="data-table" id="caixas-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Data Abertura</th>
+                            <th>Operador</th>
+                            <th>Status</th>
+                            <th>Entradas</th>
+                            <th>Saídas</th>
+                            <th>Saldo</th>
+                            <th>Formas de Pagamento</th>
+                            <th>Contas a Prazo Recebidas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <!-- Dados serão inseridos via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginação -->
+            <div class="pagination" id="pagination">
+                <!-- Paginação será inserida via JavaScript -->
+            </div>
+        </section>
+
+        <!-- Loading state -->
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <p>Carregando dados dos caixas...</p>
+        </div>
+
+        <!-- Error state -->
+        <div class="error-state" id="error-state" style="display: none;">
+            <div class="error-icon">⚠️</div>
+            <h3>Erro ao carregar dados</h3>
+            <p id="error-message"></p>
+            <button class="retry-btn" id="retry-btn">Tentar Novamente</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script_formas_pagamento.js') }}"></script>
+</body>
+</html>
