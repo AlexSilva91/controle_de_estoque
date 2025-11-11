@@ -87,10 +87,21 @@ function configurarModais() {
             abrirModalTransferencia(usuarioId);
         }
 
+        if (e.target.closest('.btn-caixas-nao-aprovados')) {
+            const card = e.target.closest('.metric-card');
+            const usuarioId = card.getAttribute('data-usuario-id');
+            abrirModalCaixasNaoAprovados(usuarioId);
+        }
+
         if (e.target.closest('.btn-relatorio')) {
             const card = e.target.closest('.metric-card');
             const usuarioId = card.getAttribute('data-usuario-id');
             gerarRelatorioIndividual(usuarioId);
+        }
+        if (e.target.closest('.btn-aprovar-caixa')) {
+            const button = e.target.closest('.btn-aprovar-caixa');
+            const caixaId = button.getAttribute('data-caixa-id');
+            aprovarCaixa(caixaId);
         }
     });
 
@@ -137,7 +148,8 @@ async function carregarUsuarios() {
         if (data.success && data.usuarios) {
             usuarios = data.usuarios.map(usuario => ({
                 ...usuario,
-                id: parseInt(usuario.id) // Garantir que id é número
+                id: parseInt(usuario.id), // Garantir que id é número
+                tipo: usuario.tipo || 'usuario' // Garantir que tipo existe
             }));
         } else {
             throw new Error(data.message || 'Estrutura de dados inválida');
@@ -145,6 +157,148 @@ async function carregarUsuarios() {
     } catch (error) {
         usuarios = [];
         throw error;
+    }
+}
+
+// Função para verificar se o usuário é operador
+function isOperador(usuario) {
+    return usuario && usuario.tipo && usuario.tipo.toLowerCase() === 'operador';
+}
+
+function abrirModalCaixasNaoAprovados(usuarioId) {
+    try {
+        // Converter para número para garantir comparação correta
+        const usuarioIdNum = parseInt(usuarioId);
+        const usuario = usuarios.find(u => parseInt(u.id) === usuarioIdNum);
+
+        if (!usuario) {
+            mostrarMensagem('Usuário não encontrado', 'error');
+            return;
+        }
+
+        // SALVAR o usuarioId como selecionado
+        usuarioSelecionado = usuarioIdNum;
+        console.log('💾 Usuário selecionado para modal:', usuarioSelecionado);
+
+        // Carregar dados dos caixas não aprovados
+        carregarCaixasNaoAprovados(usuarioId);
+
+        // Mostrar modal
+        abrirModal('modalCaixasNaoAprovados');
+
+    } catch (error) {
+        mostrarMensagem('Erro ao abrir caixas não aprovados: ' + error.message, 'error');
+    }
+}
+
+async function aprovarCaixa(caixaId) {
+    if (!caixaId) {
+        mostrarMensagem('ID do caixa não encontrado', 'error');
+        return;
+    }
+
+    if (!confirm('Tem certeza que deseja aprovar este caixa? Esta ação transferirá automaticamente os valores para sua conta?')) {
+        return;
+    }
+
+    try {
+        mostrarLoading(true);
+        console.log('🚀 Iniciando aprovação do caixa:', caixaId);
+
+        // ESTRATÉGIA: Obter o operadorId do card que abriu o modal
+        let operadorId = null;
+        
+        // Tentativa 1: Buscar o card que tem o botão de caixas não aprovados ativo
+        const cardAtivo = document.querySelector('.metric-card .btn-caixas-nao-aprovados:focus, .metric-card.active');
+        if (cardAtivo) {
+            const card = cardAtivo.closest('.metric-card');
+            if (card) {
+                operadorId = card.getAttribute('data-usuario-id');
+                console.log('✅ Operador ID do card ativo:', operadorId);
+            }
+        }
+        
+        // Tentativa 2: Buscar qualquer card com dados de usuário
+        if (!operadorId) {
+            const primeiroCard = document.querySelector('.metric-card[data-usuario-id]');
+            if (primeiroCard) {
+                operadorId = primeiroCard.getAttribute('data-usuario-id');
+                console.log('✅ Operador ID do primeiro card:', operadorId);
+            }
+        }
+        
+        // Tentativa 3: Usar o usuário selecionado (se existir)
+        if (!operadorId && usuarioSelecionado) {
+            operadorId = usuarioSelecionado;
+            console.log('✅ Operador ID do usuário selecionado:', operadorId);
+        }
+        
+        // Tentativa 4: Buscar na lista de usuários
+        if (!operadorId) {
+            const operador = usuarios.find(u => isOperador(u));
+            if (operador) {
+                operadorId = operador.id;
+                console.log('✅ Operador ID do primeiro operador:', operadorId);
+            }
+        }
+
+        console.log('💾 Operador ID final:', operadorId);
+
+        if (!operadorId) {
+            throw new Error('Não foi possível identificar o operador do caixa');
+        }
+
+        const botaoAprovar = document.querySelector(`.btn-aprovar-caixa[data-caixa-id="${caixaId}"]`);
+        if (botaoAprovar) {
+            botaoAprovar.disabled = true;
+            botaoAprovar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Aprovando...';
+        }
+
+        const response = await fetch(`${API_BASE_URL}/caixas/${caixaId}/aprovar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || 'Erro ao aprovar caixa');
+
+        mostrarMensagem(data.message || 'Caixa aprovado com sucesso!', 'success');
+
+        // Remove a linha da tabela (feedback visual)
+        if (botaoAprovar) {
+            const linha = botaoAprovar.closest('tr');
+            if (linha) {
+                linha.style.opacity = '0.5';
+                linha.style.backgroundColor = '#f8f9fa';
+                setTimeout(() => linha.remove(), 800);
+            }
+        }
+
+        // Recarregar a lista com o operador encontrado
+        console.log('🔄 Recarregando caixas do operador:', operadorId);
+        setTimeout(async () => {
+            try {
+                await carregarCaixasNaoAprovados(operadorId, true);
+                console.log('✅ Lista recarregada com sucesso');
+            } catch (err) {
+                console.error('❌ Erro ao recarregar lista:', err);
+            }
+        }, 800);
+
+        // Atualiza os cards principais
+        setTimeout(() => carregarDadosIniciais(), 1000);
+
+    } catch (error) {
+        console.error('❌ Erro ao aprovar caixa:', error);
+        mostrarMensagem('Erro ao aprovar caixa: ' + error.message, 'error');
+
+        const botaoAprovar = document.querySelector(`.btn-aprovar-caixa[data-caixa-id="${caixaId}"]`);
+        if (botaoAprovar) {
+            botaoAprovar.disabled = false;
+            botaoAprovar.innerHTML = '<i class="fas fa-check"></i> Aprovar';
+        }
+    } finally {
+        mostrarLoading(false);
     }
 }
 
@@ -182,6 +336,126 @@ async function carregarContas() {
     }
 }
 
+async function carregarCaixasNaoAprovados(operadorId = null, forceRefresh = true) {
+    try {
+        mostrarLoading(true);
+        console.log('Carregando caixas não aprovados. Operador:', operadorId);
+
+        let url = `${API_BASE_URL}/api/caixas/nao-aprovados`;
+        const params = new URLSearchParams();
+
+        if (operadorId) {
+            params.append('operador_id', operadorId);
+        }
+
+        const dataInicio = document.getElementById('filtroDataInicioNaoAprovado')?.value;
+        const dataFim = document.getElementById('filtroDataFimNaoAprovado')?.value;
+
+        if (dataInicio) params.append('data_inicio', dataInicio);
+        if (dataFim) params.append('data_fim', dataFim);
+
+        // Adicionar timestamp para evitar cache
+        if (forceRefresh) {
+            params.append('_t', Date.now());
+        }
+
+        if (params.toString()) {
+            url += `?${params.toString()}`;
+        }
+
+        console.log('URL da API:', url);
+
+        const response = await fetch(url);
+        console.log('Status da resposta:', response.status);
+
+        if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
+
+        const data = await response.json();
+        console.log('Dados recebidos da API:', data);
+        
+        if (data.success) {
+            console.log('Número de caixas recebidos:', data.data?.length || 0);
+            preencherTabelaCaixasNaoAprovados(data.data || []);
+        } else {
+            throw new Error(data.message || 'Erro ao carregar caixas');
+        }
+
+    } catch (error) {
+        console.error('Erro detalhado ao carregar caixas:', error);
+        mostrarMensagem('Erro ao carregar caixas não aprovados: ' + error.message, 'error');
+        preencherTabelaCaixasNaoAprovados([]);
+    } finally {
+        mostrarLoading(false);
+    }
+}
+
+function preencherTabelaCaixasNaoAprovados(caixas) {
+    const tbody = document.querySelector('#tabelaCaixasNaoAprovados tbody');
+    tbody.innerHTML = '';
+
+    if (caixas.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="no-data-message">
+                    Nenhum caixa não aprovado encontrado
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    caixas.forEach(caixa => {
+        const tr = document.createElement('tr');
+
+        const vendas = caixa.vendas_por_forma_pagamento || {};
+        const aPrazoRecebido = caixa.a_prazo_recebido || [];
+
+        let valoresHTML = '<div class="formas-container">';
+        for (const [forma, valor] of Object.entries(vendas)) {
+            if (valor > 0 && !forma.toLowerCase().includes('prazo')) {
+                valoresHTML += `
+                    <div class="forma-item">
+                        <span class="forma-nome">${forma.replace(/_/g, ' ')}</span>
+                        <span class="forma-valor">R$ ${valor.toFixed(2)}</span>
+                    </div>
+                `;
+            }
+        }
+
+        for (const recebido of aPrazoRecebido) {
+            if (
+                recebido.valor > 0 &&
+                recebido.forma_pagamento &&
+                !recebido.forma_pagamento.toLowerCase().includes('prazo')
+            ) {
+                valoresHTML += `
+                    <div class="forma-item">
+                        <span class="forma-nome">${recebido.forma_pagamento.replace(/_/g, ' ')}</span>
+                        <span class="forma-valor">R$ ${recebido.valor.toFixed(2)}</span>
+                    </div>
+                `;
+            }
+        }
+        valoresHTML += '</div>';
+
+        tr.innerHTML = `
+            <td>${caixa.id || '-'}</td>
+            <td>${caixa.data_abertura ? new Date(caixa.data_abertura).toLocaleString('pt-BR') : '-'}</td>
+            <td>${valoresHTML}</td>
+            <td>
+                <span class="badge badge-warning">${caixa.status || 'Não Aprovado'}</span>
+            </td>
+            <td>
+                <button class="btn btn-sm btn-primary btn-aprovar-caixa" data-caixa-id="${caixa.id}">
+                    <i class="fas fa-check"></i>
+                    Aprovar
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(tr);
+    });
+}
 
 async function carregarFormasPagamento() {
     // Carregar formas de pagamento do enum
@@ -216,6 +490,7 @@ function atualizarCardsOperadores() {
             usuariosSemConta.push(usuario.nome);
         }
     });
+    
     contas.forEach(conta => {
         // Converter para número para garantir comparação correta
         const usuarioId = parseInt(conta.usuario_id);
@@ -246,6 +521,15 @@ function atualizarCardsOperadores() {
             })
             .join('');
 
+        // Verificar se é operador para mostrar botão de caixas não aprovados
+        const isUserOperador = isOperador(usuario);
+        const caixasNaoAprovadosBtn = isUserOperador ? `
+            <button class="btn btn-info btn-sm btn-caixas-nao-aprovados" title="Caixas Não Aprovados">
+                <i class="fas fa-cash-register"></i>
+                Caixas
+            </button>
+        ` : '';
+
         card.innerHTML = `
             <div class="metric-icon">
                 <i class="fas fa-user"></i>
@@ -269,6 +553,7 @@ function atualizarCardsOperadores() {
                         <i class="fas fa-exchange-alt"></i>
                         Transferir
                     </button>
+                    ${caixasNaoAprovadosBtn}
                     <button class="btn btn-warning btn-sm btn-relatorio" title="Relatório PDF">
                         <i class="fas fa-file-pdf"></i>
                         PDF
@@ -349,7 +634,6 @@ function mostrarDetalhesUsuario(usuarioId) {
 
 function fecharDetalhesUsuario() {
     document.getElementById('detalhesUsuario').style.display = 'none';
-    usuarioSelecionado = null;
 }
 
 let paginaAtual = 1;

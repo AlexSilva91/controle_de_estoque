@@ -399,6 +399,50 @@
             </div>
         </div>
     </div>
+    <!-- Modal: Caixas Ainda Não Aprovados -->
+    <div id="modalCaixasNaoAprovados" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-cash-register"></i>
+                        <span>Caixas Ainda Não Aprovados</span>
+                    </h3>
+                    <button class="close-modal" data-modal="modalCaixasNaoAprovados">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <!-- Tabela -->
+                    <div class="table-responsive">
+                        <table class="table table-hover-effect" id="tabelaCaixasNaoAprovados">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Abertura</th>
+                                    <th>Valores</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Linhas carregadas dinamicamente via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Paginação -->
+                    <div id="paginacaoCaixasNaoAprovados" class="pagination-controls"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-outline" data-modal="modalCaixasNaoAprovados">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Scripts -->
     <script src="{{ url_for('static', filename='js/script_contas_usuario.js') }}"></script>

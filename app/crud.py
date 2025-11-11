@@ -419,6 +419,19 @@ def get_caixas_abertos(db: Session):
     return db.query(Caixa).filter(
         Caixa.status == StatusCaixa.aberto
     ).all()
+
+def get_caixas_fechado(db: Session, operador_id: int):
+    """
+    Retorna todos os caixas do mês atual com status diferente de 'aprovado' 
+    e filtrados por operador_id.
+    """
+    now = datetime.now()
+    return db.query(Caixa).filter(
+        Caixa.status == StatusCaixa.fechado,
+        extract('month', Caixa.data_abertura) == now.month,
+        extract('year', Caixa.data_abertura) == now.year,
+        Caixa.operador_id == operador_id
+    ).all()
     
 def get_caixa_by_id(db: Session, caixa_id: int) -> Optional[entities.Caixa]:
     """Retorna um caixa pelo ID"""

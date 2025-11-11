@@ -55,7 +55,7 @@ from app.crud import (
     TipoEstoque, atualizar_desconto, atualizar_estoque_produto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao, calcular_formas_pagamento,
     criar_desconto, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
     TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao,
-    criar_desconto, criar_ou_atualizar_lote, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
+    criar_desconto, criar_ou_atualizar_lote, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, get_caixas_fechado, get_caixas_fechado, 
     get_transferencias, get_user_by_id, get_usuarios, create_user, obter_caixas_completo,
     transferir_todo_saldo, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
     registrar_movimentacao, get_cliente, create_cliente, 
@@ -8288,5 +8288,59 @@ def get_operadores_formas_pagamento():
     except Exception as e:
         logger.error(f"Erro ao buscar operadores: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.session.close()
+        
+@admin_bp.route('/api/caixas/nao-aprovados', methods=['GET'])
+@login_required
+@admin_required
+def get_caixas_financeiro_todos():
+    operador_id = request.args.get('operador_id', type=int)
+    if not operador_id:
+        return jsonify({'success': False, 'message': 'Operador ID é obrigatório'}), 400
+
+    try:
+        caixas = get_caixas_fechado(db.session, operador_id)
+        if not caixas:
+            return jsonify({'success': True, 'data': []})
+
+        data = []
+        for c in caixas:
+            valores_caixa = calcular_formas_pagamento(c.id, db.session)
+
+            # mantém como Decimal
+            total_vendas = sum(
+                Decimal(str(v)) for v in valores_caixa.get('vendas_por_forma_pagamento', {}).values()
+            )
+
+            a_prazo_recebido = valores_caixa.get('a_prazo_recebido', [])
+            total_a_prazo = sum(
+                Decimal(str(valor)) for _, valor in a_prazo_recebido
+            )
+
+            valor_total = total_vendas + total_a_prazo
+
+            data.append({
+                'id': c.id,
+                'operador_id': c.operador_id,
+                'data_abertura': c.data_abertura.strftime('%Y-%m-%d %H:%M:%S'),
+                'valor_abertura': float(c.valor_abertura),
+                'valor_fechamento': float(c.valor_fechamento) if c.valor_fechamento else None,
+                'valor_total_calculado': float(valor_total),
+                'status': c.status.value,
+                'observacoes_operador': c.observacoes_operador,
+                'vendas_por_forma_pagamento': {
+                    k: float(v) for k, v in valores_caixa.get('vendas_por_forma_pagamento', {}).items()
+                },
+                'a_prazo_recebido': [
+                    {'forma_pagamento': forma.value, 'valor': float(valor)}
+                    for forma, valor in a_prazo_recebido
+                ]
+            })
+
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        logger.error(f"Erro ao buscar caixas do operador {operador_id}: {e}")
+        return jsonify({'success': False, 'message': 'Erro interno ao buscar caixas'}), 500
     finally:
         db.session.close()
