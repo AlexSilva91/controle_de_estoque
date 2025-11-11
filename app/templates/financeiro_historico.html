@@ -391,7 +391,9 @@
                     <i class="fas fa-chart-line me-2"></i>
                     Histórico Financeiro - {{ tipo_movimentacao|capitalize }}
                 </h1>
-                <p class="page-subtitle">Período: {{ mes_ano }} | Visualize e gerencie todas as movimentações financeiras</p>
+                <p class="page-subtitle" id="periodoSubtitle">
+                    Período: {{ mes_ano }} | Visualize e gerencie todas as movimentações financeiras
+                </p>
             </div>
         </div>
         
@@ -402,16 +404,19 @@
                     <label class="filter-label" for="startDate">
                         <i class="fas fa-calendar-alt me-1"></i>Data Inicial
                     </label>
-                    <input type="date" id="startDate" class="filter-input">
+                    <input type="date" id="startDate" class="filter-input" value="{{ start_date if start_date else '' }}">
                 </div>
                 <div class="filter-group">
                     <label class="filter-label" for="endDate">
                         <i class="fas fa-calendar-alt me-1"></i>Data Final
                     </label>
-                    <input type="date" id="endDate" class="filter-input">
+                    <input type="date" id="endDate" class="filter-input" value="{{ end_date if end_date else '' }}">
                 </div>
                 <button id="btnFiltrar" class="btn-modern">
                     <i class="fas fa-filter"></i> Filtrar
+                </button>
+                <button id="btnLimparFiltro" class="btn-modern btn-secondary-modern">
+                    <i class="fas fa-times"></i> Limpar
                 </button>
             </div>
             
@@ -502,6 +507,18 @@
                 }
             });
 
+            // Função para atualizar o subtítulo do período
+            function atualizarSubtitulo(start, end) {
+                if (start && end) {
+                    var startDate = new Date(start);
+                    var endDate = new Date(end);
+                    var periodo = startDate.toLocaleDateString('pt-BR') + ' a ' + endDate.toLocaleDateString('pt-BR');
+                    $('#periodoSubtitle').html('Período: ' + periodo + ' | Visualize e gerencie todas as movimentações financeiras');
+                } else {
+                    $('#periodoSubtitle').html('Período: {{ mes_ano }} | Visualize e gerencie todas as movimentações financeiras');
+                }
+            }
+
             // Função para atualizar a tabela via AJAX
             function atualizarTabela(start, end) {
                 var tipo = "{{ tipo_movimentacao }}";
@@ -533,6 +550,7 @@
                             ]);
                         });
                         table.draw();
+                        atualizarSubtitulo(start, end);
                     },
                     error: function (xhr) {
                         alert("Erro ao buscar dados: " + (xhr.responseJSON?.error || xhr.statusText));
@@ -544,7 +562,30 @@
             $('#btnFiltrar').click(function () {
                 var start = $('#startDate').val();
                 var end = $('#endDate').val();
+                
+                if (!start || !end) {
+                    alert('Por favor, selecione ambas as datas (inicial e final)');
+                    return;
+                }
+                
+                // Atualizar a URL sem recarregar a página completamente
+                var novaUrl = "{{ url_for('admin.historico_financeiro') }}?tipo={{ tipo_movimentacao }}&start=" + start + "&end=" + end;
+                window.history.pushState({}, '', novaUrl);
+                
                 atualizarTabela(start, end);
+            });
+
+            // Limpar filtro
+            $('#btnLimparFiltro').click(function () {
+                $('#startDate').val('');
+                $('#endDate').val('');
+                
+                // Voltar para a URL sem filtros
+                var novaUrl = "{{ url_for('admin.historico_financeiro') }}?tipo={{ tipo_movimentacao }}";
+                window.history.pushState({}, '', novaUrl);
+                
+                // Recarregar a página sem filtros
+                window.location.href = novaUrl;
             });
 
             // Botão Gerar PDF
@@ -553,20 +594,46 @@
                 var tipo = "{{ tipo_movimentacao }}";
                 var start = $('#startDate').val();
                 var end = $('#endDate').val();
-                var dataMesAno = "{{ mes_ano|replace('/', '-') }}";
-                var url = "{{ url_for('admin.historico_financeiro_pdf') }}" + "?tipo=" + tipo + "&data=" + dataMesAno;
+                var url = "{{ url_for('admin.historico_financeiro_pdf') }}?tipo=" + tipo;
                 if (start) url += "&start=" + start;
                 if (end) url += "&end=" + end;
                 window.open(url, '_blank');
             });
 
-            // Definir datas padrão (mês atual)
-            var today = new Date();
-            var firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-            var lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            // Verificar se há parâmetros de data na URL e definir valores padrão
+            function inicializarDatas() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const startParam = urlParams.get('start');
+                const endParam = urlParams.get('end');
+                
+                if (startParam && endParam) {
+                    // Usar as datas da URL
+                    $('#startDate').val(startParam);
+                    $('#endDate').val(endParam);
+                    atualizarSubtitulo(startParam, endParam);
+                } else {
+                    // Só definir mês atual se não houver nenhum filtro
+                    var today = new Date();
+                    var firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                    var lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    
+                    // Preencher os campos mas não aplicar o filtro automaticamente
+                    $('#startDate').val(firstDay.toISOString().split('T')[0]);
+                    $('#endDate').val(lastDay.toISOString().split('T')[0]);
+                }
+            }
+
+            // Inicializar as datas quando a página carregar
+            inicializarDatas();
+
+            // Se veio com parâmetros de data, aplicar o filtro automaticamente
+            const urlParams = new URLSearchParams(window.location.search);
+            const startParam = urlParams.get('start');
+            const endParam = urlParams.get('end');
             
-            $('#startDate').val(firstDay.toISOString().split('T')[0]);
-            $('#endDate').val(lastDay.toISOString().split('T')[0]);
+            if (startParam && endParam) {
+                atualizarTabela(startParam, endParam);
+            }
         });
     </script>
 </body>

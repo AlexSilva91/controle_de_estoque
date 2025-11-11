@@ -674,174 +674,265 @@ document.addEventListener('DOMContentLoaded', function () {
       // 1. Gráfico Vendas vs Despesas
       const vendasMensaisData = await fetchWithErrorHandling(buildUrl('/admin/dashboard/vendas-mensais'));
       if (vendasMensaisData.success) {
-        const vendasDespesasCtx = document.getElementById('vendasDespesasChart').getContext('2d');
-        vendasDespesasChart = new Chart(vendasDespesasCtx, {
-          type: 'bar',
-          data: {
-            labels: vendasMensaisData.meses,
-            datasets: [
-              {
-                label: 'Vendas',
-                data: vendasMensaisData.vendas,
-                backgroundColor: chartColors.green,
-                borderColor: chartColors.greenBorder,
-                borderWidth: 2
+          const vendasDespesasCtx = document.getElementById('vendasDespesasChart').getContext('2d');
+          
+          vendasDespesasChart = new Chart(vendasDespesasCtx, {
+              type: 'bar',
+              data: {
+                  labels: vendasMensaisData.meses,
+                  datasets: [
+                      {
+                          label: 'Vendas',
+                          data: vendasMensaisData.vendas,
+                          backgroundColor: chartColors.green,
+                          borderColor: chartColors.greenBorder,
+                          borderWidth: 2
+                      },
+                      {
+                          label: 'Despesas',
+                          data: vendasMensaisData.despesas,
+                          backgroundColor: chartColors.red,
+                          borderColor: chartColors.redBorder,
+                          borderWidth: 2
+                      }
+                  ]
               },
-              {
-                label: 'Despesas',
-                data: vendasMensaisData.despesas,
-                backgroundColor: chartColors.red,
-                borderColor: chartColors.redBorder,
-                borderWidth: 2
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                position: 'top',
-                labels: { color: '#e0e0e0' }
-              },
-              tooltip: {
-                callbacks: {
-                  label: function (context) {
-                    return `${context.dataset.label}: ${formatMoney(context.raw)}`;
+              options: {
+                  responsive: true,
+                  plugins: {
+                      legend: {
+                          position: 'top',
+                          labels: { color: '#e0e0e0' }
+                      },
+                      tooltip: {
+                          callbacks: {
+                              label: function (context) {
+                                  return `${context.dataset.label}: ${formatMoney(context.raw)}`;
+                              }
+                          }
+                      }
+                  },
+                  scales: {
+                      y: {
+                          beginAtZero: true,
+                          grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                          ticks: { callback: value => formatMoney(value) }
+                      },
+                      x: { grid: { color: 'rgba(255, 255, 255, 0.1)' } }
+                  },
+                  // Configuração para capturar eventos de clique
+                  onClick: (event, elements) => {
+                      if (elements.length > 0) {
+                          const elementIndex = elements[0].index;
+                          const datasetIndex = elements[0].datasetIndex;
+                          
+                          // Obter o mês/ano do label
+                          const mesAno = vendasMensaisData.meses[elementIndex];
+                          
+                          // Converter de MM/YYYY para primeiro e último dia do mês
+                          const [mes, ano] = mesAno.split('/');
+                          const mesNum = parseInt(mes);
+                          const anoNum = parseInt(ano);
+                          
+                          // Calcular primeiro dia do mês (YYYY-MM-DD)
+                          const primeiroDia = new Date(anoNum, mesNum - 1, 1);
+                          const startDate = primeiroDia.toISOString().split('T')[0];
+                          
+                          // Calcular último dia do mês CORRETAMENTE
+                          const ultimoDia = new Date(anoNum, mesNum, 0); // Dia 0 do próximo mês = último dia do mês atual
+                          const endDate = ultimoDia.toISOString().split('T')[0];
+                          
+                          console.log(`Mês: ${mesNum}, Ano: ${anoNum}`);
+                          console.log(`Primeiro dia: ${startDate}`);
+                          console.log(`Último dia: ${endDate}`);
+                          console.log(`Dias no mês: ${ultimoDia.getDate()}`);
+                          
+                          // Determinar o tipo baseado no dataset clicado
+                          let tipo;
+                          if (datasetIndex === 0) {
+                              tipo = 'entrada'; // Vendas
+                          } else if (datasetIndex === 1) {
+                              tipo = 'saida'; // Despesas
+                          }
+                          
+                          if (tipo) {
+                              // Redirecionar para a rota de histórico com datas completas
+                              window.location.href = `/admin/financeiro/historico?tipo=${tipo}&start=${startDate}&end=${endDate}`;
+                          }
+                      }
+                  },
+                  // Melhorar a interatividade visual
+                  interaction: {
+                      mode: 'nearest',
+                      intersect: false
+                  },
+                  // Configurar cursor pointer
+                  onHover: (event, elements) => {
+                      event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
                   }
-                }
               }
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-                grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                ticks: { callback: value => formatMoney(value) }
-              },
-              x: { grid: { color: 'rgba(255, 255, 255, 0.1)' } }
-            }
-          }
-        });
+          });
       }
 
       // 2. Gráfico Formas de Pagamento
       const vendasDiariasData = await fetchWithErrorHandling(buildUrl('/admin/dashboard/vendas-diarias'));
       if (vendasDiariasData.success) {
-        const formasPagamentoMap = new Map();
-        vendasDiariasData.dados.forEach(dia => {
-          dia.formas_pagamento.forEach(fp => {
-            const forma = fp.forma.replace('pix_', '').replace(/_/g, ' ').replace('cartao', 'cartão');
-            const total = parseFloat(fp.total.replace(/[^\d,]/g, '').replace(',', '.'));
+          const formasPagamentoMap = new Map();
+          // Criar um mapa para armazenar tanto o display quanto o valor original
+          const formasPagamentoOriginais = new Map();
+          
+          vendasDiariasData.dados.forEach(dia => {
+              dia.formas_pagamento.forEach(fp => {
+                  const formaOriginal = fp.forma;
+                  const formaDisplay = fp.forma.replace('pix_', '').replace(/_/g, ' ').replace('cartao', 'cartão');
+                  const total = parseFloat(fp.total.replace(/[^\d,]/g, '').replace(',', '.'));
 
-            if (formasPagamentoMap.has(forma)) {
-              formasPagamentoMap.set(forma, formasPagamentoMap.get(forma) + total);
-            } else {
-              formasPagamentoMap.set(forma, total);
-            }
+                  // Armazenar o mapeamento entre display e original
+                  formasPagamentoOriginais.set(formaDisplay, formaOriginal);
+
+                  if (formasPagamentoMap.has(formaDisplay)) {
+                      formasPagamentoMap.set(formaDisplay, formasPagamentoMap.get(formaDisplay) + total);
+                  } else {
+                      formasPagamentoMap.set(formaDisplay, total);
+                  }
+              });
           });
-        });
 
-        const formasPagamentoCtx = document.getElementById('formasPagamentoChart').getContext('2d');
+          const formasPagamentoCtx = document.getElementById('formasPagamentoChart').getContext('2d');
 
-        // Função que retorna posição/alinhamento da legenda
-        function getLegendConfig() {
-          const isSmall = window.innerWidth <= 600;
-          return {
-            position: isSmall ? 'bottom' : 'right',
-            align: isSmall ? 'center' : 'init'
-          };
-        }
-
-        // Função que gera o texto da legenda (sempre com valor)
-        function generateLegendText(chart, index) {
-          const dataset = chart.data.datasets[0];
-          const value = dataset.data[index] || 0;
-          const label = chart.data.labels[index] || '';
-          return `${label}: ${formatMoney(value)}`;
-        }
-
-        let legendCfg = getLegendConfig();
-
-        formasPagamentoChart = new Chart(formasPagamentoCtx, {
-          type: 'doughnut',
-          data: {
-            labels: Array.from(formasPagamentoMap.keys()),
-            datasets: [{
-              data: Array.from(formasPagamentoMap.values()),
-              backgroundColor: [
-                chartColors.green,
-                chartColors.blue,
-                chartColors.yellow,
-                chartColors.purple,
-                chartColors.orange,
-                chartColors.teal,
-                chartColors.red
-              ],
-              borderColor: [
-                chartColors.greenBorder,
-                chartColors.blueBorder,
-                chartColors.yellowBorder,
-                chartColors.purpleBorder,
-                chartColors.orangeBorder,
-                chartColors.tealBorder,
-                chartColors.redBorder
-              ],
-              borderWidth: 2
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '70%',
-            plugins: {
-              legend: {
-                position: legendCfg.position,
-                align: legendCfg.align,
-                labels: {
-                  color: '#e0e0e0',
-                  font: { size: 12, weight: 'bold' },
-                  boxWidth: 20,
-                  generateLabels: function (chart) {
-                    const dataset = chart.data.datasets[0];
-                    const meta = chart.getDatasetMeta(0);
-                    const labels = chart.data.labels;
-                    return labels.map((label, i) => {
-                      const arc = meta.data[i];
-                      const hidden = arc && arc.hidden === true;
-                      return {
-                        text: generateLegendText(chart, i),
-                        fillStyle: dataset.backgroundColor[i],
-                        strokeStyle: dataset.borderColor[i],
-                        lineWidth: dataset.borderWidth,
-                        fontColor: '#e0e0e0',
-                        hidden: hidden,
-                        index: i,
-                        datasetIndex: 0
-                      };
-                    });
-                  }
-                },
-                onClick: function (evt, legendItem, legend) {
-                  const index = legendItem.index;
-                  const chart = legend.chart;
-                  const meta = chart.getDatasetMeta(legendItem.datasetIndex);
-                  meta.data[index].hidden = !meta.data[index].hidden;
-                  chart.update();
-                }
-              },
-              tooltip: {
-                callbacks: {
-                  label: function (context) {
-                    const label = context.label || '';
-                    const value = context.raw || 0;
-                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                    const percentage = Math.round((value / total) * 100);
-                    return `${label}: ${formatMoney(value)} (${percentage}%)`;
-                  }
-                }
-              }
-            }
+          // Função que retorna posição/alinhamento da legenda
+          function getLegendConfig() {
+              const isSmall = window.innerWidth <= 600;
+              return {
+                  position: isSmall ? 'bottom' : 'right',
+                  align: isSmall ? 'center' : 'init'
+              };
           }
-        });
+
+          // Função que gera o texto da legenda (sempre com valor)
+          function generateLegendText(chart, index) {
+              const dataset = chart.data.datasets[0];
+              const value = dataset.data[index] || 0;
+              const label = chart.data.labels[index] || '';
+              return `${label}: ${formatMoney(value)}`;
+          }
+
+          let legendCfg = getLegendConfig();
+
+          formasPagamentoChart = new Chart(formasPagamentoCtx, {
+              type: 'doughnut',
+              data: {
+                  labels: Array.from(formasPagamentoMap.keys()),
+                  datasets: [{
+                      data: Array.from(formasPagamentoMap.values()),
+                      backgroundColor: [
+                          chartColors.green,
+                          chartColors.blue,
+                          chartColors.yellow,
+                          chartColors.purple,
+                          chartColors.orange,
+                          chartColors.teal,
+                          chartColors.red
+                      ],
+                      borderColor: [
+                          chartColors.greenBorder,
+                          chartColors.blueBorder,
+                          chartColors.yellowBorder,
+                          chartColors.purpleBorder,
+                          chartColors.orangeBorder,
+                          chartColors.tealBorder,
+                          chartColors.redBorder
+                      ],
+                      borderWidth: 2
+                  }]
+              },
+              options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  cutout: '70%',
+                  plugins: {
+                      legend: {
+                          position: legendCfg.position,
+                          align: legendCfg.align,
+                          labels: {
+                              color: '#e0e0e0',
+                              font: { size: 12, weight: 'bold' },
+                              boxWidth: 20,
+                              generateLabels: function (chart) {
+                                  const dataset = chart.data.datasets[0];
+                                  const meta = chart.getDatasetMeta(0);
+                                  const labels = chart.data.labels;
+                                  return labels.map((label, i) => {
+                                      const arc = meta.data[i];
+                                      const hidden = arc && arc.hidden === true;
+                                      return {
+                                          text: generateLegendText(chart, i),
+                                          fillStyle: dataset.backgroundColor[i],
+                                          strokeStyle: dataset.borderColor[i],
+                                          lineWidth: dataset.borderWidth,
+                                          fontColor: '#e0e0e0',
+                                          hidden: hidden,
+                                          index: i,
+                                          datasetIndex: 0
+                                      };
+                                  });
+                              }
+                          },
+                          onClick: function (evt, legendItem, legend) {
+                              const index = legendItem.index;
+                              const chart = legend.chart;
+                              const meta = chart.getDatasetMeta(legendItem.datasetIndex);
+                              meta.data[index].hidden = !meta.data[index].hidden;
+                              chart.update();
+                          }
+                      },
+                      tooltip: {
+                          callbacks: {
+                              label: function (context) {
+                                  const label = context.label || '';
+                                  const value = context.raw || 0;
+                                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                  const percentage = Math.round((value / total) * 100);
+                                  return [
+                                      `${label}: ${formatMoney(value)} (${percentage}%)`,
+                                      'Clique para ver detalhes'
+                                  ];
+                              }
+                          }
+                      }
+                  },
+                  // Evento de clique nas fatias do gráfico - CORRIGIDO
+                  onClick: function(evt, elements, chart) {
+                      if (elements.length > 0) {
+                          const elementIndex = elements[0].index;
+                          const formaPagamentoDisplay = this.data.labels[elementIndex];
+                          
+                          // Obter o valor original do mapa
+                          const formaPagamentoOriginal = formasPagamentoOriginais.get(formaPagamentoDisplay);
+                          
+                          if (formaPagamentoOriginal) {
+                              console.log(`Forma de pagamento clicada: ${formaPagamentoDisplay} -> ${formaPagamentoOriginal}`);
+                              
+                              // Redirecionar para a página de formas de pagamento com o filtro aplicado
+                              window.location.href = `/admin/formas-pagamento?forma_pagamento=${encodeURIComponent(formaPagamentoOriginal)}`;
+                          } else {
+                              console.error(`Não foi encontrado o valor original para: ${formaPagamentoDisplay}`);
+                          }
+                      }
+                  },
+                  // Melhorar interatividade visual
+                  interaction: {
+                      mode: 'nearest',
+                      intersect: false
+                  },
+                  // Configurar cursor pointer
+                  onHover: function(evt, elements, chart) {
+                      if (evt.native && evt.native.target) {
+                          evt.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                      }
+                  }
+              }
+          });
       }
 
       // 3. Gráfico Totais por Caixa

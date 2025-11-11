@@ -6626,22 +6626,54 @@ def historico_financeiro():
     except ValueError:
         return "Tipo de movimentação inválido", 400
 
-    # Data principal (mês/ano)
-    data = None
-    if data_str:
+    # Variáveis para o período
+    start_date = None
+    end_date = None
+    mes_ano_display = None
+
+    # Priorizar start/end se fornecidos
+    if start_str and end_str:
+        try:
+            start_date = datetime.strptime(start_str, "%Y-%m-%d")
+            # Ajustar end_date para incluir todo o último dia (até 23:59:59)
+            end_date = datetime.strptime(end_str, "%Y-%m-%d").replace(hour=23, minute=59, second=59, microsecond=999999)
+            mes_ano_display = start_date.strftime('%m/%Y')
+        except Exception as e:
+            return f"Datas de filtro inválidas. Use YYYY-MM-DD. Erro: {str(e)}", 400
+    
+    # Se não tem start/end, usar data_str (MM-YYYY)
+    elif data_str:
         try:
             mes, ano = map(int, data_str.split('-'))
-            data = datetime(ano, mes, 1)
-        except:
-            return "Data inválida. Use MM-YYYY", 400
+            start_date = datetime(ano, mes, 1)
+            # Calcular último dia do mês corretamente
+            if mes == 12:
+                end_date = datetime(ano, 12, 31)
+            else:
+                end_date = datetime(ano, mes + 1, 1) - timedelta(days=1)
+            end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            mes_ano_display = data_str.replace('-', '/')
+        except Exception as e:
+            return f"Data inválida. Use MM-YYYY. Erro: {str(e)}", 400
+    
+    # Se nenhuma data foi fornecida, usar mês atual
+    else:
+        hoje = datetime.now()
+        start_date = datetime(hoje.year, hoje.month, 1)
+        if hoje.month == 12:
+            end_date = datetime(hoje.year, 12, 31)
+        else:
+            end_date = datetime(hoje.year, hoje.month + 1, 1) - timedelta(days=1)
+        end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+        mes_ano_display = hoje.strftime('%m/%Y')
 
-    # Datas de filtro adicionais
-    start_date = datetime.strptime(start_str, "%Y-%m-%d") if start_str else None
-    end_date = datetime.strptime(end_str, "%Y-%m-%d") if end_str else None
+    # Log para debug (opcional)
+    print(f"Período selecionado: {start_date} até {end_date}")
+    print(f"Tipo: {tipo_movimentacao}")
 
     historico_agrupado = buscar_historico_financeiro_agrupado(
         tipo_movimentacao, 
-        data=data, 
+        data=None,  # Não usar mais o parâmetro data, usar start_date e end_date
         incluir_outros=incluir_outros,
         start_date=start_date,
         end_date=end_date
@@ -6651,9 +6683,11 @@ def historico_financeiro():
         'financeiro_historico.html',
         tipo_movimentacao=tipo_movimentacao.value,
         historico=historico_agrupado,
-        mes_ano=data.strftime('%m/%Y') if data else datetime.now().strftime('%m/%Y')
+        mes_ano=mes_ano_display,
+        start_date=start_date.strftime('%Y-%m-%d') if start_date else '',
+        end_date=end_date.strftime('%Y-%m-%d') if end_date else ''
     )
-
+    
 @admin_bp.route('/financeiro/historico/json', methods=['GET'])
 @login_required
 @admin_required
@@ -8149,7 +8183,23 @@ def salvar_configuracoes():
 @admin_required
 def formas_pagamento():
     logger.info(f"Acessando formas de pagamento - Usuário: {current_user.nome}")
-    return render_template('formas_pagamento.html', nome_usuario=current_user.nome)
+    
+    forma_pagamento_filtro = request.args.get('forma_pagamento')
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    operador_id = request.args.get('operador_id')
+    
+    logger.info(f"Filtros formas de pagamento - forma_pagamento: {forma_pagamento_filtro}, "
+                f"data_inicio: {data_inicio}, data_fim: {data_fim}, operador_id: {operador_id}")
+    
+    return render_template(
+        'formas_pagamento.html', 
+        nome_usuario=current_user.nome,
+        forma_pagamento_filtro=forma_pagamento_filtro or '',
+        data_inicio_filtro=data_inicio or '',
+        data_fim_filtro=data_fim or '',
+        operador_id_filtro=operador_id or ''
+    )
 
 @admin_bp.route('/caixas/financeiro/todos', methods=['GET'])
 @login_required
@@ -8163,7 +8213,7 @@ def get_todos_caixas_financeiro():
         operador_id = request.args.get('operador_id')
         caixa_id = request.args.get('caixa_id')
         
-        logger.info(f"Filtros recebidos - data_inicio: {data_inicio}, data_fim: {data_fim}")
+        logger.info(f"Filtros recebidos - data_inicio: {data_inicio}, data_fim: {data_fim}, forma_pagamento: {forma_pagamento}")
         
         # Query base para caixas
         query = db.session.query(Caixa)
@@ -8206,11 +8256,35 @@ def get_todos_caixas_financeiro():
             
             # Filtrar formas de pagamento se especificado
             vendas_por_forma = totais['vendas_por_forma_pagamento']
+            
+            # VERIFICAÇÃO: Incluir o caixa apenas se tiver a forma de pagamento filtrada
             if forma_pagamento:
-                vendas_por_forma = {
-                    k: v for k, v in vendas_por_forma.items() 
-                    if k == forma_pagamento
-                }
+                # Verifica se tem a forma de pagamento nas vendas normais
+                tem_forma_vendas = forma_pagamento in vendas_por_forma and vendas_por_forma[forma_pagamento] > 0
+                
+                # Verifica se tem a forma de pagamento nas contas a prazo recebidas
+                tem_forma_contas_prazo = False
+                for forma_contas, valor in totais.get('a_prazo_recebido', []):
+                    if forma_contas and forma_contas.value == forma_pagamento and float(valor) > 0:
+                        tem_forma_contas_prazo = True
+                        break
+                
+                # Se não tem em nenhum dos dois, pula o caixa
+                if not tem_forma_vendas and not tem_forma_contas_prazo:
+                    logger.info(f"Caixa {caixa.id} não tem {forma_pagamento} - pulando")
+                    continue
+                else:
+                    logger.info(f"Caixa {caixa.id} tem {forma_pagamento} - incluindo")
+            
+            # Filtrar apenas a forma de pagamento específica para exibição
+            formas_filtradas = {}
+            if forma_pagamento:
+                # Mostra apenas a forma de pagamento filtrada
+                if forma_pagamento in vendas_por_forma:
+                    formas_filtradas[forma_pagamento] = vendas_por_forma[forma_pagamento]
+            else:
+                # Sem filtro, mostra todas as formas
+                formas_filtradas = vendas_por_forma
             
             # Processar contas a prazo recebidas
             contas_prazo_recebidas = {}
@@ -8218,7 +8292,10 @@ def get_todos_caixas_financeiro():
                 if forma and valor:
                     forma_str = forma.value
                     valor_float = float(valor)
-                    contas_prazo_recebidas[forma_str] = contas_prazo_recebidas.get(forma_str, 0) + valor_float
+                    
+                    # Aplicar filtro também nas contas a prazo
+                    if not forma_pagamento or (forma_pagamento and forma_str == forma_pagamento):
+                        contas_prazo_recebidas[forma_str] = contas_prazo_recebidas.get(forma_str, 0) + valor_float
             
             caixa_info = {
                 'id': caixa.id,
@@ -8231,7 +8308,7 @@ def get_todos_caixas_financeiro():
                     'saidas': totais['saidas'],
                     'saldo': totais['saldo']
                 },
-                'formas_pagamento': vendas_por_forma,
+                'formas_pagamento': formas_filtradas,
                 'contas_prazo_recebidas': contas_prazo_recebidas,
                 'total_contas_prazo_recebidas': totais.get('contas_prazo_recebidas', 0)
             }
@@ -8245,7 +8322,7 @@ def get_todos_caixas_financeiro():
         end_idx = start_idx + per_page
         caixas_paginados = resultado[start_idx:end_idx]
         
-        logger.info(f"Retornados {len(caixas_paginados)} caixas de {len(resultado)} total")
+        logger.info(f"Retornados {len(caixas_paginados)} caixas de {len(resultado)} total após filtro de forma de pagamento")
         
         return jsonify({
             'success': True,

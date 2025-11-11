@@ -25,6 +25,10 @@ const elements = {
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Inicializando aplicação...');
+    
+    // Verificar se há parâmetros na URL e aplicar filtros automaticamente
+    aplicarFiltrosDaURL();
+    
     initializeApp();
     
     // Event listeners
@@ -35,6 +39,88 @@ document.addEventListener('DOMContentLoaded', function() {
     // Carregar operadores
     carregarOperadores();
 });
+
+// Aplicar filtros da URL automaticamente
+function aplicarFiltrosDaURL() {
+    console.log('Verificando parâmetros da URL...');
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Obter parâmetros da URL
+    const formaPagamentoParam = urlParams.get('forma_pagamento');
+    const dataInicioParam = urlParams.get('data_inicio');
+    const dataFimParam = urlParams.get('data_fim');
+    const operadorParam = urlParams.get('operador_id');
+    const caixaIdParam = urlParams.get('caixa_id');
+    
+    console.log('Parâmetros da URL:', {
+        forma_pagamento: formaPagamentoParam,
+        data_inicio: dataInicioParam,
+        data_fim: dataFimParam,
+        operador_id: operadorParam,
+        caixa_id: caixaIdParam
+    });
+    
+    // Preencher campos de filtro com os parâmetros da URL
+    if (formaPagamentoParam) {
+        elements.formaPagamento.value = formaPagamentoParam;
+        console.log(`Forma de pagamento definida: ${formaPagamentoParam}`);
+    }
+    
+    if (dataInicioParam) {
+        elements.dataInicio.value = dataInicioParam;
+    }
+    
+    if (dataFimParam) {
+        elements.dataFim.value = dataFimParam;
+    }
+    
+    if (operadorParam) {
+        // O operador será definido após carregar a lista
+        setTimeout(() => {
+            elements.operador.value = operadorParam;
+        }, 500);
+    }
+    
+    if (caixaIdParam) {
+        elements.caixaId.value = caixaIdParam;
+    }
+    
+    // Aplicar filtros automaticamente se houver parâmetros
+    if (formaPagamentoParam || dataInicioParam || dataFimParam || operadorParam || caixaIdParam) {
+        console.log('Aplicando filtros da URL automaticamente...');
+        aplicarFiltrosAutomaticamente();
+    }
+}
+
+// Aplicar filtros automaticamente sem clicar no botão
+function aplicarFiltrosAutomaticamente() {
+    console.log('Aplicando filtros automaticamente...');
+    currentFilters = {};
+    
+    if (elements.dataInicio.value) {
+        currentFilters.data_inicio = elements.dataInicio.value;
+    }
+    
+    if (elements.dataFim.value) {
+        currentFilters.data_fim = elements.dataFim.value;
+    }
+    
+    if (elements.formaPagamento.value) {
+        currentFilters.forma_pagamento = elements.formaPagamento.value;
+    }
+    
+    if (elements.operador.value) {
+        currentFilters.operador_id = elements.operador.value;
+    }
+    
+    if (elements.caixaId.value) {
+        currentFilters.caixa_id = elements.caixaId.value;
+    }
+    
+    console.log('Filtros automáticos aplicados:', currentFilters);
+    currentPage = 1;
+    initializeApp();
+}
 
 // Função principal de inicialização
 async function initializeApp() {
@@ -66,6 +152,14 @@ async function carregarOperadores() {
                     elements.operador.appendChild(option);
                 });
                 console.log(`Carregados ${data.operadores.length} operadores`);
+                
+                // Verificar se há parâmetro de operador na URL e aplicar
+                const urlParams = new URLSearchParams(window.location.search);
+                const operadorParam = urlParams.get('operador_id');
+                if (operadorParam) {
+                    elements.operador.value = operadorParam;
+                    console.log(`Operador definido da URL: ${operadorParam}`);
+                }
             } else {
                 console.error('Erro na resposta dos operadores:', data.error);
             }
@@ -112,7 +206,7 @@ function renderizarDados(data) {
     console.log('Renderizando dados...', data);
     hideLoading();
     
-    const { caixas, paginacao } = data;
+    const { caixas, paginacao, filtros } = data;
     
     // Limpar tabela
     elements.tableBody.innerHTML = '';
@@ -138,6 +232,41 @@ function renderizarDados(data) {
     
     // Atualizar paginação
     renderizarPaginacao(paginacao);
+    
+    // Mostrar informações dos filtros aplicados
+    mostrarInfoFiltros(filtros);
+}
+
+// Mostrar informações dos filtros aplicados
+function mostrarInfoFiltros(filtros) {
+    const filtrosAtivos = [];
+    
+    if (filtros.data_inicio && filtros.data_fim) {
+        filtrosAtivos.push(`Período: ${filtros.data_inicio} a ${filtros.data_fim}`);
+    } else if (filtros.data_inicio) {
+        filtrosAtivos.push(`Data: ${filtros.data_inicio}`);
+    }
+    
+    if (filtros.forma_pagamento) {
+        filtrosAtivos.push(`Forma de Pagamento: ${formatMethodName(filtros.forma_pagamento)}`);
+    }
+    
+    if (filtros.operador_id) {
+        // Tentar obter o nome do operador do select
+        const operadorSelect = elements.operador;
+        const selectedOption = operadorSelect.options[operadorSelect.selectedIndex];
+        const nomeOperador = selectedOption ? selectedOption.text : filtros.operador_id;
+        filtrosAtivos.push(`Operador: ${nomeOperador}`);
+    }
+    
+    if (filtros.caixa_id) {
+        filtrosAtivos.push(`Caixa ID: ${filtros.caixa_id}`);
+    }
+    
+    if (filtrosAtivos.length > 0) {
+        console.log('Filtros ativos:', filtrosAtivos);
+        // Você pode exibir essas informações em algum lugar da interface se quiser
+    }
 }
 
 // Criar linha da tabela
@@ -169,7 +298,7 @@ function criarLinhaTabela(caixa) {
     return row;
 }
 
-// Criar lista de formas de pagamento - ATUALIZADO
+// Criar lista de formas de pagamento
 function criarListaFormasPagamento(formasPagamento, tipo = '') {
     console.log(`Criando lista ${tipo}:`, formasPagamento);
     
@@ -278,6 +407,11 @@ function limparFiltros() {
     
     currentFilters = {};
     currentPage = 1;
+    
+    // Limpar também a URL
+    const novaURL = window.location.pathname;
+    window.history.replaceState({}, '', novaURL);
+    
     initializeApp();
 }
 
@@ -296,7 +430,7 @@ function formatMethodName(method) {
         'cartao_debito': 'Cartão Débito',
         'pix_fabiano': 'PIX Fabiano',
         'pix_maquineta': 'PIX Maquineta',
-        'pix_edfrance': 'PIX EDFrance',
+        'pix_edfrance': 'PIX Edfranci',
         'pix_loja': 'PIX Loja',
         'a_prazo': 'A Prazo'
     };
