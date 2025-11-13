@@ -52,11 +52,11 @@ from app.models.entities import (
     StatusPagamento, Caixa, StatusCaixa, NotaFiscalItem, FormaPagamento, Entrega, TipoDesconto, PagamentoNotaFiscal,
     Desconto, PagamentoContaReceber, Usuario, produto_desconto_association)
 from app.crud import (
-    TipoEstoque, atualizar_desconto, atualizar_estoque_produto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao, calcular_formas_pagamento,
+    TipoEstoque, atualizar_desconto, atualizar_estoque_produto, atualizar_venda, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao, calcular_formas_pagamento,
     criar_desconto, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, 
     TipoEstoque, atualizar_desconto, buscar_desconto_by_id, buscar_descontos_por_produto_id, buscar_historico_financeiro, buscar_historico_financeiro_agrupado, buscar_produtos_por_unidade, buscar_todos_os_descontos, calcular_fator_conversao,
     criar_desconto, criar_ou_atualizar_lote, deletar_desconto, estornar_venda, get_caixa_aberto, abrir_caixa, fechar_caixa, get_caixas, get_caixa_by_id, get_caixas_fechado, get_caixas_fechado, 
-    get_transferencias, get_user_by_id, get_usuarios, create_user, obter_caixas_completo,
+    get_transferencias, get_user_by_id, get_usuarios, create_user, get_venda_completa, obter_caixas_completo,
     transferir_todo_saldo, update_user, get_produto, get_produtos, create_produto, update_produto, delete_produto,
     registrar_movimentacao, get_cliente, create_cliente, 
     update_cliente, delete_cliente, create_nota_fiscal, get_nota_fiscal, 
@@ -8421,3 +8421,45 @@ def get_caixas_financeiro_todos():
         return jsonify({'success': False, 'message': 'Erro interno ao buscar caixas'}), 500
     finally:
         db.session.close()
+        
+# -------- ROTAS DE VENDAS (ADMIN) --------
+@admin_bp.route('/vendas/<int:nota_id>', methods=['GET'])
+@login_required
+@admin_required
+def admin_get_venda_completa(nota_id):
+    """Rota para buscar todos os dados completos de uma venda."""
+    try:
+        dados = get_venda_completa(db.session, nota_id)
+        if not dados:
+            return jsonify({'success': False, 'message': 'Venda não encontrada'}), 404
+        return jsonify({'success': True, 'data': dados}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao buscar venda {nota_id}: {e}")
+        return jsonify({'success': False, 'message': 'Erro ao buscar venda'}), 500
+    finally:
+        db.session.close()
+
+
+@admin_bp.route('/vendas/<int:nota_id>', methods=['PUT'])
+@login_required
+@admin_required
+def admin_atualizar_venda(nota_id):
+    """Rota para atualizar uma venda existente, aplicando apenas alterações reais."""
+    session = Session(db.engine)
+    try:
+        novos_dados = request.get_json()
+        if not novos_dados:
+            return jsonify({'success': False, 'message': 'Dados inválidos ou ausentes'}), 400
+
+        dados_atualizados = atualizar_venda(session, nota_id, novos_dados)
+        return jsonify({'success': True, 'data': dados_atualizados}), 200
+    except ValueError as ve:
+        session.rollback()
+        return jsonify({'success': False, 'message': str(ve)}), 404
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Erro ao atualizar venda {nota_id}: {e}")
+        return jsonify({'success': False, 'message': 'Erro ao atualizar venda'}), 500
+    finally:
+        session.close()

@@ -82,6 +82,12 @@
                             <span class="nav-text">Caixas</span>
                         </a>
                     </li>
+                    <li data-tab="vendas">
+                        <a href="#vendas" class="nav-link">
+                            <i class="fas fa-receipt"></i>
+                            <span class="nav-text">Vendas</span>
+                        </a>
+                    </li>
                     <li data-tab="contas">
                         <a href="{{ url_for('admin.formas_pagamento') }}" class="nav-link">
                             <i class="fas fa-money-check-alt"></i>
@@ -790,6 +796,107 @@
                                 </table>
                             </div>
                         </div>
+                    </div>
+                </div>
+                <div id="vendas" class="tab-content">
+
+                    <!-- Barra de ações -->
+                    <div class="action-bar">
+                        <div class="filter-container">
+                            <div class="filter-group">
+                                <label for="vendaId">ID da Venda:</label>
+                                <input type="number" id="vendaId" class="form-control" placeholder="Digite o ID da venda">
+                            </div>
+                            <button class="btn btn-primary" id="buscarVenda">
+                                <i class="fas fa-search"></i>
+                                <span>Buscar</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Card principal da venda -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-file-invoice"></i> Detalhes da Venda</h3>
+                        </div>
+                        <div class="card-body" id="vendaDetalhes">
+                            <p>Informe um ID de venda e clique em "Buscar" para visualizar os detalhes.</p>
+                        </div>
+                    </div>
+
+                    <!-- Container para abas internas -->
+                    <div class="subtabs">
+                        <ul class="nav-subtabs">
+                            <li><a href="#dadosNota" class="subtab-link active">Nota Fiscal</a></li>
+                            <li><a href="#dadosCliente" class="subtab-link">Cliente</a></li>
+                            <li><a href="#dadosItens" class="subtab-link">Itens</a></li>
+                            <li><a href="#dadosPagamentos" class="subtab-link">Pagamentos</a></li>
+                            <li><a href="#dadosEntrega" class="subtab-link">Entrega</a></li>
+                            <li><a href="#dadosConta" class="subtab-link">Conta a Receber</a></li>
+                        </ul>
+                    </div>
+
+                    <!-- Conteúdos das subtabs -->
+                    <div id="dadosNota" class="subtab-content active">
+                        <h4>Dados da Nota Fiscal</h4>
+                        <table class="info-table">
+                            <tbody id="tabelaNota"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="dadosCliente" class="subtab-content">
+                        <h4>Dados do Cliente</h4>
+                        <table class="info-table">
+                            <tbody id="tabelaCliente"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="dadosItens" class="subtab-content">
+                        <h4>Itens da Venda</h4>
+                        <div class="info-table">
+                            <table id="tabelaItens">
+                                <thead>
+                                    <tr>
+                                        <th>Produto</th>
+                                        <th>Quantidade</th>
+                                        <th>Valor Unitário</th>
+                                        <th>Desconto</th>
+                                        <th>Valor Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="dadosPagamentos" class="subtab-content">
+                        <h4>Pagamentos</h4>
+                        <div class="info-table">
+                            <table id="tabelaPagamentos">
+                                <thead>
+                                    <tr>
+                                        <th>Forma de Pagamento</th>
+                                        <th>Valor</th>
+                                        <th>Data</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="dadosEntrega" class="subtab-content">
+                        <h4>Dados de Entrega</h4>
+                        <table class="info-table">
+                            <tbody id="tabelaEntrega"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="dadosConta" class="subtab-content">
+                        <h4>Conta a Receber</h4>
+                        <table class="info-table">
+                            <tbody id="tabelaConta"></tbody>
+                        </table>
                     </div>
                 </div>
 

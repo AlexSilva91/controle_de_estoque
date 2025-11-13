@@ -24,7 +24,10 @@ from typing import Dict, Any, List, Union, Tuple
 
 from app.models.entities import (
     Caixa,
+    Cliente,
     Conta,
+    ContaReceber,
+    Entrega,
     Financeiro,
     LoteEstoque,
     MovimentacaoConta,
@@ -3193,3 +3196,247 @@ def listar_despesas_dia_atual_formatado(db: Session):
         }
         for d in despesas
     ]
+
+# -------- VENDAS ----------
+def get_venda_completa(session, nota_id):
+    """Retorna todos os dados da venda (nota, cliente, itens, pagamentos, entrega, conta a receber)."""
+    nota = session.query(NotaFiscal).get(nota_id)
+    if not nota:
+        return None
+
+    cliente = session.query(Cliente).get(nota.cliente_id)
+    itens = session.query(NotaFiscalItem).filter_by(nota_id=nota.id).all()
+    pagamentos = session.query(PagamentoNotaFiscal).filter_by(nota_fiscal_id=nota.id).all()
+    entrega = session.query(Entrega).get(nota.entrega_id) if nota.entrega_id else None
+    conta_receber = session.query(ContaReceber).filter_by(nota_fiscal_id=nota.id).first()
+
+    return {
+        'nota_fiscal': {
+            'id': nota.id,
+            'cliente_id': nota.cliente_id,
+            'operador_id': nota.operador_id,
+            'caixa_id': nota.caixa_id,
+            'data_emissao': nota.data_emissao.isoformat(),
+            'valor_total': float(nota.valor_total),
+            'valor_desconto': float(nota.valor_desconto or 0),
+            'forma_pagamento': nota.forma_pagamento.value if nota.forma_pagamento else None,
+            'valor_recebido': float(nota.valor_recebido or 0),
+            'troco': float(nota.troco or 0),
+            'a_prazo': nota.a_prazo,
+            'observacao': nota.observacao or '',
+            'status': nota.status.value if nota.status else None,
+        },
+        'cliente': {
+            'id': cliente.id,
+            'nome': cliente.nome,
+            'cpf_cnpj': cliente.documento,
+            'telefone': cliente.telefone,
+            'email': cliente.email,
+        } if cliente else None,
+        'itens': [
+            {
+                'id': item.id,
+                'produto_id': item.produto_id,
+                'produto_nome': item.produto.nome if item.produto else 'Produto não encontrado',  # NOME DO PRODUTO
+                'produto_codigo': item.produto.codigo if item.produto else None,  # CÓDIGO DO PRODUTO (opcional)
+                'quantidade': float(item.quantidade),
+                'valor_unitario': float(item.valor_unitario),
+                'valor_total': float(item.valor_total),
+                'desconto_aplicado': float(item.desconto_aplicado or 0),
+                'tipo_desconto': item.tipo_desconto.value if item.tipo_desconto else None,
+            } for item in itens
+        ],
+        'pagamentos': [
+            {
+                'id': p.id,
+                'forma_pagamento': p.forma_pagamento.value,
+                'valor': float(p.valor),
+                'data': p.data.isoformat(),
+            } for p in pagamentos
+        ],
+        'entrega': {
+            'id': entrega.id,
+            'logradouro': entrega.logradouro,
+            'numero': entrega.numero,
+            'complemento': entrega.complemento,
+            'bairro': entrega.bairro,
+            'cidade': entrega.cidade,
+            'estado': entrega.estado,
+            'cep': entrega.cep,
+            'instrucoes': entrega.instrucoes,
+        } if entrega else None,
+        'conta_receber': {
+            'id': conta_receber.id,
+            'valor_original': float(conta_receber.valor_original),
+            'valor_aberto': float(conta_receber.valor_aberto),
+            'data_vencimento': conta_receber.data_vencimento.isoformat(),
+            'status': conta_receber.status.value,
+        } if conta_receber else None
+    }
+
+def atualizar_venda(session, nota_id, novos_dados):
+    """Atualiza apenas os campos alterados de uma venda existente."""
+    nota = session.query(NotaFiscal).get(nota_id)
+    if not nota:
+        raise ValueError("Nota fiscal não encontrada")
+
+    alterado = False  # Flag geral para commit
+
+    # ----------------------------
+    # 1. Atualizar dados principais
+    # ----------------------------
+    campos_simples = {
+        'valor_total': Decimal(str(novos_dados.get('valor_total', nota.valor_total))),
+        'valor_desconto': Decimal(str(novos_dados.get('valor_desconto', nota.valor_desconto or 0))),
+        'observacao': novos_dados.get('observacao', nota.observacao),
+        'a_prazo': novos_dados.get('a_prazo', nota.a_prazo),
+        'valor_recebido': Decimal(str(novos_dados.get('valor_recebido', nota.valor_recebido or 0))),
+        'troco': Decimal(str(novos_dados.get('troco', nota.troco or 0))),
+    }
+
+    forma_pag = novos_dados.get('forma_pagamento')
+    if forma_pag and (not nota.forma_pagamento or nota.forma_pagamento.value != forma_pag):
+        nota.forma_pagamento = FormaPagamento(forma_pag)
+        alterado = True
+
+    for campo, novo_valor in campos_simples.items():
+        valor_atual = getattr(nota, campo)
+        if valor_atual != novo_valor:
+            setattr(nota, campo, novo_valor)
+            alterado = True
+
+    # ----------------------------
+    # 2. Atualizar entrega (se existir)
+    # ----------------------------
+    entrega_dados = novos_dados.get('entrega')
+    if entrega_dados:
+        if nota.entrega_id:
+            entrega = session.query(Entrega).get(nota.entrega_id)
+        else:
+            entrega = Entrega()
+            session.add(entrega)
+            session.flush()
+            nota.entrega_id = entrega.id
+            alterado = True
+
+        for campo in ['logradouro', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'cep', 'instrucoes']:
+            novo = entrega_dados.get(campo)
+            if novo is not None and getattr(entrega, campo) != novo:
+                setattr(entrega, campo, novo)
+                alterado = True
+
+    # ----------------------------
+    # 3. Atualizar itens (somente se houver diferença)
+    # ----------------------------
+    novos_itens = novos_dados.get('itens', [])
+    if novos_itens:
+        itens_atual = session.query(NotaFiscalItem).filter_by(nota_id=nota.id).all()
+
+        # Cria dicionários comparativos
+        atual_dict = {i.produto_id: i for i in itens_atual}
+        novo_dict = {i['produto_id']: i for i in novos_itens}
+
+        # Atualizar ou criar novos
+        for pid, novo_item in novo_dict.items():
+            if pid in atual_dict:
+                item = atual_dict[pid]
+                campos_item = {
+                    'quantidade': Decimal(str(novo_item['quantidade'])),
+                    'valor_unitario': Decimal(str(novo_item['valor_unitario'])),
+                    'valor_total': Decimal(str(novo_item['valor_total'])),
+                    'desconto_aplicado': Decimal(str(novo_item.get('desconto_aplicado', 0))),
+                    'tipo_desconto': TipoDesconto(novo_item['tipo_desconto']) if novo_item.get('tipo_desconto') else None
+                }
+                for campo, novo_valor in campos_item.items():
+                    if getattr(item, campo) != novo_valor:
+                        setattr(item, campo, novo_valor)
+                        alterado = True
+            else:
+                item = NotaFiscalItem(
+                    nota_id=nota.id,
+                    produto_id=pid,
+                    quantidade=Decimal(str(novo_item['quantidade'])),
+                    valor_unitario=Decimal(str(novo_item['valor_unitario'])),
+                    valor_total=Decimal(str(novo_item['valor_total'])),
+                    desconto_aplicado=Decimal(str(novo_item.get('desconto_aplicado', 0))),
+                    tipo_desconto=TipoDesconto(novo_item['tipo_desconto']) if novo_item.get('tipo_desconto') else None,
+                    sincronizado=False
+                )
+                session.add(item)
+                alterado = True
+
+        # Remover itens que não estão mais presentes
+        for pid in set(atual_dict.keys()) - set(novo_dict.keys()):
+            session.delete(atual_dict[pid])
+            alterado = True
+
+    # ----------------------------
+    # 4. Atualizar pagamentos
+    # ----------------------------
+    novos_pagamentos = novos_dados.get('pagamentos', [])
+    if novos_pagamentos:
+        pagamentos_atual = session.query(PagamentoNotaFiscal).filter_by(nota_fiscal_id=nota.id).all()
+        atual_dict = {p.forma_pagamento.value: p for p in pagamentos_atual}
+        novo_dict = {p['forma_pagamento']: p for p in novos_pagamentos}
+
+        for forma, novo_pag in novo_dict.items():
+            valor = Decimal(str(novo_pag['valor']))
+            if forma in atual_dict:
+                p = atual_dict[forma]
+                if p.valor != valor:
+                    p.valor = valor
+                    p.data = datetime.now()
+                    alterado = True
+            else:
+                novo = PagamentoNotaFiscal(
+                    nota_fiscal_id=nota.id,
+                    forma_pagamento=FormaPagamento(forma),
+                    valor=valor,
+                    data=datetime.now(),
+                    sincronizado=False
+                )
+                session.add(novo)
+                alterado = True
+
+        # Remover pagamentos antigos inexistentes
+        for forma in set(atual_dict.keys()) - set(novo_dict.keys()):
+            session.delete(atual_dict[forma])
+            alterado = True
+
+    # ----------------------------
+    # 5. Atualizar conta a receber
+    # ----------------------------
+    conta_receber = session.query(ContaReceber).filter_by(nota_fiscal_id=nota.id).first()
+    valor_a_prazo = sum(
+        Decimal(str(p['valor']))
+        for p in novos_dados.get('pagamentos', [])
+        if p['forma_pagamento'] == 'a_prazo'
+    )
+
+    if valor_a_prazo > 0:
+        if not conta_receber:
+            conta_receber = ContaReceber(
+                cliente_id=nota.cliente_id,
+                nota_fiscal_id=nota.id,
+                descricao=f"Venda a prazo NF #{nota.id}",
+                sincronizado=False
+            )
+            session.add(conta_receber)
+            alterado = True
+        if conta_receber.valor_original != valor_a_prazo:
+            conta_receber.valor_original = valor_a_prazo
+            conta_receber.valor_aberto = valor_a_prazo
+            conta_receber.data_vencimento = datetime.now() + timedelta(days=30)
+            conta_receber.status = StatusPagamento.pendente
+            alterado = True
+    elif conta_receber:
+        session.delete(conta_receber)
+        alterado = True
+
+    # ----------------------------
+    # 6. Commit apenas se necessário
+    # ----------------------------
+    if alterado:
+        session.commit()
+
+    return get_venda_completa(session, nota_id)

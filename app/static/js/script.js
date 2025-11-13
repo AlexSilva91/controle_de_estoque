@@ -1287,7 +1287,197 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     });
   });
+// ==========================================
+// SISTEMA DE ALTERNÂNCIA DE ABAS (SUBTABS)
+// ==========================================
 
+function inicializarAbas() {
+    const subtabLinks = document.querySelectorAll('#vendas .subtab-link');
+    
+    if (subtabLinks.length === 0) return;
+    
+    subtabLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Remove a classe 'active' de todos os links
+            subtabLinks.forEach(l => l.classList.remove('active'));
+            
+            // Adiciona a classe 'active' ao link clicado
+            this.classList.add('active');
+            
+            // Obtém o ID do conteúdo a ser exibido
+            const targetId = this.getAttribute('href').substring(1);
+            
+            // Esconde todos os conteúdos das subtabs
+            const allContents = document.querySelectorAll('#vendas .subtab-content');
+            allContents.forEach(content => {
+                content.classList.remove('active');
+                content.style.display = 'none';
+            });
+            
+            // Exibe o conteúdo da aba clicada
+            const targetContent = document.getElementById(targetId);
+            if (targetContent) {
+                targetContent.classList.add('active');
+                targetContent.style.display = 'block';
+            }
+        });
+    });
+}
+
+// Inicializa quando o DOM estiver pronto
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inicializarAbas);
+} else {
+    inicializarAbas();
+}
+
+setTimeout(inicializarAbas, 500);
+
+// ==========================================
+// BUSCAR VENDA E PREENCHER DADOS
+// ==========================================
+
+function inicializarBusca() {
+    const btnBuscar = document.getElementById('buscarVenda');
+    
+    if (!btnBuscar) {
+        setTimeout(inicializarBusca, 500);
+        return;
+    }
+    
+    btnBuscar.addEventListener('click', async () => {
+        const id = document.getElementById('vendaId').value;
+        if (!id) {
+            alert('Informe o ID da venda.');
+            return;
+        }
+
+        try {
+            const resp = await fetch(`/admin/vendas/${id}`);
+            const data = await resp.json();
+
+            if (!data.success) {
+                alert(data.message || 'Erro ao buscar venda.');
+                return;
+            }
+
+            const v = data.data;
+
+            // Atualiza o card header com informações básicas
+            document.getElementById('vendaDetalhes').innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div>
+                        <strong>ID da Venda:</strong> ${v.nota_fiscal.id}
+                    </div>
+                    <div>
+                        <strong>Data:</strong> ${new Date(v.nota_fiscal.data_emissao).toLocaleDateString('pt-BR')}
+                    </div>
+                    <div>
+                        <strong>Valor Total:</strong> R$ ${v.nota_fiscal.valor_total.toFixed(2)}
+                    </div>
+                    <div>
+                        <strong>Status:</strong> <span style="color: var(--success-color);">${v.nota_fiscal.status || 'N/A'}</span>
+                    </div>
+                </div>
+            `;
+
+            // --- Nota Fiscal ---
+            const nf = v.nota_fiscal;
+            document.getElementById('tabelaNota').innerHTML = `
+                <tr><td><strong>ID:</strong></td><td>${nf.id}</td></tr>
+                <tr><td><strong>Data Emissão:</strong></td><td>${new Date(nf.data_emissao).toLocaleString('pt-BR')}</td></tr>
+                <tr><td><strong>Valor Total:</strong></td><td>R$ ${nf.valor_total.toFixed(2)}</td></tr>
+                <tr><td><strong>Desconto:</strong></td><td>R$ ${nf.valor_desconto.toFixed(2)}</td></tr>
+                <tr><td><strong>Valor Recebido:</strong></td><td>R$ ${nf.valor_recebido.toFixed(2)}</td></tr>
+                <tr><td><strong>Troco:</strong></td><td>R$ ${nf.troco.toFixed(2)}</td></tr>
+                <tr><td><strong>Forma de Pagamento:</strong></td><td>${nf.forma_pagamento || '-'}</td></tr>
+                <tr><td><strong>A Prazo:</strong></td><td>${nf.a_prazo ? 'Sim' : 'Não'}</td></tr>
+                <tr><td><strong>Status:</strong></td><td>${nf.status || '-'}</td></tr>
+                <tr><td><strong>Observação:</strong></td><td>${nf.observacao || '-'}</td></tr>
+            `;
+
+            // --- Cliente ---
+            const c = v.cliente;
+            document.getElementById('tabelaCliente').innerHTML = c ? `
+                <tr><td><strong>ID:</strong></td><td>${c.id}</td></tr>
+                <tr><td><strong>Nome:</strong></td><td>${c.nome}</td></tr>
+                <tr><td><strong>CPF/CNPJ:</strong></td><td>${c.cpf_cnpj}</td></tr>
+                <tr><td><strong>Telefone:</strong></td><td>${c.telefone || '-'}</td></tr>
+                <tr><td><strong>Email:</strong></td><td>${c.email || '-'}</td></tr>
+            ` : '<tr><td colspan="2">Cliente não informado.</td></tr>';
+
+            // --- Itens ---
+            if (v.itens && v.itens.length > 0) {
+                const itensHTML = v.itens.map((item, index) => `
+                    <tr><td colspan="2" style="background: var(--bg-tertiary); padding: 12px; font-weight: bold; text-align: center;">Item ${index + 1}</td></tr>
+                    <tr><td><strong>Produto:</strong></td><td>${item.produto_nome || 'N/A'}</td></tr>
+                    <tr><td><strong>Quantidade:</strong></td><td>${item.quantidade}</td></tr>
+                    <tr><td><strong>Valor Unitário:</strong></td><td>R$ ${item.valor_unitario.toFixed(2)}</td></tr>
+                    <tr><td><strong>Desconto:</strong></td><td>${item.desconto_aplicado ? 'R$ ' + item.desconto_aplicado.toFixed(2) : '-'}</td></tr>
+                    <tr><td><strong>Valor Total:</strong></td><td>R$ ${item.valor_total.toFixed(2)}</td></tr>
+                `).join('');
+                document.getElementById('tabelaItens').innerHTML = itensHTML;
+            } else {
+                document.getElementById('tabelaItens').innerHTML = '<tr><td colspan="2">Nenhum item encontrado.</td></tr>';
+            }
+
+            // --- Pagamentos ---
+            if (v.pagamentos && v.pagamentos.length > 0) {
+                const pagHTML = v.pagamentos.map((pag, index) => `
+                    <tr><td colspan="2" style="background: var(--bg-tertiary); padding: 12px; font-weight: bold; text-align: center;">Pagamento ${index + 1}</td></tr>
+                    <tr><td><strong>Forma de Pagamento:</strong></td><td>${pag.forma_pagamento}</td></tr>
+                    <tr><td><strong>Valor:</strong></td><td>R$ ${pag.valor.toFixed(2)}</td></tr>
+                    <tr><td><strong>Data:</strong></td><td>${new Date(pag.data).toLocaleString('pt-BR')}</td></tr>
+                `).join('');
+                document.getElementById('tabelaPagamentos').innerHTML = pagHTML;
+            } else {
+                document.getElementById('tabelaPagamentos').innerHTML = '<tr><td colspan="2">Nenhum pagamento registrado.</td></tr>';
+            }
+
+            // --- Entrega ---
+            const e = v.entrega;
+            document.getElementById('tabelaEntrega').innerHTML = e ? `
+                <tr><td><strong>Endereço:</strong></td><td>${e.logradouro}, ${e.numero}</td></tr>
+                <tr><td><strong>Complemento:</strong></td><td>${e.complemento || '-'}</td></tr>
+                <tr><td><strong>Bairro:</strong></td><td>${e.bairro}</td></tr>
+                <tr><td><strong>Cidade/UF:</strong></td><td>${e.cidade} - ${e.estado}</td></tr>
+                <tr><td><strong>CEP:</strong></td><td>${e.cep}</td></tr>
+                <tr><td><strong>Instruções:</strong></td><td>${e.instrucoes || '-'}</td></tr>
+            ` : '<tr><td colspan="2">Nenhum dado de entrega.</td></tr>';
+
+            // --- Conta a Receber ---
+            const cr = v.conta_receber;
+            document.getElementById('tabelaConta').innerHTML = cr ? `
+                <tr><td><strong>ID:</strong></td><td>${cr.id}</td></tr>
+                <tr><td><strong>Valor Original:</strong></td><td>R$ ${cr.valor_original.toFixed(2)}</td></tr>
+                <tr><td><strong>Valor em Aberto:</strong></td><td>R$ ${cr.valor_aberto.toFixed(2)}</td></tr>
+                <tr><td><strong>Vencimento:</strong></td><td>${new Date(cr.data_vencimento).toLocaleDateString('pt-BR')}</td></tr>
+                <tr><td><strong>Status:</strong></td><td>${cr.status}</td></tr>
+            ` : '<tr><td colspan="2">Nenhuma conta a receber associada.</td></tr>';
+
+            // Volta para a primeira aba após carregar os dados
+            const primeiraAba = document.querySelector('#vendas .subtab-link');
+            if (primeiraAba) {
+                primeiraAba.click();
+            }
+
+        } catch (error) {
+            console.error('Erro ao buscar venda:', error);
+            alert('Erro ao buscar venda. Verifique o console para mais detalhes.');
+        }
+    });
+}
+
+// Inicializa a busca
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inicializarBusca);
+} else {
+    inicializarBusca();
+}
+
+setTimeout(inicializarBusca, 500);
   // ===== CLIENTES =====
   async function loadClientesData() {
     try {
