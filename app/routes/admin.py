@@ -8446,20 +8446,19 @@ def admin_get_venda_completa(nota_id):
 @admin_required
 def admin_atualizar_venda(nota_id):
     """Rota para atualizar uma venda existente, aplicando apenas alterações reais."""
-    session = Session(db.engine)
     try:
         novos_dados = request.get_json()
         if not novos_dados:
             return jsonify({'success': False, 'message': 'Dados inválidos ou ausentes'}), 400
 
-        dados_atualizados = atualizar_venda(session, nota_id, novos_dados)
+        dados_atualizados = atualizar_venda(db.session, nota_id, novos_dados)
         return jsonify({'success': True, 'data': dados_atualizados}), 200
     except ValueError as ve:
-        session.rollback()
+        db.session.rollback()
         return jsonify({'success': False, 'message': str(ve)}), 404
     except Exception as e:
-        session.rollback()
+        db.session.rollback()
         logger.error(f"Erro ao atualizar venda {nota_id}: {e}")
         return jsonify({'success': False, 'message': 'Erro ao atualizar venda'}), 500
     finally:
-        session.close()
+        db.session.close()
