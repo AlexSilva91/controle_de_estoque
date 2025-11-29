@@ -1988,11 +1988,26 @@ setTimeout(inicializarBusca, 500);
       const url = `/admin/produtos/pdf?search=${encodeURIComponent(searchText)}&incluir_inativos=${incluirInativos}`;
       window.open(url, '_blank');
     });
+
+    let relatorioAberto = false;
+
     document.getElementById('btnRelatorioEntradas').addEventListener('click', () => {
+      if (relatorioAberto) return;
+
+      relatorioAberto = true;
 
       const url = `/admin/lotes/pdf`;
       window.open(url, '_blank');
+
+      setTimeout(() => {
+        relatorioAberto = false;
+      }, 2000);
     });
+
+    document.getElementById("btnEntradaLotes").addEventListener("click", () => {
+        window.open("/admin/dashboard/entrada-lotes", "_blank");
+    });
+
   }
 
   async function openEditarProdutoModal(produtoId) {

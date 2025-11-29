@@ -3,6 +3,7 @@ from functools import wraps
 import io
 import locale
 import math
+from math import ceil
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 import os
 from zoneinfo import ZoneInfo
@@ -26,7 +27,7 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
     Table as PlatypusTable
 )
-from sqlalchemy import extract
+from sqlalchemy import Date, cast, extract
 from flask import make_response, request, jsonify
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -40,7 +41,7 @@ import io
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from io import BytesIO
-
+from datetime import datetime, time
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 from app.models import db
@@ -8440,7 +8441,6 @@ def admin_get_venda_completa(nota_id):
     finally:
         db.session.close()
 
-
 @admin_bp.route('/vendas/<int:nota_id>', methods=['PUT'])
 @login_required
 @admin_required
@@ -8462,3 +8462,81 @@ def admin_atualizar_venda(nota_id):
         return jsonify({'success': False, 'message': 'Erro ao atualizar venda'}), 500
     finally:
         db.session.close()
+
+@admin_bp.route("/api/lotes", methods=["GET"])
+@login_required
+@admin_required
+def listar_lotes():
+    query = LoteEstoque.query.join(Produto)
+
+    produto_id = request.args.get("produto_id", type=int)
+    data_inicio = request.args.get("data_inicio")
+    data_fim = request.args.get("data_fim")
+    pagina = request.args.get("pagina", default=1, type=int)
+    por_pagina = 10
+
+    if produto_id:
+        query = query.filter(LoteEstoque.produto_id == produto_id)
+
+    if data_inicio:
+        try:
+            # Início do dia: 2025-11-27 00:00:00
+            dt_inicio = datetime.strptime(f"{data_inicio} 00:00:00", "%Y-%m-%d %H:%M:%S")
+            query = query.filter(LoteEstoque.data_entrada >= dt_inicio)
+            print(f"Filtro início: >= {dt_inicio}")
+        except ValueError:
+            pass
+
+    if data_fim:
+        try:
+            # Fim do dia: 2025-11-27 23:59:59
+            dt_fim = datetime.strptime(f"{data_fim} 23:59:59", "%Y-%m-%d %H:%M:%S")
+            query = query.filter(LoteEstoque.data_entrada <= dt_fim)
+            print(f"Filtro fim: <= {dt_fim}")
+        except ValueError:
+            pass
+
+    total_lotes = query.count()
+    print(f"Total encontrado: {total_lotes}")
+    
+    total_paginas = max(1, ceil(total_lotes / por_pagina))
+
+    lotes_pag = query.order_by(LoteEstoque.data_entrada.desc()) \
+                     .offset((pagina - 1) * por_pagina) \
+                     .limit(por_pagina) \
+                     .all()
+
+    resultado = []
+    for lote in lotes_pag:
+        resultado.append({
+            "id": lote.id,
+            "produto_id": lote.produto_id,
+            "produto_nome": lote.produto.nome if lote.produto else None,
+            "quantidade_inicial": str(lote.quantidade_inicial),
+            "quantidade_disponivel": str(lote.quantidade_disponivel),
+            "valor_unitario_compra": str(lote.valor_unitario_compra),
+            "data_entrada": lote.data_entrada.isoformat(),
+            "status": "ativo" if lote.ativo else "inativo",
+            "observacao": lote.observacao,
+        })
+
+    paginacao = {
+        "pagina_atual": pagina,
+        "por_pagina": por_pagina,
+        "total_lotes": total_lotes,
+        "total_paginas": total_paginas,
+        "tem_anterior": pagina > 1,
+        "tem_proxima": pagina < total_paginas
+    }
+
+    return jsonify({
+        "lotes": resultado,
+        "paginacao": paginacao
+    })
+
+@admin_bp.route('/dashboard/entrada-lotes')
+@login_required
+@admin_required
+def entrada_lotes():
+    logger.info(f"Acessando dashboard admin - Usuário: {current_user.nome}")
+    return render_template('lotes.html')
