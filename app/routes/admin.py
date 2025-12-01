@@ -8235,15 +8235,10 @@ def get_todos_caixas_financeiro():
         caixas = query.order_by(Caixa.data_abertura.desc()).all()
 
         resultado = []
-
-        # ----------------------
-        #  CÁLCULO GLOBAL
-        # ----------------------
         totais_formas = {}
         estornos_por_forma_global = {}
 
         for caixa in caixas:
-            # --- Pagamentos de Notas ---
             pagamentos_notas = db.session.query(
                 PagamentoNotaFiscal.forma_pagamento,
                 func.sum(PagamentoNotaFiscal.valor)
@@ -8252,37 +8247,47 @@ def get_todos_caixas_financeiro():
             ).filter(
                 NotaFiscal.caixa_id == caixa.id,
                 NotaFiscal.status == StatusNota.emitida
-            ).group_by(
+            )
+            
+            if forma_pagamento:
+                pagamentos_notas = pagamentos_notas.filter(
+                    PagamentoNotaFiscal.forma_pagamento == forma_pagamento
+                )
+            
+            pagamentos_notas = pagamentos_notas.group_by(
                 PagamentoNotaFiscal.forma_pagamento
             ).all()
 
-            # --- Pagamentos de Contas ---
             pagamentos_contas = db.session.query(
                 PagamentoContaReceber.forma_pagamento,
                 func.sum(PagamentoContaReceber.valor_pago)
             ).filter(
                 PagamentoContaReceber.caixa_id == caixa.id
-            ).group_by(
+            )
+            
+            if forma_pagamento:
+                pagamentos_contas = pagamentos_contas.filter(
+                    PagamentoContaReceber.forma_pagamento == forma_pagamento
+                )
+            
+            pagamentos_contas = pagamentos_contas.group_by(
                 PagamentoContaReceber.forma_pagamento
             ).all()
 
             total_caixa_formas = 0
 
-            # Somar vendas
             for forma, total in pagamentos_notas:
                 if total:
                     valor = float(total)
                     totais_formas[forma.value] = totais_formas.get(forma.value, 0) + valor
                     total_caixa_formas += valor
 
-            # Somar contas recebidas
             for forma, total in pagamentos_contas:
                 if total:
                     valor = float(total)
                     totais_formas[forma.value] = totais_formas.get(forma.value, 0) + valor
                     total_caixa_formas += valor
 
-            # --- Estornos (saída_estorno) ---
             estornos = db.session.query(
                 func.sum(Financeiro.valor)
             ).filter(
@@ -8293,33 +8298,32 @@ def get_todos_caixas_financeiro():
             estornos_valor = float(estornos)
 
             if estornos_valor > 0 and total_caixa_formas > 0:
-                # Proporcional para notas
                 for forma, total in pagamentos_notas:
                     if total:
                         proporcao = float(total) / total_caixa_formas
                         valor_estorno = estornos_valor * proporcao
                         estornos_por_forma_global[forma.value] = estornos_por_forma_global.get(forma.value, 0) + valor_estorno
 
-                # Proporcional para contas
                 for forma, total in pagamentos_contas:
                     if total:
                         proporcao = float(total) / total_caixa_formas
                         valor_estorno = estornos_valor * proporcao
                         estornos_por_forma_global[forma.value] = estornos_por_forma_global.get(forma.value, 0) + valor_estorno
 
-            # ----------------------
-            # Dados por caixa (lista principal)
-            # ----------------------
             totais = calcular_formas_pagamento(caixa.id, db.session)
             vendas_por_forma = totais['vendas_por_forma_pagamento']
-
-            formas_filtradas = vendas_por_forma.copy()
+            
+            if forma_pagamento:
+                formas_filtradas = {forma_pagamento: vendas_por_forma.get(forma_pagamento, 0)}
+            else:
+                formas_filtradas = vendas_por_forma.copy()
 
             contas_prazo_recebidas = {}
             for forma, valor in totais.get('a_prazo_recebido', []):
                 if forma and valor:
                     forma_str = forma.value
-                    contas_prazo_recebidas[forma_str] = contas_prazo_recebidas.get(forma_str, 0) + float(valor)
+                    if not forma_pagamento or forma_str == forma_pagamento:
+                        contas_prazo_recebidas[forma_str] = contas_prazo_recebidas.get(forma_str, 0) + float(valor)
 
             caixa_info = {
                 'id': caixa.id,
@@ -8335,25 +8339,23 @@ def get_todos_caixas_financeiro():
                 'formas_pagamento': formas_filtradas,
                 'contas_prazo_recebidas': contas_prazo_recebidas,
             }
-            resultado.append(caixa_info)
+            
+            if forma_pagamento:
+                if formas_filtradas.get(forma_pagamento, 0) > 0 or contas_prazo_recebidas.get(forma_pagamento, 0) > 0:
+                    resultado.append(caixa_info)
+            else:
+                resultado.append(caixa_info)
 
-        # ----------------------
-        # Subtrair estornos globais
-        # ----------------------
         for forma, estorno in estornos_por_forma_global.items():
             if forma in totais_formas:
                 totais_formas[forma] -= estorno
 
-        # Nenhum valor negativo
         for forma in list(totais_formas.keys()):
             if totais_formas[forma] < 0:
                 totais_formas[forma] = 0
 
         total_geral = sum(totais_formas.values())
 
-        # ----------------------
-        # Paginação
-        # ----------------------
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
 
@@ -8389,7 +8391,6 @@ def get_todos_caixas_financeiro():
         }), 500
     finally:
         db.session.close()
-
 
 @admin_bp.route('/caixas/operadores/formas-pagamento', methods=['GET'])
 @login_required
