@@ -19,7 +19,9 @@ const elements = {
     operador: document.getElementById('operador'),
     caixaId: document.getElementById('caixa-id'),
     btnFiltrar: document.getElementById('btn-filtrar'),
-    btnLimpar: document.getElementById('btn-limpar')
+    btnLimpar: document.getElementById('btn-limpar'),
+    totaisGrid: document.getElementById('totais-grid'),
+
 };
 
 // Inicialização
@@ -207,7 +209,8 @@ function renderizarDados(data) {
     hideLoading();
     
     const { caixas, paginacao, filtros } = data;
-    
+    renderizarTotaisConsolidados(data);
+
     // Limpar tabela
     elements.tableBody.innerHTML = '';
     
@@ -268,6 +271,34 @@ function mostrarInfoFiltros(filtros) {
         // Você pode exibir essas informações em algum lugar da interface se quiser
     }
 }
+
+function renderizarTotaisConsolidados(data) {
+    const grid = elements.totaisGrid;
+    grid.innerHTML = '';
+
+    const totais = data.totais_por_forma_pagamento || {};
+    const totalGeral = data.total_geral_formas_pagamento || "0,00";
+
+    // Cards individuais por forma de pagamento
+    const cardsFormas = Object.entries(totais).map(([forma, valor]) => `
+        <div class="card-total">
+            <h3>${formatMethodName(forma)}</h3>
+            <p class="valor-total">${valor}</p>
+        </div>
+    `).join('');
+
+    // Card do Total Geral
+    const cardTotalGeral = `
+        <div class="card-total card-total-geral">
+            <h3>Total Geral</h3>
+            <p class="valor-total">${totalGeral}</p>
+        </div>
+    `;
+
+    // Inserir tudo no grid
+    grid.innerHTML = cardsFormas + cardTotalGeral;
+}
+
 
 // Criar linha da tabela
 function criarLinhaTabela(caixa) {

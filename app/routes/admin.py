@@ -8207,97 +8207,120 @@ def formas_pagamento():
 @admin_required
 def get_todos_caixas_financeiro():
     try:
-        # Parâmetros de filtro
         data_inicio = request.args.get('data_inicio')
         data_fim = request.args.get('data_fim')
         forma_pagamento = request.args.get('forma_pagamento')
         operador_id = request.args.get('operador_id')
         caixa_id = request.args.get('caixa_id')
         
-        logger.info(f"Filtros recebidos - data_inicio: {data_inicio}, data_fim: {data_fim}, forma_pagamento: {forma_pagamento}")
-        
-        # Query base para caixas
         query = db.session.query(Caixa)
-        
-        # Aplicar filtros de data
+
         if data_inicio and data_fim:
-            # Filtro por período
             data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d')
             data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
             query = query.filter(Caixa.data_abertura.between(data_inicio_dt, data_fim_dt))
-            logger.info(f"Filtrando por período: {data_inicio} a {data_fim}")
-            
-        elif data_inicio and not data_fim:
-            # Filtro por data específica (apenas um dia)
+        elif data_inicio:
             data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d')
             data_fim_dt = data_inicio_dt + timedelta(days=1)
             query = query.filter(Caixa.data_abertura.between(data_inicio_dt, data_fim_dt))
-            logger.info(f"Filtrando por data específica: {data_inicio}")
-            
-        elif data_fim and not data_inicio:
-            # Se só tem data_fim, busca tudo até essa data
+        elif data_fim:
             data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
             query = query.filter(Caixa.data_abertura <= data_fim_dt)
-            logger.info(f"Filtrando até data: {data_fim}")
-        
-        # Outros filtros
+
         if operador_id:
             query = query.filter(Caixa.operador_id == operador_id)
-        
         if caixa_id:
             query = query.filter(Caixa.id == caixa_id)
-        
+
         caixas = query.order_by(Caixa.data_abertura.desc()).all()
-        logger.info(f"Encontrados {len(caixas)} caixas com os filtros aplicados")
-        
+
         resultado = []
+
+        # ----------------------
+        #  CÁLCULO GLOBAL
+        # ----------------------
+        totais_formas = {}
+        estornos_por_forma_global = {}
+
         for caixa in caixas:
-            # Calcular totais para cada caixa
+            # --- Pagamentos de Notas ---
+            pagamentos_notas = db.session.query(
+                PagamentoNotaFiscal.forma_pagamento,
+                func.sum(PagamentoNotaFiscal.valor)
+            ).join(
+                NotaFiscal, PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+            ).filter(
+                NotaFiscal.caixa_id == caixa.id,
+                NotaFiscal.status == StatusNota.emitida
+            ).group_by(
+                PagamentoNotaFiscal.forma_pagamento
+            ).all()
+
+            # --- Pagamentos de Contas ---
+            pagamentos_contas = db.session.query(
+                PagamentoContaReceber.forma_pagamento,
+                func.sum(PagamentoContaReceber.valor_pago)
+            ).filter(
+                PagamentoContaReceber.caixa_id == caixa.id
+            ).group_by(
+                PagamentoContaReceber.forma_pagamento
+            ).all()
+
+            total_caixa_formas = 0
+
+            # Somar vendas
+            for forma, total in pagamentos_notas:
+                if total:
+                    valor = float(total)
+                    totais_formas[forma.value] = totais_formas.get(forma.value, 0) + valor
+                    total_caixa_formas += valor
+
+            # Somar contas recebidas
+            for forma, total in pagamentos_contas:
+                if total:
+                    valor = float(total)
+                    totais_formas[forma.value] = totais_formas.get(forma.value, 0) + valor
+                    total_caixa_formas += valor
+
+            # --- Estornos (saída_estorno) ---
+            estornos = db.session.query(
+                func.sum(Financeiro.valor)
+            ).filter(
+                Financeiro.caixa_id == caixa.id,
+                Financeiro.tipo == TipoMovimentacao.saida_estorno
+            ).scalar() or 0
+
+            estornos_valor = float(estornos)
+
+            if estornos_valor > 0 and total_caixa_formas > 0:
+                # Proporcional para notas
+                for forma, total in pagamentos_notas:
+                    if total:
+                        proporcao = float(total) / total_caixa_formas
+                        valor_estorno = estornos_valor * proporcao
+                        estornos_por_forma_global[forma.value] = estornos_por_forma_global.get(forma.value, 0) + valor_estorno
+
+                # Proporcional para contas
+                for forma, total in pagamentos_contas:
+                    if total:
+                        proporcao = float(total) / total_caixa_formas
+                        valor_estorno = estornos_valor * proporcao
+                        estornos_por_forma_global[forma.value] = estornos_por_forma_global.get(forma.value, 0) + valor_estorno
+
+            # ----------------------
+            # Dados por caixa (lista principal)
+            # ----------------------
             totais = calcular_formas_pagamento(caixa.id, db.session)
-            
-            # Filtrar formas de pagamento se especificado
             vendas_por_forma = totais['vendas_por_forma_pagamento']
-            
-            # VERIFICAÇÃO: Incluir o caixa apenas se tiver a forma de pagamento filtrada
-            if forma_pagamento:
-                # Verifica se tem a forma de pagamento nas vendas normais
-                tem_forma_vendas = forma_pagamento in vendas_por_forma and vendas_por_forma[forma_pagamento] > 0
-                
-                # Verifica se tem a forma de pagamento nas contas a prazo recebidas
-                tem_forma_contas_prazo = False
-                for forma_contas, valor in totais.get('a_prazo_recebido', []):
-                    if forma_contas and forma_contas.value == forma_pagamento and float(valor) > 0:
-                        tem_forma_contas_prazo = True
-                        break
-                
-                # Se não tem em nenhum dos dois, pula o caixa
-                if not tem_forma_vendas and not tem_forma_contas_prazo:
-                    logger.info(f"Caixa {caixa.id} não tem {forma_pagamento} - pulando")
-                    continue
-                else:
-                    logger.info(f"Caixa {caixa.id} tem {forma_pagamento} - incluindo")
-            
-            # Filtrar apenas a forma de pagamento específica para exibição
-            formas_filtradas = {}
-            if forma_pagamento:
-                # Mostra apenas a forma de pagamento filtrada
-                if forma_pagamento in vendas_por_forma:
-                    formas_filtradas[forma_pagamento] = vendas_por_forma[forma_pagamento]
-            else:
-                # Sem filtro, mostra todas as formas
-                formas_filtradas = vendas_por_forma
-            
-            # Processar contas a prazo recebidas
+
+            formas_filtradas = vendas_por_forma.copy()
+
             contas_prazo_recebidas = {}
             for forma, valor in totais.get('a_prazo_recebido', []):
                 if forma and valor:
                     forma_str = forma.value
-                    valor_float = float(valor)
-                    
-                    # Aplicar filtro também nas contas a prazo
-                    if not forma_pagamento or (forma_pagamento and forma_str == forma_pagamento):
-                        contas_prazo_recebidas[forma_str] = contas_prazo_recebidas.get(forma_str, 0) + valor_float
-            
+                    contas_prazo_recebidas[forma_str] = contas_prazo_recebidas.get(forma_str, 0) + float(valor)
+
             caixa_info = {
                 'id': caixa.id,
                 'data_abertura': caixa.data_abertura.isoformat(),
@@ -8311,20 +8334,33 @@ def get_todos_caixas_financeiro():
                 },
                 'formas_pagamento': formas_filtradas,
                 'contas_prazo_recebidas': contas_prazo_recebidas,
-                'total_contas_prazo_recebidas': totais.get('contas_prazo_recebidas', 0)
             }
             resultado.append(caixa_info)
-        
+
+        # ----------------------
+        # Subtrair estornos globais
+        # ----------------------
+        for forma, estorno in estornos_por_forma_global.items():
+            if forma in totais_formas:
+                totais_formas[forma] -= estorno
+
+        # Nenhum valor negativo
+        for forma in list(totais_formas.keys()):
+            if totais_formas[forma] < 0:
+                totais_formas[forma] = 0
+
+        total_geral = sum(totais_formas.values())
+
+        # ----------------------
         # Paginação
+        # ----------------------
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
-        
+
         start_idx = (page - 1) * per_page
         end_idx = start_idx + per_page
         caixas_paginados = resultado[start_idx:end_idx]
-        
-        logger.info(f"Retornados {len(caixas_paginados)} caixas de {len(resultado)} total após filtro de forma de pagamento")
-        
+
         return jsonify({
             'success': True,
             'caixas': caixas_paginados,
@@ -8340,18 +8376,20 @@ def get_todos_caixas_financeiro():
                 'forma_pagamento': forma_pagamento,
                 'operador_id': operador_id,
                 'caixa_id': caixa_id
-            }
+            },
+            'totais_por_forma_pagamento': { f: format_currency(v) for f, v in totais_formas.items() },
+            'total_geral_formas_pagamento': format_currency(total_geral)
         })
-        
+
     except Exception as e:
-        logger.error(f"Erro ao buscar caixas: {str(e)}", exc_info=True)
         db.session.rollback()
         return jsonify({
             'success': False,
-            'error': 'Erro interno ao processar dados dos caixas'
+            'error': str(e)
         }), 500
     finally:
         db.session.close()
+
 
 @admin_bp.route('/caixas/operadores/formas-pagamento', methods=['GET'])
 @login_required
