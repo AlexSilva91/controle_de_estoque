@@ -564,7 +564,19 @@ def abrir_caixa_route():
             valor_abertura=valor_abertura,
             observacao=observacao
         )
+
+        AuditLog.registrar(
+            session=db.session,
+            tabela="caixas",
+            registro_id=caixa.id,
+            usuario_id=current_user.id,
+            acao="abrir",
+            antes="Sem registro anterior",
+            depois=f"valor_abertura={caixa.valor_abertura}, observacao='{caixa.observacao}'"
+        )
+
         logger.info(f"Caixa {caixa.id} aberto por usuário {current_user.nome}")
+
         return jsonify({
             'success': True,
             'message': 'Caixa aberto com sucesso',
@@ -593,6 +605,17 @@ def fechar_caixa_route():
             valor_fechamento=valor_fechamento,
             observacao=observacao
         )
+
+        AuditLog.registrar(
+            session=db.session,
+            tabela="caixas",
+            registro_id=caixa.id,
+            usuario_id=current_user.id,
+            acao="fechar",
+            antes=f"valor_fechamento={caixa.fechamento}, observacao='{caixa.observacao}'",
+            depois=f"valor_fechamento={caixa.fechamento}, observacao='{caixa.observacao}'"
+        )
+
         logger.info(f"Caixa {caixa.id} fechado por usuário {current_user.nome}")
         return jsonify({
             'success': True,
@@ -793,8 +816,23 @@ def criar_cliente():
             criado_em=datetime.now(tz=ZoneInfo("America/Sao_Paulo")),
             ativo=True
         )
-        
+
         cliente = create_cliente(db.session, cliente_data)
+
+        AuditLog.registrar(
+            session=db.session,
+            tabela="clientes",
+            registro_id=cliente.id,
+            usuario_id=current_user.id,
+            acao="Cadastrar",
+            antes=f"Cliente inexistente",
+            depois= f"nome={cliente.nome}, "
+                    f"documento={cliente.documento}, "
+                    f"telefone={cliente.telefone}, "
+                    f"email={cliente.email}, "
+                    f"endereco={cliente.endereco}, "
+                    f"ativo={cliente.ativo}"
+        )
 
         logger.info(f"Cliente {cliente.nome} criado por usuário {current_user.nome}")
         return jsonify({
