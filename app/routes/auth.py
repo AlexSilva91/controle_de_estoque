@@ -10,7 +10,7 @@ from app.crud import (
     verify_password,
 )
 from app.database import SessionLocal
-from app.models.entities import Caixa, StatusCaixa, Usuario
+from app.models.entities import Caixa, StatusCaixa, Usuario, AuditLog
 from zoneinfo import ZoneInfo 
 from datetime import datetime
 from app import schemas
@@ -21,13 +21,11 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/')
 logger = logging.getLogger(__name__)
 
 def get_session():
-    """Obtém uma nova sessão do banco"""
     return SessionLocal()
 
 @auth_bp.route('/', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        # Usar uma nova sessão para cada requisição
         db = get_session()
         
         try:
@@ -35,52 +33,40 @@ def login():
             senha = request.form.get('senha', '').strip()
 
             if not cpf or not senha:
-                logger.warning("CPF ou senha não fornecidos")
-                return jsonify({
-                    'success': False,
-                    'message': 'Preencha CPF e senha corretamente.'
-                })
+                return jsonify({'success': False,'message': 'Preencha CPF e senha corretamente.'})
 
             usuario = get_user_by_cpf(db, cpf)
             if not usuario:
-                logger.warning(f"Usuário não encontrado para CPF: {cpf}")
-                return jsonify({
-                    'success': False,
-                    'message': 'Usuário não encontrado.'
-                })
+                return jsonify({'success': False,'message': 'Usuário não encontrado.'})
 
             if not verify_password(senha, usuario.senha_hash):
-                logger.warning(f"Senha incorreta para CPF: {cpf}")
-                return jsonify({
-                    'success': False,
-                    'message': 'Senha incorreta.'
-                })
+                return jsonify({'success': False,'message': 'Senha incorreta.'})
 
             if not usuario.status:
-                logger.warning(f"Usuário inativo. Contate o administrador. CPF: {cpf}")
-                return jsonify({
-                    'success': False,
-                    'message': 'Usuário inativo. Contate o administrador.'
-                })
+                return jsonify({'success': False,'message': 'Usuário inativo. Contate o administrador.'})
 
             login_user(usuario)
             
-            # Verificar se é o primeiro login do usuário
             primeiro_login = usuario.ultimo_acesso is None
-            
-            # Atualiza último acesso
+            antes = f"Último acesso: {usuario.ultimo_acesso}"
             usuario.ultimo_acesso = datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
             db.commit()
 
-            # Verificar caixa aberto apenas para operadores
+            AuditLog.registrar(
+                session=db,
+                tabela="usuarios",
+                registro_id=usuario.id,
+                acao="atualizar_ultimo_acesso",
+                usuario_id=usuario.id,
+                antes=antes,
+                depois=f"Login: {usuario.ultimo_acesso}"
+            )
+
             if usuario.tipo.value == 'operador':
-                logger.info(f"Verificando caixa para operador {usuario.nome}")
                 caixa_aberto = get_caixa_aberto(db, operador_id=usuario.id)
                 
                 if not caixa_aberto:
-                    # Se é o primeiro login, mostra modal de abertura manual
                     if primeiro_login:
-                        # Busca último caixa fechado para valor sugerido
                         ultimo_caixa = db.query(Caixa).filter(
                             Caixa.operador_id == usuario.id,
                             Caixa.status == StatusCaixa.fechado,
@@ -97,46 +83,47 @@ def login():
                             'user_type': 'operador'
                         })
                     else:
-                        # Se não é o primeiro login, abre automaticamente com valor do último caixa
                         ultimo_caixa = db.query(Caixa).filter(
                             Caixa.operador_id == usuario.id,
                             Caixa.status == StatusCaixa.fechado,
                             Caixa.valor_fechamento.isnot(None)
                         ).order_by(desc(Caixa.data_fechamento)).first()
                         
-                        # Define valor de abertura
-                        if ultimo_caixa and ultimo_caixa.valor_fechamento:
+                        if ultimo_caixa:
                             valor_abertura = ultimo_caixa.valor_fechamento
                         else:
                             valor_abertura = Decimal('0.00')
                         
                         try:
-                            # Abre o caixa automaticamente
                             novo_caixa = abrir_caixa(
                                 db=db,
                                 operador_id=usuario.id,
                                 valor_abertura=valor_abertura,
                                 observacao=f"Abertura automática - valor do último fechamento (Caixa #{ultimo_caixa.id})" if ultimo_caixa else "Abertura automática - primeiro caixa"
                             )
+
+                            AuditLog.registrar(
+                                session=db,
+                                tabela="caixas",
+                                registro_id=novo_caixa.id,
+                                acao="abertura_automatica",
+                                usuario_id=usuario.id,
+                                antes="Sem caixa aberto",
+                                depois=f"Caixa aberto automaticamente com valor {valor_abertura}"
+                            )
                             
-                            if novo_caixa:
-                                return jsonify({
-                                    'success': True,
-                                    'needs_caixa': False,
-                                    'abertura_automatica': True,
-                                    'caixa_id': novo_caixa.id,
-                                    'valor_abertura': float(valor_abertura),
-                                    'user_type': 'operador',
-                                    'message': f'Caixa #{novo_caixa.id} aberto automaticamente com R$ {valor_abertura:.2f}'
-                                })
-                            else:
-                                logger.error("Falha ao criar o caixa automaticamente")
-                                raise Exception("Falha ao criar o caixa")
+                            return jsonify({
+                                'success': True,
+                                'needs_caixa': False,
+                                'abertura_automatica': True,
+                                'caixa_id': novo_caixa.id,
+                                'valor_abertura': float(valor_abertura),
+                                'user_type': 'operador',
+                                'message': f'Caixa #{novo_caixa.id} aberto automaticamente com R$ {valor_abertura:.2f}'
+                            })
                                 
                         except Exception as e:
                             db.rollback()
-                            logger.error(f"Erro na abertura automática: {str(e)}")
-                            # Se falhar na abertura automática, solicita abertura manual
                             return jsonify({
                                 'success': True,
                                 'needs_caixa': True,
@@ -147,7 +134,7 @@ def login():
                                 'message': f'Erro na abertura automática: {str(e)}. Por favor, abra manualmente.'
                             })
                 else:
-                    logger.info(f"Usuário {usuario.id} já tem caixa aberto #{caixa_aberto.id}")
+                    pass
 
             return jsonify({
                 'success': True,
@@ -156,20 +143,12 @@ def login():
                 'message': f'Bem-vindo, {usuario.nome}!'
             })
             
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             db.rollback()
-            logger.error(f"Erro SQL: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': 'Erro ao atualizar dados de acesso.'
-            }), 500
+            return jsonify({'success': False,'message': 'Erro ao atualizar dados de acesso.'}), 500
         except Exception as e:
             db.rollback()
-            logger.error(f"Erro geral no login: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': f'Erro interno: {str(e)}'
-            }), 500
+            return jsonify({'success': False,'message': f'Erro interno: {str(e)}'}), 500
         finally:
             db.close()
 
@@ -179,40 +158,27 @@ def login():
 @login_required
 def abrir_caixa_manual():
     if current_user.tipo.value != 'operador':
-        logger.warning(f"Tentativa de abertura de caixa por usuário não operador: {current_user.id}")
-        return jsonify({
-            'success': False,
-            'message': 'Apenas operadores podem abrir caixa'
-        }), 403
+        return jsonify({'success': False,'message': 'Apenas operadores podem abrir caixa'}), 403
 
-    # Usar uma nova sessão
     db = get_session()
     
     try:
         if not request.is_json:
-            logger.warning("Content-Type inválido na abertura de caixa manual")
             return jsonify({'success': False, 'message': 'Content-Type deve ser application/json'}), 400
 
         data = request.get_json()
         if not data:
-            logger.warning("Dados inválidos na abertura de caixa manual")
-            return jsonify({'success': False, 'message': 'Dados inválidos'}), 400
+            return jsonify({'success': False,'message': 'Dados inválidos'}), 400
 
         try:
             valor_abertura = Decimal(str(data.get('valor_abertura', 0)))
-        except (ValueError, TypeError) as e:
-            logger.warning(f"Valor de abertura inválido: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': f'Valor de abertura inválido: {str(e)}'
-            }), 400
+        except:
+            return jsonify({'success': False,'message': 'Valor de abertura inválido'}), 400
 
         observacao = data.get('observacao', 'Abertura manual')
 
-        # Verifica se já existe caixa aberto para o usuário atual
         caixa_existente = get_caixa_aberto(db, operador_id=current_user.id)
         if caixa_existente:
-            logger.warning(f"Usuário {current_user.id} já tem caixa aberto #{caixa_existente.id}")
             return jsonify({
                 'success': False,
                 'message': f'Você já tem um caixa aberto (Caixa #{caixa_existente.id} aberto em {caixa_existente.data_abertura.strftime("%d/%m/%Y %H:%M")})',
@@ -220,7 +186,6 @@ def abrir_caixa_manual():
                 'redirect_url': url_for('operador.dashboard')
             }), 400
 
-        # Tenta abrir o caixa
         novo_caixa = abrir_caixa(
             db=db,
             operador_id=current_user.id,
@@ -229,8 +194,17 @@ def abrir_caixa_manual():
         )
         
         if not novo_caixa:
-            logger.error("Falha ao criar o caixa manualmente")
             raise ValueError("Erro ao criar caixa")
+
+        AuditLog.registrar(
+            session=db,
+            tabela="caixas",
+            registro_id=novo_caixa.id,
+            acao="abertura_manual",
+            usuario_id=current_user.id,
+            antes="Sem caixa aberto",
+            depois=f"Caixa aberto manualmente com valor {valor_abertura}"
+        )
         
         return jsonify({
             'success': True,
@@ -239,20 +213,9 @@ def abrir_caixa_manual():
             'redirect_url': url_for('operador.dashboard')
         })
 
-    except ValueError as e:
-        logger.warning(f"Erro de valor na abertura manual: {str(e)}")
-        db.rollback()
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 400
     except Exception as e:
-        logger.error(f"Erro na abertura manual: {str(e)}", exc_info=True)
         db.rollback()
-        return jsonify({
-            'success': False,
-            'message': f'Erro ao abrir caixa: {str(e)}'
-        }), 500
+        return jsonify({'success': False,'message': f'Erro ao abrir caixa: {str(e)}'}), 500
     finally:
         db.close()
 
@@ -262,13 +225,23 @@ def logout():
     try:
         usuario = Usuario.query.get(current_user.id)
         if usuario:
+            antes = f"Último acesso: {usuario.ultimo_acesso}"
             usuario.ultimo_acesso = datetime.now(tz=ZoneInfo('America/Sao_Paulo'))
             db.session.commit()
-    except Exception as e:
-        logger.exception("Erro ao atualizar último acesso no logout")
+
+            AuditLog.registrar(
+                session=db.session,
+                tabela="usuarios",
+                registro_id=current_user.id,
+                acao="logout",
+                usuario_id=current_user.id,
+                antes=antes,
+                depois=f"Logout realizado em {usuario.ultimo_acesso}"
+            )
+    except:
         db.session.rollback()
     finally:
-        db.session.close()  # garante liberar a sessão
+        db.session.close()
     
     logout_user()
     flash('Logout efetuado com sucesso.', 'success')

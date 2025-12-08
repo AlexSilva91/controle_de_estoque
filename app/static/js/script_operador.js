@@ -339,9 +339,6 @@ function renderClientsTable() {
                     <button class="btn-action btn-view" onclick="viewClientDetails(${client.id})" title="Ver detalhes">
                         <i class="fas fa-eye"></i>
                     </button>
-                    <button class="btn-action btn-select" onclick="selectClientForSale(${client.id})" title="Selecionar para venda">
-                        <i class="fas fa-shopping-cart"></i>
-                    </button>
                 </div>
             </td>
         </tr>

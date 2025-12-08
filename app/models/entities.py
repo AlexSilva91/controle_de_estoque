@@ -880,12 +880,59 @@ class AuditLog(Base):
     tabela = Column(String(100), nullable=False)
     registro_id = Column(Integer, nullable=False)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
-    acao = Column(String(50), nullable=False)  # insert, update, delete
-    antes = Column(Text, nullable=True)        # JSON com estado anterior
-    depois = Column(Text, nullable=True)       # JSON com estado posterior
+    acao = Column(String(50), nullable=False)
+    antes = Column(Text, nullable=True)       # texto puro
+    depois = Column(Text, nullable=True)      # texto puro
     criado_em = Column(DateTime, default=datetime.now, nullable=False)
 
     usuario = relationship("Usuario")
+
+    # ---------------------------------------
+    # MÉTODO PARA SALVAR LOG MANUAL
+    # ---------------------------------------
+    @staticmethod
+    def registrar(session, tabela, registro_id, acao,
+                  usuario_id=None, antes=None, depois=None):
+        """
+        antes e depois devem ser strings, NÃO JSON.
+        """
+        log = AuditLog(
+            tabela=tabela,
+            registro_id=registro_id,
+            usuario_id=usuario_id,
+            acao=acao,
+            antes=antes,
+            depois=depois,
+        )
+        session.add(log)
+        session.commit()
+        return log
+
+    # ---------------------------------------
+    # MÉTODO PARA LISTAR LOGS
+    # ---------------------------------------
+    @staticmethod
+    def listar(session, tabela=None, registro_id=None,
+               acao=None, usuario_id=None, limite=100, ordenar_desc=True):
+
+        query = session.query(AuditLog)
+
+        if tabela:
+            query = query.filter(AuditLog.tabela == tabela)
+        if registro_id:
+            query = query.filter(AuditLog.registro_id == registro_id)
+        if acao:
+            query = query.filter(AuditLog.acao == acao)
+        if usuario_id:
+            query = query.filter(AuditLog.usuario_id == usuario_id)
+
+        if ordenar_desc:
+            query = query.order_by(AuditLog.id.desc())
+        else:
+            query = query.order_by(AuditLog.id.asc())
+
+        return query.limit(limite).all()
+
     
 class Configuracao(Base):
     __tablename__ = "configuracoes"
