@@ -1,28 +1,43 @@
 import base64
 from functools import wraps
-from flask import request, jsonify
+from io import BytesIO
+import textwrap
+# Importações do Flask e sistema
+from flask import current_app, request, jsonify, send_file
 from datetime import datetime
+from io import BytesIO
+from reportlab.lib.styles import getSampleStyleSheet
+# Importações do ReportLab
 from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import Table, TableStyle
+import re
 import threading
-from flask import Blueprint, abort, make_response, render_template, request, jsonify, current_app as app
-from datetime import datetime, time, timedelta
+from flask import Blueprint, abort, json, make_response, render_template, request, jsonify, current_app as app
+from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db
 from zoneinfo import ZoneInfo
-from app.bot.bot_movimentacao import enviar_resumo_caixa_fechado
+from sqlalchemy.orm import Session
+from app.bot.bot_movimentacao import enviar_resumo_caixa_fechado, enviar_resumo_movimentacao_diaria
+from flask import send_file
+from app.utils.preparar_notas import preparar_dados_nota
+from app.utils.converter_endereco import parse_endereco_string
 from app.utils.format_data_moeda import format_currency, format_number
 from app.utils.nfce import gerar_nfce_pdf_bobina_bytesio
 from app.models.entities import (
-     AuditLog, Caixa, Cliente, Configuracao, ContaReceber, Desconto, Entrega, Financeiro, LoteEstoque, NotaFiscal,
+     Caixa, Cliente, Configuracao, ContaReceber, Desconto, Entrega, Financeiro, LoteEstoque, NotaFiscal,
      NotaFiscalItem, PagamentoNotaFiscal, Produto, TipoDesconto, TipoEstoque, 
      TipoUsuario, produto_desconto_association, NotaFiscal, PagamentoContaReceber
 )
 from app.schemas import (
     ClienteCreate,
-    ClienteBase
+    ClienteBase,
+    MovimentacaoEstoqueCreate,
 )
 from app.crud import (
     CategoriaFinanceira,
@@ -34,13 +49,17 @@ from app.crud import (
     buscar_pagamentos_notas_fiscais,
     estornar_venda,
     listar_despesas_dia_atual_formatado,
+    listar_despesas_do_dia,
     obter_detalhes_vendas_dia,
+    registrar_venda_completa,
     get_caixa_aberto,
     get_clientes,
     get_produtos,
     get_produto,
     abrir_caixa,
     fechar_caixa,
+    get_lancamentos_financeiros,
+    get_ultimo_caixa_fechado,
     create_cliente,
     update_cliente,
     delete_cliente
@@ -55,7 +74,7 @@ def operador_required(f):
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
             return jsonify({'success': False, 'message': 'Acesso não autorizado'}), 401
-        if current_user.tipo != 'operador': 
+        if current_user.tipo != 'operador':  # Supondo que 'tipo' seja o campo que define o tipo de usuário
             return jsonify({'success': False, 'message': 'Acesso restrito a operadores'}), 403
         return f(*args, **kwargs)
     return decorated_function
@@ -128,30 +147,8 @@ def api_create_cliente():
     try:
         cliente = ClienteCreate(**data)
         cliente.ativo = True
-
-        antes = "Cliente inexistente"
-
         db_cliente = create_cliente(db.session, cliente)
-
-        depois = (
-            f"nome={db_cliente.nome}, "
-            f"documento={db_cliente.documento}, "
-            f"telefone={db_cliente.telefone}, "
-            f"email={db_cliente.email}, "
-            f"endereco={db_cliente.endereco}, "
-            f"ativo={db_cliente.ativo}"
-        )
-
-        AuditLog.registrar(
-            session=db.session,
-            tabela="clientes",
-            registro_id=db_cliente.id,
-            acao="criar",
-            usuario_id=current_user.id,
-            antes=antes,
-            depois=depois
-        )
-
+        logger.info(f"Cliente criado com sucesso: {db_cliente.nome} (ID: {db_cliente.id})")
         return jsonify({
             'id': db_cliente.id,
             'nome': db_cliente.nome,
@@ -160,14 +157,9 @@ def api_create_cliente():
             'email': db_cliente.email,
             'endereco': db_cliente.endereco
         }), 201
-
     except ValueError as e:
-        db.session.rollback()
+        logger.error(f"Erro ao criar cliente: {str(e)}")
         return jsonify({'error': str(e)}), 400
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @operador_bp.route('/api/clientes/<int:cliente_id>', methods=['PUT'])
 @login_required
@@ -176,41 +168,8 @@ def api_update_cliente(cliente_id):
     data = request.get_json()
     try:
         cliente_data = ClienteBase(**data)
-
-        cliente_atual = db.session.query(Cliente).get(cliente_id)
-        if not cliente_atual:
-            return jsonify({'error': 'Cliente não encontrado'}), 404
-
-        antes = (
-            f"nome={cliente_atual.nome}, "
-            f"documento={cliente_atual.documento}, "
-            f"telefone={cliente_atual.telefone}, "
-            f"email={cliente_atual.email}, "
-            f"endereco={cliente_atual.endereco}, "
-            f"ativo={cliente_atual.ativo}"
-        )
-
         db_cliente = update_cliente(db.session, cliente_id, cliente_data)
-
-        depois = (
-            f"nome={db_cliente.nome}, "
-            f"documento={db_cliente.documento}, "
-            f"telefone={db_cliente.telefone}, "
-            f"email={db_cliente.email}, "
-            f"endereco={db_cliente.endereco}, "
-            f"ativo={db_cliente.ativo}"
-        )
-
-        AuditLog.registrar(
-            session=db.session,
-            tabela="clientes",
-            registro_id=db_cliente.id,
-            acao="atualizar",
-            usuario_id=current_user.id,
-            antes=antes,
-            depois=depois
-        )
-
+        logger.info(f"Cliente atualizado com sucesso: {db_cliente.nome} (ID: {db_cliente.id})")
         return jsonify({
             'id': db_cliente.id,
             'nome': db_cliente.nome,
@@ -219,9 +178,8 @@ def api_update_cliente(cliente_id):
             'email': db_cliente.email,
             'endereco': db_cliente.endereco
         })
-
     except ValueError as e:
-        db.session.rollback()
+        logger.error(f"Erro ao atualizar cliente ID {cliente_id}: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 @operador_bp.route('/api/clientes/<int:cliente_id>', methods=['DELETE'])
@@ -229,40 +187,12 @@ def api_update_cliente(cliente_id):
 @operador_required
 def api_delete_cliente(cliente_id):
     try:
-        cliente_atual = db.session.query(Cliente).get(cliente_id)
-        if not cliente_atual:
-            return jsonify({'error': 'Cliente não encontrado'}), 404
-
-        antes = (
-            f"nome={cliente_atual.nome}, "
-            f"documento={cliente_atual.documento}, "
-            f"telefone={cliente_atual.telefone}, "
-            f"email={cliente_atual.email}, "
-            f"endereco={cliente_atual.endereco}, "
-            f"ativo={cliente_atual.ativo}"
-        )
-
         success = delete_cliente(db.session, cliente_id)
-
-        AuditLog.registrar(
-            session=db.session,
-            tabela="clientes",
-            registro_id=cliente_id,
-            acao="deletar",
-            usuario_id=current_user.id,
-            antes=antes,
-            depois="Cliente removido"
-        )
-
+        logger.info(f"Cliente ID {cliente_id} deletado com sucesso")
         return jsonify({'success': success}), 200
-
     except ValueError as e:
-        db.session.rollback()
+        logger.error(f"Erro ao deletar cliente ID {cliente_id}: {str(e)}")
         return jsonify({'error': str(e)}), 400
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 # ===== API PRODUTOS =====
 @operador_bp.route('/api/produtos', methods=['GET'])
@@ -391,6 +321,7 @@ def api_registrar_venda():
                 'message': 'Lista de pagamentos inválida ou vazia'
             }), 400
 
+        # Conversão e validação de valores
         try:
             cliente_id = int(dados_venda['cliente_id'])
             valor_total = Decimal(str(dados_venda['valor_total']))
