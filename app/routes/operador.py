@@ -1137,35 +1137,22 @@ def rota_estornar_venda(sale_id):
 @login_required
 @operador_required
 def gerar_pdf_vendas_dia():
-    from reportlab.lib.pagesizes import portrait, mm
+    from reportlab.lib.pagesizes import mm
     from reportlab.lib import colors
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageTemplate, Frame, NextPageTemplate, BaseDocTemplate, KeepTogether, Image
-    from reportlab.platypus.flowables import PageBreak
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
     from io import BytesIO
-    from flask import send_file, request, jsonify, current_app
+    from flask import send_file, request, jsonify, make_response, current_app
     from datetime import datetime
     from sqlalchemy import func, and_
     import os
+    from PIL import Image as PILImage
+    import math
 
-    # Configuração para impressora térmica (80mm ~ 72mm de área imprimível)
-    LARGURA_IMPRESSORA = 72 * mm
-    ALTURA_IMPRESSORA = 1000 * mm
-    MARGEM = 2 * mm
-    TAMANHO_FONTE = 10
-    ESPACAMENTO = 1.2
-
-    try:
-        pdfmetrics.registerFont(TTFont('RobotoCondensed', 'RobotoCondensed-Regular.ttf'))
-        pdfmetrics.registerFont(TTFont('RobotoCondensed-Bold', 'RobotoCondensed-Bold.ttf'))
-        FONTE_NORMAL = 'RobotoCondensed-Bold'
-        FONTE_NEGRITO = 'RobotoCondensed-Bold'
-    except:
-        FONTE_NORMAL = 'Courier-Bold'
-        FONTE_NEGRITO = 'Courier-Bold'
-
+    # Configuração IDÊNTICA para bobina 80mm
+    bobina_width = 226  # Exatamente igual
+    bobina_height = 3000  # Exatamente igual
+    
     # Obter caixa aberto do operador atual
     caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
     if not caixa:
@@ -1173,9 +1160,8 @@ def gerar_pdf_vendas_dia():
         return jsonify({'success': False, 'message': 'Nenhum caixa aberto encontrado para o operador'}), 400
     
     caixa_id = caixa.id
-    operador_id = current_user.id
 
-    # Tratar parâmetros de data (se existirem)
+    # Tratar parâmetros de data
     data_str = request.args.get('data')
     data = None
     if data_str:
@@ -1187,11 +1173,10 @@ def gerar_pdf_vendas_dia():
 
     data_relatorio = data if data else datetime.now().date()
 
-    # Obter dados das vendas - agora com fallback padrão se não houver vendas
-    resultado = obter_detalhes_vendas_dia(data, caixa_id, operador_id)
+    # Obter dados das vendas
+    resultado = obter_detalhes_vendas_dia(data, caixa_id, current_user.id)
     if not resultado['success']:
         logger.error("Erro ao obter detalhes das vendas do dia")
-        # Se não houver vendas, criar estrutura vazia mas ainda gerar o PDF
         dados = {
             'vendas': [],
             'total_descontos': 0,
@@ -1201,449 +1186,268 @@ def gerar_pdf_vendas_dia():
     else:
         dados = resultado['data']
 
-    # BUSCAR CONTAS A RECEBER PAGAS NO DIA ATUAL
-    contas_receber_pagas = []
+    # BUSCAR CONTAS A RECEBER PAGAS NO DIA (igual ao método da outra rota)
     total_contas_receber_pagas = 0
-    
     try:
         # Calcular início e fim do dia
         inicio_dia = datetime.combine(data_relatorio, datetime.min.time())
         fim_dia = datetime.combine(data_relatorio, datetime.max.time())
         
-        # Buscar pagamentos de contas a receber realizados no dia
-        pagamentos_do_dia = PagamentoContaReceber.query.filter(
-            and_(
-                PagamentoContaReceber.data_pagamento >= inicio_dia,
-                PagamentoContaReceber.data_pagamento <= fim_dia,
-                PagamentoContaReceber.caixa_id == caixa_id
-            )
-        ).all()
+        # Buscar pagamentos de contas a receber (igual)
+        total_contas_receber_pagas = db.session.query(
+            func.sum(PagamentoContaReceber.valor_pago)
+        ).filter(
+            PagamentoContaReceber.caixa_id == caixa_id,
+            PagamentoContaReceber.data_pagamento >= inicio_dia,
+            PagamentoContaReceber.data_pagamento <= fim_dia
+        ).scalar() or 0.0
         
-        # Agrupar pagamentos por conta
-        pagamentos_por_conta = {}
-        for pagamento in pagamentos_do_dia:
-            if pagamento.conta_id not in pagamentos_por_conta:
-                pagamentos_por_conta[pagamento.conta_id] = {
-                    'conta': pagamento.conta,
-                    'pagamentos': [],
-                    'total_pago': 0
-                }
-            pagamentos_por_conta[pagamento.conta_id]['pagamentos'].append(pagamento)
-            pagamentos_por_conta[pagamento.conta_id]['total_pago'] += float(pagamento.valor_pago)
-        
-        # Preparar dados para exibição
-        for conta_id, info in pagamentos_por_conta.items():
-            conta = info['conta']
-            total_pago = info['total_pago']
-            
-            contas_receber_pagas.append({
-                'id': conta.id,
-                'cliente': conta.cliente.nome if conta.cliente else 'N/A',
-                'descricao': conta.descricao,
-                'valor_original': float(conta.valor_original),
-                'total_pago': total_pago,
-                'data_vencimento': conta.data_vencimento,
-                'pagamentos': info['pagamentos']
-            })
-            total_contas_receber_pagas += total_pago
+        total_contas_receber_pagas = float(total_contas_receber_pagas)
             
     except Exception as e:
         logger.error(f"Erro ao buscar contas a receber pagas: {str(e)}", exc_info=True)
-        contas_receber_pagas = []
+        total_contas_receber_pagas = 0
 
     buffer = BytesIO()
 
-    # Definir o caminho absoluto para a imagem
-    caminho_imagem = 'app/static/assets/logo.jpeg'
-    
-    # Verificar se a imagem existe
-    if not os.path.exists(caminho_imagem):
-        return jsonify({'success': False, 'message': 'Arquivo de logo não encontrado'}), 400
-
-    class PDFComRodape(BaseDocTemplate):
-        def __init__(self, filename, **kw):
-            super().__init__(filename, **kw)
-            template = PageTemplate('normal', [
-                Frame(MARGEM, MARGEM, LARGURA_IMPRESSORA - 2 * MARGEM,
-                      ALTURA_IMPRESSORA - 2 * MARGEM - 15 * mm - 22*mm,
-                      id='F1')],
-                      onPage=self.draw_header)
-            self.addPageTemplates(template)
-
-        def draw_header(self, canvas, doc):
-            """Desenha a imagem diretamente no topo de cada página"""
-            canvas.drawImage(caminho_imagem,
-                           0, ALTURA_IMPRESSORA - 20*mm,
-                           width=LARGURA_IMPRESSORA,
-                           height=20*mm)
-
-        def afterFlowable(self, flowable):
-            if hasattr(flowable, 'keepWithNext'):
-                self.drawFooter()
-
-        def drawFooter(self):
-            self.saveState()
-            footer = Paragraph(
-                f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')} • Página {self.page}",
-                ParagraphStyle(
-                    name='Rodape',
-                    fontName=FONTE_NEGRITO,
-                    fontSize=TAMANHO_FONTE - 1,
-                    alignment=1,
-                    spaceBefore=5
-                )
-            )
-            footer_frame = Frame(MARGEM, 0, LARGURA_IMPRESSORA - 2 * MARGEM, 15 * mm)
-            footer_frame.addFromList([footer], self)
-            self.restoreState()
-
-    doc = PDFComRodape(
+    # Criar documento EXATAMENTE IGUAL
+    doc = SimpleDocTemplate(
         buffer,
-        pagesize=(LARGURA_IMPRESSORA, ALTURA_IMPRESSORA),
-        leftMargin=MARGEM,
-        rightMargin=MARGEM,
-        topMargin=MARGEM,
-        bottomMargin=15 * mm
+        pagesize=(bobina_width, bobina_height),
+        leftMargin=5,
+        rightMargin=5,
+        topMargin=-6,  # Exatamente igual
+        bottomMargin=5
     )
     elements = []
+
+    # --- Estilos EXATAMENTE IGUAIS ---
     styles = getSampleStyleSheet()
+    header_style = ParagraphStyle(
+        name='Header',
+        parent=styles['Heading1'],
+        fontSize=14,
+        leading=14,
+        alignment=1,
+        fontName='Helvetica-Bold',
+        spaceAfter=6
+    )
+    subtitle_style = ParagraphStyle(
+        name='Subtitle',
+        parent=styles['Heading2'],
+        fontSize=12,
+        leading=12,
+        alignment=1,
+        fontName='Helvetica-Bold',
+        spaceAfter=4
+    )
+    normal_style = ParagraphStyle(
+        name='Normal',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=10,
+        alignment=0,
+        fontName='Helvetica'
+    )
+    valor_style = ParagraphStyle(
+        name='Valor',
+        parent=normal_style,
+        alignment=2,
+        fontName='Helvetica-Bold'
+    )
+    linha_style = ParagraphStyle(
+        name='Linha',
+        parent=normal_style,
+        alignment=1,
+        textColor=colors.black
+    )
 
-    def criar_estilo(nome, **kwargs):
-        defaults = {
-            'fontName': FONTE_NEGRITO,
-            'fontSize': TAMANHO_FONTE,
-            'leading': TAMANHO_FONTE * ESPACAMENTO,
-            'spaceAfter': 4,
-            'alignment': 0
-        }
-        defaults.update(kwargs)
-        return ParagraphStyle(nome, parent=styles['Normal'], **defaults)
-
-    estilos = {
-        'titulo': criar_estilo('Titulo', fontSize=10, alignment=1, spaceAfter=8),
-        'subtitulo': criar_estilo('Subtitulo', alignment=1, spaceAfter=6),
-        'normal': criar_estilo('Normal'),
-        'negrito': criar_estilo('Negrito'),
-        'valor': criar_estilo('Valor', alignment=2),
-        'valor_negrito': criar_estilo('ValorNegrito', alignment=2),
-        'estorno': criar_estilo('Estorno', textColor=colors.black, backColor=colors.whitesmoke),
-        'rodape': criar_estilo('Rodape', fontSize=TAMANHO_FONTE - 1, alignment=1)
-    }
-
+    # --- Funções auxiliares EXATAMENTE IGUAIS ---
     def moeda_br(valor):
-        return format_number(valor)
+        return f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
-    def criar_tabela_adaptavel(dados, colWidths=None, estilo=None, quebrar_linhas=True):
-        dados_formatados = []
-        for linha in dados:
-            linha_formatada = []
-            for i, celula in enumerate(linha):
-                if isinstance(celula, (int, float)):
-                    conteudo = moeda_br(celula) if i > 0 else str(celula)
-                    estilo_celula = estilos['valor_negrito'] if i > 0 else estilos['negrito']
-                    linha_formatada.append(Paragraph(conteudo, estilo_celula))
-                else:
-                    largura_coluna = colWidths[i] if colWidths else '*'
-                    max_chars = int(largura_coluna / (TAMANHO_FONTE * 0.6)) if isinstance(largura_coluna, (int, float)) else 30
-                    texto = str(celula)
-                    if quebrar_linhas and len(texto) > max_chars:
-                        texto = '<br/>'.join([texto[j:j + max_chars] for j in range(0, len(texto), max_chars)])
-                    estilo_celula = estilos['negrito']
-                    linha_formatada.append(Paragraph(texto, estilo_celula))
-            dados_formatados.append(linha_formatada)
+    def linha_separadora():
+        return Paragraph("=" * 34, linha_style)
 
-        if not colWidths:
-            num_colunas = len(dados[0])
-            colWidths = [LARGURA_IMPRESSORA / num_colunas] * num_colunas
+    def linha_dupla(label, valor):
+        tabela = Table(
+            [[Paragraph(label, normal_style), Paragraph(valor, valor_style)]],
+            colWidths=[120, 80]
+        )
+        tabela.setStyle(TableStyle([
+            ('ALIGN', (0,0), (0,0), 'LEFT'),
+            ('ALIGN', (1,0), (1,0), 'RIGHT'),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('FONTNAME', (0,0), (0,0), 'Helvetica'),
+            ('FONTNAME', (1,0), (1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 12),  # Exatamente 12 como na outra
+            ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+            ('TOPPADDING', (0,0), (-1,-1), 0),
+        ]))
+        return tabela
 
-        tabela = Table(dados_formatados, colWidths=colWidths, hAlign='LEFT')
-        estilo_base = [
-            ('FONTNAME', (0, 0), (-1, -1), FONTE_NEGRITO),
-            ('FONTSIZE', (0, 0), (-1, -1), TAMANHO_FONTE),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEADING', (0, 0), (-1, -1), TAMANHO_FONTE * ESPACAMENTO),
-            ('GRID', (0, 0), (-1, -1), 0.25, colors.black),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ]
+    # --- Logo EXATAMENTE IGUAL ---
+    logo_path = os.path.join(current_app.root_path, 'static', 'assets', 'logo.jpeg')
+    if os.path.exists(logo_path):
+        try:
+            with PILImage.open(logo_path) as img:
+                img_width, img_height = img.size
+                aspect_ratio = img_width / img_height
+            logo_width = 250  # Exatamente igual
+            logo_height = logo_width / aspect_ratio
+            logo = Image(logo_path, width=logo_width, height=logo_height)
+            logo.hAlign = 'CENTER'
+            elements.append(logo)
+            elements.append(Spacer(0, 6))  # Exatamente 6
+        except Exception as e:
+            logger.error(f"Erro ao carregar a logo: {e}")
 
-        if estilo:
-            estilo_base.extend(estilo)
+    # --- Cabeçalho EXATAMENTE IGUAL ---
+    elements.append(Paragraph("RELATÓRIO DIÁRIO DE VENDAS", header_style))
+    elements.append(linha_separadora())
+    elements.append(Spacer(1, 6))
+    
+    # Informações (layout igual)
+    elements.append(Paragraph(f"Data: {data_relatorio.strftime('%d/%m/%Y')}", normal_style))
+    elements.append(Paragraph(f"Operador: {current_user.nome}", normal_style))
+    elements.append(Paragraph(f"Caixa: #{caixa_id}", normal_style))
+    elements.append(Spacer(1, 6))
 
-        if len(dados) > 1:
-            estilo_base.extend([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black), 
-                ('FONTNAME', (0, 0), (-1, 0), FONTE_NEGRITO),
-            ])
-
-        tabela.setStyle(TableStyle(estilo_base))
-        return KeepTogether(tabela)
-
-    elements.append(Spacer(1, -45))
-    elements.append(Paragraph("RELATÓRIO DIÁRIO DE VENDAS", estilos['titulo']))
-    elements.append(Spacer(1, 10))
-    info_cabecalho = [
-        ["Data", data_relatorio.strftime('%d/%m/%Y')],
-        ["Caixa", f"#{caixa_id}"],
-        ["Operador", current_user.nome],
-        ["Abertura", moeda_br(caixa.valor_abertura)]
-    ]
-    if caixa.valor_fechamento:
-        info_cabecalho.append(["Fechamento", moeda_br(caixa.valor_fechamento)])
-    if caixa.valor_confirmado:
-        info_cabecalho.append(["Confirmado", moeda_br(caixa.valor_confirmado)])
-    elements.append(criar_tabela_adaptavel(
-        info_cabecalho,
-        colWidths=['30%', '70%'],
-        estilo=[
-            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-            ('FONTNAME', (0, 0), (0, -1), FONTE_NEGRITO),
-        ],
-        quebrar_linhas=False
-    ))
-    elements.append(Spacer(1, 10))
-
-    # Resumo Financeiro
+    # --- Resumo Financeiro (layout IDÊNTICO) ---
+    elements.append(linha_separadora())
+    elements.append(Paragraph("RESUMO FINANCEIRO", subtitle_style))
+    elements.append(Spacer(1, 4))
+    elements.append(linha_separadora())
+    
+    # Calcular valores como na outra rota
     total_vendas_positivas = sum(v['valor_total'] for v in dados['vendas'] if 'valor_total' in v and v['valor_total'] > 0) if 'vendas' in dados else 0
     total_estornos = sum(abs(v['valor_total']) for v in dados['vendas'] if 'valor_total' in v and v['valor_total'] < 0) if 'vendas' in dados else 0
-    total_liquido = total_vendas_positivas - dados.get('total_saidas', 0)
-    # Calcular total a prazo pendente
-    total_a_prazo_pendente = 0
-    if 'vendas' in dados:
-        total_a_prazo_pendente = sum(
-            v['valor_total'] - sum(p['valor'] for p in v['pagamentos']) 
-            for v in dados['vendas'] 
-            if 'a_prazo' in v and v['a_prazo'] and 'pagamentos' in v
-        )
-
-    # Adicionar total de contas a receber pagas ao resumo
-    elements.append(Paragraph("RESUMO FINANCEIRO", estilos['subtitulo']))
-    elements.append(Spacer(1, 5))
-    dados_resumo = [
-        ["Descrição", "Valor (R$)"],
-        ["Total Vendas", total_vendas_positivas],
-        ["Total Estornos", total_estornos],
-        ["Total Descontos", dados.get('total_descontos', 0)],
-        ["Total Entradas", total_vendas_positivas],
-        ["Total Saídas", dados.get('total_saidas', 0)],
-        ["Total a Prazo Pendente", total_a_prazo_pendente],
-        ["Contas Recebidas", total_contas_receber_pagas],  # NOVA LINHA
-        ["Saldo Líquido", total_liquido + total_contas_receber_pagas]  # ATUALIZADO
-    ]
-    elements.append(criar_tabela_adaptavel(
-        dados_resumo,
-        colWidths=['60%', '40%'],
-        estilo=[
-            ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
-            ('FONTNAME', (0, -1), (-1, -1), FONTE_NEGRITO),
-        ]
-    ))
-    elements.append(Spacer(1, 10))
-
-    # Formas de Pagamento
-    elements.append(Paragraph("FORMAS DE PAGAMENTO", estilos['subtitulo']))
-    elements.append(Spacer(1, 5))
-    dados_pagamentos = [["Forma de Pagamento", "Qtd", "Total"]]
-    total_geral_pagamentos = 0
-    total_geral_transacoes = 0
+    total_descontos = dados.get('total_descontos', 0)
+    total_saidas = dados.get('total_saidas', 0)
     
-    por_forma_pagamento = dados.get('por_forma_pagamento', {})
+    # Calcular formas de pagamento (igual ao método da outra rota)
+    formas_pagamento = dados.get('por_forma_pagamento', {})
     
-    if por_forma_pagamento:
-        contadores_transacoes = {}
-        
-        for venda in dados.get('vendas', []):
-            if venda.get('valor_total', 0) < 0:
-                continue
-                
-            if 'pagamentos' in venda and venda['pagamentos']:
-                for pagamento in venda['pagamentos']:
-                    if pagamento.get('valor', 0) > 0:
-                        forma = pagamento['forma_pagamento']
-                        if forma not in contadores_transacoes:
-                            contadores_transacoes[forma] = 0
-                        contadores_transacoes[forma] += 1
-            else:
-                if venda.get('valor_total', 0) > 0:
-                    forma = venda.get('forma_pagamento', 'nao_informado')
-                    if forma not in contadores_transacoes:
-                        contadores_transacoes[forma] = 0
-                    contadores_transacoes[forma] += 1
-        
-        formas_ordenadas = sorted(por_forma_pagamento.items(), key=lambda x: x[1], reverse=True)
-        
-        for forma, total in formas_ordenadas:
-            forma_nome = str(forma).replace('_', ' ').title()
-            qtd_transacoes = contadores_transacoes.get(forma, 0)
-            
-            dados_pagamentos.append([
-                forma_nome,
-                qtd_transacoes,
-                total
-            ])
-            total_geral_pagamentos += total
-            total_geral_transacoes += qtd_transacoes
-    else:
-        dados_pagamentos.append(["Nenhum pagamento registrado", 0, 0])
+    # Calcular valor físico/digital como na outra rota
+    valor_dinheiro = formas_pagamento.get('dinheiro', 0.0)
+    valor_fisico = valor_dinheiro
     
-    dados_pagamentos.append(["TOTAL GERAL", total_geral_transacoes, total_geral_pagamentos])
-    elements.append(criar_tabela_adaptavel(
-        dados_pagamentos,
-        colWidths=['50%', '20%', '30%'],
-        estilo=[
-            ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
-            ('FONTNAME', (0, -1), (-1, -1), FONTE_NEGRITO),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
-        ]
-    ))
-    elements.append(Spacer(1, 15))
+    # EXATAMENTE IGUAL ao cálculo da outra rota
+    if caixa.valor_fechamento and caixa.valor_abertura:
+        valor_abertura = float(caixa.valor_abertura)
+        valor_fechamento = float(caixa.valor_fechamento)
+        valor_fisico = max((valor_dinheiro + valor_abertura) - valor_fechamento - total_saidas, 0.0)
 
-    # NOVA SEÇÃO: CONTAS A RECEBER PAGAS NO DIA
-    if contas_receber_pagas:
-        elements.append(Paragraph("CONTAS A RECEBER PAGAS", estilos['subtitulo']))
-        elements.append(Spacer(1, 5))
-        
-        for conta in contas_receber_pagas:
-            elements.append(Paragraph(f"CONTA #{conta['id']}", estilos['negrito']))
-            elements.append(Spacer(1, 3))
-            
-            info_conta = [
-                ["Cliente", conta['cliente']],
-                ["Descrição", conta['descricao']],
-                ["Valor Original", moeda_br(conta['valor_original'])],
-                ["Total Pago", moeda_br(conta['total_pago'])],
-                ["Vencimento", conta['data_vencimento'].strftime('%d/%m/%Y') if hasattr(conta['data_vencimento'], 'strftime') else str(conta['data_vencimento'])]
-            ]
-            
-            elements.append(criar_tabela_adaptavel(
-                info_conta,
-                colWidths=['30%', '70%'],
-                estilo=[('FONTNAME', (0, 0), (0, -1), FONTE_NEGRITO)],
-                quebrar_linhas=True
-            ))
-            elements.append(Spacer(1, 5))
-            
-            # Detalhes dos pagamentos
-            if conta['pagamentos']:
-                elements.append(Paragraph("PAGAMENTOS:", estilos['negrito']))
-                dados_pagamentos_conta = [["Data", "Forma", "Valor"]]
-                for pagamento in conta['pagamentos']:
-                    dados_pagamentos_conta.append([
-                        pagamento.data_pagamento.strftime('%d/%m/%Y %H:%M'),
-                        pagamento.forma_pagamento.value.replace('_', ' ').title(),
-                        pagamento.valor_pago
-                    ])
-                elements.append(criar_tabela_adaptavel(
-                    dados_pagamentos_conta,
-                    colWidths=['40%', '30%', '30%'],
-                    estilo=[('ALIGN', (2, 1), (2, -1), 'RIGHT')]
-                ))
-            
-            elements.append(Spacer(1, 10))
-        
-        elements.append(Spacer(1, 10))
+        # Pega parte inteira e parte decimal (IGUAL)
+        parte_inteira = math.floor(valor_fisico)
+        parte_decimal = valor_fisico - parte_inteira
 
-    # Detalhes das Vendas
-    if 'vendas' in dados and dados['vendas']:
-        elements.append(Paragraph("DETALHES DAS VENDAS", estilos['subtitulo']))
-        elements.append(Spacer(1, 5))
-        for i, venda in enumerate(dados['vendas']):
-            is_estorno = venda.get('valor_total', 0) < 0
-            valor_exibicao = abs(venda.get('valor_total', 0))
-            titulo_venda = f"ESTORNO - VENDA #{venda.get('id', '')}" if is_estorno else f"VENDA #{venda.get('id', '')}"
-            elements.append(Paragraph(titulo_venda, estilos['estorno'] if is_estorno else estilos['negrito']))
-            elements.append(Spacer(1, 3))
-            
-            valor_pendente = None
-            if venda.get('a_prazo', False):
-                total_pago = sum(p['valor'] for p in venda['pagamentos']) if 'pagamentos' in venda else 0
-                valor_pendente = venda.get('valor_total', 0) - total_pago
-            
-            info_venda_data = [
-                ["Data|Hora", datetime.fromisoformat(venda['data']).strftime('%d/%m/%Y %H:%M') if 'data' in venda else "N/D"],
-                ["Cliente", venda.get('cliente', "Não informado")],
-                ["Operador", venda.get('operador', "N/D")],
-                ["Pagamento", venda.get('forma_pagamento', "N/D")],
-                ["A Prazo", "Sim" if venda.get('a_prazo', False) else "Não"],
-                ["Total", valor_exibicao],
-                ["Desconto", venda.get('valor_desconto', 0)],
-            ]
-            
-            if venda.get('a_prazo', False) and valor_pendente is not None:
-                info_venda_data.append(["Pendente", valor_pendente])
-            
-            elements.append(criar_tabela_adaptavel(
-                info_venda_data,
-                colWidths=['30%', '70%'],
-                estilo=[('FONTNAME', (0, 0), (0, -1), FONTE_NEGRITO)],
-                quebrar_linhas=True
-            ))
-            elements.append(Spacer(1, 5))
-            
-            if venda.get('a_prazo', False) and 'pagamentos' in venda and venda['pagamentos']:
-                elements.append(Paragraph("PAGAMENTOS REALIZADOS:", estilos['negrito']))
-                dados_pagamentos_venda = [["Data", "Forma", "Valor"]]
-                for pagamento in venda['pagamentos']:
-                    dados_pagamentos_venda.append([
-                        datetime.fromisoformat(pagamento['data']).strftime('%d/%m/%Y %H:%M') if 'data' in pagamento else "N/D",
-                        pagamento.get('forma_pagamento', "N/D"),
-                        pagamento.get('valor', 0)
-                    ])
-                elements.append(criar_tabela_adaptavel(
-                    dados_pagamentos_venda,
-                    colWidths=['40%', '30%', '30%'],
-                    estilo=[('ALIGN', (2, 1), (2, -1), 'RIGHT')]
-                ))
-                elements.append(Spacer(1, 5))
-            
-            if 'itens' in venda and venda['itens']:
-                dados_itens = [["Produto", "Qtd", "Unit.", "Total"]]
-                for item in venda['itens']:
-                    quantidade = -item['quantidade'] if is_estorno else item['quantidade']
-                    valor_total_item = -item['valor_total'] if is_estorno else item['valor_total']
-                    dados_itens.append([
-                        item.get('produto', "N/D"),
-                        quantidade,
-                        item.get('valor_unitario', 0),
-                        valor_total_item
-                    ])
-                elements.append(criar_tabela_adaptavel(
-                    dados_itens,
-                    colWidths=['40%', '15%', '20%', '25%'],
-                    estilo=[('ALIGN', (1, 1), (-1, -1), 'RIGHT')]
-                ))
-            else:
-                elements.append(Paragraph("Nenhum item registrado nesta venda", estilos['normal']))
-            
-            if i < len(dados['vendas']) - 1:
-                elements.append(Spacer(1, 10))
-    else:
-        elements.append(Paragraph("DETALHES DAS VENDAS", estilos['subtitulo']))
-        elements.append(Spacer(1, 5))
-        elements.append(Paragraph("Nenhuma venda registrada no período", estilos['normal']))
-        elements.append(Spacer(1, 10))
+        # Código comentado mantido igual
+        # if parte_decimal == 0.5:
+        #     valor_fisico = valor_fisico
+        # elif parte_decimal > 0.5:
+        #     valor_fisico = math.ceil(valor_fisico)
+        # else:
+        #     valor_fisico = math.floor(valor_fisico)
+    
+    formas_pagamento['dinheiro'] = valor_fisico
+    
+    # Calcular valor digital IGUAL
+    valor_digital = sum([
+        formas_pagamento.get('pix_loja', 0.0),
+        formas_pagamento.get('pix_fabiano', 0.0),
+        formas_pagamento.get('pix_edfrance', 0.0),
+        formas_pagamento.get('pix_maquineta', 0.0),
+        formas_pagamento.get('cartao_debito', 0.0),
+        formas_pagamento.get('cartao_credito', 0.0)
+    ])
 
-    # Rodapé
-    elements.append(Spacer(1, 15))
-    elements.append(Table([[""]], colWidths=['*'], style=[
-        ('LINEABOVE', (0, 0), (0, 0), 0.5, colors.black),
-    ]))
-    elements.append(Spacer(1, 5))
-    elements.append(Paragraph("Operador: ________________________", estilos['negrito']))
-    elements.append(Spacer(1, 3))
-    elements.append(Paragraph("Administração: ________________________", estilos['negrito']))
-    elements.append(Spacer(1, 5))
-    elements.append(Paragraph(f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')}", estilos['rodape']))
+    a_prazo = formas_pagamento.get('a_prazo', 0.0)
+    total_liquido = total_vendas_positivas - total_saidas
+    
+    # Linhas do resumo (ORDEM E FORMATO IDÊNTICOS)
+    elements.append(linha_dupla("Total Entradas:", moeda_br(total_vendas_positivas)))
+    elements.append(linha_dupla("Total Saídas:", moeda_br(total_saidas)))
+    elements.append(linha_dupla("Saldo:", moeda_br(total_liquido)))
+    elements.append(Spacer(1, 6))  # Espaço igual
+    
+    # Valores físicos/digitais (MESMA SEÇÃO)
+    elements.append(linha_dupla("Valor Físico:", moeda_br(valor_fisico)))
+    elements.append(linha_dupla("Valor Digital:", moeda_br(valor_digital)))
+    elements.append(linha_dupla("A Prazo:", moeda_br(a_prazo)))
+    elements.append(linha_dupla("A Prazo Recebidos:", moeda_br(total_contas_receber_pagas)))
+    
+    elements.append(Spacer(1, 4))
+    elements.append(linha_separadora())
+    elements.append(Spacer(1, 1))
+    elements.append(Paragraph("Valores do Caixa", subtitle_style))  # MESMO SUBTÍTULO
+    elements.append(Spacer(1, 6))
+    elements.append(linha_separadora())
+    
+    # Valores de caixa (IGUAL)
+    valor_abertura = float(caixa.valor_abertura) if caixa.valor_abertura else 0.0
+    valor_fechamento = float(caixa.valor_fechamento) if caixa.valor_fechamento else 0.0
+    
+    elements.append(linha_dupla("Abertura:", moeda_br(valor_abertura)))
+    elements.append(linha_dupla("Fechamento:", moeda_br(valor_fechamento)))
+    
+    # --- Formas de Pagamento (layout IDÊNTICO) ---
+    elements.append(Spacer(1, 4))
+    elements.append(linha_separadora())
+    elements.append(Spacer(1, 1))
+    elements.append(Paragraph("FORMAS DE PAGAMENTO", subtitle_style))  # MESMO
+    elements.append(Spacer(1, 6))
+    elements.append(linha_separadora())
+    
+    # Mapear nomes IGUAL
+    nomes_formas = {
+        'dinheiro': 'Dinheiro',
+        'pix_loja': 'PIX Loja',
+        'pix_fabiano': 'PIX Fabiano',
+        'pix_edfrance': 'PIX Edfranci',  # MESMO NOME
+        'pix_maquineta': 'PIX Maquineta',
+        'cartao_debito': 'Cartão Débito',
+        'cartao_credito': 'Cartão Crédito',
+        'a_prazo': 'A Prazo'
+    }
+    
+    # Exibir formas de pagamento (ORDEM E FORMATO IGUAIS)
+    for forma, valor in formas_pagamento.items():
+        if valor > 0:
+            nome_forma = nomes_formas.get(forma, forma)
+            elements.append(linha_dupla(f"{nome_forma}:", moeda_br(valor)))
 
+    # --- Detalhes das Vendas (opcional, manter só se necessário) ---
+    # REMOVIDO para ser EXATAMENTE IGUAL à outra rota que não tem esta seção
+
+    # --- Assinaturas (EXATAMENTE IGUAL) ---
+    elements.append(Spacer(1, 15))  # MESMO ESPAÇO
+    elements.append(linha_separadora())
+    elements.append(Paragraph("ASSINATURAS", subtitle_style))  # MESMO
+    elements.append(Spacer(1, 6))
+    elements.append(linha_separadora())
+    elements.append(Spacer(1, 20))  # MESMO
+    elements.append(Paragraph("Operador:", normal_style))
+    elements.append(Paragraph("____________________________________", normal_style))  # MESMO Nº DE UNDERLINES
+    elements.append(Spacer(1, 15))  # MESMO
+    elements.append(Paragraph("Administrador:", normal_style))
+    elements.append(Paragraph("____________________________________", normal_style))  # MESMO
+    
+    # NÃO tem rodapé com data/hora (igual à outra rota que não tem)
+
+    # Construir PDF
     doc.build(elements)
     buffer.seek(0)
-    return send_file(
+
+    # Retornar EXATAMENTE IGUAL
+    response = make_response(send_file(
         buffer,
+        mimetype='application/pdf',
         as_attachment=False,
-        download_name=f"relatorio_vendas_{data_relatorio.strftime('%Y%m%d')}.pdf",
-        mimetype='application/pdf'
-    )
+        download_name=f"relatorio_vendas_{data_relatorio.strftime('%Y%m%d')}.pdf"
+    ))
+    response.headers['Content-Disposition'] = f'inline; filename=relatorio_vendas_{data_relatorio.strftime("%Y%m%d")}.pdf'
+    return response
     
 # ===== API SALDO =====
 @operador_bp.route('/api/saldo', methods=['GET'])
