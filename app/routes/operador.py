@@ -1475,20 +1475,20 @@ def api_get_saldo():
         data_fim = datetime.combine(hoje, time.max).replace(tzinfo=ZoneInfo('America/Sao_Paulo'))
 
         # Filtra vendas apenas do caixa do operador atual, excluindo notas canceladas
-        lancamentos = db.session.query( Financeiro).join(
-             NotaFiscal,
-             Financeiro.nota_fiscal_id ==  NotaFiscal.id,
+        lancamentos = db.session.query(Financeiro).join(
+            NotaFiscal,
+            Financeiro.nota_fiscal_id == NotaFiscal.id,
             isouter=True
         ).filter(
-             Financeiro.tipo ==  TipoMovimentacao.entrada,
-             Financeiro.categoria ==  CategoriaFinanceira.venda,
-             Financeiro.data >= data_inicio,
-             Financeiro.data <= data_fim,
-             Financeiro.caixa_id == caixa.id,
+            Financeiro.tipo == TipoMovimentacao.entrada,
+            Financeiro.categoria == CategoriaFinanceira.venda,
+            Financeiro.data >= data_inicio,
+            Financeiro.data <= data_fim,
+            Financeiro.caixa_id == caixa.id,
             # Filtro para notas fiscais: ou é nula (não tem nota) ou não está cancelada
             db.or_(
-                 NotaFiscal.id.is_(None),
-                 NotaFiscal.status !=  StatusNota.cancelada
+                NotaFiscal.id.is_(None),
+                NotaFiscal.status != StatusNota.cancelada
             )
         ).all()
 
@@ -1498,17 +1498,84 @@ def api_get_saldo():
 
         # --- Total de DESPESAS do dia ---
         # Busca despesas apenas do caixa do operador atual
-        despesas = db.session.query( Financeiro).filter(
-             Financeiro.tipo ==  TipoMovimentacao.saida,
-             Financeiro.categoria ==  CategoriaFinanceira.despesa,
-             Financeiro.data >= data_inicio,
-             Financeiro.data <= data_fim,
-             Financeiro.caixa_id == caixa.id
+        despesas = db.session.query(Financeiro).filter(
+            Financeiro.tipo == TipoMovimentacao.saida,
+            Financeiro.categoria == CategoriaFinanceira.despesa,
+            Financeiro.data >= data_inicio,
+            Financeiro.data <= data_fim,
+            Financeiro.caixa_id == caixa.id
         ).all()
         
         total_despesas = Decimal('0.00')
         for desp in despesas:
             total_despesas += Decimal(str(desp.valor))
+
+        # --- NOVO: Total em DINHEIRO das vendas do dia ---
+        # Busca todas as notas fiscais do dia que não estão canceladas
+        notas_dia = db.session.query(NotaFiscal).filter(
+            NotaFiscal.caixa_id == caixa.id,
+            NotaFiscal.data_emissao >= data_inicio,
+            NotaFiscal.data_emissao <= data_fim,
+            NotaFiscal.status == StatusNota.emitida
+        ).all()
+
+        total_dinheiro = Decimal('0.00')
+        
+        for nota in notas_dia:
+            # Verifica se é uma venda (não é estorno)
+            if nota.valor_total > 0:
+                # Verifica os pagamentos da nota
+                if nota.pagamentos:
+                    # Se tem pagamentos múltiplos, soma apenas os em dinheiro
+                    for pagamento in nota.pagamentos:
+                        if pagamento.forma_pagamento == FormaPagamento.dinheiro:
+                            total_dinheiro += Decimal(str(pagamento.valor))
+                else:
+                    # Se não tem pagamentos múltiplos, verifica a forma de pagamento da nota
+                    if nota.forma_pagamento == FormaPagamento.dinheiro:
+                        total_dinheiro += Decimal(str(nota.valor_total))
+
+        # --- NOVO: Subtrair estornos de vendas em dinheiro ---
+        # Busca estornos (vendas com valor negativo) que foram em dinheiro
+        notas_estorno_dinheiro = db.session.query(NotaFiscal).filter(
+            NotaFiscal.caixa_id == caixa.id,
+            NotaFiscal.data_emissao >= data_inicio,
+            NotaFiscal.data_emissao <= data_fim,
+            NotaFiscal.status == StatusNota.emitida,
+            NotaFiscal.valor_total < 0
+        ).all()
+        
+        for nota_estorno in notas_estorno_dinheiro:
+            # Verifica se o estorno foi de uma venda em dinheiro
+            if nota_estorno.pagamentos:
+                # Se tem pagamentos múltiplos
+                for pagamento in nota_estorno.pagamentos:
+                    if pagamento.forma_pagamento == FormaPagamento.dinheiro:
+                        # Subtrai o valor do estorno (já é negativo, então subtrai valor absoluto)
+                        total_dinheiro -= abs(Decimal(str(pagamento.valor)))
+            else:
+                # Se não tem pagamentos múltiplos
+                if nota_estorno.forma_pagamento == FormaPagamento.dinheiro:
+                    # Subtrai o valor do estorno (já é negativo, então subtrai valor absoluto)
+                    total_dinheiro -= abs(Decimal(str(nota_estorno.valor_total)))
+
+        # --- NOVO: Subtrair despesas em dinheiro ---
+        # Busca despesas pagas em dinheiro
+        despesas_dinheiro = db.session.query(Financeiro).filter(
+            Financeiro.caixa_id == caixa.id,
+            Financeiro.data >= data_inicio,
+            Financeiro.data <= data_fim,
+            Financeiro.tipo == TipoMovimentacao.saida,
+            Financeiro.categoria == CategoriaFinanceira.despesa,
+            # Busca despesas pagas em dinheiro pelo campo forma_pagamento
+            db.or_(
+                Financeiro.descricao.ilike('%dinheiro%'),  # Descrição contém "dinheiro"
+                # Se tiver um campo específico para forma de pagamento, adicione aqui
+            )
+        ).all()
+        
+        for despesa in despesas_dinheiro:
+            total_dinheiro -= Decimal(str(despesa.valor))
 
         # --- Lógica do saldo: abertura + vendas - despesas ---
         abertura = Decimal(str(caixa.valor_abertura))
@@ -1520,6 +1587,8 @@ def api_get_saldo():
             'valor_abertura': float(abertura),
             'total_vendas': float(total_vendas),
             'total_despesas': float(total_despesas),
+            'total_dinheiro': float(total_dinheiro),  # NOVO CAMPO
+            'total_dinheiro_formatado': f"R$ {total_dinheiro:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),  # NOVO CAMPO
             'message': 'Saldo atualizado com sucesso',
             'caixa_id': caixa.id,
             'operador_nome': current_user.nome

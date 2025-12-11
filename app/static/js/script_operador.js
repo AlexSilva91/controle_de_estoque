@@ -21,6 +21,7 @@ let balanceUpdateInterval = null;
 // ==================== ELEMENTOS DOM ====================
 const openingBalanceLabel = document.getElementById('opening-balance')?.querySelector('.balance-value');
 const currentBalanceLabel = document.getElementById('current-balance')?.querySelector('.balance-value');
+const currentMoneyLabel = document.getElementById('current-money')?.querySelector('.balance-value');
 const currentDateElement = document.getElementById('current-date');
 const toggleBalanceBtn = document.getElementById('toggle-balance');
 const tabBtns = document.querySelectorAll('.menu-item');
@@ -3231,6 +3232,7 @@ async function updateBalance(forceUpdate = false) {
         if (data.message === 'Nenhum caixa aberto encontrado') {
             if (openingBalanceLabel) openingBalanceLabel.textContent = 'Caixa fechado';
             if (currentBalanceLabel) currentBalanceLabel.textContent = '';
+            if (currentMoneyLabel) currentMoneyLabel.textContent = '';
             return;
         }
 
@@ -3238,9 +3240,11 @@ async function updateBalance(forceUpdate = false) {
         if (balanceVisible) {
             if (openingBalanceLabel) openingBalanceLabel.textContent = formatCurrency(data.valor_abertura);
             if (currentBalanceLabel) currentBalanceLabel.textContent = data.saldo_formatado || 'R$ 0,00';
+            if (currentMoneyLabel) currentMoneyLabel.textContent = data.total_dinheiro_formatado || 'R$ 0,00';
         } else {
             if (openingBalanceLabel) openingBalanceLabel.textContent = '******';
             if (currentBalanceLabel) currentBalanceLabel.textContent = '******';
+            if (currentMoneyLabel) currentMoneyLabel.textContent = '******';
         }
 
         // Atualiza o saldo atual na variável global
@@ -3253,6 +3257,7 @@ async function updateBalance(forceUpdate = false) {
         console.error('Error updating balance:', error);
         if (openingBalanceLabel) openingBalanceLabel.textContent = 'Erro';
         if (currentBalanceLabel) currentBalanceLabel.textContent = '';
+        if (currentMoneyLabel) currentMoneyLabel.textContent = '';
     }
 }
 
