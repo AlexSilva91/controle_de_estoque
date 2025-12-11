@@ -692,27 +692,30 @@ def obter_detalhes_cliente(cliente_id):
         if not cliente:
             return jsonify({'success': False, 'message': 'Cliente não encontrado'}), 404
 
-        # Obter todas as notas fiscais do cliente
         notas_fiscais = NotaFiscal.query.filter_by(cliente_id=cliente_id).all()
-        
-        # Obter todos os produtos comprados pelo cliente
+
         produtos_comprados = []
         produtos_quantidade = {}
-        
+
         for nota in notas_fiscais:
             for item in nota.itens:
-                produto_info = {
+                valor_unit = float(item.valor_unitario)
+                valor_total = float(item.valor_total)
+
+                produtos_comprados.append({
                     'id': item.produto.id,
                     'nome': item.produto.nome,
                     'quantidade': float(item.quantidade),
-                    'valor_unitario': float(item.valor_unitario),
-                    'valor_total': float(item.valor_total),
+                    'quantidade_formatada': format_number(item.quantidade),
+                    'valor_unitario': valor_unit,
+                    'valor_unitario_formatado': format_currency(valor_unit),
+                    'valor_total': valor_total,
+                    'valor_total_formatado': format_currency(valor_total),
                     'data_compra': nota.data_emissao.isoformat(),
+                    'data_compra_br': formatar_data_br(nota.data_emissao),
                     'unidade': item.produto.unidade.value if item.produto.unidade else 'un'
-                }
-                produtos_comprados.append(produto_info)
-                
-                # Contabilizar para produtos mais comprados
+                })
+
                 if item.produto.id in produtos_quantidade:
                     produtos_quantidade[item.produto.id]['quantidade_total'] += float(item.quantidade)
                     produtos_quantidade[item.produto.id]['vezes_comprado'] += 1
@@ -721,40 +724,53 @@ def obter_detalhes_cliente(cliente_id):
                         'id': item.produto.id,
                         'nome': item.produto.nome,
                         'quantidade_total': float(item.quantidade),
+                        'quantidade_total_formatada': format_number(item.quantidade),
                         'vezes_comprado': 1,
                         'unidade': item.produto.unidade.value if item.produto.unidade else 'un'
                     }
-        
-        # Ordenar produtos mais comprados por quantidade
+
         produtos_mais_comprados = sorted(
-            produtos_quantidade.values(), 
-            key=lambda x: x['quantidade_total'], 
+            produtos_quantidade.values(),
+            key=lambda x: x['quantidade_total'],
             reverse=True
-        )[:10]  # Top 10 produtos
-        
-        # Obter contas a receber
+        )[:10]
+
         contas_receber = ContaReceber.query.filter_by(cliente_id=cliente_id).all()
+
         contas_abertas = []
         contas_quitadas = []
+
         for conta in contas_receber:
-            conta_info = {
+            valor_original = float(conta.valor_original)
+            valor_aberto = float(conta.valor_aberto)
+
+            info = {
                 'id': conta.id,
                 'descricao': conta.descricao,
-                'valor_original': float(conta.valor_original),
-                'valor_aberto': float(conta.valor_aberto),
+                'valor_original': valor_original,
+                'valor_original_formatado': format_currency(valor_original),
+                'valor_aberto': valor_aberto,
+                'valor_aberto_formatado': format_currency(valor_aberto),
                 'data_vencimento': conta.data_vencimento.isoformat(),
+                'data_vencimento_br': formatar_data_br(conta.data_vencimento),
                 'data_emissao': conta.data_emissao.isoformat(),
+                'data_emissao_br': formatar_data_br(conta.data_emissao),
                 'status': conta.status.value
             }
-            
+
             if conta.status == StatusPagamento.quitado:
-                contas_quitadas.append(conta_info)
+                contas_quitadas.append(info)
             else:
-                contas_abertas.append(conta_info)
-        
-        # Calcular valor total das compas
+                contas_abertas.append(info)
+
         valor_total_compras = sum(float(nota.valor_total) for nota in notas_fiscais)
-        
+        valor_total_divida = sum(float(c.valor_original) for c in contas_receber)
+        valor_total_aberto = sum(float(c.valor_aberto) for c in contas_receber)
+        valor_total_pago = valor_total_divida - valor_total_aberto if valor_total_divida > 0 else 0
+
+        porcentagem_pago = (valor_total_pago / valor_total_divida * 100) if valor_total_divida > 0 else 0
+        porcentagem_aberto = (valor_total_aberto / valor_total_divida * 100) if valor_total_divida > 0 else 0
+
         return jsonify({
             'success': True,
             'cliente': {
@@ -765,6 +781,7 @@ def obter_detalhes_cliente(cliente_id):
                 'email': cliente.email,
                 'endereco': cliente.endereco,
                 'limite_credito': float(cliente.limite_credito),
+                'limite_credito_formatado': format_currency(cliente.limite_credito),
                 'ativo': cliente.ativo
             },
             'produtos_comprados': produtos_comprados,
@@ -772,10 +789,101 @@ def obter_detalhes_cliente(cliente_id):
             'contas_abertas': contas_abertas,
             'contas_quitadas': contas_quitadas,
             'total_compras': len(notas_fiscais),
-            'valor_total_compras': valor_total_compras
+            'valor_total_compras': valor_total_compras,
+            'valor_total_compras_formatado': format_currency(valor_total_compras),
+            'dividas': {
+                'valor_total_divida': valor_total_divida,
+                'valor_total_divida_formatado': format_currency(valor_total_divida),
+                'valor_total_aberto': valor_total_aberto,
+                'valor_total_aberto_formatado': format_currency(valor_total_aberto),
+                'valor_total_pago': valor_total_pago,
+                'valor_total_pago_formatado': format_currency(valor_total_pago),
+                'porcentagem_pago': porcentagem_pago,
+                'porcentagem_aberto': porcentagem_aberto
+            }
         })
+
     except Exception as e:
         logger.error(f"Erro ao obter detalhes do cliente: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@admin_bp.route('/cliente/contas/<int:conta_id>/detalhes', methods=['GET'])
+@login_required
+@admin_required
+def obter_detalhes_conta(conta_id):
+    try:
+        conta = ContaReceber.query.get(conta_id)
+        if not conta:
+            return jsonify({'success': False, 'message': 'Conta não encontrada'}), 404
+
+        # Dados básicos da conta
+        conta_info = {
+            'id': conta.id,
+            'cliente_id': conta.cliente_id,
+            'cliente_nome': conta.cliente.nome if conta.cliente else 'N/A',
+            'descricao': conta.descricao,
+            'valor_original': float(conta.valor_original),
+            'valor_original_formatado': format_currency(conta.valor_original),
+            'valor_aberto': float(conta.valor_aberto),
+            'valor_aberto_formatado': format_currency(conta.valor_aberto),
+            'valor_pago': float(conta.valor_original - conta.valor_aberto),
+            'valor_pago_formatado': format_currency(conta.valor_original - conta.valor_aberto),
+            'data_emissao': conta.data_emissao.isoformat(),
+            'data_emissao_br': formatar_data_br(conta.data_emissao),
+            'data_vencimento': conta.data_vencimento.isoformat(),
+            'data_vencimento_br': formatar_data_br(conta.data_vencimento),
+            'data_pagamento': conta.data_pagamento.isoformat() if conta.data_pagamento else None,
+            'data_pagamento_br': formatar_data_br(conta.data_pagamento) if conta.data_pagamento else None,
+            'status': conta.status.value,
+            'status_label': conta.status.name.capitalize(),
+            'observacoes': conta.observacoes,
+            'nota_fiscal_id': conta.nota_fiscal_id
+        }
+
+        # Produtos da nota fiscal (se houver)
+        produtos = []
+        if conta.nota_fiscal:
+            for item in conta.nota_fiscal.itens:
+                produtos.append({
+                    'produto_id': item.produto_id,
+                    'nome': item.produto.nome,
+                    'quantidade': float(item.quantidade),
+                    'quantidade_formatada': format_number(item.quantidade),
+                    'valor_unitario': float(item.valor_unitario),
+                    'valor_unitario_formatado': format_currency(item.valor_unitario),
+                    'valor_total': float(item.valor_total),
+                    'valor_total_formatado': format_currency(item.valor_total),
+                    'unidade': item.produto.unidade.value if item.produto.unidade else 'un',
+                    'estoque_origem': item.estoque_origem.value if item.estoque_origem else 'N/A'
+                })
+
+        # Histórico de pagamentos
+        pagamentos = []
+        for pagamento in conta.pagamentos:
+            pagamentos.append({
+                'id': pagamento.id,
+                'valor_pago': float(pagamento.valor_pago),
+                'valor_pago_formatado': format_currency(pagamento.valor_pago),
+                'data_pagamento': pagamento.data_pagamento.isoformat(),
+                'data_pagamento_br': formatar_data_br(pagamento.data_pagamento),
+                'forma_pagamento': pagamento.forma_pagamento.value,
+                'forma_pagamento_label': pagamento.forma_pagamento.name.replace('_', ' ').title(),
+                'observacoes': pagamento.observacoes,
+                'caixa_id': pagamento.caixa_id,
+                'operador': pagamento.caixa.operador.nome if pagamento.caixa and pagamento.caixa.operador else 'N/A'
+            })
+
+        return jsonify({
+            'success': True,
+            'conta': conta_info,
+            'produtos': produtos,
+            'pagamentos': pagamentos,
+            'total_produtos': len(produtos),
+            'total_pagamentos': len(pagamentos)
+        })
+
+    except Exception as e:
+        logger.error(f"Erro ao obter detalhes da conta: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @admin_bp.route('/clientes', methods=['POST'])

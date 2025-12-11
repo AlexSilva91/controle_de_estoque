@@ -1527,20 +1527,19 @@ setTimeout(inicializarBusca, 500);
     }
   }
   async function openDetalhesClienteModal(clienteId) {
-    const content = document.getElementById('detalhesClienteContent');
-    if (content) content.innerHTML = '<p class="loading-text">Carregando dados...</p>';
+      const content = document.getElementById('detalhesClienteContent');
+      if (content) content.innerHTML = '<p class="loading-text">Carregando dados...</p>';
 
-    try {
-      const response = await fetchWithErrorHandling(`/admin/clientes/${clienteId}/detalhes`);
-      if (!response.success) {
-        showFlashMessage('error', response.message || 'Erro ao carregar detalhes');
-        return;
-      }
+      try {
+          const response = await fetchWithErrorHandling(`/admin/clientes/${clienteId}/detalhes`);
+          if (!response.success) {
+              showFlashMessage('error', response.message || 'Erro ao carregar detalhes');
+              return;
+          }
 
-      const c = response.cliente;
+          const c = response.cliente;
 
-      // HTML com seções retráteis
-      let html = `
+          let html = `
               <div class="details-main-info">
                   <h3 class="section-title">Informações do Cliente</h3>
                   <div class="details-grid">
@@ -1570,15 +1569,36 @@ setTimeout(inicializarBusca, 500);
                       </div>
                       <div class="detail-item">
                           <label>Valor Total:</label>
-                          <div class="value monetary">R$ ${response.valor_total_compras.toFixed(2)}</div>
+                          <div class="value monetary">${response.valor_total_compras_formatado}</div>
                       </div>
                   </div>
               </div>
 
-              <!-- Produtos Comprados -->
+              <div class="details-main-info">
+                  <h3 class="section-title">Situação Financeira</h3>
+                  <div class="details-grid">
+                      <div class="detail-item">
+                          <label>Dívida Total:</label>
+                          <div class="value monetary">${response.dividas.valor_total_divida_formatado}</div>
+                      </div>
+                      <div class="detail-item">
+                          <label>Total em Aberto:</label>
+                          <div class="value monetary" style="color:#ff4d4d; font-weight:bold;">
+                              ${response.dividas.valor_total_aberto_formatado}
+                          </div>
+                      </div>
+                      <div class="detail-item">
+                          <label>Total Pago:</label>
+                          <div class="value monetary" style="color:#0a7600; font-weight:bold;">
+                              ${response.dividas.valor_total_pago_formatado}
+                          </div>
+                      </div>
+                  </div>
+              </div>
+
               <div class="collapsible-section">
                   <button class="collapsible btn btn-outline">
-                      <i class="fas fa-shopping-bag"></i> Produtos Comprados (${response.produtos_comprados.length})
+                      <i class="fas fa-shopping-bag"></i> Últimas compras (${response.produtos_comprados.length})
                       <i class="fas fa-chevron-down toggle-icon"></i>
                   </button>
                   <div class="collapsible-content" style="display:none;">
@@ -1593,11 +1613,11 @@ setTimeout(inicializarBusca, 500);
                                   ${response.produtos_comprados.map(p => `
                                       <tr>
                                           <td>${p.nome}</td>
-                                          <td>${p.quantidade}</td>
+                                          <td>${p.quantidade_formatada}</td>
                                           <td>${p.unidade}</td>
-                                          <td class="monetary">R$ ${p.valor_unitario.toFixed(2)}</td>
-                                          <td class="monetary">R$ ${p.valor_total.toFixed(2)}</td>
-                                          <td>${new Date(p.data_compra).toLocaleDateString()}</td>
+                                          <td class="monetary">${p.valor_unitario_formatado}</td>
+                                          <td class="monetary">${p.valor_total_formatado}</td>
+                                          <td>${p.data_compra_br}</td>
                                       </tr>
                                   `).join('')}
                               </tbody>
@@ -1606,7 +1626,6 @@ setTimeout(inicializarBusca, 500);
                   </div>
               </div>
 
-              <!-- Top Produtos Mais Comprados -->
               <div class="collapsible-section">
                   <button class="collapsible btn btn-outline">
                       <i class="fas fa-trophy"></i> Top Produtos Mais Comprados (${response.produtos_mais_comprados.length})
@@ -1624,7 +1643,7 @@ setTimeout(inicializarBusca, 500);
                                   ${response.produtos_mais_comprados.map(p => `
                                       <tr>
                                           <td>${p.nome}</td>
-                                          <td>${p.quantidade_total}</td>
+                                          <td>${p.quantidade_total_formatada}</td>
                                           <td>${p.unidade}</td>
                                           <td>${p.vezes_comprado}x</td>
                                       </tr>
@@ -1635,7 +1654,6 @@ setTimeout(inicializarBusca, 500);
                   </div>
               </div>
 
-              <!-- Contas em Aberto -->
               <div class="collapsible-section">
                   <button class="collapsible btn btn-outline">
                       <i class="fas fa-clock"></i> Contas em Aberto (${response.contas_abertas.length})
@@ -1644,7 +1662,7 @@ setTimeout(inicializarBusca, 500);
                   <div class="collapsible-content" style="display:none;">
                       ${response.contas_abertas.length ? `
                           <div class="details-table-container">
-                              <table class="table compact-table">
+                              <table class="table compact-table contas-abertas-table">
                                   <thead>
                                       <tr>
                                           <th>Descrição</th><th>Vencimento</th><th>Valor em Aberto</th>
@@ -1652,10 +1670,10 @@ setTimeout(inicializarBusca, 500);
                                   </thead>
                                   <tbody>
                                       ${response.contas_abertas.map(ca => `
-                                          <tr>
+                                          <tr class="clickable-row" data-conta-id="${ca.id}" title="Clique para ver detalhes da conta">
                                               <td>${ca.descricao}</td>
-                                              <td>${new Date(ca.data_vencimento).toLocaleDateString()}</td>
-                                              <td class="monetary">R$ ${ca.valor_aberto.toFixed(2)}</td>
+                                              <td>${ca.data_vencimento_br}</td>
+                                              <td class="monetary">${ca.valor_aberto_formatado}</td>
                                           </tr>
                                       `).join('')}
                                   </tbody>
@@ -1665,7 +1683,6 @@ setTimeout(inicializarBusca, 500);
                   </div>
               </div>
 
-              <!-- Contas Quitadas -->
               <div class="collapsible-section">
                   <button class="collapsible btn btn-outline">
                       <i class="fas fa-check-circle"></i> Contas Quitadas (${response.contas_quitadas.length})
@@ -1674,18 +1691,18 @@ setTimeout(inicializarBusca, 500);
                   <div class="collapsible-content" style="display:none;">
                       ${response.contas_quitadas.length ? `
                           <div class="details-table-container">
-                              <table class="table compact-table">
+                              <table class="table compact-table contas-quitadas-table">
                                   <thead>
                                       <tr>
-                                          <th>Descrição</th><th>Data de Pagamento</th><th>Valor Original</th>
+                                          <th>Descrição</th><th>Pagamento</th><th>Valor Original</th>
                                       </tr>
                                   </thead>
                                   <tbody>
                                       ${response.contas_quitadas.map(cq => `
-                                          <tr>
+                                          <tr class="clickable-row" data-conta-id="${cq.id}" title="Clique para ver detalhes da conta">
                                               <td>${cq.descricao}</td>
-                                              <td>${new Date(cq.data_pagamento || cq.data_vencimento).toLocaleDateString()}</td>
-                                              <td class="monetary">R$ ${cq.valor_original.toFixed(2)}</td>
+                                              <td>${cq.data_emissao_br}</td>
+                                              <td class="monetary">${cq.valor_original_formatado}</td>
                                           </tr>
                                       `).join('')}
                                   </tbody>
@@ -1695,33 +1712,903 @@ setTimeout(inicializarBusca, 500);
                   </div>
               </div>
           `;
+          
+          content.innerHTML = html;
 
-      content.innerHTML = html;
+          // Ativar colapsáveis
+          document.querySelectorAll('.collapsible').forEach(btn => {
+              btn.addEventListener('click', function () {
+                  this.classList.toggle('active');
+                  const contentDiv = this.nextElementSibling;
+                  const toggleIcon = this.querySelector('.toggle-icon');
 
-      // Ativar colapsáveis
-      document.querySelectorAll('.collapsible').forEach(btn => {
-        btn.addEventListener('click', function () {
-          this.classList.toggle('active');
-          const contentDiv = this.nextElementSibling;
-          const toggleIcon = this.querySelector('.toggle-icon');
+                  if (contentDiv.style.display === 'block') {
+                      contentDiv.style.display = 'none';
+                      toggleIcon.classList.remove('rotated');
+                  } else {
+                      contentDiv.style.display = 'block';
+                      toggleIcon.classList.add('rotated');
+                      
+                      // Adicionar event listeners para as linhas clicáveis após expandir
+                      setTimeout(() => {
+                          addClickableRowListeners(contentDiv);
+                      }, 100);
+                  }
+              });
+          });
 
-          if (contentDiv.style.display === 'block') {
-            contentDiv.style.display = 'none';
-            toggleIcon.classList.remove('rotated');
-          } else {
-            contentDiv.style.display = 'block';
-            toggleIcon.classList.add('rotated');
-          }
-        });
-      });
+          // Adicionar event listeners para as linhas clicáveis que já estão visíveis
+          setTimeout(() => {
+              // Verificar se alguma seção está expandida por padrão e adicionar listeners
+              document.querySelectorAll('.collapsible-content').forEach(contentDiv => {
+                  if (contentDiv.style.display === 'block') {
+                      addClickableRowListeners(contentDiv);
+                  }
+              });
+              
+              // Adicionar estilos CSS para as linhas clicáveis
+              addClickableRowStyles();
+          }, 100);
 
-      openModal('detalhesClienteModal');
+          openModal('detalhesClienteModal');
 
-    } catch (err) {
-      showFlashMessage('error', 'Erro ao carregar detalhes do cliente');
-    }
+      } catch (err) {
+          showFlashMessage('error', 'Erro ao carregar detalhes do cliente');
+      }
   }
 
+  // Função para adicionar listeners às linhas clicáveis
+  function addClickableRowListeners(container) {
+      const rows = container.querySelectorAll('.clickable-row');
+      rows.forEach(row => {
+          // Remover event listeners existentes para evitar duplicação
+          const newRow = row.cloneNode(true);
+          row.parentNode.replaceChild(newRow, row);
+          
+          // Adicionar novos listeners
+          newRow.style.cursor = 'pointer';
+          newRow.addEventListener('click', function(e) {
+              e.stopPropagation(); // Prevenir que o clique propague para outros elementos
+              const contaId = this.dataset.contaId;
+              if (contaId) {
+                  openDetalhesContaModal(contaId);
+              }
+          });
+          
+          // Efeitos de hover
+          newRow.addEventListener('mouseenter', function() {
+              this.style.backgroundColor = '#f0f8ff';
+              this.style.transition = 'background-color 0.2s ease';
+          });
+          
+          newRow.addEventListener('mouseleave', function() {
+              this.style.backgroundColor = '';
+          });
+          
+          // Indicador visual de que é clicável
+          newRow.title = newRow.title || 'Clique para ver detalhes da conta';
+      });
+  }
+
+  // Função para adicionar estilos CSS para as linhas clicáveis
+  function addClickableRowStyles() {
+      // Verificar se os estilos já foram adicionados
+      if (document.getElementById('clickable-rows-styles')) {
+          return;
+      }
+      
+      const style = document.createElement('style');
+      style.id = 'clickable-rows-styles';
+      style.textContent = `
+          .clickable-row {
+              transition: background-color 0.2s ease, transform 0.1s ease;
+          }
+          
+          .clickable-row:hover {
+              background-color: #f0f8ff !important;
+          }
+          
+          .clickable-row:active {
+              transform: scale(0.995);
+              background-color: #e0f0ff !important;
+          }
+          
+          .contas-abertas-table .clickable-row:hover td {
+              border-color: #ffcccc;
+          }
+          
+          .contas-quitadas-table .clickable-row:hover td {
+              border-color: #ccffcc;
+          }
+      `;
+      document.head.appendChild(style);
+  }
+
+  // Nova função para abrir detalhes da conta (você precisará implementar esta rota também)
+  async function openDetalhesContaModal(contaId) {
+      try {
+          const response = await fetchWithErrorHandling(`/admin/cliente/contas/${contaId}/detalhes`);
+          if (!response.success) {
+              showFlashMessage('error', response.message || 'Erro ao carregar detalhes da conta');
+              return;
+          }
+
+          const conta = response.conta;
+          const produtos = response.produtos || [];
+          const pagamentos = response.pagamentos || [];
+
+          // Criar o overlay e o popup
+          const popupId = 'contaDetalhesPopup';
+          
+          // Remover popup anterior se existir
+          const existingPopup = document.getElementById(popupId);
+          if (existingPopup) {
+              existingPopup.remove();
+          }
+
+          // Criar overlay
+          const overlay = document.createElement('div');
+          overlay.id = 'contaDetalhesOverlay';
+          overlay.className = 'popup-overlay';
+          overlay.style.cssText = `
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              background-color: rgba(0, 0, 0, 0.85);
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              z-index: 9999;
+              animation: fadeIn 0.3s ease;
+          `;
+
+          // Criar popup
+          const popup = document.createElement('div');
+          popup.id = popupId;
+          popup.className = 'conta-detalhes-popup';
+          popup.style.cssText = `
+              background: var(--bg-secondary);
+              border-radius: var(--border-radius);
+              box-shadow: var(--shadow-lg);
+              width: 90%;
+              max-width: 900px;
+              max-height: 85vh;
+              overflow-y: auto;
+              animation: slideUp 0.4s ease;
+              position: relative;
+              border: 1px solid var(--border-color);
+          `;
+
+          // Criar conteúdo do popup
+          let html = `
+              <style>
+                  @keyframes fadeIn {
+                      from { opacity: 0; }
+                      to { opacity: 1; }
+                  }
+                  
+                  @keyframes slideUp {
+                      from { 
+                          opacity: 0;
+                          transform: translateY(30px);
+                      }
+                      to { 
+                          opacity: 1;
+                          transform: translateY(0);
+                      }
+                  }
+                  
+                  .popup-header {
+                      padding: var(--space-lg) var(--space-xl);
+                      background: var(--gradient-primary);
+                      color: var(--text-light);
+                      border-radius: var(--border-radius) var(--border-radius) 0 0;
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      position: sticky;
+                      top: 0;
+                      z-index: 10;
+                      border-bottom: 1px solid var(--border-color);
+                  }
+                  
+                  .popup-header h2 {
+                      margin: 0;
+                      font-size: var(--font-size-xl);
+                      font-weight: var(--font-weight-semibold);
+                      display: flex;
+                      align-items: center;
+                      gap: var(--space-sm);
+                  }
+                  
+                  .popup-close-btn {
+                      background: rgba(255, 255, 255, 0.15);
+                      border: none;
+                      color: var(--text-light);
+                      width: 36px;
+                      height: 36px;
+                      border-radius: 50%;
+                      cursor: pointer;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      font-size: var(--font-size-md);
+                      transition: all 0.3s ease;
+                  }
+                  
+                  .popup-close-btn:hover {
+                      background: rgba(255, 255, 255, 0.25);
+                      transform: rotate(90deg);
+                  }
+                  
+                  .popup-body {
+                      padding: var(--space-xl);
+                  }
+                  
+                  .popup-section {
+                      margin-bottom: var(--space-xl);
+                      background: var(--card-bg);
+                      border-radius: var(--border-radius);
+                      padding: var(--space-lg);
+                      border-left: 4px solid var(--primary-color);
+                      transition: background-color 0.3s ease;
+                  }
+                  
+                  .popup-section:hover {
+                      background: var(--card-hover);
+                  }
+                  
+                  .popup-section-title {
+                      margin: 0 0 var(--space-md) 0;
+                      color: var(--text-primary);
+                      font-size: var(--font-size-lg);
+                      font-weight: var(--font-weight-semibold);
+                      display: flex;
+                      align-items: center;
+                      gap: var(--space-sm);
+                  }
+                  
+                  .popup-grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                      gap: var(--space-md);
+                      margin-top: var(--space-md);
+                  }
+                  
+                  .popup-detail-item {
+                      display: flex;
+                      flex-direction: column;
+                  }
+                  
+                  .popup-detail-item.full-width {
+                      grid-column: 1 / -1;
+                  }
+                  
+                  .popup-detail-label {
+                      font-weight: var(--font-weight-medium);
+                      color: var(--text-muted);
+                      font-size: var(--font-size-sm);
+                      margin-bottom: var(--space-xs);
+                  }
+                  
+                  .popup-detail-value {
+                      font-size: var(--font-size-md);
+                      color: var(--text-secondary);
+                      padding: var(--space-sm) var(--space-md);
+                      background: var(--bg-tertiary);
+                      border-radius: var(--border-radius-sm);
+                      border-left: 3px solid var(--primary-light);
+                      box-shadow: var(--shadow-sm);
+                  }
+                  
+                  .popup-detail-value.highlight {
+                      font-weight: var(--font-weight-semibold);
+                      font-size: var(--font-size-lg);
+                      color: var(--primary-light);
+                  }
+                  
+                  .popup-notes-box {
+                      background: rgba(253, 121, 168, 0.1) !important;
+                      border-left-color: var(--accent-color) !important;
+                      white-space: pre-line;
+                  }
+                  
+                  .popup-financial-summary {
+                      background: linear-gradient(135deg, rgba(108, 92, 231, 0.1), rgba(86, 73, 192, 0.1));
+                      padding: var(--space-lg);
+                      border-radius: var(--border-radius-sm);
+                      margin-top: var(--space-lg);
+                      border: 1px solid var(--border-color);
+                  }
+                  
+                  .status-badge {
+                      display: inline-block;
+                      padding: var(--space-xs) var(--space-md);
+                      border-radius: 20px;
+                      font-size: var(--font-size-xs);
+                      font-weight: var(--font-weight-semibold);
+                      text-transform: uppercase;
+                      letter-spacing: 0.5px;
+                  }
+                  
+                  .status-pendente {
+                      background: rgba(253, 203, 110, 0.2);
+                      color: var(--warning-color);
+                      border: 1px solid var(--warning-color);
+                  }
+                  
+                  .status-parcial {
+                      background: rgba(9, 132, 227, 0.2);
+                      color: var(--info-color);
+                      border: 1px solid var(--info-color);
+                  }
+                  
+                  .status-quitado {
+                      background: rgba(0, 184, 148, 0.2);
+                      color: var(--success-color);
+                      border: 1px solid var(--success-color);
+                  }
+                  
+                  .popup-collapsible {
+                      width: 100%;
+                      text-align: left;
+                      background: var(--bg-tertiary);
+                      border: 1px solid var(--border-color);
+                      border-radius: var(--border-radius-sm);
+                      padding: var(--space-md) var(--space-lg);
+                      cursor: pointer;
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      font-weight: var(--font-weight-semibold);
+                      color: var(--text-secondary);
+                      margin: var(--space-sm) 0;
+                      transition: all 0.3s ease;
+                  }
+                  
+                  .popup-collapsible:hover {
+                      background: var(--card-hover);
+                      border-color: var(--primary-light);
+                      transform: translateY(-1px);
+                  }
+                  
+                  .popup-collapsible.active {
+                      background: rgba(108, 92, 231, 0.15);
+                      border-color: var(--primary-light);
+                  }
+                  
+                  .popup-collapsible-icon {
+                      transition: transform 0.3s ease;
+                      color: var(--primary-light);
+                  }
+                  
+                  .popup-collapsible-icon.rotated {
+                      transform: rotate(180deg);
+                  }
+                  
+                  .popup-collapsible-content {
+                      background: var(--bg-tertiary);
+                      border-radius: var(--border-radius-sm);
+                      padding: 0;
+                      margin: var(--space-sm) 0 var(--space-lg) 0;
+                      border: 1px solid var(--border-color);
+                      overflow: hidden;
+                  }
+                  
+                  .popup-table-container {
+                      overflow-x: auto;
+                      border-radius: var(--border-radius-sm);
+                  }
+                  
+                  .popup-table {
+                      width: 100%;
+                      border-collapse: collapse;
+                      font-size: var(--font-size-sm);
+                  }
+                  
+                  .popup-table th {
+                      background: var(--card-bg);
+                      padding: var(--space-md) var(--space-lg);
+                      font-weight: var(--font-weight-semibold);
+                      color: var(--text-secondary);
+                      border-bottom: 2px solid var(--border-color);
+                      position: sticky;
+                      top: 0;
+                  }
+                  
+                  .popup-table td {
+                      padding: var(--space-md) var(--space-lg);
+                      border-bottom: 1px solid var(--border-color);
+                      color: var(--text-secondary);
+                  }
+                  
+                  .popup-table tr:hover {
+                      background: rgba(108, 92, 231, 0.05);
+                  }
+                  
+                  .popup-table tfoot tr {
+                      background: var(--card-bg);
+                  }
+                  
+                  .monetary {
+                      text-align: right;
+                      font-family: 'JetBrains Mono', 'Courier New', monospace;
+                      font-weight: var(--font-weight-medium);
+                  }
+                  
+                  .no-data-message {
+                      text-align: center;
+                      padding: var(--space-xl);
+                      color: var(--text-muted);
+                      font-style: italic;
+                      background: var(--bg-tertiary);
+                      border-radius: var(--border-radius-sm);
+                      margin: var(--space-lg) 0;
+                  }
+                  
+                  .payment-method-badge {
+                      display: inline-block;
+                      padding: var(--space-xs) var(--space-sm);
+                      background: rgba(0, 206, 201, 0.15);
+                      border-radius: var(--border-radius-sm);
+                      font-size: var(--font-size-xs);
+                      font-weight: var(--font-weight-medium);
+                      color: var(--secondary-color);
+                  }
+                  
+                  .loading-container {
+                      text-align: center;
+                      padding: var(--space-xl);
+                  }
+                  
+                  .loading-spinner {
+                      border: 3px solid rgba(255, 255, 255, 0.1);
+                      border-top: 3px solid var(--primary-color);
+                      border-radius: 50%;
+                      width: 40px;
+                      height: 40px;
+                      animation: spin 1s linear infinite;
+                      margin: 0 auto var(--space-md) auto;
+                  }
+                  
+                  @keyframes spin {
+                      0% { transform: rotate(0deg); }
+                      100% { transform: rotate(360deg); }
+                  }
+                  
+                  /* Scrollbar personalizada */
+                  .conta-detalhes-popup::-webkit-scrollbar {
+                      width: 8px;
+                  }
+                  
+                  .conta-detalhes-popup::-webkit-scrollbar-track {
+                      background: var(--bg-tertiary);
+                      border-radius: 4px;
+                  }
+                  
+                  .conta-detalhes-popup::-webkit-scrollbar-thumb {
+                      background: var(--primary-color);
+                      border-radius: 4px;
+                  }
+                  
+                  .conta-detalhes-popup::-webkit-scrollbar-thumb:hover {
+                      background: var(--primary-dark);
+                  }
+              </style>
+              
+              <div class="popup-header">
+                  <h2><i class="fas fa-file-invoice-dollar"></i> Detalhes da Conta #${conta.id}</h2>
+                  <button class="popup-close-btn" id="closePopupBtn">
+                      <i class="fas fa-times"></i>
+                  </button>
+              </div>
+              
+              <div class="popup-body">
+                  <div class="popup-section">
+                      <h3 class="popup-section-title">
+                          <i class="fas fa-info-circle"></i> Informações da Conta
+                      </h3>
+                      <div class="popup-grid">
+                          <div class="popup-detail-item">
+                              <span class="popup-detail-label">Status:</span>
+                              <div class="popup-detail-value">
+                                  <span class="status-badge status-${conta.status}">
+                                      ${conta.status === 'pendente' ? 'Pendente' : conta.status === 'parcial' ? 'Parcial' : 'Quitado'}
+                                  </span>
+                              </div>
+                          </div>
+                          <div class="popup-detail-item">
+                              <span class="popup-detail-label">Cliente:</span>
+                              <div class="popup-detail-value">${conta.cliente_nome || 'N/A'}</div>
+                          </div>
+                          <div class="popup-detail-item">
+                              <span class="popup-detail-label">Descrição:</span>
+                              <div class="popup-detail-value">${conta.descricao || '-'}</div>
+                          </div>
+                          <div class="popup-detail-item">
+                              <span class="popup-detail-label">Emissão:</span>
+                              <div class="popup-detail-value">${conta.data_emissao_br || '-'}</div>
+                          </div>
+                          <div class="popup-detail-item">
+                              <span class="popup-detail-label">Vencimento:</span>
+                              <div class="popup-detail-value">${conta.data_vencimento_br || '-'}</div>
+                          </div>
+                          ${conta.data_pagamento_br ? `
+                              <div class="popup-detail-item">
+                                  <span class="popup-detail-label">Pagamento:</span>
+                                  <div class="popup-detail-value">${conta.data_pagamento_br}</div>
+                              </div>
+                          ` : ''}
+                      </div>
+                      
+                      <div class="popup-financial-summary">
+                          <div class="popup-grid">
+                              <div class="popup-detail-item">
+                                  <span class="popup-detail-label">Valor Original:</span>
+                                  <div class="popup-detail-value highlight">${conta.valor_original_formatado}</div>
+                              </div>
+                              <div class="popup-detail-item">
+                                  <span class="popup-detail-label">Valor Pago:</span>
+                                  <div class="popup-detail-value" style="color: var(--success-color); font-weight: var(--font-weight-semibold);">
+                                      ${conta.valor_pago_formatado || 'R$ 0,00'}
+                                  </div>
+                              </div>
+                              <div class="popup-detail-item">
+                                  <span class="popup-detail-label">Valor em Aberto:</span>
+                                  <div class="popup-detail-value" style="color: var(--danger-color); font-weight: var(--font-weight-semibold);">
+                                      ${conta.valor_aberto_formatado}
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                      
+                      ${conta.observacoes ? `
+                          <div class="popup-detail-item full-width" style="margin-top: var(--space-md);">
+                              <span class="popup-detail-label">Observações:</span>
+                              <div class="popup-detail-value popup-notes-box">${conta.observacoes}</div>
+                          </div>
+                      ` : ''}
+                  </div>
+          `;
+
+          // Seção de Produtos (se houver)
+          if (produtos.length > 0) {
+              const totalProdutos = produtos.reduce((sum, p) => sum + (p.valor_total || 0), 0);
+              html += `
+                  <div class="popup-section">
+                      <button class="popup-collapsible active" data-target="produtos-section">
+                          <span><i class="fas fa-boxes"></i> Produtos (${produtos.length})</span>
+                          <i class="fas fa-chevron-down popup-collapsible-icon rotated"></i>
+                      </button>
+                      <div class="popup-collapsible-content" id="produtos-section" style="display: block;">
+                          <div class="popup-table-container">
+                              <table class="popup-table">
+                                  <thead>
+                                      <tr>
+                                          <th>Produto</th>
+                                          <th>Quantidade</th>
+                                          <th>Unidade</th>
+                                          <th>Valor Unitário</th>
+                                          <th>Valor Total</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody>
+                                      ${produtos.map(p => `
+                                          <tr>
+                                              <td><strong>${p.nome || 'N/A'}</strong></td>
+                                              <td>${p.quantidade_formatada || '0'}</td>
+                                              <td><span class="payment-method-badge">${p.unidade || 'un'}</span></td>
+                                              <td class="monetary">${p.valor_unitario_formatado || 'R$ 0,00'}</td>
+                                              <td class="monetary"><strong>${p.valor_total_formatado || 'R$ 0,00'}</strong></td>
+                                          </tr>
+                                      `).join('')}
+                                  </tbody>
+                                  <tfoot>
+                                      <tr>
+                                          <td colspan="4" style="text-align: right; font-weight: var(--font-weight-semibold); padding: var(--space-md); color: var(--text-primary);">
+                                              Total Produtos:
+                                          </td>
+                                          <td class="monetary" style="font-weight: var(--font-weight-bold); padding: var(--space-md); color: var(--primary-light);">
+                                              ${formatCurrency(totalProdutos)}
+                                          </td>
+                                      </tr>
+                                  </tfoot>
+                              </table>
+                          </div>
+                      </div>
+                  </div>
+              `;
+          } else {
+              html += `
+                  <div class="popup-section">
+                      <h3 class="popup-section-title">
+                          <i class="fas fa-boxes"></i> Produtos
+                      </h3>
+                      <div class="no-data-message">
+                          <i class="fas fa-box-open fa-2x" style="margin-bottom: var(--space-sm); opacity: 0.5; color: var(--text-muted);"></i>
+                          <p>Nenhum produto associado a esta conta</p>
+                      </div>
+                  </div>
+              `;
+          }
+
+          // Seção de Pagamentos (se houver)
+          if (pagamentos.length > 0) {
+              const totalPago = pagamentos.reduce((sum, p) => sum + (p.valor_pago || 0), 0);
+              html += `
+                  <div class="popup-section">
+                      <button class="popup-collapsible active" data-target="pagamentos-section">
+                          <span><i class="fas fa-credit-card"></i> Histórico de Pagamentos (${pagamentos.length})</span>
+                          <i class="fas fa-chevron-down popup-collapsible-icon rotated"></i>
+                      </button>
+                      <div class="popup-collapsible-content" id="pagamentos-section" style="display: block;">
+                          <div class="popup-table-container">
+                              <table class="popup-table">
+                                  <thead>
+                                      <tr>
+                                          <th>Data</th>
+                                          <th>Valor</th>
+                                          <th>Forma de Pagamento</th>
+                                          <th>Observações</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody>
+                                      ${pagamentos.map(p => `
+                                          <tr>
+                                              <td><strong>${p.data_pagamento_br || '-'}</strong></td>
+                                              <td class="monetary"><strong>${p.valor_pago_formatado || 'R$ 0,00'}</strong></td>
+                                              <td><span class="payment-method-badge">${p.forma_pagamento_label || 'N/A'}</span></td>
+                                              <td>${p.observacoes || '-'}</td>
+                                          </tr>
+                                      `).join('')}
+                                  </tbody>
+                                  <tfoot>
+                                      <tr>
+                                          <td colspan="1" style="text-align: right; font-weight: var(--font-weight-semibold); padding: var(--space-md); color: var(--text-primary);">
+                                              Total Pago:
+                                          </td>
+                                          <td class="monetary" style="font-weight: var(--font-weight-bold); padding: var(--space-md); color: var(--success-color);">
+                                              ${formatCurrency(totalPago)}
+                                          </td>
+                                          <td colspan="2"></td>
+                                      </tr>
+                                  </tfoot>
+                              </table>
+                          </div>
+                      </div>
+                  </div>
+              `;
+          } else {
+              html += `
+                  <div class="popup-section">
+                      <h3 class="popup-section-title">
+                          <i class="fas fa-credit-card"></i> Histórico de Pagamentos
+                      </h3>
+                      <div class="no-data-message">
+                          <i class="fas fa-wallet fa-2x" style="margin-bottom: var(--space-sm); opacity: 0.5; color: var(--text-muted);"></i>
+                          <p>Nenhum pagamento registrado para esta conta</p>
+                      </div>
+                  </div>
+              `;
+          }
+
+          html += `
+              </div>
+          `;
+
+          popup.innerHTML = html;
+          overlay.appendChild(popup);
+          document.body.appendChild(overlay);
+          
+          // Prevenir scroll do body
+          document.body.style.overflow = 'hidden';
+
+          // Adicionar event listeners
+          setupPopupEventListeners(popupId);
+
+      } catch (err) {
+          console.error('Erro ao carregar detalhes da conta:', err);
+          showFlashMessage('error', 'Erro ao carregar detalhes da conta');
+          
+          // Mostrar popup de erro com a paleta de cores
+          showErrorPopup('Erro ao carregar detalhes da conta. Por favor, tente novamente.');
+      }
+  }
+
+  // Função auxiliar para formatar moeda
+  function formatCurrency(value) {
+      return new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL'
+      }).format(value);
+  }
+
+  // Configurar event listeners do popup
+  function setupPopupEventListeners(popupId) {
+      // Fechar ao clicar no botão de fechar
+      const closeBtn = document.querySelector(`#${popupId} .popup-close-btn`);
+      if (closeBtn) {
+          closeBtn.addEventListener('click', closePopup);
+      }
+      
+      // Fechar ao clicar no overlay (fora do popup)
+      const overlay = document.getElementById('contaDetalhesOverlay');
+      if (overlay) {
+          overlay.addEventListener('click', function(e) {
+              if (e.target === this) {
+                  closePopup();
+              }
+          });
+      }
+      
+      // Fechar com tecla ESC
+      document.addEventListener('keydown', function(e) {
+          if (e.key === 'Escape') {
+              closePopup();
+          }
+      });
+      
+      // Configurar colapsáveis
+      document.querySelectorAll('.popup-collapsible').forEach(btn => {
+          btn.addEventListener('click', function() {
+              const targetId = this.getAttribute('data-target');
+              const content = document.getElementById(targetId);
+              const icon = this.querySelector('.popup-collapsible-icon');
+              
+              if (content) {
+                  if (content.style.display === 'block') {
+                      content.style.display = 'none';
+                      icon.classList.remove('rotated');
+                      this.classList.remove('active');
+                  } else {
+                      content.style.display = 'block';
+                      icon.classList.add('rotated');
+                      this.classList.add('active');
+                  }
+              }
+          });
+      });
+  }
+
+  // Fechar popup
+  function closePopup() {
+      const overlay = document.getElementById('contaDetalhesOverlay');
+      const popup = document.getElementById('contaDetalhesPopup');
+      
+      if (popup) {
+          popup.style.animation = 'slideUp 0.3s ease reverse';
+      }
+      
+      if (overlay) {
+          overlay.style.animation = 'fadeIn 0.3s ease reverse';
+          
+          setTimeout(() => {
+              overlay.remove();
+              // Restaurar scroll do body
+              document.body.style.overflow = '';
+          }, 300);
+      }
+  }
+
+  // Mostrar popup de erro com a paleta de cores
+  function showErrorPopup(message) {
+      const overlay = document.createElement('div');
+      overlay.className = 'popup-overlay';
+      overlay.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.85);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 9999;
+          animation: fadeIn 0.3s ease;
+      `;
+
+      const popup = document.createElement('div');
+      popup.style.cssText = `
+          background: var(--bg-secondary);
+          border-radius: var(--border-radius);
+          padding: var(--space-xl);
+          width: 90%;
+          max-width: 400px;
+          text-align: center;
+          animation: slideUp 0.4s ease;
+          border: 1px solid var(--border-color);
+          box-shadow: var(--shadow-lg);
+      `;
+
+      popup.innerHTML = `
+          <style>
+              @keyframes fadeIn {
+                  from { opacity: 0; }
+                  to { opacity: 1; }
+              }
+              
+              @keyframes slideUp {
+                  from { 
+                      opacity: 0;
+                      transform: translateY(30px);
+                  }
+                  to { 
+                      opacity: 1;
+                      transform: translateY(0);
+                  }
+              }
+              
+              .error-icon {
+                  font-size: 3rem;
+                  color: var(--danger-color);
+                  margin-bottom: var(--space-md);
+              }
+              
+              .error-title {
+                  color: var(--danger-color);
+                  margin-bottom: var(--space-sm);
+                  font-weight: var(--font-weight-semibold);
+                  font-size: var(--font-size-lg);
+              }
+              
+              .error-message {
+                  color: var(--text-secondary);
+                  margin-bottom: var(--space-lg);
+                  font-size: var(--font-size-md);
+              }
+              
+              .error-btn {
+                  background: var(--danger-color);
+                  color: var(--text-light);
+                  border: none;
+                  padding: var(--space-sm) var(--space-xl);
+                  border-radius: var(--border-radius-sm);
+                  cursor: pointer;
+                  font-weight: var(--font-weight-semibold);
+                  font-size: var(--font-size-md);
+                  transition: all 0.3s ease;
+              }
+              
+              .error-btn:hover {
+                  background: var(--danger-dark);
+                  transform: translateY(-1px);
+              }
+          </style>
+          
+          <div class="error-icon">
+              <i class="fas fa-exclamation-circle"></i>
+          </div>
+          <h3 class="error-title">Erro</h3>
+          <p class="error-message">${message}</p>
+          <button class="error-btn" onclick="this.closest('.popup-overlay').remove(); document.body.style.overflow = '';">
+              Fechar
+          </button>
+      `;
+
+      overlay.appendChild(popup);
+      document.body.appendChild(overlay);
+      document.body.style.overflow = 'hidden';
+      
+      // Fechar com ESC
+      document.addEventListener('keydown', function closeOnEsc(e) {
+          if (e.key === 'Escape') {
+              overlay.remove();
+              document.body.style.overflow = '';
+              document.removeEventListener('keydown', closeOnEsc);
+          }
+      });
+      
+      // Fechar ao clicar fora
+      overlay.addEventListener('click', function(e) {
+          if (e.target === this) {
+              overlay.remove();
+              document.body.style.overflow = '';
+          }
+      });
+  }
   async function openEditarClienteModal(clienteId) {
     const clienteForm = document.getElementById('clienteForm');
     if (clienteForm) clienteForm.reset();
