@@ -3114,3 +3114,144 @@ body {
 .multiple-payments:hover {
     color: #007bff;
 }
+.finance-summary-section {
+    margin: 20px 0;
+    padding: 15px;
+    background: var(--background);
+    border-radius: var(--radius);
+    border-left: 4px solid var(--primary);
+}
+
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.summary-card {
+    background: var(--text-light);
+    padding: 15px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+
+.summary-label {
+    font-size: 0.9em;
+    color: var(--secondary);
+    margin-bottom: 5px;
+}
+
+.summary-value {
+    font-size: 1.8em;
+    font-weight: bold;
+}
+
+.open-value {
+    color: var(--danger);
+}
+
+.paid-value {
+    color: var(--success);
+}
+
+.original-value {
+    color: var(--primary);
+}
+
+.conta-status-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.conta-values {
+    font-size: 0.9em;
+    color: var(--secondary);
+}
+
+.conta-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 10px;
+    margin: 15px 0;
+    padding: 15px;
+    background: var(--background);
+    border-radius: var(--radius);
+}
+
+.info-item {
+    padding: 5px 0;
+}
+
+.info-item.full-width {
+    grid-column: 1 / -1;
+}
+
+.pagamentos-section {
+    margin: 15px 0;
+}
+
+.pagamentos-section h6 {
+    margin-bottom: 10px;
+    color: var(--secondary);
+}
+
+.pagamentos-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.pagamentos-table th {
+    background: var(--primary-light);
+    padding: 10px;
+    text-align: left;
+    border-bottom: 2px solid var(--primary);
+}
+
+.pagamentos-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.pagamentos-table tr:hover {
+    background: var(--background);
+}
+
+.status-badge.pendente {
+    background: var(--danger);
+    color: var(--text-light);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+.status-badge.parcial {
+    background: var(--warning);
+    color: var(--text);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+.status-badge.pago {
+    background: var(--success);
+    color: var(--text-light);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+.status-badge.vencido {
+    background: var(--danger);
+    color: var(--text-light);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+.conta-values strong {
+    color: var(--text-light);
+    font-size: 1.1em;
+}

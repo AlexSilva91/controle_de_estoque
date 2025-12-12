@@ -694,7 +694,6 @@ function closeClientModal() {
     }
 }
 
-// Sua função selectClient existente (mantendo como está)
 function selectClient(client) {
     if (!client) {
         // Define o cliente padrão quando nenhum cliente é selecionado
@@ -716,10 +715,6 @@ function selectClient(client) {
     }
     updateCaixaStatus();
 }
-// Versão alternativa se você quiser passar o objeto cliente diretamente no botão
-// Neste caso, o botão seria: onclick="selectClientForSaleByObject(this)" 
-// E você adicionaria data-attributes no botão com as informações do cliente
-
 function selectClientForSaleByObject(buttonElement) {
     const clientData = {
         id: buttonElement.getAttribute('data-client-id'),
@@ -870,10 +865,31 @@ async function viewClientDetails(clientId) {
             return;
         }
 
-        // Busca as contas a receber do cliente
-        const contasReceber = await findContasReceberByClienteId(clientId);
+        const response = await fetch(`/operador/api/clientes/${clientId}/contas_receber`);
+        
+        if (!response.ok) {
+            throw new Error('Erro ao buscar contas a receber');
+        }
 
-        // Create a modal to display client details
+        const contasReceber = await response.json();
+
+        let totalValorAberto = 0;
+        let totalValorPago = 0;
+        let totalValorOriginal = 0;
+        let totalPagamentosNota = 0;
+        let totalPagamentosConta = 0;
+        
+        contasReceber.forEach(conta => {
+            totalValorOriginal += conta.valor_original || 0;
+            const valorAberto = conta.valor_aberto || 0;
+            const valorPago = (conta.valor_original || 0) - valorAberto;
+            
+            totalValorAberto += valorAberto;
+            totalValorPago += valorPago;
+            totalPagamentosNota += conta.total_pago_nota || 0;
+            totalPagamentosConta += conta.total_pago_conta || 0;
+        });
+
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.id = 'client-details-modal';
@@ -890,28 +906,134 @@ async function viewClientDetails(clientId) {
                             <label>Nome:</label>
                             <p>${client.nome || 'Não informado'}</p>
                         </div>
-                        <!-- ... outros campos do cliente ... -->
                     </div>
                     
-                    <!-- Seção de Contas a Receber -->
+                    <div class="finance-summary-section">
+                        <h4>Resumo Financeiro</h4>
+                        <div class="summary-cards">
+                            <div class="summary-card">
+                                <div class="summary-label">Total em Aberto</div>
+                                <div class="summary-value open-value">${formatCurrency(totalValorAberto)}</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Total Pago</div>
+                                <div class="summary-value paid-value">${formatCurrency(totalValorPago)}</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Total Original</div>
+                                <div class="summary-value original-value">${formatCurrency(totalValorOriginal)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="client-section">
                         <h4>Contas a Receber (${contasReceber.length})</h4>
                         ${contasReceber.length > 0 ?
-                contasReceber.map(conta => `
+                contasReceber.map(conta => {
+                    const valorPagoConta = (conta.valor_original || 0) - (conta.valor_aberto || 0);
+                    const totalPagoGeral = conta.total_pago_geral || 0;
+                    const valorAindaAberto = conta.valor_ainda_aberto || 0;
+                    
+                    return `
                                 <div class="conta-receber-card" data-conta-id="${conta.id}">
                                     <div class="conta-header">
                                         <h5>${conta.descricao || 'Conta sem descrição'}</h5>
-                                        <span class="status-badge ${conta.status}">${conta.status}</span>
+                                        <div class="conta-status-info">
+                                            <span class="status-badge ${conta.status}">${conta.status}</span>
+                                            <span class="conta-values">
+                                                <strong>Pago:</strong>
+                                                <span class="status-badge pago">
+                                                    ${formatCurrency(valorPagoConta)}
+                                                </span>
+                                                |
+                                                <strong>Aberto:</strong>
+                                                <span class="status-badge ${valorAindaAberto > 0 ? 'vencido' : 'pago'}">
+                                                    ${formatCurrency(valorAindaAberto)}
+                                                </span>
+                                            </span>
+                                        </div>
                                     </div>
                                     
                                     <div class="conta-details">
-                                        <div class="conta-info">
-                                            <div><strong>Valor Original:</strong> ${formatCurrency(conta.valor_original)}</div>
-                                            <div><strong>Valor Aberto:</strong> ${formatCurrency(conta.valor_aberto)}</div>
-                                            <div><strong>Vencimento:</strong> ${formatDate(conta.data_vencimento)}</div>
-                                            ${conta.data_pagamento ? `<div><strong>Pagamento:</strong> ${formatDateTime(conta.data_pagamento)}</div>` : ''}
-                                            ${conta.observacoes ? `<div><strong>Observações:</strong> ${conta.observacoes}</div>` : ''}
+                                        <div class="conta-info-grid">
+                                            <div class="info-item">
+                                                <strong>Valor Original:</strong> ${formatCurrency(conta.valor_original)}
+                                            </div>
+                                            <div class="info-item">
+                                                <strong>Valor Aberto:</strong> ${formatCurrency(conta.valor_aberto)}
+                                            </div>
+                                            <div class="info-item">
+                                                <strong>Vencimento:</strong> ${formatDate(conta.data_vencimento)}
+                                            </div>
+                                            <div class="info-item">
+                                                <strong>Emissão:</strong> ${formatDate(conta.data_emissao)}
+                                            </div>
+                                            ${conta.data_pagamento ? `
+                                                <div class="info-item">
+                                                    <strong>Pagamento:</strong> ${formatDateTime(conta.data_pagamento)}
+                                                </div>
+                                            ` : ''}
+                                            ${conta.observacoes ? `
+                                                <div class="info-item full-width">
+                                                    <strong>Observações:</strong> ${conta.observacoes}
+                                                </div>
+                                            ` : ''}
                                         </div>
+                                        
+                                        ${conta.pagamentos_nota_fiscal && conta.pagamentos_nota_fiscal.length > 0 ? `
+                                            <div class="pagamentos-section">
+                                                <h6>Pagamentos da Nota Fiscal</h6>
+                                                <div class="table-container">
+                                                    <table class="pagamentos-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Forma</th>
+                                                                <th>Valor</th>
+                                                                <th>Data</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            ${conta.pagamentos_nota_fiscal.map(pag => `
+                                                                <tr>
+                                                                    <td>${pag.forma_pagamento}</td>
+                                                                    <td>${formatCurrency(pag.valor)}</td>
+                                                                    <td>${formatDate(pag.data)}</td>
+                                                                </tr>
+                                                            `).join('')}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                        
+                                        ${conta.pagamentos_conta_receber && conta.pagamentos_conta_receber.length > 0 ? `
+                                            <div class="pagamentos-section">
+                                                <h6>Pagamentos da Conta</h6>
+                                                <div class="table-container">
+                                                    <table class="pagamentos-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Forma</th>
+                                                                <th>Valor Pago</th>
+                                                                <th>Data</th>
+                                                                ${conta.pagamentos_conta_receber.some(p => p.observacoes) ? '<th>Observações</th>' : ''}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            ${conta.pagamentos_conta_receber.map(pag => `
+                                                                <tr>
+                                                                    <td>${pag.forma_pagamento}</td>
+                                                                    <td>${formatCurrency(pag.valor_pago)}</td>
+                                                                    <td>${formatDate(pag.data_pagamento)}</td>
+                                                                    ${conta.pagamentos_conta_receber.some(p => p.observacoes) ? 
+                                                                        `<td>${pag.observacoes || ''}</td>` : ''}
+                                                                </tr>
+                                                            `).join('')}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        ` : ''}
                                         
                                         ${conta.itens_nota_fiscal && conta.itens_nota_fiscal.length > 0 ? `
                                             <div class="produtos-section">
@@ -965,18 +1087,17 @@ async function viewClientDetails(clientId) {
                                                                     <td colspan="4">
                                                                         <strong>Desconto na Nota ${conta.tipo_desconto_nota ? `(${conta.tipo_desconto_nota})` : ''}:</strong>
                                                                     </td>
-                                                                    <td><strong style="color: #e74c3c;">-${formatCurrency(conta.valor_desconto_nota)}</strong></td>
+                                                                    <td><strong style="color: var(--danger);">-${formatCurrency(conta.valor_desconto_nota)}</strong></td>
                                                                 </tr>
                                                             ` : ''}
-                                                            <tr style="border-top: 2px solid #333;">
+                                                            <tr style="border-top: 2px solid var(--secondary);">
                                                                 <td colspan="4"><strong>Total da Nota:</strong></td>
-                                                                <td><strong style="color: #27ae60; font-size: 1.1em;">${formatCurrency(conta.valor_total_nota)}</strong></td>
+                                                                <td><strong style="color: var(--success); font-size: 1.1em;">${formatCurrency(conta.valor_total_nota)}</strong></td>
                                                             </tr>
                                                         </tfoot>
                                                     </table>
                                                 </div>
                                                 
-                                                <!-- Resumo da venda -->
                                                 <div class="venda-resumo">
                                                     <div class="resumo-item">
                                                         <span>Total de Itens:</span>
@@ -986,18 +1107,9 @@ async function viewClientDetails(clientId) {
                                                         <span>Quantidade Total:</span>
                                                         <strong>${conta.itens_nota_fiscal.reduce((sum, item) => sum + item.quantidade, 0)} unidades</strong>
                                                     </div>
-                                                    ${conta.itens_nota_fiscal.some(item => item.desconto_aplicado > 0) || conta.valor_desconto_nota > 0 ? `
-                                                        <div class="resumo-item">
-                                                            <span>Total de Descontos:</span>
-                                                            <strong style="color: #e74c3c;">${formatCurrency(
-                    conta.itens_nota_fiscal.reduce((sum, item) => sum + (item.desconto_aplicado || 0), 0) +
-                    (conta.valor_desconto_nota || 0)
-                )}</strong>
-                                                        </div>
-                                                    ` : ''}
                                                 </div>
                                             </div>
-                                        ` : '<p class="no-products">Nenhum produto encontrado para esta conta</p>'}
+                                        ` : conta.nota_fiscal_id ? '<p class="no-products">Nota fiscal sem produtos cadastrados</p>' : '<p class="no-products">Sem nota fiscal associada</p>'}
                                     </div>
                                     
                                     <div class="conta-actions">
@@ -1018,7 +1130,8 @@ async function viewClientDetails(clientId) {
                                         </button>
                                     </div>
                                 </div>
-                            `).join('') :
+                            `;
+                }).join('') :
                 '<p class="no-accounts">Nenhuma conta a receber encontrada</p>'}
                     </div>
                 </div>
@@ -1030,24 +1143,20 @@ async function viewClientDetails(clientId) {
 
         document.body.appendChild(modal);
 
-        // Add event listeners for closing the modal
         modal.querySelectorAll('.modal-close').forEach(closeBtn => {
             closeBtn.addEventListener('click', () => {
                 modal.remove();
             });
         });
 
-        // Show the modal
         modal.style.display = 'flex';
 
-        // Close modal when clicking outside
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.remove();
             }
         });
 
-        // Add event listeners for payment buttons
         modal.querySelectorAll('.btn-pay-partial').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const contaId = e.target.getAttribute('data-conta-id');
@@ -1063,6 +1172,7 @@ async function viewClientDetails(clientId) {
                 confirmFullPayment(contaId, valorAberto);
             });
         });
+        
         modal.querySelectorAll('.btn-receipt').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const contaId = e.target.getAttribute('data-conta-id');
