@@ -1455,7 +1455,6 @@ def gerar_pdf_vendas_dia():
 @operador_required
 def api_get_saldo():
     try:
-        # Busca apenas o caixa do operador logado
         caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
 
         if not caixa:
@@ -1468,13 +1467,11 @@ def api_get_saldo():
                 'message': 'Você não possui caixa aberto',
                 'caixa_id': None
             })
-
-        # --- Total de VENDAS do dia (entrada, categoria 'venda') ---
+        
         hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
         data_inicio = datetime.combine(hoje, time.min).replace(tzinfo=ZoneInfo('America/Sao_Paulo'))
         data_fim = datetime.combine(hoje, time.max).replace(tzinfo=ZoneInfo('America/Sao_Paulo'))
 
-        # Filtra vendas apenas do caixa do operador atual, excluindo notas canceladas
         lancamentos = db.session.query(Financeiro).join(
             NotaFiscal,
             Financeiro.nota_fiscal_id == NotaFiscal.id,
@@ -1485,7 +1482,6 @@ def api_get_saldo():
             Financeiro.data >= data_inicio,
             Financeiro.data <= data_fim,
             Financeiro.caixa_id == caixa.id,
-            # Filtro para notas fiscais: ou é nula (não tem nota) ou não está cancelada
             db.or_(
                 NotaFiscal.id.is_(None),
                 NotaFiscal.status != StatusNota.cancelada
@@ -1496,8 +1492,6 @@ def api_get_saldo():
         for lanc in lancamentos:
             total_vendas += Decimal(str(lanc.valor))
 
-        # --- Total de DESPESAS do dia ---
-        # Busca despesas apenas do caixa do operador atual
         despesas = db.session.query(Financeiro).filter(
             Financeiro.tipo == TipoMovimentacao.saida,
             Financeiro.categoria == CategoriaFinanceira.despesa,
@@ -1510,8 +1504,6 @@ def api_get_saldo():
         for desp in despesas:
             total_despesas += Decimal(str(desp.valor))
 
-        # --- NOVO: Total em DINHEIRO das vendas do dia ---
-        # Busca todas as notas fiscais do dia que não estão canceladas
         notas_dia = db.session.query(NotaFiscal).filter(
             NotaFiscal.caixa_id == caixa.id,
             NotaFiscal.data_emissao >= data_inicio,
@@ -1522,20 +1514,15 @@ def api_get_saldo():
         total_dinheiro = Decimal('0.00')
         
         for nota in notas_dia:
-            # Verifica se é uma venda (não é estorno)
             if nota.valor_total > 0:
-                # Verifica os pagamentos da nota
                 if nota.pagamentos:
-                    # Se tem pagamentos múltiplos, soma apenas os em dinheiro
                     for pagamento in nota.pagamentos:
                         if pagamento.forma_pagamento == FormaPagamento.dinheiro:
                             total_dinheiro += Decimal(str(pagamento.valor))
                 else:
-                    # Se não tem pagamentos múltiplos, verifica a forma de pagamento da nota
                     if nota.forma_pagamento == FormaPagamento.dinheiro:
                         total_dinheiro += Decimal(str(nota.valor_total))
 
-        # Busca despesas pagas em dinheiro
         despesas_dinheiro = db.session.query(Financeiro).filter(
             Financeiro.caixa_id == caixa.id,
             Financeiro.data >= data_inicio,
@@ -1547,8 +1534,9 @@ def api_get_saldo():
         for despesa in despesas_dinheiro:
             total_dinheiro -= Decimal(str(despesa.valor))
 
-        # --- Lógica do saldo: abertura + vendas - despesas ---
         abertura = Decimal(str(caixa.valor_abertura))
+        total_dinheiro += abertura
+
         saldo = total_vendas - total_despesas
 
         return jsonify({
@@ -1567,7 +1555,6 @@ def api_get_saldo():
     except Exception as e:
         logger.error(f"Erro ao calcular saldo para operador {current_user.nome}: {str(e)}")
         return jsonify({'error': str(e)}), 500
-
 
 @operador_bp.route('/api/cliente/detalhes/<int:cliente_id>', methods=['GET'])
 @login_required
