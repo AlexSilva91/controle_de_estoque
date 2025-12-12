@@ -1655,7 +1655,7 @@ async function addProductToSale(product, initialQuantity = 1) {
         initialQuantity,
         discounts
     );
-
+    const uniqueId = `${product.id}_${Date.now()}`;
     const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
 
     if (existingProductIndex >= 0) {
@@ -1674,6 +1674,7 @@ async function addProductToSale(product, initialQuantity = 1) {
         selectedProducts[existingProductIndex].discountInfo = newPriceInfo.discountInfo;
     } else {
         selectedProducts.push({
+            uniqueId: uniqueId,
             id: product.id,
             name: product.nome,
             description: product.descricao || '',
@@ -1910,6 +1911,7 @@ function renderProductsList() {
         const discountValue = originalTotalValue - totalValue;
 
         const row = document.createElement('tr');
+        row.dataset.uniqueId = product.uniqueId; 
         row.innerHTML = `
             <td>
                 ${product.name}
@@ -1972,11 +1974,21 @@ function renderProductsList() {
 
     document.querySelectorAll('.btn-remove').forEach(button => {
         button.addEventListener('click', function () {
-            removeProductRow(button);
+            const uniqueId = this.dataset.uniqueId;
+            removeProductByUniqueId(uniqueId);
         });
     });
 }
-
+function removeProductByUniqueId(uniqueId) {
+    const indexToRemove = selectedProducts.findIndex(p => p.uniqueId === uniqueId);
+    
+    if (indexToRemove !== -1) {
+        console.log('Removendo produto:', selectedProducts[indexToRemove].name);
+        selectedProducts.splice(indexToRemove, 1);
+        renderProductsList();
+        calculateSaleTotal();
+    }
+}
 
 async function updateProductQuantity(input) {
     const index = parseInt(input.dataset.index);
