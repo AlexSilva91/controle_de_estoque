@@ -1535,43 +1535,13 @@ def api_get_saldo():
                     if nota.forma_pagamento == FormaPagamento.dinheiro:
                         total_dinheiro += Decimal(str(nota.valor_total))
 
-        # --- NOVO: Subtrair estornos de vendas em dinheiro ---
-        # Busca estornos (vendas com valor negativo) que foram em dinheiro
-        notas_estorno_dinheiro = db.session.query(NotaFiscal).filter(
-            NotaFiscal.caixa_id == caixa.id,
-            NotaFiscal.data_emissao >= data_inicio,
-            NotaFiscal.data_emissao <= data_fim,
-            NotaFiscal.status == StatusNota.emitida,
-            NotaFiscal.valor_total < 0
-        ).all()
-        
-        for nota_estorno in notas_estorno_dinheiro:
-            # Verifica se o estorno foi de uma venda em dinheiro
-            if nota_estorno.pagamentos:
-                # Se tem pagamentos múltiplos
-                for pagamento in nota_estorno.pagamentos:
-                    if pagamento.forma_pagamento == FormaPagamento.dinheiro:
-                        # Subtrai o valor do estorno (já é negativo, então subtrai valor absoluto)
-                        total_dinheiro -= abs(Decimal(str(pagamento.valor)))
-            else:
-                # Se não tem pagamentos múltiplos
-                if nota_estorno.forma_pagamento == FormaPagamento.dinheiro:
-                    # Subtrai o valor do estorno (já é negativo, então subtrai valor absoluto)
-                    total_dinheiro -= abs(Decimal(str(nota_estorno.valor_total)))
-
-        # --- NOVO: Subtrair despesas em dinheiro ---
         # Busca despesas pagas em dinheiro
         despesas_dinheiro = db.session.query(Financeiro).filter(
             Financeiro.caixa_id == caixa.id,
             Financeiro.data >= data_inicio,
             Financeiro.data <= data_fim,
             Financeiro.tipo == TipoMovimentacao.saida,
-            Financeiro.categoria == CategoriaFinanceira.despesa,
-            # Busca despesas pagas em dinheiro pelo campo forma_pagamento
-            db.or_(
-                Financeiro.descricao.ilike('%dinheiro%'),  # Descrição contém "dinheiro"
-                # Se tiver um campo específico para forma de pagamento, adicione aqui
-            )
+            Financeiro.categoria == CategoriaFinanceira.despesa
         ).all()
         
         for despesa in despesas_dinheiro:

@@ -6,35 +6,27 @@ from flask import Flask, abort, request, g, send_from_directory, render_template
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from werkzeug.exceptions import HTTPException
-from datetime import datetime
 from config import config
 from app.models.entities import Usuario
 from app.models import db
 from .routes import init_app
 
-
-# --------------------
-# Configuração de logging
-# --------------------
 def configure_logging(app):
     formatter = logging.Formatter(
         "[%(asctime)s] [%(levelname)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"
     )
 
-    # --- Arquivo ---
     file_handler = RotatingFileHandler(
         "logs/app.log", maxBytes=5*1024*1024, backupCount=5, encoding="utf-8"
     )
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.INFO)
 
-    # --- Console ---
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     console_handler.setLevel(logging.DEBUG)
 
-    # Limpa handlers antigos
     if app.logger.hasHandlers():
         app.logger.handlers.clear()
 
@@ -42,9 +34,6 @@ def configure_logging(app):
     app.logger.addHandler(file_handler)
     app.logger.addHandler(console_handler)
 
-    # --------------------
-    # Timer e log detalhado de requisições
-    # --------------------
     @app.before_request
     def start_timer():
         g.start_time = time.time()
@@ -58,14 +47,12 @@ def configure_logging(app):
         status = response.status_code
         size = response.calculate_content_length() or 0
 
-        # Dados da requisição
         request_data = {
             "args": request.args.to_dict(),
             "form": request.form.to_dict(),
             "json": request.get_json(silent=True)
         }
 
-        # Corpo da resposta (limitado)
         try:
             response_body = response.get_data(as_text=True)
             if len(response_body) > 1000:
@@ -87,27 +74,17 @@ def configure_logging(app):
         app.logger.info(f'{method} {path} {status}', extra={'extra_data': extra})
         return response
 
-
-# --------------------
-# Criação do app Flask
-# --------------------
 def create_app(config_name='development'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
     app.jinja_env.cache = {}
 
-    # Logging
     configure_logging(app)
 
-    # DB e Migrations
     db.init_app(app)
     Migrate(app, db)
 
-    # Importa eventos de auditoria (ativa os listeners globais)
-    from app.models import audit_events
-
-    # Login
     login_manager = LoginManager()
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
@@ -116,10 +93,12 @@ def create_app(config_name='development'):
     def load_user(user_id):
         return Usuario.query.get(int(user_id))
 
-    # Rotas
     init_app(app)
 
-    # Favicon
+    from app.models import audit_events
+    with app.app_context():
+        audit_events.setup_audit_events()
+
     @app.route('/favicon.ico')
     def favicon():
         return send_from_directory(
@@ -128,7 +107,6 @@ def create_app(config_name='development'):
             mimetype='image/vnd.microsoft.icon'
         )
 
-    # No-cache
     @app.after_request
     def add_no_cache_headers(response):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0, private"
@@ -136,9 +114,6 @@ def create_app(config_name='development'):
         response.headers["Expires"] = "0"
         return response
 
-    # --------------------
-    # Tratamento de erros
-    # --------------------
     @app.errorhandler(400)
     def bad_request_error(e):
         app.logger.warning(f"400 Bad Request em {request.path}: {e}")
@@ -177,7 +152,6 @@ def create_app(config_name='development'):
         app.logger.exception("Erro não tratado:")
         return render_template("errors/500.html"), 500
 
-    # Rotas de teste de erro
     @app.route("/test-400")
     def test_400():
         abort(400, description="Teste de Bad Request")
