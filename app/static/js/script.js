@@ -5847,19 +5847,19 @@ setTimeout(inicializarBusca, 500);
         if (pagamentosTbody) {
           pagamentosTbody.innerHTML = '';
 
-          if (conta.pagamentos && conta.pagamentos.length > 0) {
-            conta.pagamentos.forEach(pag => {
-              const tr = document.createElement('tr');
-              tr.innerHTML = `
-                              <td>${pag.data_pagamento}</td>
-                              <td>${formatarMoeda(pag.valor_pago)}</td>
-                              <td>${formatarFormaPagamento(pag.forma_pagamento)}</td>
-                              <td>${pag.observacoes || '-'}</td>
-                          `;
-              pagamentosTbody.appendChild(tr);
+         if (conta.pagamentos_efetuados && conta.pagamentos_efetuados.length > 0) {
+            conta.pagamentos_efetuados.forEach(p => {
+              pagamentosTbody.innerHTML += `
+                <tr>
+                  <td>${p.data_pagamento}</td>
+                  <td>${formatarMoeda(p.valor_pago)}</td>
+                  <td>${formatarFormaPagamento(p.forma_pagamento)}</td>
+                </tr>
+              `;
             });
           } else {
-            pagamentosTbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
+            pagamentosTbody.innerHTML =
+              '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
           }
         } else {
           console.error('Elemento detalhePagamentos não encontrado');

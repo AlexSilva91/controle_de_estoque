@@ -6082,6 +6082,13 @@ def contas_receber():
 def conta_receber_detalhes(id):
     conta = ContaReceber.query.get_or_404(id)
 
+    pagamento_efetuados = (
+        PagamentoContaReceber.query
+        .filter(PagamentoContaReceber.conta_id == conta.id)
+        .order_by(PagamentoContaReceber.data_pagamento.asc())
+        .all()
+    )
+
     caixas = Caixa.query.order_by(Caixa.data_abertura.desc()).all()
     caixas_json = [{
         'id': c.id,
@@ -6163,7 +6170,7 @@ def conta_receber_detalhes(id):
             'documento': conta.cliente.documento or ''
         },
 
-        # ---- PAGAMENTOS DA CONTA ----
+        # ---- SAÍDA ATUAL (NÃO ALTERADA) ----
         'pagamentos_conta': [
             {
                 'id': p.id,
@@ -6176,10 +6183,22 @@ def conta_receber_detalhes(id):
             for p in conta.pagamentos
         ],
 
+        # ---- NOVO RETORNO (SEM IMPACTAR O ANTERIOR) ----
+        'pagamentos_efetuados': [
+            {
+                'id': p.id,
+                'valor_pago': float(p.valor_pago),
+                'forma_pagamento': p.forma_pagamento.value,
+                'data_pagamento': p.data_pagamento.strftime('%d/%m/%Y %H:%M'),
+                'caixa_id': p.caixa_id
+            }
+            for p in pagamento_efetuados
+        ],
+
         # ---- NOTA FISCAL COMPLETA ----
         'nota_fiscal': nota_json,
 
-        # ---- CAIXAS (PARA SELEÇÃO NO FRONT) ----
+        # ---- CAIXAS ----
         'caixas': caixas_json
     })
 
