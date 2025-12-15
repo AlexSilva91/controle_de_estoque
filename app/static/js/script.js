@@ -5583,11 +5583,14 @@ setTimeout(inicializarBusca, 500);
       const dataInicio = document.getElementById('contasReceberDataInicio')?.value || '';
       const dataFim = document.getElementById('contasReceberDataFim')?.value || '';
       const status = document.getElementById('contasReceberStatus')?.value || '';
+      const clienteNome = document.getElementById('contasReceberCliente')?.value.trim() || '';
 
       const params = new URLSearchParams();
+
       if (dataInicio) params.append('data_emissao_inicio', dataInicio);
       if (dataFim) params.append('data_emissao_fim', dataFim);
       if (status) params.append('status', status);
+      if (clienteNome) params.append('cliente_nome', clienteNome);
 
       const response = await fetch(`/admin/contas-receber?${params.toString()}`);
 
@@ -5597,14 +5600,13 @@ setTimeout(inicializarBusca, 500);
 
       const data = await response.json();
 
-      if (data && data.contas && data.contas.length > 0) {
-        contasReceberData = data.contas;
-        atualizarTabelaContasReceber();
-      } else {
-        contasReceberData = [];
-        atualizarTabelaContasReceber();
+      contasReceberData = data?.contas || [];
+      atualizarTabelaContasReceber();
+
+      if (contasReceberData.length === 0) {
         showFlashMessage('warning', 'Nenhuma conta encontrada com os filtros aplicados');
       }
+
     } catch (error) {
       showFlashMessage('error', 'Erro ao carregar contas a receber');
     }
@@ -5703,7 +5705,7 @@ setTimeout(inicializarBusca, 500);
               <td>${formatarData(conta.data_vencimento)}</td>
               <td><span class="badge ${statusClass}">${statusText}</span></td>
               <td>
-                  <button class="btn btn-sm btn-info btn-detalhes-conta" data-id="${conta.id}" title="Detalhes">
+                  <button class="btn btn-detalhes-conta" data-id="${conta.id}" title="Detalhes">
                       <i class="fas fa-eye"></i>
                   </button>
                   <button class="btn btn-sm btn-danger btn-pdf-conta" data-pdf-id="${conta.id}" title="Gerar PDF">
