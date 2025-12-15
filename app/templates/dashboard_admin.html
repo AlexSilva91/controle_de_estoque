@@ -603,10 +603,8 @@
                                 <table id="tabelaContasReceber">
                                     <thead>
                                         <tr>
-                                            <th>ID</th>
                                             <th>Cliente</th>
                                             <th>Documento</th>
-                                            <th>Descrição</th>
                                             <th>Valor Total</th>
                                             <th>Valor Pendente</th>
                                             <th>Emissão</th>
@@ -684,7 +682,46 @@
                                         </tbody>
                                     </table>
                                 </div>
+                                <hr class="my-4">
+                                    <div id="areaNotaFiscal" class="mb-4" style="display:none;">
+                                        <div class="row mt-2">
+                                            <div class="col-md-4">
+                                                <div class="detail-item">
+                                                    <label>Desconto:</label>
+                                                    <div class="value" id="nfValorDesconto"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
 
+                                    <h5 class="mb-2">Produtos da Nota</h5>
+                                    <div class="table-responsive mb-4">
+                                        <table class="table table-sm table-bordered">
+                                            <thead>
+                                                <tr>
+                                                    <th>Produto</th>
+                                                    <th>Qtd</th>
+                                                    <th>V. Unit.</th>
+                                                    <th>Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="nfItens"></tbody>
+                                        </table>
+                                    </div>
+
+                                    <h5 class="mb-2">Pagamentos da Nota</h5>
+                                    <div class="table-responsive mb-4">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>Data</th>
+                                                    <th>Valor</th>
+                                                    <th>Forma</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="nfPagamentos"></tbody>
+                                        </table>
+                                    </div>
                                 <h4 class="mb-3">Registrar Pagamento</h4>
                                 <div id="areaPagamento">
                                     <form id="formPagamentoConta">

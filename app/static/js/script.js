@@ -5695,10 +5695,8 @@ setTimeout(inicializarBusca, 500);
       }
 
       tr.innerHTML = `
-              <td>${conta.id}</td>
               <td>${conta.cliente.nome}</td>
               <td>${conta.cliente.documento || ''}</td>
-              <td>${conta.descricao || '-'}</td>
               <td>${formatarMoeda(conta.valor_original)}</td>
               <td>${formatarMoeda(conta.valor_aberto)}</td>
               <td>${formatarData(conta.data_emissao)}</td>
@@ -5749,7 +5747,7 @@ setTimeout(inicializarBusca, 500);
 
         // Preencher detalhes básicos
         document.getElementById('contaIdPagamento').value = conta.id;
-        document.getElementById('detalheClienteNome').textContent = conta.cliente;
+        document.getElementById('detalheClienteNome').textContent = conta.cliente.nome;
         document.getElementById('detalheClienteDocumento').textContent = conta.cliente_documento || 'Não informado';
         document.getElementById('detalheDescricao').textContent = conta.descricao || 'Sem descrição';
         document.getElementById('detalheValorTotal').textContent = formatarMoeda(conta.valor_original);
@@ -5790,6 +5788,56 @@ setTimeout(inicializarBusca, 500);
             const pagamentoSection = document.getElementById('areaPagamento');
             if (pagamentoSection) pagamentoSection.style.display = '';
           }
+        }
+        // ===============================
+        // NOTA FISCAL
+        // ===============================
+        if (conta.nota_fiscal) {
+          const nf = conta.nota_fiscal;
+
+          document.getElementById('areaNotaFiscal').style.display = '';
+          document.getElementById('nfValorDesconto').textContent = formatarMoeda(nf.valor_desconto);
+
+          // -------- ITENS ----------
+          const itensTbody = document.getElementById('nfItens');
+          itensTbody.innerHTML = '';
+
+          if (nf.itens.length) {
+            nf.itens.forEach(i => {
+              itensTbody.innerHTML += `
+                <tr>
+                  <td>${i.produto}</td>
+                  <td>${i.quantidade}</td>
+                  <td>${formatarMoeda(i.valor_unitario)}</td>
+                  <td>${formatarMoeda(i.valor_total)}</td>
+                </tr>
+              `;
+            });
+          } else {
+            itensTbody.innerHTML =
+              '<tr><td colspan="4" class="text-center">Nenhum item</td></tr>';
+          }
+
+          // -------- PAGAMENTOS DA NOTA ----------
+          const nfPagTbody = document.getElementById('nfPagamentos');
+          nfPagTbody.innerHTML = '';
+
+          if (nf.pagamentos_nota.length) {
+            nf.pagamentos_nota.forEach(p => {
+              nfPagTbody.innerHTML += `
+                <tr>
+                  <td>${p.data}</td>
+                  <td>${formatarMoeda(p.valor)}</td>
+                  <td>${formatarFormaPagamento(p.forma_pagamento)}</td>
+                </tr>
+              `;
+            });
+          } else {
+            nfPagTbody.innerHTML =
+              '<tr><td colspan="3" class="text-center">Nenhum pagamento</td></tr>';
+          }
+        } else {
+          document.getElementById('areaNotaFiscal').style.display = 'none';
         }
 
         // Preencher pagamentos
