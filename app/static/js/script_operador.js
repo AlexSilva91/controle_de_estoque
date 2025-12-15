@@ -3354,7 +3354,6 @@ async function updateBalance(forceUpdate = false) {
         if (data.message === 'Nenhum caixa aberto encontrado') {
             if (openingBalanceLabel) openingBalanceLabel.textContent = 'Caixa fechado';
             if (currentBalanceLabel) currentBalanceLabel.textContent = '';
-            if (currentMoneyLabel) currentMoneyLabel.textContent = '';
             return;
         }
 
@@ -3362,11 +3361,9 @@ async function updateBalance(forceUpdate = false) {
         if (balanceVisible) {
             if (openingBalanceLabel) openingBalanceLabel.textContent = formatCurrency(data.valor_abertura);
             if (currentBalanceLabel) currentBalanceLabel.textContent = data.saldo_formatado || 'R$ 0,00';
-            if (currentMoneyLabel) currentMoneyLabel.textContent = data.total_dinheiro_formatado || 'R$ 0,00';
         } else {
             if (openingBalanceLabel) openingBalanceLabel.textContent = '******';
             if (currentBalanceLabel) currentBalanceLabel.textContent = '******';
-            if (currentMoneyLabel) currentMoneyLabel.textContent = '******';
         }
 
         // Atualiza o saldo atual na variável global
@@ -3379,7 +3376,6 @@ async function updateBalance(forceUpdate = false) {
         console.error('Error updating balance:', error);
         if (openingBalanceLabel) openingBalanceLabel.textContent = 'Erro';
         if (currentBalanceLabel) currentBalanceLabel.textContent = '';
-        if (currentMoneyLabel) currentMoneyLabel.textContent = '';
     }
 }
 
@@ -3405,10 +3401,8 @@ async function closeRegister() {
         </div>
     `;
 
-    // Adicionar ao corpo do documento
     document.body.appendChild(modal);
 
-    // Adicionar estilos básicos (pode mover para CSS)
     const style = document.createElement('style');
     style.textContent = `
         .custom-modal {
@@ -3458,64 +3452,39 @@ async function closeRegister() {
     `;
     document.head.appendChild(style);
 
-    // Configurar máscara para o input de valor
     const valorInput = document.getElementById('fechamento-valor');
     const observacaoInput = document.getElementById('fechamento-observacao');
-    if (valorInput) {
-        valorInput.addEventListener('input', function (e) {
-            let value = e.target.value.replace(/\D/g, '');
-            value = (value / 100).toLocaleString('pt-BR', {
-                style: 'decimal',
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-            e.target.value = value;
+
+    valorInput.addEventListener('input', e => {
+        let value = e.target.value.replace(/\D/g, '');
+        value = (value / 100).toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
         });
-    }
+        e.target.value = value;
+    });
 
-    // Retornar uma Promise que resolve quando o modal é confirmado ou rejeitado
-    return new Promise(async (resolve, reject) => {
-        // Evento de confirmação
-        document.getElementById('confirm-fechamento')?.addEventListener('click', async () => {
-            const valorText = valorInput?.value.replace(/\./g, '').replace(',', '.');
+    return new Promise((resolve, reject) => {
+
+        document.getElementById('confirm-fechamento').addEventListener('click', async () => {
+            const valorText = valorInput.value.replace(/\./g, '').replace(',', '.');
             const valorNumerico = parseFloat(valorText);
-            const observacao = observacaoInput?.value || "";
+            const observacao = observacaoInput.value || "";
 
-            if (!valorText || isNaN(valorNumerico) || valorNumerico <= 0) {
+            if (isNaN(valorNumerico) || valorNumerico <= 0) {
                 showMessage('Valor de fechamento inválido', 'error');
                 return;
             }
 
             try {
-                // Primeiro gerar o relatório PDF
-                const pdfResponse = await fetch('/operador/api/vendas/relatorio-diario-pdf', {
-                    ...preventCacheConfig,
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-
-                if (!pdfResponse.ok) {
-                    throw new Error('Erro ao gerar relatório PDF');
-                }
-
-                const pdfBlob = await pdfResponse.blob();
-                const pdfUrl = URL.createObjectURL(pdfBlob);
-                const a = document.createElement('a');
-                a.href = pdfUrl;
-                a.download = `relatorio_caixa_${new Date().toISOString().split('T')[0]}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(pdfUrl);
-
-                // Depois realizar o fechamento do caixa com observação
+                // 1️⃣ FECHA O CAIXA PRIMEIRO
                 const fechamentoResponse = await fetch('/operador/api/fechar-caixa', {
                     ...preventCacheConfig,
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         valor_fechamento: valorNumerico,
-                        observacao: observacao
+                        observacao
                     })
                 });
 
@@ -3524,22 +3493,26 @@ async function closeRegister() {
                     throw new Error(errorData.error || 'Erro ao fechar caixa');
                 }
 
-                const now = new Date();
-                showMessage(`Caixa fechado às ${now.toLocaleTimeString('pt-BR')}`);
+                // 2️⃣ AGORA ABRE O PDF EM NOVA ABA (caixa já fechado)
+                window.open(
+                    '/operador/api/vendas/relatorio-diario-pdf',
+                    '_blank'
+                );
+
+                showMessage('Caixa fechado com sucesso', 'success');
                 await checkCaixaStatus();
 
                 modal.remove();
                 style.remove();
-
                 resolve(true);
+
             } catch (error) {
                 showMessage(error.message, 'error');
                 reject(error);
             }
         });
 
-        // Evento de cancelamento
-        document.getElementById('cancel-fechamento')?.addEventListener('click', () => {
+        document.getElementById('cancel-fechamento').addEventListener('click', () => {
             showMessage('Operação cancelada', 'warning');
             modal.remove();
             style.remove();

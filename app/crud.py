@@ -408,6 +408,23 @@ def get_caixa_aberto(db: Session, operador_id: int):
         Caixa.status == StatusCaixa.aberto,
         Caixa.operador_id == operador_id
     ).first()
+
+def get_caixa_atual(db: Session, operador_id: int):
+    hoje = datetime.now().date()
+
+    return (
+        db.query(Caixa)
+        .filter(
+            Caixa.operador_id == operador_id,
+            Caixa.status == StatusCaixa.fechado,
+            Caixa.data_fechamento >= datetime.combine(hoje, datetime.min.time()),
+            Caixa.data_fechamento <= datetime.combine(hoje, datetime.max.time())
+        )
+        .order_by(
+            Caixa.data_fechamento.desc()
+        )
+        .first()
+    )
     
 def get_caixas_abertos(db: Session):
     """

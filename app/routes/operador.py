@@ -48,6 +48,7 @@ from app.crud import (
     TipoMovimentacao,
     buscar_pagamentos_notas_fiscais,
     estornar_venda,
+    get_caixa_atual,
     listar_despesas_dia_atual_formatado,
     listar_despesas_do_dia,
     obter_detalhes_vendas_dia,
@@ -1149,19 +1150,16 @@ def gerar_pdf_vendas_dia():
     from PIL import Image as PILImage
     import math
 
-    # Configuração IDÊNTICA para bobina 80mm
-    bobina_width = 226  # Exatamente igual
-    bobina_height = 3000  # Exatamente igual
+    bobina_width = 226
+    bobina_height = 3000
     
-    # Obter caixa aberto do operador atual
-    caixa = get_caixa_aberto(db.session, operador_id=current_user.id)
+    caixa = get_caixa_atual(db.session, operador_id=current_user.id)
     if not caixa:
         logger.error("Nenhum caixa aberto encontrado para o operador atual")
         return jsonify({'success': False, 'message': 'Nenhum caixa aberto encontrado para o operador'}), 400
     
     caixa_id = caixa.id
 
-    # Tratar parâmetros de data
     data_str = request.args.get('data')
     data = None
     if data_str:
@@ -1172,29 +1170,89 @@ def gerar_pdf_vendas_dia():
             return jsonify({'success': False, 'message': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
 
     data_relatorio = data if data else datetime.now().date()
+    inicio_dia = datetime.combine(data_relatorio, datetime.min.time())
+    fim_dia = datetime.combine(data_relatorio, datetime.max.time())
 
-    # Obter dados das vendas
-    resultado = obter_detalhes_vendas_dia(data, caixa_id, current_user.id)
-    if not resultado['success']:
-        logger.error("Erro ao obter detalhes das vendas do dia")
-        dados = {
-            'vendas': [],
-            'total_descontos': 0,
-            'total_saidas': 0,
-            'por_forma_pagamento': {}
-        }
-    else:
-        dados = resultado['data']
-
-    # BUSCAR CONTAS A RECEBER PAGAS NO DIA (igual ao método da outra rota)
-    total_contas_receber_pagas = 0
+    session = Session(db.engine)
     try:
-        # Calcular início e fim do dia
-        inicio_dia = datetime.combine(data_relatorio, datetime.min.time())
-        fim_dia = datetime.combine(data_relatorio, datetime.max.time())
+        operador_nome = caixa.operador.nome if caixa.operador else "Operador não identificado"
+        caixa_data = caixa.data_fechamento if caixa.data_fechamento else caixa.data_abertura
+
+        pagamentos_notas = session.query(
+            PagamentoNotaFiscal.forma_pagamento,
+            func.sum(PagamentoNotaFiscal.valor).label('total')
+        ).join(
+            NotaFiscal,
+            PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+        ).filter(
+            NotaFiscal.caixa_id == caixa_id,
+            NotaFiscal.status == StatusNota.emitida,
+            NotaFiscal.data_emissao >= inicio_dia,
+            NotaFiscal.data_emissao <= fim_dia
+        ).group_by(
+            PagamentoNotaFiscal.forma_pagamento
+        ).all()
         
-        # Buscar pagamentos de contas a receber (igual)
-        total_contas_receber_pagas = db.session.query(
+        pagamentos_contas = session.query(
+            PagamentoContaReceber.forma_pagamento,
+            func.sum(PagamentoContaReceber.valor_pago).label('total')
+        ).filter(
+            PagamentoContaReceber.caixa_id == caixa_id,
+            PagamentoContaReceber.data_pagamento >= inicio_dia,
+            PagamentoContaReceber.data_pagamento <= fim_dia
+        ).group_by(
+            PagamentoContaReceber.forma_pagamento
+        ).all()
+        
+        total_entradas = 0.0
+        formas_pagamento = {}
+        
+        for forma, total in pagamentos_notas:
+            valor = float(total) if total else 0.0
+            formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor
+            total_entradas += valor
+            
+        for forma, total in pagamentos_contas:
+            valor = float(total) if total else 0.0
+            formas_pagamento[forma.value] = formas_pagamento.get(forma.value, 0) + valor
+            total_entradas += valor
+
+        total_saidas = session.query(
+            func.sum(Financeiro.valor)
+        ).filter(
+            Financeiro.caixa_id == caixa_id,
+            Financeiro.tipo == TipoMovimentacao.saida,
+            Financeiro.categoria == CategoriaFinanceira.despesa,
+            Financeiro.data >= inicio_dia,
+            Financeiro.data <= fim_dia
+        ).scalar() or 0.0
+        
+        total_saidas = float(total_saidas)
+
+        valor_dinheiro = formas_pagamento.get('dinheiro', 0.0)
+        valor_fisico = valor_dinheiro
+        
+        if caixa.valor_fechamento and caixa.valor_abertura:
+            valor_abertura = float(caixa.valor_abertura)
+            valor_fechamento = float(caixa.valor_fechamento)
+            valor_fisico = max((valor_dinheiro + valor_abertura) - valor_fechamento - total_saidas, 0.0)
+
+            parte_inteira = math.floor(valor_fisico)
+            parte_decimal = valor_fisico - parte_inteira
+            
+        formas_pagamento['dinheiro'] = valor_fisico
+        valor_digital = sum([
+            formas_pagamento.get('pix_loja', 0.0),
+            formas_pagamento.get('pix_fabiano', 0.0),
+            formas_pagamento.get('pix_edfrance', 0.0),
+            formas_pagamento.get('pix_maquineta', 0.0),
+            formas_pagamento.get('cartao_debito', 0.0),
+            formas_pagamento.get('cartao_credito', 0.0)
+        ])
+
+        a_prazo = formas_pagamento.get('a_prazo', 0.0)
+        
+        total_contas_prazo_recebidas = session.query(
             func.sum(PagamentoContaReceber.valor_pago)
         ).filter(
             PagamentoContaReceber.caixa_id == caixa_id,
@@ -1202,252 +1260,184 @@ def gerar_pdf_vendas_dia():
             PagamentoContaReceber.data_pagamento <= fim_dia
         ).scalar() or 0.0
         
-        total_contas_receber_pagas = float(total_contas_receber_pagas)
-            
-    except Exception as e:
-        logger.error(f"Erro ao buscar contas a receber pagas: {str(e)}", exc_info=True)
-        total_contas_receber_pagas = 0
+        total_contas_prazo_recebidas = float(total_contas_prazo_recebidas)
 
-    buffer = BytesIO()
-
-    # Criar documento EXATAMENTE IGUAL
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=(bobina_width, bobina_height),
-        leftMargin=5,
-        rightMargin=5,
-        topMargin=-6,  # Exatamente igual
-        bottomMargin=5
-    )
-    elements = []
-
-    # --- Estilos EXATAMENTE IGUAIS ---
-    styles = getSampleStyleSheet()
-    header_style = ParagraphStyle(
-        name='Header',
-        parent=styles['Heading1'],
-        fontSize=14,
-        leading=14,
-        alignment=1,
-        fontName='Helvetica-Bold',
-        spaceAfter=6
-    )
-    subtitle_style = ParagraphStyle(
-        name='Subtitle',
-        parent=styles['Heading2'],
-        fontSize=12,
-        leading=12,
-        alignment=1,
-        fontName='Helvetica-Bold',
-        spaceAfter=4
-    )
-    normal_style = ParagraphStyle(
-        name='Normal',
-        parent=styles['Normal'],
-        fontSize=10,
-        leading=10,
-        alignment=0,
-        fontName='Helvetica'
-    )
-    valor_style = ParagraphStyle(
-        name='Valor',
-        parent=normal_style,
-        alignment=2,
-        fontName='Helvetica-Bold'
-    )
-    linha_style = ParagraphStyle(
-        name='Linha',
-        parent=normal_style,
-        alignment=1,
-        textColor=colors.black
-    )
-
-    # --- Funções auxiliares EXATAMENTE IGUAIS ---
-    def moeda_br(valor):
-        return f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-
-    def linha_separadora():
-        return Paragraph("=" * 34, linha_style)
-
-    def linha_dupla(label, valor):
-        tabela = Table(
-            [[Paragraph(label, normal_style), Paragraph(valor, valor_style)]],
-            colWidths=[120, 80]
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=(bobina_width, bobina_height),
+            leftMargin=5,
+            rightMargin=5,
+            topMargin=-6,
+            bottomMargin=5
         )
-        tabela.setStyle(TableStyle([
-            ('ALIGN', (0,0), (0,0), 'LEFT'),
-            ('ALIGN', (1,0), (1,0), 'RIGHT'),
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
-            ('FONTNAME', (0,0), (0,0), 'Helvetica'),
-            ('FONTNAME', (1,0), (1,0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,-1), 12),  # Exatamente 12 como na outra
-            ('BOTTOMPADDING', (0,0), (-1,-1), 2),
-            ('TOPPADDING', (0,0), (-1,-1), 0),
-        ]))
-        return tabela
+        elements = []
 
-    # --- Logo EXATAMENTE IGUAL ---
-    logo_path = os.path.join(current_app.root_path, 'static', 'assets', 'logo.jpeg')
-    if os.path.exists(logo_path):
-        try:
-            with PILImage.open(logo_path) as img:
-                img_width, img_height = img.size
-                aspect_ratio = img_width / img_height
-            logo_width = 250  # Exatamente igual
-            logo_height = logo_width / aspect_ratio
-            logo = Image(logo_path, width=logo_width, height=logo_height)
-            logo.hAlign = 'CENTER'
-            elements.append(logo)
-            elements.append(Spacer(0, 6))  # Exatamente 6
-        except Exception as e:
-            logger.error(f"Erro ao carregar a logo: {e}")
+        styles = getSampleStyleSheet()
+        header_style = ParagraphStyle(
+            name='Header',
+            parent=styles['Heading1'],
+            fontSize=14,
+            leading=14,
+            alignment=1,
+            fontName='Helvetica-Bold',
+            spaceAfter=6
+        )
+        subtitle_style = ParagraphStyle(
+            name='Subtitle',
+            parent=styles['Heading2'],
+            fontSize=12,
+            leading=12,
+            alignment=1,
+            fontName='Helvetica-Bold',
+            spaceAfter=4
+        )
+        normal_style = ParagraphStyle(
+            name='Normal',
+            parent=styles['Normal'],
+            fontSize=10,
+            leading=10,
+            alignment=0,
+            fontName='Helvetica'
+        )
+        valor_style = ParagraphStyle(
+            name='Valor',
+            parent=normal_style,
+            alignment=2,
+            fontName='Helvetica-Bold'
+        )
+        linha_style = ParagraphStyle(
+            name='Linha',
+            parent=normal_style,
+            alignment=1,
+            textColor=colors.black
+        )
 
-    # --- Cabeçalho EXATAMENTE IGUAL ---
-    elements.append(Paragraph("RELATÓRIO DIÁRIO DE VENDAS", header_style))
-    elements.append(linha_separadora())
-    elements.append(Spacer(1, 6))
-    
-    # Informações (layout igual)
-    elements.append(Paragraph(f"Data: {data_relatorio.strftime('%d/%m/%Y')}", normal_style))
-    elements.append(Paragraph(f"Operador: {current_user.nome}", normal_style))
-    elements.append(Paragraph(f"Caixa: #{caixa_id}", normal_style))
-    elements.append(Spacer(1, 6))
+        def moeda_br(valor):
+            return f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
-    # --- Resumo Financeiro (layout IDÊNTICO) ---
-    elements.append(linha_separadora())
-    elements.append(Paragraph("RESUMO FINANCEIRO", subtitle_style))
-    elements.append(Spacer(1, 4))
-    elements.append(linha_separadora())
-    
-    # Calcular valores como na outra rota
-    total_vendas_positivas = sum(v['valor_total'] for v in dados['vendas'] if 'valor_total' in v and v['valor_total'] > 0) if 'vendas' in dados else 0
-    total_estornos = sum(abs(v['valor_total']) for v in dados['vendas'] if 'valor_total' in v and v['valor_total'] < 0) if 'vendas' in dados else 0
-    total_descontos = dados.get('total_descontos', 0)
-    total_saidas = dados.get('total_saidas', 0)
-    
-    # Calcular formas de pagamento (igual ao método da outra rota)
-    formas_pagamento = dados.get('por_forma_pagamento', {})
-    
-    # Calcular valor físico/digital como na outra rota
-    valor_dinheiro = formas_pagamento.get('dinheiro', 0.0)
-    valor_fisico = valor_dinheiro
-    
-    # EXATAMENTE IGUAL ao cálculo da outra rota
-    if caixa.valor_fechamento and caixa.valor_abertura:
-        valor_abertura = float(caixa.valor_abertura)
-        valor_fechamento = float(caixa.valor_fechamento)
-        valor_fisico = max((valor_dinheiro + valor_abertura) - valor_fechamento - total_saidas, 0.0)
+        def linha_separadora():
+            return Paragraph("=" * 34, linha_style)
 
-        # Pega parte inteira e parte decimal (IGUAL)
-        parte_inteira = math.floor(valor_fisico)
-        parte_decimal = valor_fisico - parte_inteira
+        def linha_dupla(label, valor):
+            tabela = Table(
+                [[Paragraph(label, normal_style), Paragraph(valor, valor_style)]],
+                colWidths=[120, 80]
+            )
+            tabela.setStyle(TableStyle([
+                ('ALIGN', (0,0), (0,0), 'LEFT'),
+                ('ALIGN', (1,0), (1,0), 'RIGHT'),
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('FONTNAME', (0,0), (0,0), 'Helvetica'),
+                ('FONTNAME', (1,0), (1,0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,-1), 12),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+                ('TOPPADDING', (0,0), (-1,-1), 0),
+            ]))
+            return tabela
 
-        # Código comentado mantido igual
-        # if parte_decimal == 0.5:
-        #     valor_fisico = valor_fisico
-        # elif parte_decimal > 0.5:
-        #     valor_fisico = math.ceil(valor_fisico)
-        # else:
-        #     valor_fisico = math.floor(valor_fisico)
-    
-    formas_pagamento['dinheiro'] = valor_fisico
-    
-    # Calcular valor digital IGUAL
-    valor_digital = sum([
-        formas_pagamento.get('pix_loja', 0.0),
-        formas_pagamento.get('pix_fabiano', 0.0),
-        formas_pagamento.get('pix_edfrance', 0.0),
-        formas_pagamento.get('pix_maquineta', 0.0),
-        formas_pagamento.get('cartao_debito', 0.0),
-        formas_pagamento.get('cartao_credito', 0.0)
-    ])
+        logo_path = os.path.join(current_app.root_path, 'static', 'assets', 'logo.jpeg')
+        if os.path.exists(logo_path):
+            try:
+                with PILImage.open(logo_path) as img:
+                    img_width, img_height = img.size
+                    aspect_ratio = img_width / img_height
+                logo_width = 250
+                logo_height = logo_width / aspect_ratio
+                logo = Image(logo_path, width=logo_width, height=logo_height)
+                logo.hAlign = 'CENTER'
+                elements.append(logo)
+                elements.append(Spacer(0, 6))
+            except Exception as e:
+                logger.error(f"Erro ao carregar a logo: {e}")
 
-    a_prazo = formas_pagamento.get('a_prazo', 0.0)
-    total_liquido = total_vendas_positivas - total_saidas
-    
-    # Linhas do resumo (ORDEM E FORMATO IDÊNTICOS)
-    elements.append(linha_dupla("Total Entradas:", moeda_br(total_vendas_positivas)))
-    elements.append(linha_dupla("Total Saídas:", moeda_br(total_saidas)))
-    elements.append(linha_dupla("Saldo:", moeda_br(total_liquido)))
-    elements.append(Spacer(1, 6))  # Espaço igual
-    
-    # Valores físicos/digitais (MESMA SEÇÃO)
-    elements.append(linha_dupla("Valor Físico:", moeda_br(valor_fisico)))
-    elements.append(linha_dupla("Valor Digital:", moeda_br(valor_digital)))
-    elements.append(linha_dupla("A Prazo:", moeda_br(a_prazo)))
-    elements.append(linha_dupla("A Prazo Recebidos:", moeda_br(total_contas_receber_pagas)))
-    
-    elements.append(Spacer(1, 4))
-    elements.append(linha_separadora())
-    elements.append(Spacer(1, 1))
-    elements.append(Paragraph("Valores do Caixa", subtitle_style))  # MESMO SUBTÍTULO
-    elements.append(Spacer(1, 6))
-    elements.append(linha_separadora())
-    
-    # Valores de caixa (IGUAL)
-    valor_abertura = float(caixa.valor_abertura) if caixa.valor_abertura else 0.0
-    valor_fechamento = float(caixa.valor_fechamento) if caixa.valor_fechamento else 0.0
-    
-    elements.append(linha_dupla("Abertura:", moeda_br(valor_abertura)))
-    elements.append(linha_dupla("Fechamento:", moeda_br(valor_fechamento)))
-    
-    # --- Formas de Pagamento (layout IDÊNTICO) ---
-    elements.append(Spacer(1, 4))
-    elements.append(linha_separadora())
-    elements.append(Spacer(1, 1))
-    elements.append(Paragraph("FORMAS DE PAGAMENTO", subtitle_style))  # MESMO
-    elements.append(Spacer(1, 6))
-    elements.append(linha_separadora())
-    
-    # Mapear nomes IGUAL
-    nomes_formas = {
-        'dinheiro': 'Dinheiro',
-        'pix_loja': 'PIX Loja',
-        'pix_fabiano': 'PIX Fabiano',
-        'pix_edfrance': 'PIX Edfranci',  # MESMO NOME
-        'pix_maquineta': 'PIX Maquineta',
-        'cartao_debito': 'Cartão Débito',
-        'cartao_credito': 'Cartão Crédito',
-        'a_prazo': 'A Prazo'
-    }
-    
-    # Exibir formas de pagamento (ORDEM E FORMATO IGUAIS)
-    for forma, valor in formas_pagamento.items():
-        if valor > 0:
-            nome_forma = nomes_formas.get(forma, forma)
-            elements.append(linha_dupla(f"{nome_forma}:", moeda_br(valor)))
+        elements.append(Paragraph("RELATÓRIO FINANCEIRO", header_style))
+        elements.append(linha_separadora())
+        elements.append(Spacer(1, 6))
+        data_relatorio_formatada = data_relatorio.strftime("%d/%m/%Y")
+        elements.append(Paragraph(f"Data: {data_relatorio_formatada}", normal_style))
+        elements.append(Paragraph(f"Operador: {operador_nome}", normal_style))
+        elements.append(Spacer(1, 6))
 
-    # --- Detalhes das Vendas (opcional, manter só se necessário) ---
-    # REMOVIDO para ser EXATAMENTE IGUAL à outra rota que não tem esta seção
+        elements.append(linha_separadora())
+        elements.append(Paragraph("RESUMO FINANCEIRO", subtitle_style))
+        elements.append(Spacer(1, 4))
+        elements.append(linha_separadora())
+        elements.append(linha_dupla("Total Entradas:", moeda_br(total_entradas)))
+        elements.append(linha_dupla("Total Saídas:", moeda_br(total_saidas)))
+        elements.append(linha_dupla("Saldo:", moeda_br(total_entradas - total_saidas)))
+        elements.append(Spacer(1, 6))
+        elements.append(linha_dupla("Valor Físico:", moeda_br(valor_fisico)))
+        elements.append(linha_dupla("Valor Digital:", moeda_br(valor_digital)))
+        elements.append(linha_dupla("A Prazo:", moeda_br(a_prazo)))
+        elements.append(linha_dupla("A Prazo Recebidos:", moeda_br(total_contas_prazo_recebidas)))
+        
+        elements.append(Spacer(1, 4))
+        elements.append(linha_separadora())
+        elements.append(Spacer(1, 1))
+        elements.append(Paragraph("Valores do Caixa", subtitle_style))
+        elements.append(Spacer(1, 6))
+        elements.append(linha_separadora())
+        
+        valor_abertura = float(caixa.valor_abertura) if caixa.valor_abertura else 0.0
+        valor_fechamento = float(caixa.valor_fechamento) if caixa.valor_fechamento else 0.0
+        
+        elements.append(linha_dupla("Abertura:", moeda_br(valor_abertura)))
+        elements.append(linha_dupla("Fechamento:", moeda_br(valor_fechamento)))
+        
+        elements.append(Spacer(1, 4))
+        elements.append(linha_separadora())
+        elements.append(Spacer(1, 1))
+        elements.append(Paragraph("FORMAS DE PAGAMENTO", subtitle_style))
+        elements.append(Spacer(1, 6))
+        elements.append(linha_separadora())
+        
+        nomes_formas = {
+            'dinheiro': 'Dinheiro',
+            'pix_loja': 'PIX Loja',
+            'pix_fabiano': 'PIX Fabiano',
+            'pix_edfrance': 'PIX Edfranci',
+            'pix_maquineta': 'PIX Maquineta',
+            'cartao_debito': 'Cartão Débito',
+            'cartao_credito': 'Cartão Crédito',
+            'a_prazo': 'A Prazo'
+        }
+        
+        for forma, valor in formas_pagamento.items():
+            if valor > 0:
+                nome_forma = nomes_formas.get(forma, forma)
+                elements.append(linha_dupla(f"{nome_forma}:", moeda_br(valor)))
+        
+        elements.append(Spacer(1, 15))
+        elements.append(linha_separadora())
+        elements.append(Paragraph("ASSINATURAS", subtitle_style))
+        elements.append(Spacer(1, 6))
+        elements.append(linha_separadora())
+        elements.append(Spacer(1, 20))
+        elements.append(Paragraph("Operador:", normal_style))
+        elements.append(Paragraph("____________________________________", normal_style))
+        elements.append(Spacer(1, 15))
+        elements.append(Paragraph("Administrador:", normal_style))
+        elements.append(Paragraph("____________________________________", normal_style))
 
-    # --- Assinaturas (EXATAMENTE IGUAL) ---
-    elements.append(Spacer(1, 15))  # MESMO ESPAÇO
-    elements.append(linha_separadora())
-    elements.append(Paragraph("ASSINATURAS", subtitle_style))  # MESMO
-    elements.append(Spacer(1, 6))
-    elements.append(linha_separadora())
-    elements.append(Spacer(1, 20))  # MESMO
-    elements.append(Paragraph("Operador:", normal_style))
-    elements.append(Paragraph("____________________________________", normal_style))  # MESMO Nº DE UNDERLINES
-    elements.append(Spacer(1, 15))  # MESMO
-    elements.append(Paragraph("Administrador:", normal_style))
-    elements.append(Paragraph("____________________________________", normal_style))  # MESMO
-    
-    # NÃO tem rodapé com data/hora (igual à outra rota que não tem)
+        doc.build(elements)
+        buffer.seek(0)
 
-    # Construir PDF
-    doc.build(elements)
-    buffer.seek(0)
+        response = make_response(send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=False,
+            download_name=f"relatorio_diario_{data_relatorio.strftime('%Y%m%d')}.pdf"
+        ))
+        response.headers['Content-Disposition'] = f'inline; filename=relatorio_diario_{data_relatorio.strftime("%Y%m%d")}.pdf'
+        return response
 
-    # Retornar EXATAMENTE IGUAL
-    response = make_response(send_file(
-        buffer,
-        mimetype='application/pdf',
-        as_attachment=False,
-        download_name=f"relatorio_vendas_{data_relatorio.strftime('%Y%m%d')}.pdf"
-    ))
-    response.headers['Content-Disposition'] = f'inline; filename=relatorio_vendas_{data_relatorio.strftime("%Y%m%d")}.pdf'
-    return response
+    except Exception as e:
+        logger.error(f"Erro ao gerar PDF do relatório diário: {str(e)}", exc_info=True)
+        session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        session.close()
     
 # ===== API SALDO =====
 @operador_bp.route('/api/saldo', methods=['GET'])
