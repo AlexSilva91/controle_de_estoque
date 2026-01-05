@@ -5111,3 +5111,98 @@ td {
 #vendas .subtab-content::-webkit-scrollbar-thumb:hover {
   background: var(--primary-color);
 }
+#tabelaContasReceber {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+#tabelaContasReceber th,
+#tabelaContasReceber td {
+    padding: 6px 8px;    
+    font-size: 0.95rem;    
+    white-space: nowrap;   
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#tabelaContasReceber th:nth-child(1),
+#tabelaContasReceber td:nth-child(1) { width: 18%; } /* Cliente */
+
+#tabelaContasReceber th:nth-child(2),
+#tabelaContasReceber td:nth-child(2) { width: 12%; } /* Documento */
+
+#tabelaContasReceber th:nth-child(3),
+#tabelaContasReceber td:nth-child(3) { width: 10%; } /* Valor Total */
+
+#tabelaContasReceber th:nth-child(4),
+#tabelaContasReceber td:nth-child(4) { width: 10%; } /* Valor Pendente */
+
+#tabelaContasReceber th:nth-child(5),
+#tabelaContasReceber td:nth-child(5) { width: 10%; } /* Emissão */
+
+#tabelaContasReceber th:nth-child(6),
+#tabelaContasReceber td:nth-child(6) { width: 10%; } /* Vencimento */
+
+#tabelaContasReceber th:nth-child(7),
+#tabelaContasReceber td:nth-child(7) { width: 8%; }  /* Status */
+
+#tabelaContasReceber th:nth-child(8),
+#tabelaContasReceber td:nth-child(8) { width: 12%; } /* Ações */
+
+#tabelaContasReceber th:nth-child(3),
+#tabelaContasReceber td:nth-child(3),
+#tabelaContasReceber th:nth-child(4),
+#tabelaContasReceber td:nth-child(4),
+#tabelaContasReceber th:nth-child(5),
+#tabelaContasReceber td:nth-child(5),
+#tabelaContasReceber th:nth-child(6),
+#tabelaContasReceber td:nth-child(6),
+#tabelaContasReceber th:nth-child(7),
+#tabelaContasReceber td:nth-child(7),
+#tabelaContasReceber th:nth-child(8),
+#tabelaContasReceber td:nth-child(8) {
+    text-align: center;
+}
+
+@media (max-width: 1200px) {
+    #tabelaContasReceber th,
+    #tabelaContasReceber td {
+        font-size: 0.8rem;
+        padding: 5px 6px;
+    }
+}
+.btn-detalhes-conta {
+    background: linear-gradient(135deg, #4f46e5, #6366f1); /* azul moderno */
+    color: #ffffff;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-detalhes-conta i {
+    color: #ffffff;
+    font-size: 0.9rem;
+}
+.btn-detalhes-conta:hover {
+    background: linear-gradient(135deg, #4338ca, #4f46e5);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(79, 70, 229, 0.35);
+}
+
+.btn-detalhes-conta:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+}
+.btn-detalhes-conta {
+    min-width: 34px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-detalhes-conta[title] {
+    position: relative;
+}

@@ -6081,6 +6081,14 @@ def contas_receber():
 @admin_required
 def conta_receber_detalhes(id):
     conta = ContaReceber.query.get_or_404(id)
+
+    pagamento_efetuados = (
+        PagamentoContaReceber.query
+        .filter(PagamentoContaReceber.conta_id == conta.id)
+        .order_by(PagamentoContaReceber.data_pagamento.asc())
+        .all()
+    )
+
     caixas = Caixa.query.order_by(Caixa.data_abertura.desc()).all()
     caixas_json = [{
         'id': c.id,
@@ -6088,29 +6096,110 @@ def conta_receber_detalhes(id):
         'data_abertura': c.data_abertura.strftime('%Y-%m-%d'),
         'status': c.status.value
     } for c in caixas]
-    
+
+    nota = conta.nota_fiscal
+
+    nota_json = None
+    if nota:
+        nota_json = {
+            'id': nota.id,
+            'status': nota.status.value,
+            'data_emissao': nota.data_emissao.strftime('%d/%m/%Y'),
+            'forma_pagamento': nota.forma_pagamento.value if nota.forma_pagamento else None,
+            'valor_total': float(nota.valor_total),
+            'valor_desconto': float(nota.valor_desconto),
+            'valor_recebido': float(nota.valor_recebido) if nota.valor_recebido else 0.0,
+            'troco': float(nota.troco) if nota.troco else 0.0,
+            'a_prazo': nota.a_prazo,
+
+            'cliente': {
+                'id': nota.cliente.id if nota.cliente else None,
+                'nome': nota.cliente.nome if nota.cliente else None,
+                'documento': nota.cliente.documento if nota.cliente else None,
+            },
+
+            'operador': {
+                'id': nota.operador.id,
+                'nome': nota.operador.nome
+            },
+
+            # ---- ITENS / PRODUTOS DA NOTA ----
+            'itens': [
+                {
+                    'id': item.id,
+                    'produto_id': item.produto_id,
+                    'produto': item.produto.nome,
+                    'quantidade': float(item.quantidade),
+                    'valor_unitario': float(item.valor_unitario),
+                    'valor_total': float(item.valor_total),
+                    'desconto_aplicado': float(item.desconto_aplicado or 0),
+                    'tipo_desconto': item.tipo_desconto.value if item.tipo_desconto else None
+                }
+                for item in nota.itens
+            ],
+
+            # ---- PAGAMENTOS FEITOS NA NOTA ----
+            'pagamentos_nota': [
+                {
+                    'id': p.id,
+                    'forma_pagamento': p.forma_pagamento.value,
+                    'valor': float(p.valor),
+                    'data': p.data.strftime('%d/%m/%Y %H:%M')
+                }
+                for p in nota.pagamentos
+            ],
+
+            'total_pago_na_nota': float(
+                sum(p.valor for p in nota.pagamentos)
+            )
+        }
+
     return jsonify({
+        # ---- CONTA A RECEBER ----
         'id': conta.id,
-        'cliente': conta.cliente.nome,
-        'cliente_documento': conta.cliente.documento if conta.cliente and conta.cliente.documento else '',
         'descricao': conta.descricao,
+        'status': conta.status.value,
         'valor_original': float(conta.valor_original),
         'valor_aberto': float(conta.valor_aberto),
         'data_emissao': conta.data_emissao.strftime('%d/%m/%Y'),
         'data_vencimento': conta.data_vencimento.strftime('%d/%m/%Y'),
-        'status': conta.status.value,
-        'nota_fiscal': {
-            'id': conta.nota_fiscal_id,
-            'valor_total': float(conta.nota_fiscal.valor_total) if conta.nota_fiscal else None
-        } if conta.nota_fiscal else None,
-        'pagamentos': [{
-            'id': p.id,
-            'valor_pago': float(p.valor_pago),
-            'data_pagamento': p.data_pagamento.strftime('%d/%m/%Y'),
-            'forma_pagamento': p.forma_pagamento.value,
-            'observacoes': p.observacoes or ''
-        } for p in conta.pagamentos],
-        'caixas': caixas_json  
+
+        'cliente': {
+            'id': conta.cliente.id,
+            'nome': conta.cliente.nome,
+            'documento': conta.cliente.documento or ''
+        },
+
+        # ---- SAÍDA ATUAL (NÃO ALTERADA) ----
+        'pagamentos_conta': [
+            {
+                'id': p.id,
+                'valor_pago': float(p.valor_pago),
+                'forma_pagamento': p.forma_pagamento.value,
+                'data_pagamento': p.data_pagamento.strftime('%d/%m/%Y'),
+                'observacoes': p.observacoes or '',
+                'caixa_id': p.caixa_id
+            }
+            for p in conta.pagamentos
+        ],
+
+        # ---- NOVO RETORNO (SEM IMPACTAR O ANTERIOR) ----
+        'pagamentos_efetuados': [
+            {
+                'id': p.id,
+                'valor_pago': float(p.valor_pago),
+                'forma_pagamento': p.forma_pagamento.value,
+                'data_pagamento': p.data_pagamento.strftime('%d/%m/%Y %H:%M'),
+                'caixa_id': p.caixa_id
+            }
+            for p in pagamento_efetuados
+        ],
+
+        # ---- NOTA FISCAL COMPLETA ----
+        'nota_fiscal': nota_json,
+
+        # ---- CAIXAS ----
+        'caixas': caixas_json
     })
 
 @admin_bp.route('/contas-receber/<int:id>/pdf', methods=['GET'])

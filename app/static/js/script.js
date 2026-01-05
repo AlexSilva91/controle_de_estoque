@@ -5583,11 +5583,14 @@ setTimeout(inicializarBusca, 500);
       const dataInicio = document.getElementById('contasReceberDataInicio')?.value || '';
       const dataFim = document.getElementById('contasReceberDataFim')?.value || '';
       const status = document.getElementById('contasReceberStatus')?.value || '';
+      const clienteNome = document.getElementById('contasReceberCliente')?.value.trim() || '';
 
       const params = new URLSearchParams();
+
       if (dataInicio) params.append('data_emissao_inicio', dataInicio);
       if (dataFim) params.append('data_emissao_fim', dataFim);
       if (status) params.append('status', status);
+      if (clienteNome) params.append('cliente_nome', clienteNome);
 
       const response = await fetch(`/admin/contas-receber?${params.toString()}`);
 
@@ -5597,14 +5600,13 @@ setTimeout(inicializarBusca, 500);
 
       const data = await response.json();
 
-      if (data && data.contas && data.contas.length > 0) {
-        contasReceberData = data.contas;
-        atualizarTabelaContasReceber();
-      } else {
-        contasReceberData = [];
-        atualizarTabelaContasReceber();
+      contasReceberData = data?.contas || [];
+      atualizarTabelaContasReceber();
+
+      if (contasReceberData.length === 0) {
         showFlashMessage('warning', 'Nenhuma conta encontrada com os filtros aplicados');
       }
+
     } catch (error) {
       showFlashMessage('error', 'Erro ao carregar contas a receber');
     }
@@ -5695,17 +5697,15 @@ setTimeout(inicializarBusca, 500);
       }
 
       tr.innerHTML = `
-              <td>${conta.id}</td>
               <td>${conta.cliente.nome}</td>
               <td>${conta.cliente.documento || ''}</td>
-              <td>${conta.descricao || '-'}</td>
               <td>${formatarMoeda(conta.valor_original)}</td>
               <td>${formatarMoeda(conta.valor_aberto)}</td>
               <td>${formatarData(conta.data_emissao)}</td>
               <td>${formatarData(conta.data_vencimento)}</td>
               <td><span class="badge ${statusClass}">${statusText}</span></td>
               <td>
-                  <button class="btn btn-sm btn-info btn-detalhes-conta" data-id="${conta.id}" title="Detalhes">
+                  <button class="btn btn-detalhes-conta" data-id="${conta.id}" title="Detalhes">
                       <i class="fas fa-eye"></i>
                   </button>
                   <button class="btn btn-sm btn-danger btn-pdf-conta" data-pdf-id="${conta.id}" title="Gerar PDF">
@@ -5749,7 +5749,7 @@ setTimeout(inicializarBusca, 500);
 
         // Preencher detalhes básicos
         document.getElementById('contaIdPagamento').value = conta.id;
-        document.getElementById('detalheClienteNome').textContent = conta.cliente;
+        document.getElementById('detalheClienteNome').textContent = conta.cliente.nome;
         document.getElementById('detalheClienteDocumento').textContent = conta.cliente_documento || 'Não informado';
         document.getElementById('detalheDescricao').textContent = conta.descricao || 'Sem descrição';
         document.getElementById('detalheValorTotal').textContent = formatarMoeda(conta.valor_original);
@@ -5791,25 +5791,75 @@ setTimeout(inicializarBusca, 500);
             if (pagamentoSection) pagamentoSection.style.display = '';
           }
         }
+        // ===============================
+        // NOTA FISCAL
+        // ===============================
+        if (conta.nota_fiscal) {
+          const nf = conta.nota_fiscal;
+
+          document.getElementById('areaNotaFiscal').style.display = '';
+          document.getElementById('nfValorDesconto').textContent = formatarMoeda(nf.valor_desconto);
+
+          // -------- ITENS ----------
+          const itensTbody = document.getElementById('nfItens');
+          itensTbody.innerHTML = '';
+
+          if (nf.itens.length) {
+            nf.itens.forEach(i => {
+              itensTbody.innerHTML += `
+                <tr>
+                  <td>${i.produto}</td>
+                  <td>${i.quantidade}</td>
+                  <td>${formatarMoeda(i.valor_unitario)}</td>
+                  <td>${formatarMoeda(i.valor_total)}</td>
+                </tr>
+              `;
+            });
+          } else {
+            itensTbody.innerHTML =
+              '<tr><td colspan="4" class="text-center">Nenhum item</td></tr>';
+          }
+
+          // -------- PAGAMENTOS DA NOTA ----------
+          const nfPagTbody = document.getElementById('nfPagamentos');
+          nfPagTbody.innerHTML = '';
+
+          if (nf.pagamentos_nota.length) {
+            nf.pagamentos_nota.forEach(p => {
+              nfPagTbody.innerHTML += `
+                <tr>
+                  <td>${p.data}</td>
+                  <td>${formatarMoeda(p.valor)}</td>
+                  <td>${formatarFormaPagamento(p.forma_pagamento)}</td>
+                </tr>
+              `;
+            });
+          } else {
+            nfPagTbody.innerHTML =
+              '<tr><td colspan="3" class="text-center">Nenhum pagamento</td></tr>';
+          }
+        } else {
+          document.getElementById('areaNotaFiscal').style.display = 'none';
+        }
 
         // Preencher pagamentos
         const pagamentosTbody = document.getElementById('detalhePagamentos');
         if (pagamentosTbody) {
           pagamentosTbody.innerHTML = '';
 
-          if (conta.pagamentos && conta.pagamentos.length > 0) {
-            conta.pagamentos.forEach(pag => {
-              const tr = document.createElement('tr');
-              tr.innerHTML = `
-                              <td>${pag.data_pagamento}</td>
-                              <td>${formatarMoeda(pag.valor_pago)}</td>
-                              <td>${formatarFormaPagamento(pag.forma_pagamento)}</td>
-                              <td>${pag.observacoes || '-'}</td>
-                          `;
-              pagamentosTbody.appendChild(tr);
+         if (conta.pagamentos_efetuados && conta.pagamentos_efetuados.length > 0) {
+            conta.pagamentos_efetuados.forEach(p => {
+              pagamentosTbody.innerHTML += `
+                <tr>
+                  <td>${p.data_pagamento}</td>
+                  <td>${formatarMoeda(p.valor_pago)}</td>
+                  <td>${formatarFormaPagamento(p.forma_pagamento)}</td>
+                </tr>
+              `;
             });
           } else {
-            pagamentosTbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
+            pagamentosTbody.innerHTML =
+              '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
           }
         } else {
           console.error('Elemento detalhePagamentos não encontrado');
