@@ -1915,18 +1915,21 @@ def api_get_produto_descontos(produto_id):
 @operador_required
 def get_contas_receber_cliente(cliente_id):
     try:
-        # Verifica se o cliente existe
         cliente = Cliente.query.get(cliente_id)
         if not cliente:
             logger.warning(f"Cliente com ID {cliente_id} não encontrado ao buscar contas a receber")
             return jsonify({'error': 'Cliente não encontrado'}), 404
 
-        # Busca as contas a receber do cliente com os itens da nota fiscal
-        contas = ContaReceber.query.filter_by(cliente_id=cliente_id).all()
+        contas = ContaReceber.query.filter_by(
+            cliente_id=cliente_id
+        ).filter(
+            ContaReceber.status.in_([StatusPagamento.pendente, StatusPagamento.parcial])
+        ).order_by(
+            ContaReceber.data_emissao.desc()
+        ).all()
         
         contas_data = []
         for conta in contas:
-            # Busca os itens da nota fiscal associada
             itens_nota = []
             if conta.nota_fiscal:
                 for item in conta.nota_fiscal.itens:
@@ -1940,7 +1943,6 @@ def get_contas_receber_cliente(cliente_id):
                         'tipo_desconto': item.tipo_desconto.value if item.tipo_desconto else None
                     })
             
-            # ✅ NOVO: Busca os pagamentos da nota fiscal
             pagamentos_nota = []
             total_pago_nota = 0.0
             if conta.nota_fiscal and conta.nota_fiscal.pagamentos:
@@ -1953,7 +1955,6 @@ def get_contas_receber_cliente(cliente_id):
                     })
                     total_pago_nota += float(pag.valor)
             
-            # ✅ NOVO: Busca os pagamentos da conta a receber
             pagamentos_conta = []
             total_pago_conta = 0.0
             for pag in conta.pagamentos:
@@ -1981,8 +1982,6 @@ def get_contas_receber_cliente(cliente_id):
                 'valor_total_nota': float(conta.nota_fiscal.valor_total) if conta.nota_fiscal else 0.0,
                 'valor_desconto_nota': float(conta.nota_fiscal.valor_desconto) if conta.nota_fiscal and conta.nota_fiscal.valor_desconto else 0.0,
                 'tipo_desconto_nota': conta.nota_fiscal.tipo_desconto.value if conta.nota_fiscal and conta.nota_fiscal.tipo_desconto else None,
-                
-                # ✅ NOVOS CAMPOS
                 'pagamentos_nota_fiscal': pagamentos_nota,
                 'total_pago_nota': total_pago_nota,
                 'pagamentos_conta_receber': pagamentos_conta,
