@@ -1997,8 +1997,8 @@ def get_contas_receber_cliente(cliente_id):
         logger.error(f"Erro ao buscar contas a receber do cliente {cliente_id}: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
-from flask import make_response
-from reportlab.lib.pagesizes import A4, mm
+from flask import make_response, jsonify
+from reportlab.lib.pagesizes import mm
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 import io
@@ -2010,207 +2010,241 @@ import os
 @operador_required
 def gerar_comprovante_conta(conta_id):
     try:
-        # Busca a conta a receber
         conta = ContaReceber.query.get(conta_id)
         if not conta:
-            logger.warning(f"Conta a receber com ID {conta_id} não encontrada para gerar comprovante")
             return jsonify({'error': 'Conta não encontrada'}), 404
-        
-        # Busca informações do cliente
+
         cliente = conta.cliente
-        
-        # Busca pagamentos realizados
         pagamentos = PagamentoContaReceber.query.filter_by(conta_id=conta_id).all()
-        
-        # Cria o PDF em memória
+
         buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=(80*mm, 297*mm))  # Bobina 80mm
-        
-        # Configurações
-        width, height = 80*mm, 297*mm
-        margin = 5*mm
-        y_position = height - margin
-        
-        # Adiciona imagem no topo totalmente colada (sem margem superior)
-        logo_path = os.path.join('app', 'static', 'assets', 'logo.jpeg')
-        if os.path.exists(logo_path):
-            try:
-                logo = ImageReader(logo_path)
-                # Imagem colada no topo sem margem
-                c.drawImage(logo, 0, height - 20*mm, width=80*mm, height=20*mm, 
-                           preserveAspectRatio=True, anchor='n')
-                y_position = height - 25*mm  # Ajusta a posição Y após a imagem
-            except Exception as e:
-                # Se houver erro, continua sem a imagem
-                y_position -= 5*mm
-        else:
-            # Se não encontrar a imagem, ajusta o posicionamento
-            y_position = height - 10*mm
-        
-        # Função para adicionar texto com quebra de linha
+        width, height = 80 * mm, 297 * mm
+        margin = 5 * mm
+
+        c = canvas.Canvas(buffer, pagesize=(width, height))
+        y = height - margin
+
+        # =====================================================
+        # FUNÇÕES AUXILIARES
+        # =====================================================
         def add_text(text, x, y, max_width, font_size=9, font_name="Helvetica"):
             c.setFont(font_name, font_size)
-            lines = []
             words = text.split()
-            current_line = []
-            
+            line = ""
             for word in words:
-                test_line = ' '.join(current_line + [word])
-                if c.stringWidth(test_line, font_name, font_size) <= max_width:
-                    current_line.append(word)
+                test = f"{line} {word}".strip()
+                if c.stringWidth(test, font_name, font_size) <= max_width:
+                    line = test
                 else:
-                    lines.append(' '.join(current_line))
-                    current_line = [word]
-            
-            if current_line:
-                lines.append(' '.join(current_line))
-            
-            for line in lines:
+                    c.drawString(x, y, line)
+                    y -= font_size + 2
+                    line = word
+            if line:
                 c.drawString(x, y, line)
                 y -= font_size + 2
-            
             return y
-        
-        # Função para adicionar linha separadora
-        def add_separator(y):
-            c.setStrokeColorRGB(0.8, 0.8, 0.8)  # Cinza claro
+
+        def separator(y):
+            c.setStrokeColorRGB(0.8, 0.8, 0.8)
             c.line(margin, y, width - margin, y)
-            c.setStrokeColorRGB(0, 0, 0)  # Volta para preto
-            return y - 5
-        
-        # Cabeçalho
+            c.setStrokeColorRGB(0, 0, 0)
+            return y - 6
+
+        def highlight_box(y, height=14, color=(0.95, 0.95, 0.95)):
+            c.setFillColorRGB(*color)
+            c.rect(margin, y - height + 3, width - 2 * margin, height, fill=1, stroke=0)
+            c.setFillColorRGB(0, 0, 0)
+
+        # =====================================================
+        # LOGO (MANTIDA COMO ORIGINAL)
+        # =====================================================
+        logo_path = os.path.join('app', 'static', 'assets', 'logo.jpeg')
+        if os.path.exists(logo_path):
+            logo = ImageReader(logo_path)
+            c.drawImage(
+                logo,
+                0,
+                height - 20 * mm,
+                width=80 * mm,
+                height=20 * mm,
+                preserveAspectRatio=True,
+                anchor='n'
+            )
+            y = height - 25 * mm
+        else:
+            y = height - 10 * mm
+
+        # =====================================================
+        # CABEÇALHO
+        # =====================================================
         c.setFont("Helvetica-Bold", 12)
-        c.drawCentredString(width/2, y_position, "COMPROVANTE DE DÉDITO")
-        y_position -= 15
-        
+        c.drawCentredString(width / 2, y, "COMPROVANTE DE DÉBITO")
+        y -= 14
+
         c.setFont("Helvetica", 9)
-        c.drawString(margin, y_position, f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-        y_position -= 12
-        
-        # Linha separadora
-        y_position = add_separator(y_position)
-        
-        # Informações do Cliente
+        c.drawString(margin, y, f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        y -= 10
+        y = separator(y)
+
+        # =====================================================
+        # CLIENTE
+        # =====================================================
         c.setFont("Helvetica-Bold", 10)
-        c.drawString(margin, y_position, "CLIENTE:")
-        y_position -= 12
-        
+        c.drawString(margin, y, "CLIENTE")
+        y -= 10
+
         c.setFont("Helvetica", 9)
-        y_position = add_text(f"{cliente.nome}", margin, y_position, width - 2*margin)
+        y = add_text(cliente.nome, margin, y, width - 2 * margin)
+
         if cliente.documento:
-            y_position = add_text(f"Doc: {cliente.documento}", margin, y_position, width - 2*margin)
+            y = add_text(f"Doc: {cliente.documento}", margin, y, width - 2 * margin)
         if cliente.telefone:
-            y_position = add_text(f"Tel: {cliente.telefone}", margin, y_position, width - 2*margin)
-        
-        y_position -= 8
-        
-        # Linha separadora
-        y_position = add_separator(y_position)
-        
-        # Informações da Conta
+            y = add_text(f"Tel: {cliente.telefone}", margin, y, width - 2 * margin)
+
+        y -= 6
+        y = separator(y)
+
+        # =====================================================
+        # DÉBITO
+        # =====================================================
         c.setFont("Helvetica-Bold", 10)
-        c.drawString(margin, y_position, "DÉBITO:")
-        y_position -= 12
-        
+        c.drawString(margin, y, "DÉBITO")
+        y -= 10
+
         c.setFont("Helvetica", 9)
-        y_position = add_text(f"Descrição: {conta.descricao}", margin, y_position, width - 2*margin)
-        y_position = add_text(f"Valor Original: R$ {format_number(conta.valor_original)}", margin, y_position, width - 2*margin)
-        y_position = add_text(f"Valor Aberto: R$ {format_number(conta.valor_aberto)}", margin, y_position, width - 2*margin)
-        y_position = add_text(f"Vencimento: {conta.data_vencimento.strftime('%d/%m/%Y')}", margin, y_position, width - 2*margin)
-        
-        if conta.data_pagamento:
-            y_position = add_text(f"Data Pagamento: {conta.data_pagamento.strftime('%d/%m/%Y %H:%M')}", margin, y_position, width - 2*margin)
-        
-        # Status com destaque
-        status_color = (0, 0.5, 0) if conta.status.value.upper() == "PAGO" else (0.8, 0, 0)  # Verde para pago, vermelho para outros
+        y = add_text(f"Descrição: {conta.descricao}", margin, y, width - 2 * margin)
+        y = add_text(f"Vencimento: {conta.data_vencimento.strftime('%d/%m/%Y')}", margin, y, width - 2 * margin)
+
+        # =====================================================
+        # VALOR TOTAL (DESTAQUE)
+        # =====================================================
+        y -= 4
+        highlight_box(y, height=16)
+
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(margin + 2, y - 10, "VALOR TOTAL")
+
+        c.setFont("Helvetica-Bold", 12)
+        c.drawRightString(
+            width - margin - 2,
+            y - 10,
+            f"R$ {format_number(conta.valor_original)}"
+        )
+        y -= 20
+
+        # =====================================================
+        # VALOR PENDENTE
+        # =====================================================
+        highlight_box(y, height=14, color=(1, 0.97, 0.9))
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(margin + 2, y - 9, "VALOR PENDENTE")
+        c.drawRightString(
+            width - margin - 2,
+            y - 9,
+            f"R$ {format_number(conta.valor_aberto)}"
+        )
+        y -= 18
+
+        # =====================================================
+        # STATUS
+        # =====================================================
+        status = conta.status.value.upper()
+        status_color = (0, 0.6, 0) if status == "PAGO" else (0.8, 0, 0)
+
+        highlight_box(y, height=14)
+        c.setFont("Helvetica-Bold", 9)
         c.setFillColorRGB(*status_color)
-        y_position = add_text(f"Status: {conta.status.value.upper()}", margin, y_position, width - 2*margin)
-        c.setFillColorRGB(0, 0, 0)  # Volta para preto
-        
-        y_position -= 8
-        
-        # Linha separadora
-        y_position = add_separator(y_position)
-        
-        # Itens da Nota Fiscal (se existir)
+        c.drawCentredString(width / 2, y - 9, f"STATUS: {status}")
+        c.setFillColorRGB(0, 0, 0)
+        y -= 18
+
+        y = separator(y)
+
+        # =====================================================
+        # PRODUTOS (MANTIDO)
+        # =====================================================
         if conta.nota_fiscal and conta.nota_fiscal.itens:
             c.setFont("Helvetica-Bold", 10)
-            c.drawString(margin, y_position, "PRODUTOS:")
-            y_position -= 12
-            
+            c.drawString(margin, y, "PRODUTOS")
+            y -= 10
+
             c.setFont("Helvetica", 8)
             for item in conta.nota_fiscal.itens:
-                produto_text = f"{item.produto.nome if item.produto else 'Produto'}"
-                y_position = add_text(produto_text, margin, y_position, width - 2*margin, 8)
+                y = add_text(
+                    item.produto.nome if item.produto else "Produto",
+                    margin, y, width - 2 * margin, 8
+                )
 
-                detalhes = f"{item.quantidade:.2f} {item.produto.unidade.value if item.produto else 'un'} x R$ {format_number(item.valor_unitario)}"
+                detalhes = (
+                    f"{item.quantidade:.2f} "
+                    f"{item.produto.unidade.value if item.produto else 'un'} "
+                    f"x R$ {format_number(item.valor_unitario)}"
+                )
+
                 if item.desconto_aplicado and item.desconto_aplicado > 0:
                     detalhes += f" (-R$ {format_number(item.desconto_aplicado)})"
-                
+
                 detalhes += f" = R$ {format_number(item.valor_total)}"
-                
-                y_position = add_text(detalhes, margin + 5*mm, y_position, width - 7*margin, 8)
-                y_position -= 4
-            
-            # Total da nota
-            y_position -= 4
-            c.setFont("Helvetica-Bold", 9)
-            total_text = f"TOTAL NOTA: R$ {format_number(conta.nota_fiscal.valor_total)}"
-            c.drawString(margin, y_position, total_text)
-            y_position -= 12
-            
-            # Linha separadora
-            y_position = add_separator(y_position)
-        
-        # Pagamentos Realizados
+
+                y = add_text(detalhes, margin + 4 * mm, y, width - 3 * margin, 8)
+                y -= 3
+
+            y -= 6
+            y = separator(y)
+
+        # =====================================================
+        # PAGAMENTOS
+        # =====================================================
         if pagamentos:
             c.setFont("Helvetica-Bold", 10)
-            c.drawString(margin, y_position, "PAGAMENTOS:")
-            y_position -= 12
-            
-            c.setFont("Helvetica", 8)
+            c.drawString(margin, y, "PAGAMENTOS")
+            y -= 10
+
             total_pago = 0
-            for pagamento in pagamentos:
-                pag_text = f"{pagamento.data_pagamento.strftime('%d/%m/%Y')} - R$ {format_number(pagamento.valor_pago)}"
-                pag_text += f" ({pagamento.forma_pagamento.value})"
-                
-                y_position = add_text(pag_text, margin, y_position, width - 2*margin, 8)
-                total_pago += pagamento.valor_pago
-            
-            y_position -= 4
+            c.setFont("Helvetica", 8)
+            for p in pagamentos:
+                texto = (
+                    f"{p.data_pagamento.strftime('%d/%m/%Y')} - "
+                    f"R$ {format_number(p.valor_pago)} "
+                    f"({p.forma_pagamento.value})"
+                )
+                y = add_text(texto, margin, y, width - 2 * margin, 8)
+                total_pago += p.valor_pago
+
+            y -= 4
             c.setFont("Helvetica-Bold", 9)
-            c.drawString(margin, y_position, f"TOTAL PAGO: R$ {format_number(total_pago)}")
-            y_position -= 12
-            
-            # Linha separadora
-            y_position = add_separator(y_position)
-        
-        # Observações
+            c.drawString(margin, y, f"TOTAL PAGO: R$ {format_number(total_pago)}")
+            y -= 12
+            y = separator(y)
+
+        # =====================================================
+        # OBSERVAÇÕES
+        # =====================================================
         if conta.observacoes:
             c.setFont("Helvetica-Bold", 9)
-            c.drawString(margin, y_position, "OBSERVAÇÕES:")
-            y_position -= 10
-            
+            c.drawString(margin, y, "OBSERVAÇÕES")
+            y -= 8
             c.setFont("Helvetica", 8)
-            y_position = add_text(conta.observacoes, margin, y_position, width - 2*margin, 8)
-            y_position -= 8
-        
-        # Finaliza o PDF
+            y = add_text(conta.observacoes, margin, y, width - 2 * margin, 8)
+
+        # =====================================================
+        # FINALIZAÇÃO
+        # =====================================================
         c.showPage()
         c.save()
-        
+
         buffer.seek(0)
-        
-        # Retorna o PDF como resposta
         response = make_response(buffer.getvalue())
         response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=comprovante_conta_{conta_id}.pdf'
-        
+        response.headers['Content-Disposition'] = (
+            f'attachment; filename=comprovante_conta_{conta_id}.pdf'
+        )
         return response
-        
+
     except Exception as e:
-        logger.error(f"Erro ao gerar comprovante para conta {conta_id}: {str(e)}", exc_info=True)
+        logger.error(f"Erro ao gerar comprovante: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
     
 @operador_bp.route('/api/clientes/<int:cliente_id>/notas_fiscais', methods=['GET'])
 @login_required
