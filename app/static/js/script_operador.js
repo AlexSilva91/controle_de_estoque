@@ -2373,7 +2373,12 @@ function calculateSaleTotal() {
 
     let total = subtotal;
 
-    if (subtotalValueElement) subtotalValueElement.textContent = formatCurrency(subtotal);
+    if (subtotalValueElement) {
+        subtotalValueElement.textContent = formatCurrency(subtotal);
+        subtotalValueElement.dataset.originalValue = subtotal.toFixed(2);
+        subtotalValueElement.dataset.currentValue = subtotal.toFixed(2);
+    }
+    
     if (saleTotalElement) saleTotalElement.textContent = formatCurrency(total);
 
     if (amountReceivedInput && amountReceivedInput.value) {
@@ -2438,7 +2443,14 @@ function resetSaleForm() {
         }
         const deliveryInfo = document.querySelector('.delivery-info');
         if (deliveryInfo) deliveryInfo.remove();
-        if (subtotalValueElement) subtotalValueElement.textContent = 'R$ 0.00';
+        
+        const subtotalElement = document.getElementById('subtotal-value');
+        if (subtotalElement) {
+            subtotalElement.textContent = 'R$ 0,00';
+            delete subtotalElement.dataset.originalValue;
+            delete subtotalElement.dataset.currentValue;
+        }
+        
         if (saleTotalElement) saleTotalElement.textContent = 'R$ 0.00';
         if (changeValueElement) changeValueElement.textContent = 'R$ 0.00';
         updateCaixaStatus();
@@ -4038,28 +4050,22 @@ function updateRemainingSubtotal() {
     const selectedPaymentsList = document.querySelector('.selected-payments-list');
     if (!subtotalElement || !selectedPaymentsList) return;
 
-    // Captura valor original se ainda não definido
     if (!subtotalElement.dataset.originalValue) {
-        const originalText = subtotalElement.textContent.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
-        subtotalElement.dataset.originalValue = parseFloat(originalText) || 0;
+        subtotalElement.dataset.originalValue = "0";
     }
 
-    const originalSubtotal = parseFloat(subtotalElement.dataset.originalValue);
+    const originalSubtotal = parseFloat(subtotalElement.dataset.originalValue) || 0;
 
-    // Soma os pagamentos existentes
     let totalPayments = 0;
     selectedPaymentsList.querySelectorAll('input[name="payment_amounts[]"]').forEach(input => {
         const value = parseFloat(input.value.replace(',', '.')) || 0;
         totalPayments += value;
     });
 
-    // Calcula o restante
     const remaining = Math.max(originalSubtotal - totalPayments, 0);
 
-    // Atualiza exibição
     subtotalElement.textContent = formatCurrency(remaining);
 
-    // Guarda o valor atual em data-current-value
     subtotalElement.dataset.currentValue = remaining.toFixed(2);
 }
 
