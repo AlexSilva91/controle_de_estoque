@@ -1755,6 +1755,62 @@ function displayProductSearchResults(products) {
     });
 }
 
+// ==================== FUNÇÕES DE ESTOQUE ====================
+function getAvailableStockTypes(product) {
+    return [
+        { 
+            id: 'loja', 
+            name: `Loja ${product.estoque_loja <= 0 ? '(Sem estoque)' : ''}`, 
+            icon: 'fas fa-store',
+            disabled: product.estoque_loja <= 0
+        },
+        { 
+            id: 'deposito', 
+            name: `Depósito ${product.estoque_deposito <= 0 ? '(Sem estoque)' : ''}`, 
+            icon: 'fas fa-warehouse',
+            disabled: product.estoque_deposito <= 0
+        },
+        { 
+            id: 'fabrica', 
+            name: `Fábrica ${product.estoque_fabrica <= 0 ? '(Sem estoque)' : ''}`, 
+            icon: 'fas fa-industry',
+            disabled: product.estoque_fabrica <= 0
+        }
+    ];
+}
+
+// Função para obter a quantidade disponível por tipo de estoque
+function getStockByType(product, stockType) {
+    switch(stockType) {
+        case 'loja':
+            return product.estoque_loja || 0;
+        case 'deposito':
+            return product.estoque_deposito || 0;
+        case 'fabrica':
+            return product.estoque_fabrica || 0;
+        default:
+            return 0;
+    }
+}
+
+// Função para formatar o estoque
+function formatStockInfo(product, selectedStockType = 'loja') {
+    const stockTypes = getAvailableStockTypes(product);
+    const currentStock = getStockByType(product, selectedStockType);
+    
+    let info = `Loja: ${product.estoque_loja || 0}`;
+    
+    if (product.estoque_deposito > 0) {
+        info += ` | Depósito: ${product.estoque_deposito}`;
+    }
+    
+    if (product.estoque_fabrica > 0) {
+        info += ` | Fábrica: ${product.estoque_fabrica}`;
+    }
+    
+    return info;
+}
+
 async function addProductToSale(product, initialQuantity = 1) {
     if (!product) return;
 
@@ -1765,10 +1821,17 @@ async function addProductToSale(product, initialQuantity = 1) {
         initialQuantity,
         discounts
     );
+    
     const uniqueId = `${product.id}_${Date.now()}`;
     const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id);
+    
+    // Define estoque padrão (loja)
+    const defaultStockType = 'loja';
+    const availableStockTypes = getAvailableStockTypes(product);
 
     if (existingProductIndex >= 0) {
+        // Se o produto já existe, mantém o estoque selecionado anteriormente
+        const existingStockType = selectedProducts[existingProductIndex].stockType || defaultStockType;
         selectedProducts[existingProductIndex].quantity += initialQuantity;
         const newQuantity = selectedProducts[existingProductIndex].quantity;
 
@@ -1793,7 +1856,9 @@ async function addProductToSale(product, initialQuantity = 1) {
             originalPrice: product.valor_unitario,
             quantity: initialQuantity,
             unit: product.unidade,
-            stock: product.estoque_loja,
+            stock: getStockByType(product, defaultStockType),
+            stockType: defaultStockType,
+            availableStockTypes: availableStockTypes,
             allowsFraction: product.unidade.toLowerCase() === 'kg',
             hasDiscount: discountApplied,
             discountInfo: discountInfo,
@@ -2020,11 +2085,43 @@ function renderProductsList() {
         const originalTotalValue = product.originalPrice * (product.quantity || 0);
         const discountValue = originalTotalValue - totalValue;
 
+        // Cria o seletor de estoque
+        let stockSelector = '';
+        if (product.availableStockTypes && product.availableStockTypes.length > 1) {
+            stockSelector = `
+                <div class="stock-selector-container">
+                    <select class="stock-selector" data-index="${index}" title="Selecione o estoque de origem">
+                        ${product.availableStockTypes.map(stockType => `
+                            <option value="${stockType.id}" 
+                                ${product.stockType === stockType.id ? 'selected' : ''}
+                                data-icon="${stockType.icon}">
+                                ${stockType.name}
+                            </option>
+                        `).join('')}
+                    </select>
+                    <div class="stock-info">
+                        Disponível: ${getStockByType(product, product.stockType)} ${product.unit}
+                    </div>
+                </div>
+            `;
+        } else {
+            // Se só tem um tipo de estoque, mostra apenas a informação
+            stockSelector = `
+                <div class="stock-info-single">
+                    <i class="fas fa-store"></i>
+                    Disponível: ${getStockByType(product, 'loja')} ${product.unit}
+                </div>
+            `;
+        }
+
         const row = document.createElement('tr');
         row.dataset.uniqueId = product.uniqueId; 
         row.innerHTML = `
             <td>
-                ${product.name}
+                <div class="product-name-container">
+                    <div class="product-name">${product.name}</div>
+                    ${stockSelector}
+                </div>
                 <span class="discount-badge" 
                       title="${product.discountInfo?.descricao || ''}" 
                       style="display:${product.hasDiscount ? 'inline-block' : 'none'}">
@@ -2066,9 +2163,8 @@ function renderProductsList() {
         productsList.appendChild(row);
     });
 
-    // Adiciona eventos
+    // Adiciona eventos para os campos de quantidade
     document.querySelectorAll('.quantity-input').forEach(input => {
-        // Validação de caracteres
         input.addEventListener('input', function (e) {
             let value = e.target.value;
             if (!/^[0-9]*[,.]?[0-9]*$/.test(value)) {
@@ -2076,9 +2172,34 @@ function renderProductsList() {
             }
         });
 
-        // 🔹 Atualiza em tempo real enquanto digita
         input.addEventListener('input', async function (e) {
             await updateProductQuantity(e.target);
+        });
+    });
+
+    // Adiciona eventos para os seletores de estoque
+    document.querySelectorAll('.stock-selector').forEach(select => {
+        select.addEventListener('change', function(e) {
+            const index = parseInt(this.dataset.index);
+            const newStockType = this.value;
+            
+            if (index >= 0 && index < selectedProducts.length) {
+                // Atualiza o tipo de estoque
+                selectedProducts[index].stockType = newStockType;
+                
+                // Atualiza a quantidade disponível para o novo estoque
+                const product = products.find(p => p.id === selectedProducts[index].id);
+                if (product) {
+                    selectedProducts[index].stock = getStockByType(product, newStockType);
+                    
+                    // Atualiza o texto de estoque disponível
+                    const stockInfo = this.closest('.stock-selector-container').querySelector('.stock-info');
+                    if (stockInfo) {
+                        stockInfo.textContent = `Disponível: ${selectedProducts[index].stock} ${selectedProducts[index].unit}`;
+                    }
+                    
+                }
+            }
         });
     });
 
@@ -2089,6 +2210,7 @@ function renderProductsList() {
         });
     });
 }
+
 function removeProductByUniqueId(uniqueId) {
     const indexToRemove = selectedProducts.findIndex(p => p.uniqueId === uniqueId);
     
@@ -2108,6 +2230,7 @@ async function updateProductQuantity(input) {
     const value = input.value.trim().replace(',', '.');
 
     let newQuantity = parseFloat(value);
+    
     if (isNaN(newQuantity) || newQuantity <= 0) {
         product.quantity = null;
         input.value = '';
@@ -2136,11 +2259,11 @@ async function updateProductQuantity(input) {
 
     calculateSaleTotal();
 
-    // 🔹 Atualiza DOM sem recriar linha
+    // Atualiza DOM sem recriar linha
     const updatedProduct = selectedProducts[index];
     const row = input.closest('tr');
     if (row) {
-        // preço
+        // Atualiza preço
         const priceCell = row.querySelector('.product-price');
         if (priceCell) {
             priceCell.innerHTML = `
@@ -2151,7 +2274,7 @@ async function updateProductQuantity(input) {
             `;
         }
 
-        // badge
+        // Atualiza badge de desconto
         const badgeCell = row.querySelector('.discount-badge');
         if (badgeCell) {
             if (updatedProduct.hasDiscount && updatedProduct.discountInfo) {
@@ -2170,7 +2293,7 @@ async function updateProductQuantity(input) {
             }
         }
 
-        // total
+        // Atualiza total
         const totalCell = row.querySelector('.product-total');
         if (totalCell) {
             const totalValue = updatedProduct.price * (updatedProduct.quantity || 0);
@@ -2213,7 +2336,7 @@ async function registerSale() {
         const paymentMethods = [];
         const paymentItems = document.querySelectorAll('.payment-item');
 
-        // Processa os métodos de pagamento já definidos
+        // Processa os métodos de pagamento
         paymentItems.forEach(item => {
             const method = item.querySelector('input[name="payment_methods[]"]').value;
             const amount = parseFloat(item.querySelector('input[name="payment_amounts[]"]').value.replace(',', '.'));
@@ -2230,10 +2353,8 @@ async function registerSale() {
         let valor_recebido = 0;
 
         if (paymentMethods.length > 0) {
-            // Se há múltiplos métodos de pagamento, soma todos os valores
             valor_recebido = paymentMethods.reduce((sum, pm) => sum + pm.valor, 0);
         } else {
-            // Se não há múltiplos pagamentos, usa o valor do campo "valor recebido"
             const amountReceivedText = amountReceivedInput?.value.replace(/\./g, '').replace(',', '.') || '0';
             valor_recebido = parseFloat(amountReceivedText) || 0;
         }
@@ -2242,26 +2363,20 @@ async function registerSale() {
 
         if (totalPagamentos < total) {
             const remaining = total - totalPagamentos;
-
-            // Verifica se já existe um pagamento em dinheiro para somar
             const pagamentoDinheiroExistente = paymentMethods.find(pm => pm.forma_pagamento === 'dinheiro');
 
             if (pagamentoDinheiroExistente) {
-                // Se já existe pagamento em dinheiro, adiciona o valor restante
                 pagamentoDinheiroExistente.valor += remaining;
             } else {
-                // Se não existe, cria um novo pagamento em dinheiro
                 paymentMethods.push({
                     forma_pagamento: 'dinheiro',
                     valor: remaining
                 });
             }
 
-            // Atualiza o valor_recebido para incluir o pagamento em dinheiro
             valor_recebido = total;
         }
 
-        // Se não há nenhum método de pagamento definido, assume pagamento total em dinheiro
         if (paymentMethods.length === 0) {
             paymentMethods.push({
                 forma_pagamento: 'dinheiro',
@@ -2270,6 +2385,7 @@ async function registerSale() {
             valor_recebido = total;
         }
 
+        // Prepara os itens com estoque de origem
         const items = selectedProducts.map(product => {
             const originalTotal = product.originalPrice * product.quantity;
             const discountedTotal = product.price * product.quantity;
@@ -2282,6 +2398,7 @@ async function registerSale() {
                 valor_unitario_com_desconto: Number(product.price),
                 valor_total: Number(discountedTotal),
                 valor_desconto: Number(discountValue),
+                estoque_origem: product.stockType || 'loja', // Inclui o estoque de origem
                 desconto_info: product.discountInfo ? {
                     tipo: product.discountInfo.tipo,
                     valor: product.discountInfo.valor,
@@ -2297,7 +2414,7 @@ async function registerSale() {
             valor_recebido: valor_recebido,
             valor_total: total,
             itens: items,
-            pagamentos: paymentMethods, // Sempre envia a lista de pagamentos
+            pagamentos: paymentMethods,
             total_descontos: items.reduce((sum, item) => sum + item.valor_desconto, 0),
             observacao: observacao
         };
@@ -2314,7 +2431,9 @@ async function registerSale() {
                 instrucoes: deliveryAddress.instrucoes || ''
             };
         }
-        const response = await fetch('/operador/api/vendas', {
+
+        // Usa a nova rota com estoque
+        const response = await fetch('/operador/api/vendas_estoque', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -2344,6 +2463,7 @@ async function registerSale() {
         showMessage(error.message, 'error');
     }
 }
+
 // Adicione este evento listener no seu código de inicialização
 document.getElementById('sale-notes').addEventListener('input', function (e) {
     const maxLength = 500;
@@ -2933,37 +3053,42 @@ async function downloadSaleReceipt(saleId) {
         return;
     }
 
+    // ========== ADIÇÃO CRÍTICA ==========
+    const downloadBtn = document.querySelector(`.btn-download[data-id="${saleId}"]`);
+    if (downloadBtn && downloadBtn.dataset.processing === 'true') {
+        return; // Já está processando, ignora clique
+    }
+    if (downloadBtn) {
+        downloadBtn.dataset.processing = 'true'; // Marca como processando
+    }
+    // ===================================
+
     try {
-        // Criar botão de loading
-        const downloadBtn = document.querySelector(`.btn-download[data-id="${saleId}"]`);
         if (downloadBtn) {
             const originalText = downloadBtn.innerHTML;
             downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
             downloadBtn.disabled = true;
         }
 
-        // Abrir diretamente em nova guia
         const pdfUrl = `/operador/pdf/nota-venda/${saleId}`;
         window.open(pdfUrl, '_blank');
 
-        // Restaurar botão após um tempo
         setTimeout(() => {
-            const downloadBtn = document.querySelector(`.btn-download[data-id="${saleId}"]`);
             if (downloadBtn) {
                 downloadBtn.innerHTML = '<i class="fas fa-file-pdf"></i> Nota';
                 downloadBtn.disabled = false;
+                downloadBtn.dataset.processing = 'false'; // Libera para novo clique
             }
-        }, 1000);
+        }, 3000);
 
     } catch (error) {
         console.error('Erro ao abrir nota fiscal:', error);
         showMessage(error.message, 'error');
 
-        // Restaurar botão em caso de erro
-        const downloadBtn = document.querySelector(`.btn-download[data-id="${saleId}"]`);
         if (downloadBtn) {
             downloadBtn.innerHTML = '<i class="fas fa-file-pdf"></i> Nota';
             downloadBtn.disabled = false;
+            downloadBtn.dataset.processing = 'false';
         }
     }
 }

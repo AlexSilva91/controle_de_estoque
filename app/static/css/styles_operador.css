@@ -3255,3 +3255,77 @@ body {
     color: var(--text-light);
     font-size: 1.1em;
 }
+/* Estilos para o seletor de estoque */
+.stock-selector-container {
+    margin-top: 5px;
+    font-size: 0.9rem;
+}
+
+.stock-selector {
+    width: 100%;
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    font-size: 0.85rem;
+}
+
+.stock-selector:focus {
+    outline: none;
+    border-color: #4dabf7;
+    box-shadow: 0 0 0 3px rgba(77, 171, 247, 0.1);
+}
+
+.stock-info {
+    margin-top: 2px;
+    color: #666;
+    font-size: 0.8rem;
+}
+
+.stock-info-single {
+    margin-top: 5px;
+    color: #666;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.stock-info-single i {
+    color: #28a745;
+}
+
+.product-name-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.product-name {
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+/* Estilos para os ícones nos options (se necessário) */
+.stock-selector option {
+    padding: 8px;
+}
+
+/* Validação de estoque insuficiente */
+.quantity-input.error {
+    border-color: #dc3545 !important;
+    background-color: #fff5f5 !important;
+}
+.stock-note {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    border-left: 3px solid #4dabf7;
+    font-size: 0.85rem;
+    color: #495057;
+}
+
+.stock-note i {
+    color: #4dabf7;
+    margin-right: 5px;
+}

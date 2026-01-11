@@ -248,9 +248,7 @@ class Caixa(Base):
 
     def fechar_caixa(self, valor_fechamento, observacoes_operador=None, usuario_id=None):
         """Método para fechar o caixa (aguardando aprovação)"""
-        # if self.status != StatusCaixa.aberto:
-        #     raise ValueError("Caixa não está aberto para fechamento")
-            
+        
         self.valor_fechamento = valor_fechamento
         self.data_fechamento = datetime.now()
         self.observacoes_operador = observacoes_operador
@@ -270,8 +268,6 @@ class Caixa(Base):
 
     def aprovar_fechamento(self, administrador_id, valor_confirmado=None, observacoes_admin=None):
         """Método para aprovar o fechamento do caixa"""
-        # if self.status != StatusCaixa.em_analise:
-        #     raise ValueError("Caixa não está aguardando análise")
             
         self.valor_confirmado = valor_confirmado if valor_confirmado else self.valor_fechamento
         self.observacoes_admin = observacoes_admin
@@ -293,8 +289,6 @@ class Caixa(Base):
 
     def rejeitar_fechamento(self, administrador_id, motivo, valor_correto=None):
         """Método para rejeitar o fechamento do caixa"""
-        # if self.status != StatusCaixa.em_analise:
-        #     raise ValueError("Caixa não está aguardando análise")
             
         self.valor_confirmado = valor_correto
         self.observacoes_admin = motivo
@@ -554,7 +548,18 @@ class Produto(Base):
             novo_numero += 1
 
         return str(novo_numero)
-
+    
+    @classmethod
+    def get_estoque(cls, tipo_estoque):
+            """Retorna o estoque específico baseado no tipo"""
+            if tipo_estoque == TipoEstoque.loja:
+                return cls.estoque_loja
+            elif tipo_estoque == TipoEstoque.deposito:
+                return cls.estoque_deposito
+            elif tipo_estoque == TipoEstoque.fabrica:
+                return cls.estoque_fabrica
+            else:
+                return cls.estoque_loja
 # --------------------
 # Cliente
 # --------------------

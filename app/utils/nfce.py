@@ -82,6 +82,15 @@ def formatar_endereco_entrega(endereco) -> str:
 def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict) -> BytesIO:
     largura = 80 * mm
     styles = getSampleStyleSheet()
+    
+    # Função para formatar valores no padrão brasileiro
+    def format_br(valor):
+        """Formata número no padrão brasileiro: 1.234,56"""
+        try:
+            valor_float = float(valor)
+            return f"{valor_float:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        except (ValueError, TypeError):
+            return "0,00"
 
     # Estilo pequeno (usado em textos extras)
     styleN_small = ParagraphStyle(
@@ -91,13 +100,25 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict) -> BytesIO:
         leading=7
     )
 
-    # Estilo negrito e maior para itens da tabela
+    # Estilo negrito e maior para itens da tabela - COM NOWRAP
     styleItemBold = ParagraphStyle(
         name="ItemBold",
         parent=styles["Normal"],
         fontName="Helvetica-Bold",
         fontSize=7,
-        leading=8
+        leading=8,
+        wordWrap=None
+    )
+    
+    # Estilo para informação de estoque (menor e em itálico) - COM NOWRAP
+    styleStockInfo = ParagraphStyle(
+        name="StockInfo",
+        parent=styles["Normal"],
+        fontName="Helvetica-Oblique",
+        fontSize=6,
+        leading=6,
+        textColor=colors.grey,
+        wordWrap=None
     )
 
     from flask import current_app
@@ -125,15 +146,43 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict) -> BytesIO:
         safe_float(p.get("desconto_aplicado")) > 0 
         for p in produtos if p is not None
     )
+    
+    # Verifica se algum produto tem estoque de origem diferente de "loja"
+    tem_estoque_diferente = any(
+        p.get("estoque_origem") and p.get("estoque_origem") != "loja"
+        for p in produtos if p is not None
+    )
+    
+    # Função para obter texto do estoque (abreviado)
+    def get_stock_text(stock_type):
+        textos = {
+            'loja': 'Loja',
+            'deposito': 'Dep',
+            'fabrica': 'Fab'
+        }
+        return textos.get(stock_type, stock_type)
 
+    # Define colunas da tabela baseado em descontos e estoque
     if tem_descontos:
-        data = [["Produto", "Qtd", "Unit", "Desc", "Total"]]
-        col_widths = [30*mm, 8*mm, 10*mm, 8*mm, 9*mm]
+        if tem_estoque_diferente:
+            data = [["Produto", "Qtd", "Unit", "Desc", "Total", "Est"]]
+            col_widths = [26*mm, 7*mm, 9*mm, 9*mm, 9*mm, 9*mm]
+            fonte_valores = 4.5  # Fonte menor quando tem desconto + estoque
+        else:
+            data = [["Produto", "Qtd", "Unit", "Desc", "Total"]]
+            col_widths = [30*mm, 8*mm, 10*mm, 9*mm, 12*mm]
+            fonte_valores = 5.5  # Fonte menor quando tem desconto
     else:
-        data = [["Produto", "Qtd", "Unit", "Total"]]
-        col_widths = [34*mm, 10*mm, 12*mm, 15*mm]
+        if tem_estoque_diferente:
+            data = [["Produto", "Qtd", "Unit", "Total", "Est"]]
+            col_widths = [28*mm, 9*mm, 11*mm, 13*mm, 9*mm]
+            fonte_valores = 5.5  # Fonte menor quando tem estoque
+        else:
+            data = [["Produto", "Qtd", "Unit", "Total"]]
+            col_widths = [34*mm, 10*mm, 12*mm, 15*mm]
+            fonte_valores = 7.5  # Fonte normal quando tem apenas as colunas básicas
 
-    # Agora todos os campos dos produtos já vêm com estilo bold e maior
+    # Adiciona produtos à tabela
     for produto in produtos:
         if not produto or not isinstance(produto, dict):
             continue
@@ -142,34 +191,35 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict) -> BytesIO:
             safe_str(produto.get("nome"), f"Produto {produto.get('id', '')}"),
             styleItemBold
         )
-        quantidade = Paragraph(
-            format_number(safe_float(produto.get("quantidade"))),
-            styleItemBold
+        
+        # Valores numéricos como strings simples (sem Paragraph para evitar wrap)
+        quantidade = format_br(safe_float(produto.get("quantidade")))
+        valor_unitario = format_br(safe_float(produto.get("valor_unitario")))
+        
+        valor_total_prod = safe_float(
+            produto.get("valor_total_com_desconto",
+                safe_float(produto.get("valor_unitario")) * safe_float(produto.get("quantidade"))
+            )
         )
-        valor_unitario = Paragraph(
-            format_number(safe_float(produto.get("valor_unitario"))),
-            styleItemBold
-        )
-        valor_total = Paragraph(
-            format_number(
-                safe_float(
-                    produto.get("valor_total_com_desconto",
-                        safe_float(produto.get("valor_unitario")) * safe_float(produto.get("quantidade"))
-                    )
-                )
-            ),
-            styleItemBold
-        )
-        desconto = Paragraph(
-            f"-{format_number(safe_float(produto.get('desconto_aplicado')))}"
-            if safe_float(produto.get("desconto_aplicado")) > 0 else "-",
-            styleItemBold
-        )
+        valor_total = format_br(valor_total_prod)
+        
+        desc_val = safe_float(produto.get('desconto_aplicado'))
+        desconto = f"-{format_br(desc_val)}" if desc_val > 0 else "-"
+        
+        # Informação de estoque de origem
+        estoque_origem = produto.get("estoque_origem", "loja")
+        estoque_info = get_stock_text(estoque_origem)
 
         if tem_descontos:
-            data.append([nome_produto, quantidade, valor_unitario, desconto, valor_total])
+            if tem_estoque_diferente:
+                data.append([nome_produto, quantidade, valor_unitario, desconto, valor_total, estoque_info])
+            else:
+                data.append([nome_produto, quantidade, valor_unitario, desconto, valor_total])
         else:
-            data.append([nome_produto, quantidade, valor_unitario, valor_total])
+            if tem_estoque_diferente:
+                data.append([nome_produto, quantidade, valor_unitario, valor_total, estoque_info])
+            else:
+                data.append([nome_produto, quantidade, valor_unitario, valor_total])
 
     altura_base = 95 * mm
     altura_linha_item = 7 * mm
@@ -230,14 +280,34 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict) -> BytesIO:
         ('ALIGN', (1,0), (-1,0), 'RIGHT'),
         ('ALIGN', (1,1), (-1,-1), 'RIGHT'),
         ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 7.5),
+        ('FONTSIZE', (0,0), (-1,0), 7.5),  # Cabeçalho mantém tamanho normal
+        ('FONTSIZE', (0,1), (0,-1), 7),  # Nome do produto tamanho 7
+        ('FONTSIZE', (1,1), (-1,-1), fonte_valores),  # Valores numéricos com fonte variável
         ('BOTTOMPADDING', (0,0), (-1,0), 3),
         ('TOPPADDING', (0,0), (-1,-1), 1),
         ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
         ('LEADING', (0,0), (-1,-1), 7),
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('WORDWRAP', (0,0), (-1,-1), True),
     ]
+    
+    # Wordwrap APENAS na primeira coluna (nome do produto)
+    estilo.append(('WORDWRAP', (0,1), (0,-1), True))
+    
+    # Adiciona alinhamento central para a coluna de estoque se existir
+    if tem_estoque_diferente:
+        if tem_descontos:
+            # Coluna estoque está na posição 5 (última coluna)
+            estilo.append(('ALIGN', (5,0), (5,-1), 'CENTER'))
+            estilo.append(('FONTNAME', (5,1), (5,-1), 'Helvetica-Oblique'))
+            estilo.append(('FONTSIZE', (5,1), (5,-1), 6))
+            estilo.append(('TEXTCOLOR', (5,1), (5,-1), colors.grey))
+        else:
+            # Coluna estoque está na posição 4 (última coluna)
+            estilo.append(('ALIGN', (4,0), (4,-1), 'CENTER'))
+            estilo.append(('FONTNAME', (4,1), (4,-1), 'Helvetica-Oblique'))
+            estilo.append(('FONTSIZE', (4,1), (4,-1), 6))
+            estilo.append(('TEXTCOLOR', (4,1), (4,-1), colors.grey))
+    
     for i in range(1, len(data)):
         estilo.append(('BACKGROUND', (0,i), (-1,i), colors.whitesmoke if i%2 else colors.white))
     tabela.setStyle(TableStyle(estilo))
@@ -247,11 +317,11 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict) -> BytesIO:
 
     if desconto_total > 0:
         c.setFont("Helvetica", 7)
-        c.drawRightString(largura-5*mm, y, f"DESCONTO: -{format_number(desconto_total)}")
+        c.drawRightString(largura-5*mm, y, f"DESCONTO: - R$ {format_br(desconto_total)}")
         y -= 4 * mm
 
     c.setFont("Helvetica-Bold", 9)
-    c.drawRightString(largura-5*mm, y, f"TOTAL R$: {format_number(valor_total_nota)}")
+    c.drawRightString(largura-5*mm, y, f"TOTAL: R$ {format_br(valor_total_nota)}")
     y -= 8 * mm
 
     if formas_pagamento:
@@ -264,7 +334,7 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict) -> BytesIO:
                 continue
             forma = safe_str(pgto.get("forma_pagamento")).replace("_", " ").title()
             valor = safe_float(pgto.get("valor"))
-            c.drawString(10*mm, y, f"{forma}: R$ {format_number(valor)}")
+            c.drawString(10*mm, y, f"{forma}: R$ {format_br(valor)}")
             y -= 4 * mm
     else:
         pgto_especifico = dados_nota.get("pagamento_especifico", {})
@@ -294,12 +364,17 @@ def gerar_nfce_pdf_bobina_bytesio(dados_nota: dict) -> BytesIO:
     y -= 12 * mm
     c.setFont("Helvetica-Oblique", 6)
     c.drawCentredString(largura/2, y, "Documento sem valor fiscal")
+    
+    # Adiciona nota sobre o estoque de origem apenas se houver produtos de estoque diferente
+    if tem_estoque_diferente:
+        y -= 6 * mm
+        c.setFont("Helvetica-Oblique", 5)
+        c.drawCentredString(largura/2, y, "*'Est' indica origem: Loja/Dep/Fab")
 
     c.showPage()
     c.save()
     buffer.seek(0)
     return buffer
-
 
 def generate_caixa_financeiro_pdf(data):
     from reportlab.lib.pagesizes import letter, A4
