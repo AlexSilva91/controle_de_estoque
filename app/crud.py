@@ -1253,6 +1253,9 @@ def buscar_pagamentos_notas_fiscais(db: Session, ids_pagamentos: Union[int, List
             valor_item_com_desconto = float(item.valor_total)
             desconto_item = valor_item_sem_desconto - valor_item_com_desconto
 
+            # Obter informações do estoque de origem - MODIFICADO: retorna string direto
+            estoque_origem_info = item.estoque_origem.value if item.estoque_origem else None
+
             produtos.append({
                 'id': item.produto.id,
                 'nome': item.produto.nome,
@@ -1264,7 +1267,13 @@ def buscar_pagamentos_notas_fiscais(db: Session, ids_pagamentos: Union[int, List
                 'desconto_aplicado': float(item.desconto_aplicado) if item.desconto_aplicado else None,
                 'tipo_desconto': item.tipo_desconto.value if item.tipo_desconto else None,
                 'valor_desconto': desconto_item,
-                'percentual_desconto': round((desconto_item / valor_item_sem_desconto * 100), 2) if valor_item_sem_desconto > 0 else 0
+                'percentual_desconto': round((desconto_item / valor_item_sem_desconto * 100), 2) if valor_item_sem_desconto > 0 else 0,
+                'estoque_origem': estoque_origem_info,  # MODIFICADO: agora é string ('loja', 'deposito', 'fabrica')
+                # Campos adicionais do produto para referência
+                'estoque_atual_loja': float(item.produto.estoque_loja) if item.produto.estoque_loja else 0.0,
+                'estoque_atual_deposito': float(item.produto.estoque_deposito) if item.produto.estoque_deposito else 0.0,
+                'estoque_atual_fabrica': float(item.produto.estoque_fabrica) if item.produto.estoque_fabrica else 0.0,
+                'unidade_medida': item.produto.unidade.value if item.produto.unidade else None
             })
 
         # Formas de pagamento
@@ -1288,6 +1297,12 @@ def buscar_pagamentos_notas_fiscais(db: Session, ids_pagamentos: Union[int, List
                 'cep': nota_fiscal.entrega.cep,
                 'instrucoes': nota_fiscal.entrega.instrucoes
             }
+
+        # Verificar se algum produto saiu de estoque diferente da loja
+        estoques_origem_utilizados = set()
+        for item in nota_fiscal.itens:
+            if item.estoque_origem:
+                estoques_origem_utilizados.add(item.estoque_origem.value)
 
         # Resultado final para esta nota
         resultados.append({
@@ -1318,7 +1333,12 @@ def buscar_pagamentos_notas_fiscais(db: Session, ids_pagamentos: Union[int, List
                 'total_itens': len(nota_fiscal.itens),
                 'total_formas_pagamento': len(nota_fiscal.pagamentos),
                 'possui_entrega': endereco_entrega is not None,
-                'possui_cliente': cliente_info is not None  # Novo metadado
+                'possui_cliente': cliente_info is not None,
+                'estoques_origem_utilizados': list(estoques_origem_utilizados) if estoques_origem_utilizados else None,
+                'produtos_de_estoque_alternativo': len([
+                    item for item in nota_fiscal.itens 
+                    if item.estoque_origem and item.estoque_origem.value != 'loja'
+                ])
             }
         })
 
@@ -1327,6 +1347,7 @@ def buscar_pagamentos_notas_fiscais(db: Session, ids_pagamentos: Union[int, List
         "data": resultados,
         "success": True
     }
+    
     
 # ===== Contas a Receber =====
 def create_conta_receber(db: Session, conta: schemas.ContaReceberCreate) -> entities.ContaReceber:
