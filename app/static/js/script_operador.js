@@ -252,7 +252,6 @@ async function loadClients(page = 1, searchTerm = '') {
         currentPage = page;
         currentSearchTerm = searchTerm;
 
-        // Constrói a URL com parâmetros
         let url = `/operador/api/clientes?page=${page}&per_page=${clientsPerPage}`;
         if (searchTerm) {
             url += `&search=${encodeURIComponent(searchTerm)}`;
@@ -269,7 +268,6 @@ async function loadClients(page = 1, searchTerm = '') {
         clients = data.clientes;
         filteredClients = [...clients];
 
-        // Informações de paginação
         totalPages = data.pagination.pages;
         totalClients = data.pagination.total;
 
@@ -278,8 +276,17 @@ async function loadClients(page = 1, searchTerm = '') {
         renderPagination();
 
     } catch (error) {
-        showMessage(error.message, 'error');
-        showClientsEmptyState(true);
+        const tbody = document.getElementById('clients-tbody');
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 20px; color: #dc3545;">
+                        <i class="fas fa-exclamation-circle"></i> ${error.message}
+                    </td>
+                </tr>
+            `;
+        }
+        showClientsEmptyState(false);
     } finally {
         showClientsLoading(false);
     }
@@ -290,7 +297,17 @@ function renderClientsTable() {
     if (!tbody) return;
 
     if (filteredClients.length === 0) {
-        showClientsEmptyState(true);
+        if (currentSearchTerm) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 20px; color: #6c757d;">
+                        <i class="fas fa-search"></i> Nenhum cliente encontrado para "${currentSearchTerm}"
+                    </td>
+                </tr>
+            `;
+        } else {
+            showClientsEmptyState(true);
+        }
         return;
     }
 
