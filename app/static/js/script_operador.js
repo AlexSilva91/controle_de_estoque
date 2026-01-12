@@ -935,44 +935,21 @@ async function viewClientDetails(clientId) {
                     const valorAindaAberto = conta.valor_ainda_aberto || 0;
                     
                     return `
-                                <div class="conta-receber-card" data-conta-id="${conta.id}">
-                                    <div class="conta-header">
+                                <div class="conta-receber-card collapsible" data-conta-id="${conta.id}">
+                                    <div class="conta-header-collapsible" data-toggle="collapse">
+                                        <span class="collapse-icon">▶</span>
                                         <h5>${conta.descricao || 'Conta sem descrição'}</h5>
-                                        <div class="conta-status-info">
-                                            <span class="status-badge ${conta.status}">${conta.status}</span>
-                                            <span class="conta-values">
-                                                <strong>Pago:</strong>
-                                                <span class="status-badge pago">
-                                                    ${formatCurrency(valorPagoConta)}
-                                                </span>
-                                                |
-                                                <strong>Aberto:</strong>
-                                                <span class="status-badge ${valorAindaAberto > 0 ? 'vencido' : 'pago'}">
-                                                    ${formatCurrency(valorAindaAberto)}
-                                                </span>
-                                            </span>
-                                        </div>
+                                        <span class="summary-divider">|</span>
+                                        <span class="summary-inline">Data: <strong>${formatDate(conta.data_emissao)}</strong></span>
+                                        <span class="summary-divider">|</span>
+                                        <span class="summary-inline">Em Aberto: <strong class="highlight-open">${formatCurrency(valorAindaAberto)}</strong></span>
+                                        <span class="summary-divider">|</span>
+                                        <span class="summary-inline">Pago: <strong class="highlight-paid">${formatCurrency(valorPagoConta)}</strong></span>
+                                        <span class="status-badge ${conta.status}">${conta.status}</span>
                                     </div>
                                     
-                                    <div class="conta-details">
+                                    <div class="conta-details-collapsible" style="display: none;">
                                         <div class="conta-info-grid">
-                                            <div class="info-item">
-                                                <strong>Valor Original:</strong> ${formatCurrency(conta.valor_original)}
-                                            </div>
-                                            <div class="info-item">
-                                                <strong>Valor Aberto:</strong> ${formatCurrency(conta.valor_aberto)}
-                                            </div>
-                                            <div class="info-item">
-                                                <strong>Vencimento:</strong> ${formatDate(conta.data_vencimento)}
-                                            </div>
-                                            <div class="info-item">
-                                                <strong>Emissão:</strong> ${formatDate(conta.data_emissao)}
-                                            </div>
-                                            ${conta.data_pagamento ? `
-                                                <div class="info-item">
-                                                    <strong>Pagamento:</strong> ${formatDateTime(conta.data_pagamento)}
-                                                </div>
-                                            ` : ''}
                                             ${conta.observacoes ? `
                                                 <div class="info-item full-width">
                                                     <strong>Observações:</strong> ${conta.observacoes}
@@ -982,7 +959,7 @@ async function viewClientDetails(clientId) {
                                         
                                         ${conta.pagamentos_nota_fiscal && conta.pagamentos_nota_fiscal.length > 0 ? `
                                             <div class="pagamentos-section">
-                                                <h6>Pagamentos da Nota Fiscal</h6>
+                                                <h6>Formas de Pagamento Utilizadas</h6>
                                                 <div class="table-container">
                                                     <table class="pagamentos-table">
                                                         <thead>
@@ -1008,7 +985,7 @@ async function viewClientDetails(clientId) {
                                         
                                         ${conta.pagamentos_conta_receber && conta.pagamentos_conta_receber.length > 0 ? `
                                             <div class="pagamentos-section">
-                                                <h6>Pagamentos da Conta</h6>
+                                                <h6>Valor já quitado</h6>
                                                 <div class="table-container">
                                                     <table class="pagamentos-table">
                                                         <thead>
@@ -1110,24 +1087,24 @@ async function viewClientDetails(clientId) {
                                                 </div>
                                             </div>
                                         ` : conta.nota_fiscal_id ? '<p class="no-products">Nota fiscal sem produtos cadastrados</p>' : '<p class="no-products">Sem nota fiscal associada</p>'}
-                                    </div>
                                     
-                                    <div class="conta-actions">
-                                        ${conta.status === 'pendente' || conta.status === 'parcial' ? `
-                                            <button class="btn-pay-partial btn-small" data-conta-id="${conta.id}" 
-                                                data-valor-aberto="${conta.valor_aberto}">
-                                                💰 Pagar Parcial
+                                        <div class="conta-actions">
+                                            ${conta.status === 'pendente' || conta.status === 'parcial' ? `
+                                                <button class="btn-pay-partial btn-small" data-conta-id="${conta.id}" 
+                                                    data-valor-aberto="${conta.valor_aberto}">
+                                                    💰 Pagar Parcial
+                                                </button>
+                                                <button class="btn-pay-full btn-small" data-conta-id="${conta.id}" 
+                                                    data-valor-aberto="${conta.valor_aberto}">
+                                                    ✅ Pagar Total
+                                                </button>
+                                            ` : `
+                                                <span class="status-info">✅ Conta quitada</span>
+                                            `}
+                                            <button class="btn-receipt btn-small" data-conta-id="${conta.id}">
+                                                🧾 Comprovante
                                             </button>
-                                            <button class="btn-pay-full btn-small" data-conta-id="${conta.id}" 
-                                                data-valor-aberto="${conta.valor_aberto}">
-                                                ✅ Pagar Total
-                                            </button>
-                                        ` : `
-                                            <span class="status-info">✅ Conta quitada</span>
-                                        `}
-                                        <button class="btn-receipt btn-small" data-conta-id="${conta.id}">
-                                            🧾 Comprovante
-                                        </button>
+                                        </div>
                                     </div>
                                 </div>
                             `;
@@ -1142,6 +1119,28 @@ async function viewClientDetails(clientId) {
         `;
 
         document.body.appendChild(modal);
+
+        // Event listener para expandir/colapsar contas
+        modal.querySelectorAll('.conta-header-collapsible').forEach(header => {
+            header.addEventListener('click', (e) => {
+                // Evita que cliques em botões acionem o toggle
+                if (e.target.closest('button')) return;
+                
+                const card = header.closest('.conta-receber-card');
+                const details = card.querySelector('.conta-details-collapsible');
+                const icon = card.querySelector('.collapse-icon');
+                
+                if (details.style.display === 'none') {
+                    details.style.display = 'block';
+                    icon.textContent = '▼';
+                    card.classList.add('expanded');
+                } else {
+                    details.style.display = 'none';
+                    icon.textContent = '▶';
+                    card.classList.remove('expanded');
+                }
+            });
+        });
 
         modal.querySelectorAll('.modal-close').forEach(closeBtn => {
             closeBtn.addEventListener('click', () => {
@@ -1159,6 +1158,7 @@ async function viewClientDetails(clientId) {
 
         modal.querySelectorAll('.btn-pay-partial').forEach(btn => {
             btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Evita que o clique expanda/colapse
                 const contaId = e.target.getAttribute('data-conta-id');
                 const valorAberto = parseFloat(e.target.getAttribute('data-valor-aberto'));
                 showPartialPaymentModal(contaId, valorAberto);
@@ -1167,6 +1167,7 @@ async function viewClientDetails(clientId) {
 
         modal.querySelectorAll('.btn-pay-full').forEach(btn => {
             btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Evita que o clique expanda/colapse
                 const contaId = e.target.getAttribute('data-conta-id');
                 const valorAberto = parseFloat(e.target.getAttribute('data-valor-aberto'));
                 confirmFullPayment(contaId, valorAberto);
@@ -1175,6 +1176,7 @@ async function viewClientDetails(clientId) {
         
         modal.querySelectorAll('.btn-receipt').forEach(btn => {
             btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Evita que o clique expanda/colapse
                 const contaId = e.target.getAttribute('data-conta-id');
                 generateReceipt(contaId);
             });

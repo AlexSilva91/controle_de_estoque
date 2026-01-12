@@ -3329,3 +3329,97 @@ body {
     color: #4dabf7;
     margin-right: 5px;
 }
+/* Estilos para contas retráteis - VERSÃO COMPACTA */
+.conta-receber-card.collapsible {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.conta-receber-card.collapsible:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.conta-header-collapsible {
+    padding: 12px 16px;
+    cursor: pointer;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.conta-header-collapsible:hover {
+    background-color: #e9ecef;
+}
+
+.conta-header-collapsible h5 {
+    margin: 0;
+    font-size: 15px;
+    flex-shrink: 0;
+}
+
+.collapse-icon {
+    font-size: 12px;
+    transition: transform 0.3s ease;
+    color: #666;
+    flex-shrink: 0;
+}
+
+.conta-receber-card.expanded .collapse-icon {
+    transform: rotate(90deg);
+}
+
+.summary-divider {
+    color: #ccc;
+    font-weight: 300;
+}
+
+.summary-inline {
+    font-size: 14px;
+    color: #555;
+    white-space: nowrap;
+}
+
+.summary-inline strong {
+    font-weight: 600;
+}
+
+.highlight-open {
+    color: #dc3545;
+}
+
+.highlight-paid {
+    color: #28a745;
+}
+
+.status-badge {
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.conta-details-collapsible {
+    padding: 20px;
+    background-color: #fff;
+}
+
+/* Animação suave ao expandir */
+.conta-details-collapsible {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
