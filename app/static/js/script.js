@@ -3669,11 +3669,14 @@ setTimeout(inicializarBusca, 500);
     });
   }
 
-  // Funções auxiliares para formatação
-  function formatarData(dataString) {
-    if (!dataString) return '-';
-    const date = new Date(dataString);
-    return date.toLocaleDateString('pt-BR');
+  function formatarDataApenasData(dataString) {
+      if (!dataString) return '-';
+      
+      // Remove qualquer parte de hora
+      const dataPart = dataString.split(' ')[0].split('T')[0];
+      const [year, month, day] = dataPart.split('-');
+      
+      return `${day}/${month}/${year}`;
   }
 
   // Funções auxiliares para formatação
@@ -5541,7 +5544,6 @@ setTimeout(inicializarBusca, 500);
   }
 
   function setupFormasPagamentoEvents() {
-    // Adiciona eventos aos botões do modal
     const adicionarBtn = document.getElementById('adicionarFormaPagamento');
     const salvarBtn = document.getElementById('salvarFormasPagamento');
     const valorInput = document.getElementById('novoValorPagamento');
@@ -5554,7 +5556,6 @@ setTimeout(inicializarBusca, 500);
       salvarBtn.addEventListener('click', salvarFormasPagamento);
     }
 
-    // Permite pressionar Enter no campo de valor
     if (valorInput) {
       valorInput.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') {
@@ -5564,176 +5565,303 @@ setTimeout(inicializarBusca, 500);
     }
   }
 
-  // Event Listeners para Caixas
   document.getElementById('refreshData')?.addEventListener('click', loadDashboardData);
-  // Variáveis globais
+
   let contasReceberData = [];
   let caixasAbertos = [];
 
-  // Função para abrir o modal de contas a receber
   function openContasReceberModal() {
     loadContasReceber();
     carregarCaixasAbertos();
     openModal('contasReceberModal');
   }
 
-  // Função para carregar as contas a receber
   async function loadContasReceber() {
-    try {
-      const dataInicio = document.getElementById('contasReceberDataInicio')?.value || '';
-      const dataFim = document.getElementById('contasReceberDataFim')?.value || '';
-      const status = document.getElementById('contasReceberStatus')?.value || '';
-      const clienteNome = document.getElementById('contasReceberCliente')?.value.trim() || '';
+      try {
+          const dataInicio = document.getElementById('contasReceberDataInicio')?.value || '';
+          const dataFim = document.getElementById('contasReceberDataFim')?.value || '';
+          const status = document.getElementById('contasReceberStatus')?.value || '';
+          const clienteNome = document.getElementById('contasReceberCliente')?.value.trim() || '';
 
-      const params = new URLSearchParams();
+          const params = new URLSearchParams();
 
-      if (dataInicio) params.append('data_emissao_inicio', dataInicio);
-      if (dataFim) params.append('data_emissao_fim', dataFim);
-      if (status) params.append('status', status);
-      if (clienteNome) params.append('cliente_nome', clienteNome);
+          if (dataInicio) params.append('data_emissao_inicio', dataInicio);
+          if (dataFim) params.append('data_emissao_fim', dataFim);
+          if (status) params.append('status', status);
+          if (clienteNome) params.append('cliente_nome', clienteNome);
 
-      const response = await fetch(`/admin/contas-receber?${params.toString()}`);
+          const response = await fetch(`/admin/contas-receber?${params.toString()}`);
 
-      if (!response.ok) {
-        throw new Error('Erro na requisição');
+          if (!response.ok) {
+              throw new Error('Erro na requisição');
+          }
+
+          const data = await response.json();
+
+          if (data.success) {
+              renderContasAgrupadas(data.clientes_agrupados);
+              
+              document.getElementById('totalClientes').textContent = `${data.total_clientes} clientes`;
+              document.getElementById('totalContas').textContent = `${data.total_contas} contas`;
+              
+              if (data.total_clientes === 0) {
+                  showFlashMessage('warning', 'Nenhuma conta encontrada com os filtros aplicados');
+              }
+              
+          } else {
+              showFlashMessage('error', data.message || 'Erro ao carregar contas');
+          }
+
+      } catch (error) {
+          showFlashMessage('error', 'Erro ao carregar contas a receber');
       }
-
-      const data = await response.json();
-
-      contasReceberData = data?.contas || [];
-      atualizarTabelaContasReceber();
-
-      if (contasReceberData.length === 0) {
-        showFlashMessage('warning', 'Nenhuma conta encontrada com os filtros aplicados');
-      }
-
-    } catch (error) {
-      showFlashMessage('error', 'Erro ao carregar contas a receber');
-    }
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
-    const btnFiltrar = document.getElementById('filtrarContasReceber');
-    if (btnFiltrar) {
-      btnFiltrar.addEventListener('click', loadContasReceber);
-    }
+  function renderContasAgrupadas(clientesAgrupados) {
+      const container = document.getElementById('contasReceberContainer');
+      
+      if (!clientesAgrupados || clientesAgrupados.length === 0) {
+          container.innerHTML = `
+              <div class="no-contas">
+                  <i class="fas fa-file-invoice-dollar"></i>
+                  <h3>Nenhuma conta encontrada</h3>
+                  <p>Não há contas a receber com os filtros atuais.</p>
+              </div>
+          `;
+          return;
+      }
+
+      let html = '';
+
+      clientesAgrupados.forEach(clienteData => {
+          const cliente = clienteData.cliente;
+          const resumo = clienteData.resumo;
+          const contas = clienteData.contas;
+          
+          html += `
+              <div class="cliente-card" data-cliente-id="${cliente.id}">
+                  <div class="cliente-header">
+                      <div class="cliente-info">
+                          <div class="cliente-nome">${cliente.nome}</div>
+                          <div class="cliente-documento">${cliente.documento || 'Sem documento'}</div>
+                      </div>
+                      
+                      <div class="cliente-resumo">
+                          <div class="resumo-item">
+                              <span class="resumo-label">Total Dívida</span>
+                              <span class="resumo-valor resumo-total">${formatarMoeda(resumo.total_divida)}</span>
+                          </div>
+                          <div class="resumo-item">
+                              <span class="resumo-label">Total Pago</span>
+                              <span class="resumo-valor resumo-pago">${formatarMoeda(resumo.total_pago)}</span>
+                          </div>
+                          <div class="resumo-item">
+                              <span class="resumo-label">Total em Aberto</span>
+                              <span class="resumo-valor resumo-aberto">${formatarMoeda(resumo.total_aberto)}</span>
+                          </div>
+                          <div class="resumo-item">
+                              <span class="resumo-label">Contas</span>
+                              <span class="resumo-valor">${resumo.qtd_contas} (${resumo.qtd_vencidas} vencidas)</span>
+                          </div>
+                      </div>
+                      
+                      <div class="cliente-toggle">
+                          <i class="fas fa-chevron-down"></i>
+                      </div>
+                  </div>
+                  
+                  <div class="cliente-contas">
+                      <table class="contas-table">
+                          <thead>
+                              <tr>
+                                  <th>Descrição</th>
+                                  <th>Emissão</th>
+                                  <th>Vencimento</th>
+                                  <th>Valor Original</th>
+                                  <th>Valor Pago</th>
+                                  <th>Valor Aberto</th>
+                                  <th>Status</th>
+                                  <th>Ações</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              ${contas.map(conta => {
+                                  let statusClass = 'status-pendente';
+                                  let statusText = 'Pendente';
+                                  
+                                  if (conta.quitada) {
+                                      statusClass = 'status-quitada';
+                                      statusText = 'Quitada';
+                                  } else if (conta.vencida) {
+                                      statusClass = 'status-vencida';
+                                      statusText = 'Vencida';
+                                  } else if (conta.status === 'parcial') {
+                                      statusClass = 'status-parcial';
+                                      statusText = 'Parcial';
+                                  }
+                                  
+                                  const hoje = new Date();
+                                  const vencimento = new Date(conta.data_vencimento);
+                                  const diffTime = vencimento - hoje;
+                                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                  
+                                  let vencimentoClass = '';
+                                  if (diffDays === 0) {
+                                      vencimentoClass = 'vencimento-hoje';
+                                  } else if (diffDays <= 3 && diffDays > 0) {
+                                      vencimentoClass = 'vencimento-proximo';
+                                  }
+                                  
+                                  return `
+                                      <tr>
+                                          <td>${conta.descricao || 'Sem descrição'}</td>
+                                          <td>${formatarDataApenasData(conta.data_emissao)}</td>
+                                          <td class="${vencimentoClass}">${formatarDataApenasData(conta.data_vencimento)}</td>
+                                          <td>${formatarMoeda(conta.valor_original)}</td>
+                                          <td>${formatarMoeda(conta.valor_pago)}</td>
+                                          <td>${formatarMoeda(conta.valor_aberto)}</td>
+                                          <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                                          <td>
+                                              <div class="acoes-conta">
+                                                  <button class="btn-acao btn-detalhes btn-detalhes-conta" data-id="${conta.id}">
+                                                      <i class="fas fa-eye"></i> Detalhes
+                                                  </button>
+                                                  <button class="btn-acao btn-pdf btn-pdf-conta" data-pdf-id="${conta.id}">
+                                                      <i class="fas fa-file-pdf"></i> PDF
+                                                  </button>
+                                              </div>
+                                          </td>
+                                      </tr>
+                                  `;
+                              }).join('')}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          `;
+      });
+
+      container.innerHTML = html;
+      
+      setupContasToggleEvents();
+      
+      setupContasActionButtons();
+  }
+
+  function setupContasToggleEvents() {
+      document.querySelectorAll('.cliente-header').forEach(header => {
+          header.addEventListener('click', function() {
+              const card = this.closest('.cliente-card');
+              const contasDiv = card.querySelector('.cliente-contas');
+              const toggleIcon = this.querySelector('.cliente-toggle i');
+              
+              contasDiv.classList.toggle('expanded');
+              toggleIcon.classList.toggle('rotated');
+              
+              if (contasDiv.classList.contains('expanded')) {
+                  setTimeout(() => {
+                      contasDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                  }, 300);
+              }
+          });
+      });
+  }
+
+  function setupContasActionButtons() {
+      document.querySelectorAll('.btn-detalhes-conta').forEach(btn => {
+          btn.addEventListener('click', function(e) {
+              e.stopPropagation(); 
+              const contaId = this.getAttribute('data-id');
+              abrirModalDetalhesConta(contaId);
+          });
+      });
+    
+      document.querySelectorAll('.btn-pdf-conta').forEach(btn => {
+          btn.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const contaId = this.getAttribute('data-pdf-id');
+              gerarPDFConta(contaId);
+          });
+      });
+  }
+
+  async function abrirModalPagamentoConta(contaId, clienteNome) {
+      try {
+          const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
+          
+          if (response) {
+              const conta = response;
+              
+              document.getElementById('contaIdPagamento').value = contaId;
+              document.getElementById('clienteNomePagamento').textContent = clienteNome;
+              document.getElementById('valorPendentePagamento').textContent = formatarMoeda(conta.valor_aberto);
+              document.getElementById('valorPagamento').value = conta.valor_aberto;
+              document.getElementById('valorPagamento').max = conta.valor_aberto;
+              
+              openModal('modalPagamentoConta');
+          }
+      } catch (error) {
+          showFlashMessage('error', 'Erro ao carregar dados para pagamento');
+      }
+  }
+
+  function setupContasReceberDates() {
+      const hoje = new Date();
+      const trintaDiasAtras = new Date();
+      trintaDiasAtras.setDate(hoje.getDate() - 30);
+
+      document.getElementById('contasReceberDataFim').valueAsDate = hoje;
+      document.getElementById('contasReceberDataInicio').valueAsDate = trintaDiasAtras;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+      setupContasReceberDates();
+      
+      const btnFiltrar = document.getElementById('filtrarContasReceber');
+      if (btnFiltrar) {
+          btnFiltrar.addEventListener('click', loadContasReceber);
+      }
+      
+      document.getElementById('contasReceberCliente')?.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+              loadContasReceber();
+          }
+      });
   });
 
-  // Função para gerar PDF da conta
   async function gerarPDFConta(contaId) {
-    try {
-      // Mostrar indicador de carregamento (opcional)
-      const btnPDF = document.querySelector(`button[data-pdf-id="${contaId}"]`);
-      if (btnPDF) {
-        const originalHTML = btnPDF.innerHTML;
-        btnPDF.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-        btnPDF.disabled = true;
+      try {
+          const btnPDF = document.querySelector(`button[data-pdf-id="${contaId}"]`);
+          if (btnPDF) {
+              const originalHTML = btnPDF.innerHTML;
+              btnPDF.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+              btnPDF.disabled = true;
 
-        // Restaurar botão após um tempo
-        setTimeout(() => {
-          btnPDF.innerHTML = originalHTML;
-          btnPDF.disabled = false;
-        }, 3000);
+              setTimeout(() => {
+                  btnPDF.innerHTML = originalHTML;
+                  btnPDF.disabled = false;
+              }, 3000);
+          }
+
+          const response = await fetch(`/admin/contas-receber/${contaId}/pdf`);
+          
+          if (!response.ok) {
+              throw new Error('Erro ao gerar PDF');
+          }
+
+          const pdfBlob = await response.blob();
+          const pdfUrl = window.URL.createObjectURL(pdfBlob);
+          window.open(pdfUrl, '_blank');
+
+          setTimeout(() => {
+              window.URL.revokeObjectURL(pdfUrl);
+          }, 1000);
+
+      } catch (error) {
+          showFlashMessage('error', 'Erro ao gerar PDF da conta');
       }
-
-      // Fazer requisição para gerar o PDF
-      const response = await fetch(`/admin/contas-receber/${contaId}/pdf`);
-
-      if (!response.ok) {
-        throw new Error('Erro ao gerar PDF');
-      }
-
-      // Criar blob com o PDF
-      const pdfBlob = await response.blob();
-
-      // Criar URL temporária para o blob
-      const pdfUrl = window.URL.createObjectURL(pdfBlob);
-
-      // Abrir em nova guia
-      window.open(pdfUrl, '_blank');
-
-      // Limpar URL temporária após um tempo
-      setTimeout(() => {
-        window.URL.revokeObjectURL(pdfUrl);
-      }, 1000);
-
-    } catch (error) {
-      showFlashMessage('error', 'Erro ao gerar PDF da conta');
-    }
   }
 
-  // Função para atualizar a tabela de contas a receber
-  function atualizarTabelaContasReceber() {
-    const tbody = document.querySelector('#tabelaContasReceber tbody');
-    if (!tbody) return;
-
-    tbody.innerHTML = '';
-
-    if (contasReceberData.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="11" class="text-center">Nenhuma conta encontrada</td></tr>';
-      return;
-    }
-
-    contasReceberData.forEach(conta => {
-      const tr = document.createElement('tr');
-
-      // Determinar status e classe CSS
-      let statusClass, statusText;
-      const hoje = new Date();
-      const vencimento = new Date(conta.data_vencimento);
-
-      if (conta.status === 'quitado') {
-        statusClass = 'badge-success';
-        statusText = 'Quitado';
-      } else if (conta.status === 'parcial') {
-        statusClass = 'badge-info';
-        statusText = 'Parcial';
-      } else if (vencimento < hoje) {
-        statusClass = 'badge-danger';
-        statusText = 'Atrasado';
-      } else {
-        statusClass = 'badge-warning';
-        statusText = 'Pendente';
-      }
-
-      tr.innerHTML = `
-              <td>${conta.cliente.nome}</td>
-              <td>${conta.cliente.documento || ''}</td>
-              <td>${formatarMoeda(conta.valor_original)}</td>
-              <td>${formatarMoeda(conta.valor_aberto)}</td>
-              <td>${formatarData(conta.data_emissao)}</td>
-              <td>${formatarData(conta.data_vencimento)}</td>
-              <td><span class="badge ${statusClass}">${statusText}</span></td>
-              <td>
-                  <button class="btn btn-detalhes-conta" data-id="${conta.id}" title="Detalhes">
-                      <i class="fas fa-eye"></i>
-                  </button>
-                  <button class="btn btn-sm btn-danger btn-pdf-conta" data-pdf-id="${conta.id}" title="Gerar PDF">
-                      <i class="fas fa-file-pdf"></i>
-                  </button>
-              </td>
-          `;
-
-      tbody.appendChild(tr);
-    });
-
-    // Adicionar eventos aos botões de detalhes
-    document.querySelectorAll('.btn-detalhes-conta').forEach(btn => {
-      btn.addEventListener('click', function () {
-        const contaId = this.getAttribute('data-id');
-        abrirModalDetalhesConta(contaId);
-      });
-    });
-
-    // Adicionar eventos aos botões de PDF
-    document.querySelectorAll('.btn-pdf-conta').forEach(btn => {
-      btn.addEventListener('click', function () {
-        const contaId = this.getAttribute('data-pdf-id');
-        gerarPDFConta(contaId);
-      });
-    });
-  }
-  // Função para formatar data (dd/mm/aaaa)
   function formatarData(dataString) {
     if (!dataString) return '-';
     const date = new Date(dataString);

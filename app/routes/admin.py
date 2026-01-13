@@ -41,7 +41,7 @@ import io
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from io import BytesIO
-from datetime import datetime, time
+from datetime import datetime, date, time
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 from app.models import db
@@ -6006,24 +6006,20 @@ def contas_receber():
     data_emissao_inicio = request.args.get('data_emissao_inicio') or request.args.get('data_inicio')
     data_emissao_fim = request.args.get('data_emissao_fim') or request.args.get('data_fim')
     status = request.args.get('status')
-    
-    params = request.args
 
     query = ContaReceber.query.join(Cliente)
 
-    # Filtros de cliente
     if cliente_nome:
         query = query.filter(Cliente.nome.ilike(f'%{cliente_nome}%'))
     if cliente_documento:
         query = query.filter(Cliente.documento.ilike(f'%{cliente_documento}%'))
 
-    # Filtros de data
     if data_emissao_inicio:
         try:
             inicio = datetime.strptime(data_emissao_inicio, '%Y-%m-%d')
             inicio = inicio.replace(hour=0, minute=0, second=0, microsecond=0)
             query = query.filter(ContaReceber.data_emissao >= inicio)
-        except ValueError:
+        except ValueError as e:
             pass
 
     if data_emissao_fim:
@@ -6031,50 +6027,106 @@ def contas_receber():
             fim = datetime.strptime(data_emissao_fim, '%Y-%m-%d')
             fim = fim.replace(hour=23, minute=59, second=59, microsecond=999999)
             query = query.filter(ContaReceber.data_emissao <= fim)
-        except ValueError:
+        except ValueError as e:
             pass
 
-    # Filtro de status
     hoje = datetime.now()
+    
+    query = query.filter(ContaReceber.status != StatusPagamento.quitado)
+    
     if status:
         status = status.lower()
         if status == 'pendente':
             query = query.filter(
-                ContaReceber.status != StatusPagamento.quitado,
-                ContaReceber.data_vencimento >= hoje
+                ContaReceber.data_vencimento >= hoje.date()
             )
         elif status == 'quitado':
             query = query.filter(ContaReceber.status == StatusPagamento.quitado)
         elif status == 'parcial':
             query = query.filter(
-                ContaReceber.status != StatusPagamento.quitado,
                 ContaReceber.valor_aberto > 0,
                 ContaReceber.valor_aberto < ContaReceber.valor_original
             )
-    else:
-        # Se nenhum status selecionado, retorna todas não quitadas
-        query = query.filter(ContaReceber.status != StatusPagamento.quitado)
-        
+    
     contas = query.order_by(
-        Cliente.nome.asc(),           # Ordena pelo nome do cliente (A-Z)
-        ContaReceber.data_vencimento.asc()  # Ordena por data de vencimento caso nomes sejam iguais
+        Cliente.nome.asc(),
+        ContaReceber.data_vencimento.asc()
     ).all()
+    
+    clientes_dict = {}
+    
+    for conta in contas:
+        cliente_id = conta.cliente.id
+        
+        if cliente_id not in clientes_dict:
+            clientes_dict[cliente_id] = {
+                'cliente': {
+                    'id': conta.cliente.id,
+                    'nome': conta.cliente.nome,
+                    'documento': conta.cliente.documento
+                },
+                'contas': [],
+                'resumo': {
+                    'total_divida': 0.0,
+                    'total_pago': 0.0,
+                    'total_aberto': 0.0,
+                    'qtd_contas': 0,
+                    'qtd_vencidas': 0,
+                    'qtd_pendentes': 0,
+                    'qtd_quitadas': 0
+                }
+            }
 
-    contas_json = [
-        {
+        valor_pago = conta.valor_original - conta.valor_aberto
+        
+        hoje = datetime.now()
+        vencida = conta.data_vencimento < hoje and conta.status != StatusPagamento.quitado
+        pendente = conta.data_vencimento >= hoje and conta.status != StatusPagamento.quitado
+        
+        conta_data = {
             'id': conta.id,
-            'cliente': {'nome': conta.cliente.nome, 'documento': conta.cliente.documento},
             'descricao': conta.descricao,
             'valor_original': float(conta.valor_original),
             'valor_aberto': float(conta.valor_aberto),
+            'valor_pago': float(valor_pago),
             'data_emissao': conta.data_emissao.strftime('%Y-%m-%d'),
             'data_vencimento': conta.data_vencimento.strftime('%Y-%m-%d'),
-            'status': conta.status.value
+            'status': conta.status.value,
+            'vencida': vencida,
+            'pendente': pendente,
+            'quitada': conta.status == StatusPagamento.quitado
         }
-        for conta in contas
-    ]
+        
+        clientes_dict[cliente_id]['contas'].append(conta_data)
 
-    return jsonify({'success': True, 'contas': contas_json})
+        resumo = clientes_dict[cliente_id]['resumo']
+        resumo['total_divida'] += float(conta.valor_original)
+        resumo['total_pago'] += float(valor_pago)
+        resumo['total_aberto'] += float(conta.valor_aberto)
+        resumo['qtd_contas'] += 1
+        
+        if vencida:
+            resumo['qtd_vencidas'] += 1
+        elif pendente:
+            resumo['qtd_pendentes'] += 1
+        elif conta.status == StatusPagamento.quitado:
+            resumo['qtd_quitadas'] += 1
+
+    clientes_agrupados = list(clientes_dict.values())
+
+    return jsonify({
+        'success': True, 
+        'clientes_agrupados': clientes_agrupados,
+        'total_clientes': len(clientes_agrupados),
+        'total_contas': sum(len(cliente['contas']) for cliente in clientes_agrupados),
+        'filtros': {
+            'cliente_nome': cliente_nome,
+            'data_emissao_inicio': data_emissao_inicio,
+            'data_emissao_fim': data_emissao_fim,
+            'status': status
+        }
+    })
+    
     
 @admin_bp.route('/contas-receber/<int:id>/detalhes', methods=['GET'])
 @login_required
