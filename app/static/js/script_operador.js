@@ -2109,7 +2109,7 @@ function renderProductsList() {
         if (product.availableStockTypes && product.availableStockTypes.length > 1) {
             stockSelector = `
                 <div class="stock-selector-container">
-                    <select class="stock-selector" data-index="${index}" title="Selecione o estoque de origem">
+                    <select class="stock-selector" data-unique-id="${product.uniqueId}" title="Selecione o estoque de origem">
                         ${product.availableStockTypes.map(stockType => `
                             <option value="${stockType.id}" 
                                 ${product.stockType === stockType.id ? 'selected' : ''}
@@ -2134,7 +2134,7 @@ function renderProductsList() {
         }
 
         const row = document.createElement('tr');
-        row.dataset.uniqueId = product.uniqueId; 
+        row.dataset.uniqueId = product.uniqueId; // Usa o uniqueId em vez do índice
         row.innerHTML = `
             <td>
                 <div class="product-name-container">
@@ -2163,7 +2163,7 @@ function renderProductsList() {
             <td>
                 <input type="text" class="quantity-input" 
                        value="${product.quantity !== null && product.quantity !== undefined ? product.quantity.toString().replace('.', ',') : ''}" 
-                       data-index="${index}" 
+                       data-unique-id="${product.uniqueId}" 
                        title="Digite números com vírgula ou ponto. Pode deixar em branco.">
                 <small>${product.unit}</small>
             </td>
@@ -2174,12 +2174,56 @@ function renderProductsList() {
             }
             </td>
             <td>
-                <button class="btn-remove" data-index="${index}" title="Remover produto">
+                <button class="btn-remove" data-unique-id="${product.uniqueId}" title="Remover produto">
                     <i class="fas fa-trash"></i>
                 </button>
+                <!-- Espaço reservado para botão de remover desconto (será adicionado dinamicamente se necessário) -->
             </td>
         `;
+        
+        // Adiciona evento de clique para selecionar a linha
+        row.addEventListener('click', function(e) {
+            // Não seleciona se clicou em um botão ou input
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || 
+                e.target.tagName === 'SELECT' || e.target.closest('button') || 
+                e.target.closest('input') || e.target.closest('select')) {
+                return;
+            }
+            
+            // Remove seleção de outras linhas
+            productsList.querySelectorAll('tr.selected').forEach(r => {
+                r.classList.remove('selected');
+            });
+            
+            // Seleciona esta linha
+            this.classList.add('selected');
+            
+            // Atualiza instruções
+            showDiscountInstructions();
+        });
+        
         productsList.appendChild(row);
+        
+        // ADICIONA O BOTÃO DE REMOVER DESCONTO APÓS O BOTÃO DE REMOVER PRODUTO
+        if (product.hasDiscount) {
+            const actionsCell = row.querySelector('td:last-child');
+            if (actionsCell) {
+                const removeDiscountBtn = document.createElement('button');
+                removeDiscountBtn.className = 'btn-remove-discount';
+                removeDiscountBtn.dataset.uniqueId = product.uniqueId;
+                removeDiscountBtn.title = 'Remover desconto deste produto';
+                removeDiscountBtn.innerHTML = '<i class="fas fa-times"></i>';
+                
+                // Adiciona o botão APÓS o botão de remover produto
+                const removeBtn = actionsCell.querySelector('.btn-remove');
+                if (removeBtn) {
+                    removeBtn.insertAdjacentElement('afterend', removeDiscountBtn);
+                } else {
+                    // Se por algum motivo não houver botão de remover, adiciona no final
+                    actionsCell.appendChild(removeDiscountBtn);
+                }
+            }
+        }
     });
 
     // Adiciona eventos para os campos de quantidade
@@ -2199,35 +2243,159 @@ function renderProductsList() {
     // Adiciona eventos para os seletores de estoque
     document.querySelectorAll('.stock-selector').forEach(select => {
         select.addEventListener('change', function(e) {
-            const index = parseInt(this.dataset.index);
+            const uniqueId = this.dataset.uniqueId;
             const newStockType = this.value;
             
-            if (index >= 0 && index < selectedProducts.length) {
+            const productIndex = selectedProducts.findIndex(p => p.uniqueId === uniqueId);
+            
+            if (productIndex >= 0 && productIndex < selectedProducts.length) {
                 // Atualiza o tipo de estoque
-                selectedProducts[index].stockType = newStockType;
+                selectedProducts[productIndex].stockType = newStockType;
                 
                 // Atualiza a quantidade disponível para o novo estoque
-                const product = products.find(p => p.id === selectedProducts[index].id);
+                const product = products.find(p => p.id === selectedProducts[productIndex].id);
                 if (product) {
-                    selectedProducts[index].stock = getStockByType(product, newStockType);
+                    selectedProducts[productIndex].stock = getStockByType(product, newStockType);
                     
                     // Atualiza o texto de estoque disponível
                     const stockInfo = this.closest('.stock-selector-container').querySelector('.stock-info');
                     if (stockInfo) {
-                        stockInfo.textContent = `Disponível: ${selectedProducts[index].stock} ${selectedProducts[index].unit}`;
+                        stockInfo.textContent = `Disponível: ${selectedProducts[productIndex].stock} ${selectedProducts[productIndex].unit}`;
                     }
-                    
                 }
             }
         });
     });
 
+    // Corrigido: Evento de remover produto por uniqueId
     document.querySelectorAll('.btn-remove').forEach(button => {
-        button.addEventListener('click', function () {
+        button.addEventListener('click', function (e) {
+            e.stopPropagation(); // Impede a seleção da linha
             const uniqueId = this.dataset.uniqueId;
-            removeProductByUniqueId(uniqueId);
+            
+            // Encontra o índice pelo uniqueId
+            const productIndex = selectedProducts.findIndex(p => p.uniqueId === uniqueId);
+            
+            if (productIndex !== -1) {
+                // Remove o produto específico
+                selectedProducts.splice(productIndex, 1);
+                renderProductsList();
+                calculateSaleTotal();
+                // Atualiza instruções após remover produto
+                showDiscountInstructions();
+            }
         });
     });
+    
+    // Corrigido: Evento de remover desconto por uniqueId
+    document.querySelectorAll('.btn-remove-discount').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.stopPropagation(); // Impede a seleção da linha
+            const uniqueId = this.dataset.uniqueId;
+            
+            // Encontra o índice pelo uniqueId
+            const productIndex = selectedProducts.findIndex(p => p.uniqueId === uniqueId);
+            
+            if (productIndex !== -1) {
+                removeProductDiscount(productIndex);
+                // Atualiza instruções após remover desconto
+                showDiscountInstructions();
+            }
+        });
+    });
+    
+    // Mostra instruções após renderizar a tabela
+    showDiscountInstructions();
+}
+
+function showDiscountInstructions() {
+    const discountControl = document.querySelector('.discount-control');
+    if (!discountControl) return;
+    
+    // Remove instruções antigas se existirem
+    const oldInstructions = discountControl.querySelector('.discount-instructions');
+    if (oldInstructions) oldInstructions.remove();
+    
+    // Cria ou atualiza as instruções
+    const instructions = document.createElement('div');
+    instructions.className = 'discount-instructions';
+    instructions.style.cssText = `
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 5px;
+        padding: 5px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        border-left: 3px solid #007bff;
+    `;
+    
+    const hasSelectedProduct = productsList && productsList.querySelector('tr.selected');
+    
+    if (hasSelectedProduct) {
+        instructions.innerHTML = `
+            <i class="fas fa-info-circle" style="color: #28a745; margin-right: 5px;"></i>
+            <strong>Desconto específico:</strong> Será aplicado apenas no produto selecionado.
+            <small style="display: block; margin-top: 2px;">Clique fora da tabela para aplicar em todos os produtos.</small>
+        `;
+        instructions.style.borderLeftColor = '#28a745';
+    } else {
+        instructions.innerHTML = `
+            <i class="fas fa-info-circle" style="color: #6c757d; margin-right: 5px;"></i>
+            <strong>Desconto geral:</strong> Será aplicado em todos os produtos.
+            <small style="display: block; margin-top: 2px;">Clique em um produto na tabela para aplicar apenas nele.</small>
+        `;
+        instructions.style.borderLeftColor = '#007bff';
+    }
+    
+    discountControl.appendChild(instructions);
+}
+
+document.addEventListener('click', function(e) {
+    // Se clicar fora da tabela de produtos
+    if (!e.target.closest('.products-table') && !e.target.closest('.discount-control')) {
+        // Remove seleção de todas as linhas
+        if (productsList) {
+            productsList.querySelectorAll('tr.selected').forEach(r => {
+                r.classList.remove('selected');
+            });
+        }
+        // Atualiza instruções
+        showDiscountInstructions();
+    }
+});
+
+// Atualiza instruções quando houver mudanças na quantidade
+document.addEventListener('quantityUpdated', function() {
+    setTimeout(showDiscountInstructions, 100);
+});
+
+function removeAllDiscounts() {
+    if (selectedProducts.length === 0) {
+        showMessage('Não há produtos na venda', 'error');
+        return;
+    }
+
+    let discountRemoved = false;
+    
+    selectedProducts.forEach((product, index) => {
+        if (product.hasDiscount) {
+            // Restaura o preço original
+            product.price = product.originalPrice;
+            product.hasDiscount = false;
+            product.discountInfo = null;
+            discountRemoved = true;
+            
+            // Atualiza a linha específica
+            updateProductRow(index);
+        }
+    });
+
+    if (discountRemoved) {
+        calculateSaleTotal();
+        showMessage('Todos os descontos foram removidos!');
+    } else {
+        showMessage('Nenhum desconto aplicado para remover', 'info');
+    }
 }
 
 function removeProductByUniqueId(uniqueId) {
@@ -2242,10 +2410,14 @@ function removeProductByUniqueId(uniqueId) {
 }
 
 async function updateProductQuantity(input) {
-    const index = parseInt(input.dataset.index);
-    if (isNaN(index)) return;
+    const uniqueId = input.dataset.uniqueId;
+    if (!uniqueId) return;
 
-    const product = selectedProducts[index];
+    // Encontra o produto pelo uniqueId
+    const productIndex = selectedProducts.findIndex(p => p.uniqueId === uniqueId);
+    if (productIndex === -1) return;
+
+    const product = selectedProducts[productIndex];
     const value = input.value.trim().replace(',', '.');
 
     let newQuantity = parseFloat(value);
@@ -2267,7 +2439,7 @@ async function updateProductQuantity(input) {
             discounts
         );
 
-        selectedProducts[index] = {
+        selectedProducts[productIndex] = {
             ...product,
             price: finalPrice,
             hasDiscount: discountApplied,
@@ -2279,7 +2451,7 @@ async function updateProductQuantity(input) {
     calculateSaleTotal();
 
     // Atualiza DOM sem recriar linha
-    const updatedProduct = selectedProducts[index];
+    const updatedProduct = selectedProducts[productIndex];
     const row = input.closest('tr');
     if (row) {
         // Atualiza preço
@@ -2327,6 +2499,9 @@ async function updateProductQuantity(input) {
             `;
         }
     }
+    document.dispatchEvent(new CustomEvent('quantityUpdated', { 
+        detail: { uniqueId, newQuantity } 
+    }));
 }
 
 function removeProductRow(button) {
@@ -4089,7 +4264,7 @@ function setupEventListeners() {
 function setupDiscountControls() {
     const applyDiscountBtn = document.getElementById('apply-discount-btn');
     if (applyDiscountBtn) {
-        applyDiscountBtn.addEventListener('click', applyManualDiscount);
+        applyDiscountBtn.addEventListener('click', applyDiscount);
     }
 
     // Adiciona listener para tecla Enter no campo de valor do desconto
@@ -4097,97 +4272,275 @@ function setupDiscountControls() {
     if (discountValueInput) {
         discountValueInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                applyManualDiscount();
+                applyDiscount();
             }
         });
     }
+
+    // Adiciona listener para o botão de remover todos os descontos
+    const removeAllDiscountsBtn = document.getElementById('remove-all-discounts-btn');
+    if (removeAllDiscountsBtn) {
+        removeAllDiscountsBtn.addEventListener('click', removeAllDiscounts);
+    }
 }
 
-function applyManualDiscount() {
+function applyDiscount() {
     try {
-        // 1. Obtém os valores dos campos
         const discountType = document.getElementById('discount-type').value;
         const discountValueInput = document.getElementById('discount-value').value.trim();
+        const selectedProductIndex = getSelectedProductIndex();
 
-        // 2. Validações básicas
         if (!discountValueInput) {
             throw new Error('Digite um valor para o desconto');
         }
 
-        // Converte o valor para número
         const discountValue = parseFloat(discountValueInput.replace(',', '.'));
         if (isNaN(discountValue)) {
             throw new Error('Valor de desconto inválido. Use apenas números.');
         }
 
-        // 3. Calcula o subtotal atual (sem descontos)
-        const subtotal = selectedProducts.reduce((sum, product) => {
-            return sum + (product.originalPrice * product.quantity);
-        }, 0);
-
-        // 4. Validações específicas por tipo de desconto
-        if (discountType === 'percentual') {
-            if (discountValue <= 0 || discountValue > 100) {
-                throw new Error('Percentual deve ser entre 0.01% e 100%');
-            }
-        } else { // desconto fixo
-            if (discountValue <= 0) {
-                throw new Error('Valor fixo deve ser maior que zero');
-            }
-
-            if (discountValue >= subtotal) {
-                throw new Error(`Desconto não pode ser maior que ${formatCurrency(subtotal)}`);
-            }
-        }
-
-        // 5. Verifica se há produtos na venda
-        if (selectedProducts.length === 0) {
-            throw new Error('Adicione produtos antes de aplicar desconto');
-        }
-
-        // 6. Calcula o valor total do desconto
-        let totalDiscount = 0;
-        if (discountType === 'percentual') {
-            totalDiscount = subtotal * (discountValue / 100);
+        // Se houver um produto selecionado na tabela, aplica desconto apenas nesse produto
+        if (selectedProductIndex !== -1) {
+            applyProductDiscount(selectedProductIndex, discountType, discountValue);
         } else {
-            totalDiscount = discountValue;
+            // Se não houver produto selecionado, aplica desconto geral
+            applyGlobalDiscount(discountType, discountValue);
         }
 
-        // 7. Calcula o fator de ajuste para manter a proporção dos produtos
-        const totalWithDiscount = subtotal - totalDiscount;
-        const adjustmentFactor = totalWithDiscount / subtotal;
-
-        // 8. Aplica o fator de ajuste para manter a proporção entre os produtos
-        selectedProducts = selectedProducts.map(product => {
-            const newPrice = product.originalPrice * adjustmentFactor;
-
-            return {
-                ...product,
-                price: newPrice,
-                hasDiscount: true,
-                discountInfo: {
-                    tipo: discountType,
-                    valor: discountValue,
-                    valor_aplicado: discountType === 'percentual'
-                        ? `${discountValue}%`
-                        : formatCurrency(discountValue),
-                    identificador: 'MANUAL',
-                    descricao: 'Desconto manual aplicado'
-                }
-            };
-        });
-
-        // 9. Atualiza a interface
-        renderProductsList();
-        calculateSaleTotal();
-
-        // 10. Mostra mensagem de sucesso e limpa o campo
-        showMessage(`Desconto de ${formatCurrency(totalDiscount)} aplicado com sucesso!`);
+        // Limpa o campo de valor
         document.getElementById('discount-value').value = '';
+
     } catch (error) {
         showMessage(error.message, 'error');
     }
 }
+
+function applyProductDiscount(productIndex, discountType, discountValue) {
+    if (productIndex < 0 || productIndex >= selectedProducts.length) {
+        throw new Error('Produto selecionado inválido');
+    }
+
+    const product = selectedProducts[productIndex];
+    
+    // Validações específicas
+    if (discountType === 'percentual') {
+        if (discountValue <= 0 || discountValue > 100) {
+            throw new Error('Percentual deve ser entre 0.01% e 100%');
+        }
+        // Calcula desconto percentual
+        const discountAmount = product.originalPrice * (discountValue / 100);
+        product.price = product.originalPrice - discountAmount;
+    } else {
+        // Desconto fixo
+        if (discountValue <= 0) {
+            throw new Error('Valor fixo deve ser maior que zero');
+        }
+        if (discountValue >= product.originalPrice) {
+            throw new Error(`Desconto não pode ser maior que ${formatCurrency(product.originalPrice)}`);
+        }
+        product.price = product.originalPrice - discountValue;
+    }
+
+    product.hasDiscount = true;
+    product.discountInfo = {
+        tipo: discountType,
+        valor: discountValue,
+        valor_aplicado: discountType === 'percentual'
+            ? `${discountValue}%`
+            : formatCurrency(discountValue),
+        identificador: 'MANUAL',
+        descricao: 'Desconto manual aplicado no produto'
+    };
+
+    // Atualiza a linha específica
+    updateProductRow(productIndex);
+    calculateSaleTotal();
+    
+    showMessage(`Desconto aplicado no produto ${product.name}!`);
+}
+
+function updateProductRow(productIndex) {
+    const product = selectedProducts[productIndex];
+    const row = productsList.querySelector(`[data-unique-id="${product.uniqueId}"]`);
+    
+    if (!row) return;
+
+    const totalValue = product.price * (product.quantity || 0);
+    const originalTotalValue = product.originalPrice * (product.quantity || 0);
+    const discountValue = originalTotalValue - totalValue;
+
+    // Atualiza o preço unitário
+    const priceCell = row.querySelector('.product-price');
+    if (priceCell) {
+        priceCell.innerHTML = `
+            ${formatCurrency(product.price)}
+            ${product.hasDiscount ?
+                `<small class="original-price">${formatCurrency(product.originalPrice)}</small>` : ''
+            }
+        `;
+    }
+
+    // Atualiza badge de desconto
+    const badgeCell = row.querySelector('.discount-badge');
+    if (badgeCell) {
+        if (product.hasDiscount && product.discountInfo) {
+            badgeCell.innerHTML = `
+                <i class="fas fa-tag"></i> ${product.discountInfo.identificador || 'DESCONTO'}
+                ${product.discountInfo.tipo === 'percentual' ?
+                    ` (${product.discountInfo.valor}%)` :
+                    ` (${formatCurrency(product.discountInfo.valor)})`
+                }
+            `;
+            badgeCell.title = product.discountInfo.descricao || 'Desconto aplicado';
+            badgeCell.style.display = 'inline-block';
+        } else {
+            badgeCell.innerHTML = '';
+            badgeCell.style.display = 'none';
+        }
+    }
+
+    // Atualiza total
+    const totalCell = row.querySelector('.product-total');
+    if (totalCell) {
+        totalCell.innerHTML = `
+            ${formatCurrency(totalValue)}
+            ${product.hasDiscount ?
+                `<small class="discount-value">(Economia: ${formatCurrency(discountValue)})</small>` : ''
+            }
+        `;
+    }
+    
+    // ATUALIZA O BOTÃO DE REMOVER DESCONTO - CORRIGIDO
+    const actionsCell = row.querySelector('td:last-child');
+    if (actionsCell) {
+        // Remove botão de remover desconto existente
+        const existingRemoveDiscountBtn = actionsCell.querySelector('.btn-remove-discount');
+        if (existingRemoveDiscountBtn) {
+            existingRemoveDiscountBtn.remove();
+        }
+        
+        // Adiciona novo botão se tiver desconto
+        if (product.hasDiscount) {
+            const removeDiscountBtn = document.createElement('button');
+            removeDiscountBtn.className = 'btn-remove-discount';
+            removeDiscountBtn.dataset.uniqueId = product.uniqueId;
+            removeDiscountBtn.title = 'Remover desconto deste produto';
+            removeDiscountBtn.innerHTML = '<i class="fas fa-times"></i>';
+            
+            // Adiciona evento de clique
+            removeDiscountBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const uniqueId = this.dataset.uniqueId;
+                const index = selectedProducts.findIndex(p => p.uniqueId === uniqueId);
+                if (index !== -1) {
+                    removeProductDiscount(index);
+                }
+            });
+            
+            // CORREÇÃO: Adiciona o botão APÓS o botão de remover produto (não antes)
+            const removeBtn = actionsCell.querySelector('.btn-remove');
+            if (removeBtn) {
+                // Insere APÓS o botão de remover, não antes
+                removeBtn.insertAdjacentElement('afterend', removeDiscountBtn);
+            } else {
+                // Se por algum motivo não houver botão de remover, adiciona no final
+                actionsCell.appendChild(removeDiscountBtn);
+            }
+        }
+    }
+}
+
+function getSelectedProductIndex() {
+    const selectedRow = productsList.querySelector('tr.selected');
+    if (selectedRow) {
+        const uniqueId = selectedRow.dataset.uniqueId;
+        if (uniqueId) {
+            return selectedProducts.findIndex(p => p.uniqueId === uniqueId);
+        }
+    }
+    return -1;
+}
+
+function applyGlobalDiscount(discountType, discountValue) {
+    // Valida se há produtos na venda
+    if (selectedProducts.length === 0) {
+        throw new Error('Adicione produtos antes de aplicar desconto');
+    }
+
+    // Calcula o subtotal atual
+    const subtotal = selectedProducts.reduce((sum, product) => {
+        return sum + (product.originalPrice * product.quantity);
+    }, 0);
+
+    // Validações específicas
+    if (discountType === 'percentual') {
+        if (discountValue <= 0 || discountValue > 100) {
+            throw new Error('Percentual deve ser entre 0.01% e 100%');
+        }
+    } else {
+        if (discountValue <= 0) throw new Error('Valor fixo deve ser maior que zero');
+        if (discountValue >= subtotal) {
+            throw new Error(`Desconto não pode ser maior que ${formatCurrency(subtotal)}`);
+        }
+    }
+
+    // Calcula o valor total do desconto
+    let totalDiscount = 0;
+    if (discountType === 'percentual') {
+        totalDiscount = subtotal * (discountValue / 100);
+    } else {
+        totalDiscount = discountValue;
+    }
+
+    // Calcula o fator de ajuste para manter a proporção dos produtos
+    const totalWithDiscount = subtotal - totalDiscount;
+    const adjustmentFactor = totalWithDiscount / subtotal;
+
+    // Aplica o fator de ajuste para manter a proporção entre os produtos
+    selectedProducts.forEach((product, index) => {
+        const newPrice = product.originalPrice * adjustmentFactor;
+
+        selectedProducts[index] = {
+            ...product,
+            price: newPrice,
+            hasDiscount: true,
+            discountInfo: {
+                tipo: discountType,
+                valor: discountValue,
+                valor_aplicado: discountType === 'percentual'
+                    ? `${discountValue}%`
+                    : formatCurrency(discountValue),
+                identificador: 'MANUAL',
+                descricao: 'Desconto manual aplicado'
+            }
+        };
+    });
+
+    // Atualiza a interface
+    renderProductsList();
+    calculateSaleTotal();
+    showMessage(`Desconto de ${formatCurrency(totalDiscount)} aplicado ao total!`);
+}
+
+function removeProductDiscount(productIndex) {
+    if (productIndex < 0 || productIndex >= selectedProducts.length) {
+        return;
+    }
+
+    const product = selectedProducts[productIndex];
+    
+    // Restaura o preço original
+    product.price = product.originalPrice;
+    product.hasDiscount = false;
+    product.discountInfo = null;
+
+    // Atualiza a linha
+    updateProductRow(productIndex);
+    calculateSaleTotal();
+    
+    showMessage(`Desconto removido do produto ${product.name}`);
+}
+
 // ==================== FUNÇÕES PARA MÚLTIPLAS FORMAS DE PAGAMENTO ====================
 function updateRemainingSubtotal() {
     const subtotalElement = document.getElementById('subtotal-value');

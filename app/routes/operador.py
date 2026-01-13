@@ -273,405 +273,405 @@ def api_get_produto(produto_id):
         return jsonify({'error': 'Erro interno ao buscar produto'}), 500
 
 # ===== API VENDAS =====
-@operador_bp.route('/api/vendas', methods=['POST'])
-@login_required
-@operador_required
-def api_registrar_venda():
-    # Verificação inicial do conteúdo da requisição
-    config = Configuracao.get_config(db.session)
-    permitir_venda_sem_estoque = config.permitir_venda_sem_estoque
+# @operador_bp.route('/api/vendas', methods=['POST'])
+# @login_required
+# @operador_required
+# def api_registrar_venda():
+#     # Verificação inicial do conteúdo da requisição
+#     config = Configuracao.get_config(db.session)
+#     permitir_venda_sem_estoque = config.permitir_venda_sem_estoque
     
-    if not request.is_json:
-        logger.error("Requisição sem cabeçalho Content-Type: application/json")
-        return jsonify({
-            'success': False,
-            'message': 'Content-Type deve ser application/json'
-        }), 400
+#     if not request.is_json:
+#         logger.error("Requisição sem cabeçalho Content-Type: application/json")
+#         return jsonify({
+#             'success': False,
+#             'message': 'Content-Type deve ser application/json'
+#         }), 400
 
-    try:
-        dados_venda = request.get_json()
-        if dados_venda is None:
-            logger.error("Nenhum dado JSON recebido ou JSON inválido")
-            return jsonify({
-                'success': False,
-                'message': 'JSON inválido ou não enviado'
-            }), 400
+#     try:
+#         dados_venda = request.get_json()
+#         if dados_venda is None:
+#             logger.error("Nenhum dado JSON recebido ou JSON inválido")
+#             return jsonify({
+#                 'success': False,
+#                 'message': 'JSON inválido ou não enviado'
+#             }), 400
 
-        # Campos obrigatórios
-        required_fields = ['cliente_id', 'itens', 'pagamentos', 'valor_total']
-        for field in required_fields:
-            if field not in dados_venda:
-                logger.error(f"Campo obrigatório faltando: {field}")
-                return jsonify({
-                    'success': False,
-                    'message': f'Campo obrigatório faltando: {field}'
-                }), 400
+#         # Campos obrigatórios
+#         required_fields = ['cliente_id', 'itens', 'pagamentos', 'valor_total']
+#         for field in required_fields:
+#             if field not in dados_venda:
+#                 logger.error(f"Campo obrigatório faltando: {field}")
+#                 return jsonify({
+#                     'success': False,
+#                     'message': f'Campo obrigatório faltando: {field}'
+#                 }), 400
 
-        # Validação de tipos
-        if not isinstance(dados_venda['itens'], list) or len(dados_venda['itens']) == 0:
-            logger.error("Lista de itens inválida ou vazia")
-            return jsonify({
-                'success': False,
-                'message': 'Lista de itens inválida ou vazia'
-            }), 400
+#         # Validação de tipos
+#         if not isinstance(dados_venda['itens'], list) or len(dados_venda['itens']) == 0:
+#             logger.error("Lista de itens inválida ou vazia")
+#             return jsonify({
+#                 'success': False,
+#                 'message': 'Lista de itens inválida ou vazia'
+#             }), 400
 
-        if not isinstance(dados_venda['pagamentos'], list) or len(dados_venda['pagamentos']) == 0:
-            logger.error("Lista de pagamentos inválida ou vazia")
-            return jsonify({
-                'success': False,
-                'message': 'Lista de pagamentos inválida ou vazia'
-            }), 400
+#         if not isinstance(dados_venda['pagamentos'], list) or len(dados_venda['pagamentos']) == 0:
+#             logger.error("Lista de pagamentos inválida ou vazia")
+#             return jsonify({
+#                 'success': False,
+#                 'message': 'Lista de pagamentos inválida ou vazia'
+#             }), 400
 
-        # Conversão e validação de valores
-        try:
-            cliente_id = int(dados_venda['cliente_id'])
-            valor_total = Decimal(str(dados_venda['valor_total']))
-            total_descontos = Decimal(str(dados_venda.get('total_descontos', 0)))
+#         # Conversão e validação de valores
+#         try:
+#             cliente_id = int(dados_venda['cliente_id'])
+#             valor_total = Decimal(str(dados_venda['valor_total']))
+#             total_descontos = Decimal(str(dados_venda.get('total_descontos', 0)))
             
-            # Calcula o valor total dos pagamentos que não são a prazo
-            valor_a_vista = sum(
-                Decimal(str(p.get('valor'))) 
-                for p in dados_venda['pagamentos'] 
-                if p.get('forma_pagamento') != 'a_prazo'
-            )
+#             # Calcula o valor total dos pagamentos que não são a prazo
+#             valor_a_vista = sum(
+#                 Decimal(str(p.get('valor'))) 
+#                 for p in dados_venda['pagamentos'] 
+#                 if p.get('forma_pagamento') != 'a_prazo'
+#             )
             
-            # O valor recebido é apenas o que não é a prazo
-            valor_recebido = valor_a_vista
-        except (ValueError, InvalidOperation) as e:
-            logger.error(f"Erro na conversão de valores: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': 'Valores numéricos inválidos'
-            }), 400
+#             # O valor recebido é apenas o que não é a prazo
+#             valor_recebido = valor_a_vista
+#         except (ValueError, InvalidOperation) as e:
+#             logger.error(f"Erro na conversão de valores: {str(e)}")
+#             return jsonify({
+#                 'success': False,
+#                 'message': 'Valores numéricos inválidos'
+#             }), 400
 
-        # Consultar cliente
-        cliente = Cliente.query.get(cliente_id)
-        if not cliente:
-            logger.error(f"Cliente não encontrado: ID {cliente_id}")
-            return jsonify({
-                'success': False,
-                'message': f'Cliente não encontrado: ID {cliente_id}'
-            }), 404
+#         # Consultar cliente
+#         cliente = Cliente.query.get(cliente_id)
+#         if not cliente:
+#             logger.error(f"Cliente não encontrado: ID {cliente_id}")
+#             return jsonify({
+#                 'success': False,
+#                 'message': f'Cliente não encontrado: ID {cliente_id}'
+#             }), 404
 
-        # Validar itens e estoque
-        produtos_info = {}
-        for item_data in dados_venda['itens']:
-            try:
-                produto_id = int(item_data.get('produto_id'))
-                quantidade = Decimal(str(item_data.get('quantidade')))
-                valor_unitario = Decimal(str(item_data.get('valor_unitario')))
-                valor_total_item = Decimal(str(item_data.get('valor_total')))
+#         # Validar itens e estoque
+#         produtos_info = {}
+#         for item_data in dados_venda['itens']:
+#             try:
+#                 produto_id = int(item_data.get('produto_id'))
+#                 quantidade = Decimal(str(item_data.get('quantidade')))
+#                 valor_unitario = Decimal(str(item_data.get('valor_unitario')))
+#                 valor_total_item = Decimal(str(item_data.get('valor_total')))
                 
-                produto = Produto.query.get(produto_id)
-                if not produto:
-                    logger.error(f"Produto não encontrado: ID {produto_id}")
-                    return jsonify({
-                        'success': False,
-                        'message': f'Produto não encontrado: ID {produto_id}'
-                    }), 404
+#                 produto = Produto.query.get(produto_id)
+#                 if not produto:
+#                     logger.error(f"Produto não encontrado: ID {produto_id}")
+#                     return jsonify({
+#                         'success': False,
+#                         'message': f'Produto não encontrado: ID {produto_id}'
+#                     }), 404
 
-                # Verificar se há estoque suficiente
-                if produto.estoque_loja < quantidade:
-                    logger.error(f"Estoque insuficiente para produto: {produto.nome}")
-                    if not permitir_venda_sem_estoque:
-                        return jsonify({
-                            'success': False,
-                            'message': f'Estoque insuficiente para {produto.nome}. Disponível: {produto.estoque_loja}'
-                        }), 400
-                    else:
-                        logger.warning(f"Venda sem estoque permitida para produto: {produto.nome}")
+#                 # Verificar se há estoque suficiente
+#                 if produto.estoque_loja < quantidade:
+#                     logger.error(f"Estoque insuficiente para produto: {produto.nome}")
+#                     if not permitir_venda_sem_estoque:
+#                         return jsonify({
+#                             'success': False,
+#                             'message': f'Estoque insuficiente para {produto.nome}. Disponível: {produto.estoque_loja}'
+#                         }), 400
+#                     else:
+#                         logger.warning(f"Venda sem estoque permitida para produto: {produto.nome}")
 
-                # Verificar se há lotes suficientes
-                lotes_disponiveis = LoteEstoque.query.filter(
-                    LoteEstoque.produto_id == produto_id,
-                    LoteEstoque.quantidade_disponivel > 0
-                ).order_by(LoteEstoque.data_entrada.asc()).all()
+#                 # Verificar se há lotes suficientes
+#                 lotes_disponiveis = LoteEstoque.query.filter(
+#                     LoteEstoque.produto_id == produto_id,
+#                     LoteEstoque.quantidade_disponivel > 0
+#                 ).order_by(LoteEstoque.data_entrada.asc()).all()
 
-                quantidade_necessaria = quantidade
-                for lote in lotes_disponiveis:
-                    if quantidade_necessaria <= 0:
-                        break
-                    if lote.quantidade_disponivel >= quantidade_necessaria:
-                        quantidade_necessaria = Decimal('0')
-                    else:
-                        quantidade_necessaria -= lote.quantidade_disponivel
+#                 quantidade_necessaria = quantidade
+#                 for lote in lotes_disponiveis:
+#                     if quantidade_necessaria <= 0:
+#                         break
+#                     if lote.quantidade_disponivel >= quantidade_necessaria:
+#                         quantidade_necessaria = Decimal('0')
+#                     else:
+#                         quantidade_necessaria -= lote.quantidade_disponivel
 
-                if quantidade_necessaria > 0:
-                    logger.error(f"Lotes insuficientes para produto: {produto.nome}")
-                    if not permitir_venda_sem_estoque:
-                        return jsonify({
-                            'success': False,
-                            'message': f'Lotes insuficientes para {produto.nome}. Quantidade faltante: {quantidade_necessaria}'
-                        }), 400
-                    else:
-                        logger.warning(f"Lotes insuficientes, mas venda permitida: {produto.nome}")
+#                 if quantidade_necessaria > 0:
+#                     logger.error(f"Lotes insuficientes para produto: {produto.nome}")
+#                     if not permitir_venda_sem_estoque:
+#                         return jsonify({
+#                             'success': False,
+#                             'message': f'Lotes insuficientes para {produto.nome}. Quantidade faltante: {quantidade_necessaria}'
+#                         }), 400
+#                     else:
+#                         logger.warning(f"Lotes insuficientes, mas venda permitida: {produto.nome}")
 
-                produtos_info[produto_id] = {
-                    'produto': produto,
-                    'quantidade': quantidade,
-                    'valor_unitario': valor_unitario,
-                    'valor_total_item': valor_total_item
-                }
+#                 produtos_info[produto_id] = {
+#                     'produto': produto,
+#                     'quantidade': quantidade,
+#                     'valor_unitario': valor_unitario,
+#                     'valor_total_item': valor_total_item
+#                 }
 
-            except (ValueError, InvalidOperation, TypeError) as e:
-                logger.error(f"Erro ao processar item: {str(e)}")
-                return jsonify({
-                    'success': False,
-                    'message': 'Dados do item inválidos'
-                }), 400
+#             except (ValueError, InvalidOperation, TypeError) as e:
+#                 logger.error(f"Erro ao processar item: {str(e)}")
+#                 return jsonify({
+#                     'success': False,
+#                     'message': 'Dados do item inválidos'
+#                 }), 400
 
-        # Verificar soma dos pagamentos
-        try:
-            soma_pagamentos = sum(Decimal(str(p.get('valor'))) for p in dados_venda['pagamentos'])
-            a_prazo_usado = any(p.get('forma_pagamento') == 'a_prazo' for p in dados_venda['pagamentos'])
+#         # Verificar soma dos pagamentos
+#         try:
+#             soma_pagamentos = sum(Decimal(str(p.get('valor'))) for p in dados_venda['pagamentos'])
+#             a_prazo_usado = any(p.get('forma_pagamento') == 'a_prazo' for p in dados_venda['pagamentos'])
             
-            # Verificar se a soma dos pagamentos é igual ao valor total (com tolerância para arredondamento)
-            diferenca = abs(soma_pagamentos - valor_total)
-            if diferenca > Decimal('0.01'):  # Tolerância de 1 centavo
-                logger.error(f"Soma dos pagamentos ({soma_pagamentos}) não confere com valor total ({valor_total})")
-                return jsonify({
-                    'success': False,
-                    'message': f'Soma dos pagamentos ({soma_pagamentos}) não confere com valor total ({valor_total})'
-                }), 400
+#             # Verificar se a soma dos pagamentos é igual ao valor total (com tolerância para arredondamento)
+#             diferenca = abs(soma_pagamentos - valor_total)
+#             if diferenca > Decimal('0.01'):  # Tolerância de 1 centavo
+#                 logger.error(f"Soma dos pagamentos ({soma_pagamentos}) não confere com valor total ({valor_total})")
+#                 return jsonify({
+#                     'success': False,
+#                     'message': f'Soma dos pagamentos ({soma_pagamentos}) não confere com valor total ({valor_total})'
+#                 }), 400
                 
-        except (ValueError, InvalidOperation, TypeError) as e:
-            logger.error(f"Erro ao verificar pagamentos: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': 'Dados de pagamento inválidos'
-            }), 400
+#         except (ValueError, InvalidOperation, TypeError) as e:
+#             logger.error(f"Erro ao verificar pagamentos: {str(e)}")
+#             return jsonify({
+#                 'success': False,
+#                 'message': 'Dados de pagamento inválidos'
+#             }), 400
 
-        # Verificar caixa aberto
-        caixa_aberto = get_caixa_aberto(db.session, operador_id=current_user.id)
+#         # Verificar caixa aberto
+#         caixa_aberto = get_caixa_aberto(db.session, operador_id=current_user.id)
         
-        if not caixa_aberto:
-            logger.error("Nenhum caixa aberto encontrado")
-            return jsonify({
-                'success': False,
-                'message': 'Nenhum caixa aberto encontrado'
-            }), 400
+#         if not caixa_aberto:
+#             logger.error("Nenhum caixa aberto encontrado")
+#             return jsonify({
+#                 'success': False,
+#                 'message': 'Nenhum caixa aberto encontrado'
+#             }), 400
 
-        # Criar registro de Nota Fiscal
-        nota = NotaFiscal(
-            cliente_id=cliente.id,
-            operador_id=current_user.id,
-            caixa_id=caixa_aberto.id,
-            data_emissao=datetime.now(),
-            valor_total=valor_total,
-            valor_desconto=total_descontos,
-            tipo_desconto=None,
-            status=StatusNota.emitida,
-            forma_pagamento=FormaPagamento.dinheiro,  # Será atualizado abaixo
-            valor_recebido=valor_recebido,
-            troco=max(valor_recebido - valor_total, Decimal(0)) if not a_prazo_usado else Decimal(0),
-            a_prazo=a_prazo_usado,
-            observacao=dados_venda.get('observacao', '')
-        )
+#         # Criar registro de Nota Fiscal
+#         nota = NotaFiscal(
+#             cliente_id=cliente.id,
+#             operador_id=current_user.id,
+#             caixa_id=caixa_aberto.id,
+#             data_emissao=datetime.now(),
+#             valor_total=valor_total,
+#             valor_desconto=total_descontos,
+#             tipo_desconto=None,
+#             status=StatusNota.emitida,
+#             forma_pagamento=FormaPagamento.dinheiro,  # Será atualizado abaixo
+#             valor_recebido=valor_recebido,
+#             troco=max(valor_recebido - valor_total, Decimal(0)) if not a_prazo_usado else Decimal(0),
+#             a_prazo=a_prazo_usado,
+#             observacao=dados_venda.get('observacao', '')
+#         )
 
-        # Criar Entrega, se presente - COM TRATAMENTO SEGURO
-        endereco_entrega = dados_venda.get('endereco_entrega')
-        if endereco_entrega and isinstance(endereco_entrega, dict):
-            entrega = Entrega(
-                logradouro=endereco_entrega.get('logradouro', ''),
-                numero=endereco_entrega.get('numero', ''),
-                complemento=endereco_entrega.get('complemento', ''),
-                bairro=endereco_entrega.get('bairro', ''),
-                cidade=endereco_entrega.get('cidade', ''),
-                estado=endereco_entrega.get('estado', ''),
-                cep=endereco_entrega.get('cep', ''),
-                instrucoes=endereco_entrega.get('instrucoes', ''),
-                sincronizado=False
-            )
-            db.session.add(entrega)
-            db.session.flush()
-            nota.entrega_id = entrega.id
+#         # Criar Entrega, se presente - COM TRATAMENTO SEGURO
+#         endereco_entrega = dados_venda.get('endereco_entrega')
+#         if endereco_entrega and isinstance(endereco_entrega, dict):
+#             entrega = Entrega(
+#                 logradouro=endereco_entrega.get('logradouro', ''),
+#                 numero=endereco_entrega.get('numero', ''),
+#                 complemento=endereco_entrega.get('complemento', ''),
+#                 bairro=endereco_entrega.get('bairro', ''),
+#                 cidade=endereco_entrega.get('cidade', ''),
+#                 estado=endereco_entrega.get('estado', ''),
+#                 cep=endereco_entrega.get('cep', ''),
+#                 instrucoes=endereco_entrega.get('instrucoes', ''),
+#                 sincronizado=False
+#             )
+#             db.session.add(entrega)
+#             db.session.flush()
+#             nota.entrega_id = entrega.id
 
-        db.session.add(nota)
-        db.session.flush()
+#         db.session.add(nota)
+#         db.session.flush()
 
-        # Criar itens da nota fiscal e processar lotes
-        for item_data in dados_venda['itens']:
-            produto_id = item_data.get('produto_id')
-            produto_info = produtos_info[produto_id]
-            produto = produto_info['produto']
-            quantidade = produto_info['quantidade']
-            valor_unitario = produto_info['valor_unitario']
-            valor_total_item = produto_info['valor_total_item']
-            desconto_aplicado = Decimal(str(item_data.get('valor_desconto', 0)))
+#         # Criar itens da nota fiscal e processar lotes
+#         for item_data in dados_venda['itens']:
+#             produto_id = item_data.get('produto_id')
+#             produto_info = produtos_info[produto_id]
+#             produto = produto_info['produto']
+#             quantidade = produto_info['quantidade']
+#             valor_unitario = produto_info['valor_unitario']
+#             valor_total_item = produto_info['valor_total_item']
+#             desconto_aplicado = Decimal(str(item_data.get('valor_desconto', 0)))
             
-            # Tratamento seguro para desconto_info
-            desconto_info = item_data.get('desconto_info', {}) or {}
-            tipo_desconto = desconto_info.get('tipo') if isinstance(desconto_info, dict) else None
+#             # Tratamento seguro para desconto_info
+#             desconto_info = item_data.get('desconto_info', {}) or {}
+#             tipo_desconto = desconto_info.get('tipo') if isinstance(desconto_info, dict) else None
 
-            # BUSCAR LOTES DO PRODUTO ORDENADOS POR DATA DE ENTRADA (MAIS ANTIGO PRIMEIRO)
-            lotes = LoteEstoque.query.filter(
-                LoteEstoque.produto_id == produto_id,
-                LoteEstoque.quantidade_disponivel > 0
-            ).order_by(LoteEstoque.data_entrada.asc()).all()
+#             # BUSCAR LOTES DO PRODUTO ORDENADOS POR DATA DE ENTRADA (MAIS ANTIGO PRIMEIRO)
+#             lotes = LoteEstoque.query.filter(
+#                 LoteEstoque.produto_id == produto_id,
+#                 LoteEstoque.quantidade_disponivel > 0
+#             ).order_by(LoteEstoque.data_entrada.asc()).all()
 
-            quantidade_restante = quantidade
-            valor_unitario_compra_final = Decimal('0')
-            total_custo = Decimal('0')
-            quantidade_total_usada = Decimal('0')
+#             quantidade_restante = quantidade
+#             valor_unitario_compra_final = Decimal('0')
+#             total_custo = Decimal('0')
+#             quantidade_total_usada = Decimal('0')
 
-            # PROCESSAR LOTES PARA DAR SAÍDA (PEPS - Primeiro a Entrar, Primeiro a Sair)
-            for lote in lotes:
-                if quantidade_restante <= 0:
-                    break
+#             # PROCESSAR LOTES PARA DAR SAÍDA (PEPS - Primeiro a Entrar, Primeiro a Sair)
+#             for lote in lotes:
+#                 if quantidade_restante <= 0:
+#                     break
                     
-                if lote.quantidade_disponivel > 0:
-                    quantidade_a_usar = min(quantidade_restante, lote.quantidade_disponivel)
+#                 if lote.quantidade_disponivel > 0:
+#                     quantidade_a_usar = min(quantidade_restante, lote.quantidade_disponivel)
                     
-                    # Atualizar lote
-                    lote.quantidade_disponivel -= quantidade_a_usar
-                    quantidade_restante -= quantidade_a_usar
-                    quantidade_total_usada += quantidade_a_usar
+#                     # Atualizar lote
+#                     lote.quantidade_disponivel -= quantidade_a_usar
+#                     quantidade_restante -= quantidade_a_usar
+#                     quantidade_total_usada += quantidade_a_usar
                     
-                    # Acumular custo para cálculo da média ponderada
-                    total_custo += quantidade_a_usar * lote.valor_unitario_compra
+#                     # Acumular custo para cálculo da média ponderada
+#                     total_custo += quantidade_a_usar * lote.valor_unitario_compra
                     
-                    # Se este foi o último lote usado, definir como valor_unitario_compra_final
-                    if quantidade_restante == 0:
-                        valor_unitario_compra_final = lote.valor_unitario_compra
+#                     # Se este foi o último lote usado, definir como valor_unitario_compra_final
+#                     if quantidade_restante == 0:
+#                         valor_unitario_compra_final = lote.valor_unitario_compra
 
-            # Calcular valor unitário de compra médio ponderado se usou múltiplos lotes
-            if quantidade_total_usada > 0:
-                valor_unitario_compra_final = total_custo / quantidade_total_usada
+#             # Calcular valor unitário de compra médio ponderado se usou múltiplos lotes
+#             if quantidade_total_usada > 0:
+#                 valor_unitario_compra_final = total_custo / quantidade_total_usada
 
-            # VERIFICAR SE O ESTOQUE SERÁ ZERADO E ATUALIZAR COM O PRÓXIMO LOTE VÁLIDO
-            estoque_atual = produto.estoque_loja
-            estoque_futuro = estoque_atual - quantidade
-            estoque_zerado = estoque_futuro == 0
+#             # VERIFICAR SE O ESTOQUE SERÁ ZERADO E ATUALIZAR COM O PRÓXIMO LOTE VÁLIDO
+#             estoque_atual = produto.estoque_loja
+#             estoque_futuro = estoque_atual - quantidade
+#             estoque_zerado = estoque_futuro == 0
 
-            if estoque_zerado:
-                # Buscar o próximo lote mais antigo com quantidade válida (se existir)
-                proximo_lote_valido = LoteEstoque.query.filter(
-                    LoteEstoque.produto_id == produto_id,
-                    LoteEstoque.quantidade_disponivel > 0
-                ).order_by(LoteEstoque.data_entrada.asc()).first()
+#             if estoque_zerado:
+#                 # Buscar o próximo lote mais antigo com quantidade válida (se existir)
+#                 proximo_lote_valido = LoteEstoque.query.filter(
+#                     LoteEstoque.produto_id == produto_id,
+#                     LoteEstoque.quantidade_disponivel > 0
+#                 ).order_by(LoteEstoque.data_entrada.asc()).first()
                 
-                if proximo_lote_valido:
-                    # Se há próximo lote válido, usar seu valor_unitario_compra
-                    produto.valor_unitario_compra = proximo_lote_valido.valor_unitario_compra
-                    logger.info(f"Estoque zerado para produto {produto.nome}. Atualizado valor_unitario_compra para: {proximo_lote_valido.valor_unitario_compra}")
-                else:
-                    # Se não há mais lotes, manter o último valor usado ou definir como 0
-                    if valor_unitario_compra_final > 0:
-                        produto.valor_unitario_compra = valor_unitario_compra_final
-                    else:
-                        # Se não temos valor final e não há lotes, manter o atual
-                        produto.valor_unitario_compra = produto.valor_unitario_compra if produto.valor_unitario_compra else Decimal('0')
-                    logger.info(f"Estoque zerado para produto {produto.nome}. Sem lotes disponíveis. Valor mantido: {produto.valor_unitario_compra}")
-            elif valor_unitario_compra_final > 0:
-                # Se o estoque não foi zerado mas temos um valor final válido, atualizar
-                produto.valor_unitario_compra = valor_unitario_compra_final
-                logger.info(f"Produto {produto.nome}. valor_unitario_compra atualizado para: {valor_unitario_compra_final}")
+#                 if proximo_lote_valido:
+#                     # Se há próximo lote válido, usar seu valor_unitario_compra
+#                     produto.valor_unitario_compra = proximo_lote_valido.valor_unitario_compra
+#                     logger.info(f"Estoque zerado para produto {produto.nome}. Atualizado valor_unitario_compra para: {proximo_lote_valido.valor_unitario_compra}")
+#                 else:
+#                     # Se não há mais lotes, manter o último valor usado ou definir como 0
+#                     if valor_unitario_compra_final > 0:
+#                         produto.valor_unitario_compra = valor_unitario_compra_final
+#                     else:
+#                         # Se não temos valor final e não há lotes, manter o atual
+#                         produto.valor_unitario_compra = produto.valor_unitario_compra if produto.valor_unitario_compra else Decimal('0')
+#                     logger.info(f"Estoque zerado para produto {produto.nome}. Sem lotes disponíveis. Valor mantido: {produto.valor_unitario_compra}")
+#             elif valor_unitario_compra_final > 0:
+#                 # Se o estoque não foi zerado mas temos um valor final válido, atualizar
+#                 produto.valor_unitario_compra = valor_unitario_compra_final
+#                 logger.info(f"Produto {produto.nome}. valor_unitario_compra atualizado para: {valor_unitario_compra_final}")
 
-            item_nf = NotaFiscalItem(
-                nota_id=nota.id,
-                produto_id=produto_id,
-                estoque_origem=TipoEstoque.loja,
-                quantidade=quantidade,
-                valor_unitario=valor_unitario,
-                valor_total=valor_total_item,
-                desconto_aplicado=desconto_aplicado,
-                tipo_desconto=TipoDesconto(tipo_desconto) if tipo_desconto else None,
-                sincronizado=False
-            )
-            db.session.add(item_nf)
+#             item_nf = NotaFiscalItem(
+#                 nota_id=nota.id,
+#                 produto_id=produto_id,
+#                 estoque_origem=TipoEstoque.loja,
+#                 quantidade=quantidade,
+#                 valor_unitario=valor_unitario,
+#                 valor_total=valor_total_item,
+#                 desconto_aplicado=desconto_aplicado,
+#                 tipo_desconto=TipoDesconto(tipo_desconto) if tipo_desconto else None,
+#                 sincronizado=False
+#             )
+#             db.session.add(item_nf)
             
-            # Atualizar estoque do produto
-            produto.estoque_loja = estoque_futuro
+#             # Atualizar estoque do produto
+#             produto.estoque_loja = estoque_futuro
 
-        # Criar pagamentos e armazenar seus IDs
-        pagamentos_ids = []
-        valor_a_prazo = Decimal(0)
+#         # Criar pagamentos e armazenar seus IDs
+#         pagamentos_ids = []
+#         valor_a_prazo = Decimal(0)
         
-        for pagamento_data in dados_venda['pagamentos']:
-            forma = pagamento_data.get('forma_pagamento')
-            valor = Decimal(str(pagamento_data.get('valor')))
+#         for pagamento_data in dados_venda['pagamentos']:
+#             forma = pagamento_data.get('forma_pagamento')
+#             valor = Decimal(str(pagamento_data.get('valor')))
             
-            pagamento_nf = PagamentoNotaFiscal(
-                nota_fiscal_id=nota.id,
-                forma_pagamento=FormaPagamento(forma),
-                valor=valor,
-                data=datetime.now(),
-                sincronizado=False
-            )
-            db.session.add(pagamento_nf)
-            db.session.flush()  # Garante que teremos o ID do pagamento
+#             pagamento_nf = PagamentoNotaFiscal(
+#                 nota_fiscal_id=nota.id,
+#                 forma_pagamento=FormaPagamento(forma),
+#                 valor=valor,
+#                 data=datetime.now(),
+#                 sincronizado=False
+#             )
+#             db.session.add(pagamento_nf)
+#             db.session.flush()  # Garante que teremos o ID do pagamento
             
-            pagamentos_ids.append(pagamento_nf.id)
+#             pagamentos_ids.append(pagamento_nf.id)
             
-            # Registrar no financeiro APENAS se não for a prazo
-            if forma != 'a_prazo':
-                financeiro = Financeiro(
-                    tipo=TipoMovimentacao.entrada,
-                    categoria=CategoriaFinanceira.venda,
-                    valor=valor,
-                    descricao=f"Pagamento venda NF #{nota.id}",
-                    cliente_id=cliente.id,
-                    caixa_id=caixa_aberto.id,
-                    nota_fiscal_id=nota.id,
-                    pagamento_id=pagamento_nf.id,
-                    sincronizado=False
-                )
-                db.session.add(financeiro)
-            else:
-                valor_a_prazo += valor
+#             # Registrar no financeiro APENAS se não for a prazo
+#             if forma != 'a_prazo':
+#                 financeiro = Financeiro(
+#                     tipo=TipoMovimentacao.entrada,
+#                     categoria=CategoriaFinanceira.venda,
+#                     valor=valor,
+#                     descricao=f"Pagamento venda NF #{nota.id}",
+#                     cliente_id=cliente.id,
+#                     caixa_id=caixa_aberto.id,
+#                     nota_fiscal_id=nota.id,
+#                     pagamento_id=pagamento_nf.id,
+#                     sincronizado=False
+#                 )
+#                 db.session.add(financeiro)
+#             else:
+#                 valor_a_prazo += valor
 
-        # Se houver pagamento a prazo, criar conta a receber
-        if a_prazo_usado and valor_a_prazo > 0:
-            conta_receber = ContaReceber(
-                cliente_id=cliente.id,
-                nota_fiscal_id=nota.id,
-                descricao=f"Venda a prazo NF #{nota.id}",
-                valor_original=valor_a_prazo,
-                valor_aberto=valor_a_prazo,
-                data_vencimento=datetime.now() + timedelta(days=30),
-                status=StatusPagamento.pendente,
-                sincronizado=False
-            )
-            db.session.add(conta_receber)
+#         # Se houver pagamento a prazo, criar conta a receber
+#         if a_prazo_usado and valor_a_prazo > 0:
+#             conta_receber = ContaReceber(
+#                 cliente_id=cliente.id,
+#                 nota_fiscal_id=nota.id,
+#                 descricao=f"Venda a prazo NF #{nota.id}",
+#                 valor_original=valor_a_prazo,
+#                 valor_aberto=valor_a_prazo,
+#                 data_vencimento=datetime.now() + timedelta(days=30),
+#                 status=StatusPagamento.pendente,
+#                 sincronizado=False
+#             )
+#             db.session.add(conta_receber)
 
-        # Atualizar a forma de pagamento principal da nota fiscal
-        if len(dados_venda['pagamentos']) == 1:
-            # Se houver apenas um pagamento, usa essa forma
-            nota.forma_pagamento = FormaPagamento(dados_venda['pagamentos'][0]['forma_pagamento'])
-        else:
-            # Se houver múltiplos pagamentos, define como "misto"
-            nota.forma_pagamento = FormaPagamento.dinheiro  # Ou criar um enum para "misto"
+#         # Atualizar a forma de pagamento principal da nota fiscal
+#         if len(dados_venda['pagamentos']) == 1:
+#             # Se houver apenas um pagamento, usa essa forma
+#             nota.forma_pagamento = FormaPagamento(dados_venda['pagamentos'][0]['forma_pagamento'])
+#         else:
+#             # Se houver múltiplos pagamentos, define como "misto"
+#             nota.forma_pagamento = FormaPagamento.dinheiro  # Ou criar um enum para "misto"
 
-        db.session.commit()
+#         db.session.commit()
 
-        return jsonify({
-            'success': True,
-            'message': 'Venda registrada com sucesso',
-            'nota_fiscal_id': nota.id,
-            'pagamentos_ids': pagamentos_ids,
-            'valor_total': float(valor_total),
-            'valor_recebido': float(valor_recebido),
-            'troco': float(nota.troco) if nota.troco else 0,
-            'valor_a_prazo': float(valor_a_prazo) if a_prazo_usado else 0
-        }), 201
+#         return jsonify({
+#             'success': True,
+#             'message': 'Venda registrada com sucesso',
+#             'nota_fiscal_id': nota.id,
+#             'pagamentos_ids': pagamentos_ids,
+#             'valor_total': float(valor_total),
+#             'valor_recebido': float(valor_recebido),
+#             'troco': float(nota.troco) if nota.troco else 0,
+#             'valor_a_prazo': float(valor_a_prazo) if a_prazo_usado else 0
+#         }), 201
 
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        logger.error(f'Erro no banco ao registrar venda: {str(e)}')
-        return jsonify({
-            'success': False,
-            'message': 'Erro ao registrar venda no banco',
-            'error': str(e)
-        }), 500
+#     except SQLAlchemyError as e:
+#         db.session.rollback()
+#         logger.error(f'Erro no banco ao registrar venda: {str(e)}')
+#         return jsonify({
+#             'success': False,
+#             'message': 'Erro ao registrar venda no banco',
+#             'error': str(e)
+#         }), 500
         
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f'Erro inesperado ao registrar venda: {str(e)}', exc_info=True)
-        return jsonify({
-            'success': False,
-            'message': 'Erro inesperado ao registrar venda',
-            'error': str(e)
-        }), 500
+#     except Exception as e:
+#         db.session.rollback()
+#         logger.error(f'Erro inesperado ao registrar venda: {str(e)}', exc_info=True)
+#         return jsonify({
+#             'success': False,
+#             'message': 'Erro inesperado ao registrar venda',
+#             'error': str(e)
+#         }), 500
         
 @operador_bp.route('/api/vendas_estoque', methods=['POST'])
 @login_required
@@ -1059,6 +1059,7 @@ def api_registrar_venda_com_estoque():
             'message': 'Erro inesperado ao registrar venda',
             'error': str(e)
         }), 500        
+ 
         
 @operador_bp.route('/pdf/nota/<id_list>', methods=['GET'])
 @login_required
