@@ -4,6 +4,7 @@ import io
 import locale
 import math
 from math import ceil
+from weasyprint import HTML
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 import os
 from zoneinfo import ZoneInfo
@@ -5997,137 +5998,62 @@ def formatarMoeda(valor):
     return f"R$ {float(valor):,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.')
 
 # ================= CONTAS A RECEBER =====================
+from app.crud import obter_contas_receber
+
 @admin_bp.route('/contas-receber', methods=['GET'])
 @login_required
 @admin_required
 def contas_receber():
-    cliente_nome = request.args.get('cliente_nome', '').strip()
-    cliente_documento = request.args.get('cliente_documento', '').strip()
-    data_emissao_inicio = request.args.get('data_emissao_inicio') or request.args.get('data_inicio')
-    data_emissao_fim = request.args.get('data_emissao_fim') or request.args.get('data_fim')
-    status = request.args.get('status')
+    clientes, totais = obter_contas_receber(
+        cliente_nome=request.args.get('cliente_nome'),
+        cliente_documento=request.args.get('cliente_documento'),
+        data_emissao_inicio=request.args.get('data_emissao_inicio'),
+        data_emissao_fim=request.args.get('data_emissao_fim'),
+        status=request.args.get('status')
+    )
 
-    query = ContaReceber.query.join(Cliente)
-
-    if cliente_nome:
-        query = query.filter(Cliente.nome.ilike(f'%{cliente_nome}%'))
-    if cliente_documento:
-        query = query.filter(Cliente.documento.ilike(f'%{cliente_documento}%'))
-
-    if data_emissao_inicio:
-        try:
-            inicio = datetime.strptime(data_emissao_inicio, '%Y-%m-%d')
-            inicio = inicio.replace(hour=0, minute=0, second=0, microsecond=0)
-            query = query.filter(ContaReceber.data_emissao >= inicio)
-        except ValueError as e:
-            pass
-
-    if data_emissao_fim:
-        try:
-            fim = datetime.strptime(data_emissao_fim, '%Y-%m-%d')
-            fim = fim.replace(hour=23, minute=59, second=59, microsecond=999999)
-            query = query.filter(ContaReceber.data_emissao <= fim)
-        except ValueError as e:
-            pass
-
-    hoje = datetime.now()
-    
-    query = query.filter(ContaReceber.status != StatusPagamento.quitado)
-    
-    if status:
-        status = status.lower()
-        if status == 'pendente':
-            query = query.filter(
-                ContaReceber.data_vencimento >= hoje.date()
-            )
-        elif status == 'quitado':
-            query = query.filter(ContaReceber.status == StatusPagamento.quitado)
-        elif status == 'parcial':
-            query = query.filter(
-                ContaReceber.valor_aberto > 0,
-                ContaReceber.valor_aberto < ContaReceber.valor_original
-            )
-    
-    contas = query.order_by(
-        Cliente.nome.asc(),
-        ContaReceber.data_vencimento.asc()
-    ).all()
-    
-    clientes_dict = {}
-    
-    for conta in contas:
-        cliente_id = conta.cliente.id
-        
-        if cliente_id not in clientes_dict:
-            clientes_dict[cliente_id] = {
-                'cliente': {
-                    'id': conta.cliente.id,
-                    'nome': conta.cliente.nome,
-                    'documento': conta.cliente.documento
-                },
-                'contas': [],
-                'resumo': {
-                    'total_divida': 0.0,
-                    'total_pago': 0.0,
-                    'total_aberto': 0.0,
-                    'qtd_contas': 0,
-                    'qtd_vencidas': 0,
-                    'qtd_pendentes': 0,
-                    'qtd_quitadas': 0
-                }
-            }
-
-        valor_pago = conta.valor_original - conta.valor_aberto
-        
-        hoje = datetime.now()
-        vencida = conta.data_vencimento < hoje and conta.status != StatusPagamento.quitado
-        pendente = conta.data_vencimento >= hoje and conta.status != StatusPagamento.quitado
-        
-        conta_data = {
-            'id': conta.id,
-            'descricao': conta.descricao,
-            'valor_original': float(conta.valor_original),
-            'valor_aberto': float(conta.valor_aberto),
-            'valor_pago': float(valor_pago),
-            'data_emissao': conta.data_emissao.strftime('%Y-%m-%d'),
-            'data_vencimento': conta.data_vencimento.strftime('%Y-%m-%d'),
-            'status': conta.status.value,
-            'vencida': vencida,
-            'pendente': pendente,
-            'quitada': conta.status == StatusPagamento.quitado
-        }
-        
-        clientes_dict[cliente_id]['contas'].append(conta_data)
-
-        resumo = clientes_dict[cliente_id]['resumo']
-        resumo['total_divida'] += float(conta.valor_original)
-        resumo['total_pago'] += float(valor_pago)
-        resumo['total_aberto'] += float(conta.valor_aberto)
-        resumo['qtd_contas'] += 1
-        
-        if vencida:
-            resumo['qtd_vencidas'] += 1
-        elif pendente:
-            resumo['qtd_pendentes'] += 1
-        elif conta.status == StatusPagamento.quitado:
-            resumo['qtd_quitadas'] += 1
-
-    clientes_agrupados = list(clientes_dict.values())
+    total_contas = sum(len(c['contas']) for c in clientes)
 
     return jsonify({
-        'success': True, 
-        'clientes_agrupados': clientes_agrupados,
-        'total_clientes': len(clientes_agrupados),
-        'total_contas': sum(len(cliente['contas']) for cliente in clientes_agrupados),
-        'filtros': {
-            'cliente_nome': cliente_nome,
-            'data_emissao_inicio': data_emissao_inicio,
-            'data_emissao_fim': data_emissao_fim,
-            'status': status
-        }
+        'success': True,
+        'clientes_agrupados': clientes,
+        'total_clientes': len(clientes),
+        'total_contas': total_contas,
+        'totais_gerais': totais
     })
-    
-    
+
+
+@admin_bp.route('/contas-receber/pdf', methods=['GET'])
+@login_required
+@admin_required
+def contas_receber_pdf():
+    clientes, totais = obter_contas_receber(
+        cliente_nome=request.args.get('cliente_nome'),
+        cliente_documento=request.args.get('cliente_documento'),
+        data_emissao_inicio=request.args.get('data_emissao_inicio'),
+        data_emissao_fim=request.args.get('data_emissao_fim'),
+        status=request.args.get('status')
+    )
+
+    html = render_template(
+        'relatorio_contasReceber.html',
+        clientes=clientes,
+        totais=totais,
+        data_emissao=datetime.now(),
+        periodo=f"{request.args.get('data_emissao_inicio','-')} até {request.args.get('data_emissao_fim','-')}",
+        usuario=current_user.nome
+    )
+
+    pdf_buffer = BytesIO()
+    HTML(string=html, base_url=current_app.root_path).write_pdf(pdf_buffer)
+    pdf_buffer.seek(0)
+
+    return send_file(
+        pdf_buffer,
+        mimetype='application/pdf',
+        download_name='relatorio_contas_receber.pdf'
+    )
+
 @admin_bp.route('/contas-receber/<int:id>/detalhes', methods=['GET'])
 @login_required
 @admin_required

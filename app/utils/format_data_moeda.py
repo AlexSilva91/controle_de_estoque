@@ -1,6 +1,6 @@
 from babel.dates import format_date
 from babel.numbers import format_currency as babel_format_currency
-from datetime import date
+from datetime import datetime, date
 import locale
 from decimal import Decimal, InvalidOperation
 
@@ -8,6 +8,28 @@ locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 
 def formatar_data_br(data: date) -> str:
     return data.strftime('%d/%m/%Y') if data else None
+
+def formatar_data_br2(data) -> str:
+    """
+    Aceita:
+    - datetime
+    - date
+    - string ISO 8601 (YYYY-MM-DD ou YYYY-MM-DDTHH:MM:SS)
+    """
+    if not data:
+        return '-'
+
+    if isinstance(data, (datetime, date)):
+        return data.strftime('%d/%m/%Y')
+
+    if isinstance(data, str):
+        try:
+            dt = datetime.fromisoformat(data)
+            return dt.strftime('%d/%m/%Y')
+        except ValueError:
+            return data
+
+    return str(data)
 
 def format_currency(value):
     """Formata valores monetários no padrão brasileiro (R$ XX.XXX,XX)"""

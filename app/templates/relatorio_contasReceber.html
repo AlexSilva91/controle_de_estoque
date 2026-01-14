@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Contas a Receber</title>
+
+    <style>
+        @page {
+            size: A4;
+            margin: 10mm 15mm 20mm 15mm;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 10px;
+            color: #1a1a1a;
+            line-height: 1.6;
+            background: #ffffff;
+        }
+
+        /* ===== CABEÇALHO ===== */
+        .header {
+            border-bottom: 2px solid #1a1a1a;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            height: 80px;
+        }
+
+        .titulo-container {
+            text-align: right;
+            flex: 1;
+            margin-left: 20px;
+        }
+
+        .titulo {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 3px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitulo {
+            font-size: 9px;
+            color: #666666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* ===== FILTROS ===== */
+        .filtros {
+            margin-bottom: 25px;
+            padding: 12px 0;
+            border-top: 1px solid #e0e0e0;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 9px;
+            color: #4a4a4a;
+        }
+
+        .filtros span {
+            margin-right: 25px;
+        }
+
+        .filtros strong {
+            color: #1a1a1a;
+            font-weight: 600;
+        }
+
+        /* ===== CLIENTE ===== */
+        .cliente-box {
+            margin-top: 30px;
+            margin-bottom: 0;
+            font-weight: 600;
+            font-size: 11px;
+            color: #1a1a1a;
+            background-color: #f5f5f5;
+            padding: 10px 12px;
+            border-left: 3px solid #1a1a1a;
+        }
+
+        /* ===== TABELA ===== */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 9px;
+        }
+
+        th {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            border: none;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 8px;
+        }
+
+        td {
+            border-bottom: 1px solid #e0e0e0;
+            padding: 10px 8px;
+            background-color: #ffffff;
+        }
+
+        tbody tr {
+            page-break-inside: avoid;
+        }
+
+        tbody tr:nth-child(even) td {
+            background-color: #fafafa;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: 2px solid #1a1a1a;
+        }
+
+        .text-right {
+            text-align: right;
+            font-weight: 600;
+        }
+
+        /* ===== STATUS ===== */
+        .status {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 7px;
+            letter-spacing: 0.5px;
+            padding: 3px 8px;
+            border-radius: 2px;
+            display: inline-block;
+        }
+
+        .status-pendente { 
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        
+        .status-parcial { 
+            background-color: #666666;
+            color: #ffffff;
+        }
+        
+        .status-quitado { 
+            background-color: #4a4a4a;
+            color: #ffffff;
+        }
+        
+        .status-atrasado { 
+            background-color: #000000;
+            color: #ffffff;
+        }
+
+        /* ===== TOTAIS ===== */
+        .totais {
+            margin-top: 35px;
+            width: 100%;
+        }
+
+        .totais-header {
+            font-size: 11px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #1a1a1a;
+            padding-bottom: 5px;
+        }
+
+        .totais-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .total-item {
+            border: 1px solid #e0e0e0;
+            padding: 12px;
+            background-color: #fafafa;
+        }
+
+        .total-label {
+            font-size: 8px;
+            color: #666666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .total-valor {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+
+        .total-item:last-child {
+            background-color: #1a1a1a;
+        }
+
+        .total-item:last-child .total-label {
+            color: #cccccc;
+        }
+
+        .total-item:last-child .total-valor {
+            color: #ffffff;
+        }
+
+        /* ===== RODAPÉ ===== */
+        .footer {
+            position: fixed;
+            bottom: -25px; 
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 8px;
+            color: #999999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== MENSAGEM VAZIA ===== */
+        .mensagem-vazia {
+            text-align: center;
+            font-weight: 600;
+            margin-top: 80px;
+            color: #666666;
+            font-size: 12px;
+            padding: 40px;
+            border: 2px solid #e0e0e0;
+            background-color: #fafafa;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- CABEÇALHO -->
+<div class="header">
+    <div class="header-content">
+        <img
+            src="{{ url_for('static', filename='assets/logo.jpeg', _external=True) }}"
+            class="logo"
+            alt="Logo"
+        >
+        <div class="titulo-container">
+            <div class="titulo">Contas a Receber</div>
+            <div class="subtitulo">Relatório Financeiro</div>
+        </div>
+    </div>
+</div>
+
+<!-- CONTEÚDO -->
+{% if clientes %}
+    {% for grupo in clientes %}
+        <div class="cliente-box">
+            {{ grupo.cliente.nome }}
+            {% if grupo.cliente.documento %}
+                — {{ grupo.cliente.documento }}
+            {% endif %}
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Descrição</th>
+                    <th>Data Emissão</th>
+                    <th>Vencimento</th>
+                    <th>Status</th>
+                    <th class="text-right">Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for conta in grupo.contas %}
+                <tr>
+                    <td>{{ conta.descricao or '-' }}</td>
+                    <td>{{ conta.data_emissao | data_br2 }}</td>
+                    <td>{{ conta.data_vencimento | data_br2 }}</td>
+                    <td>
+                        <span class="status status-{{ conta.status }}">
+                            {{ conta.status }}
+                        </span>
+                    </td>
+                    <td class="text-right">
+                        R$ {{ conta.valor_original | moeda_br }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endfor %}
+
+    <!-- TOTAIS -->
+    <div class="totais">
+        <div class="totais-header">Resumo Financeiro</div>
+        <div class="totais-grid">
+            <div class="total-item">
+                <div class="total-label">Total da Dívida</div>
+                <div class="total-valor">R$ {{ totais.total_divida | moeda_br }}</div>
+            </div>
+            <div class="total-item">
+                <div class="total-label">Total Pago</div>
+                <div class="total-valor">R$ {{ totais.total_pago | moeda_br }}</div>
+            </div>
+            <div class="total-item">
+                <div class="total-label">Total em Aberto</div>
+                <div class="total-valor">R$ {{ totais.total_aberto | moeda_br }}</div>
+            </div>
+        </div>
+    </div>
+{% else %}
+    <div class="mensagem-vazia">
+        Nenhuma conta encontrada com os filtros aplicados.
+    </div>
+{% endif %}
+
+<div class="footer">
+    Sistema de Controle de Estoque — Relatório Confidencial
+</div>
+
+</body>
+</html>

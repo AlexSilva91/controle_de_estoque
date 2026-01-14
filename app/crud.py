@@ -864,6 +864,135 @@ def calcular_fator_conversao(produto, unidade_origem, unidade_destino):
     
     return fatores.get((unidade_origem, unidade_destino), Decimal('1'))
 
+def obter_contas_receber(
+    cliente_nome=None,
+    cliente_documento=None,
+    data_emissao_inicio=None,
+    data_emissao_fim=None,
+    status=None
+):
+    query = ContaReceber.query.join(Cliente)
+
+    if cliente_nome:
+        query = query.filter(Cliente.nome.ilike(f'%{cliente_nome}%'))
+
+    if cliente_documento:
+        query = query.filter(Cliente.documento.ilike(f'%{cliente_documento}%'))
+
+    if data_emissao_inicio:
+        inicio = datetime.strptime(data_emissao_inicio, '%Y-%m-%d')
+        inicio = inicio.replace(hour=0, minute=0, second=0, microsecond=0)
+        query = query.filter(ContaReceber.data_emissao >= inicio)
+
+    if data_emissao_fim:
+        fim = datetime.strptime(data_emissao_fim, '%Y-%m-%d')
+        fim = fim.replace(hour=23, minute=59, second=59, microsecond=999999)
+        query = query.filter(ContaReceber.data_emissao <= fim)
+
+    hoje = datetime.now()
+
+    # Regra importante: só excluir quitadas se NÃO houver filtro explícito
+    if not status:
+        query = query.filter(ContaReceber.status != StatusPagamento.quitado)
+
+    if status:
+        status = status.lower()
+
+        if status == 'pendente':
+            query = query.filter(
+                ContaReceber.data_vencimento >= hoje,
+                ContaReceber.status != StatusPagamento.quitado
+            )
+
+        elif status == 'quitado':
+            query = query.filter(ContaReceber.status == StatusPagamento.quitado)
+
+        elif status == 'parcial':
+            query = query.filter(
+                ContaReceber.valor_aberto > 0,
+                ContaReceber.valor_aberto < ContaReceber.valor_original
+            )
+
+    contas = query.order_by(
+        Cliente.nome.asc(),
+        ContaReceber.data_vencimento.asc()
+    ).all()
+
+    # ===== AGREGAÇÃO =====
+    clientes_dict = {}
+    totais_gerais = {
+        'total_divida': 0.0,
+        'total_pago': 0.0,
+        'total_aberto': 0.0,
+        'qtd_vencidas': 0,
+        'qtd_pendentes': 0,
+        'qtd_quitadas': 0
+    }
+
+    for conta in contas:
+        cliente_id = conta.cliente.id
+        valor_pago = conta.valor_original - conta.valor_aberto
+
+        hoje = datetime.now()
+        vencida = conta.data_vencimento < hoje and conta.status != StatusPagamento.quitado
+        pendente = conta.data_vencimento >= hoje and conta.status != StatusPagamento.quitado
+        quitada = conta.status == StatusPagamento.quitado
+
+        if cliente_id not in clientes_dict:
+            clientes_dict[cliente_id] = {
+                'cliente': {
+                    'id': conta.cliente.id,
+                    'nome': conta.cliente.nome,
+                    'documento': conta.cliente.documento
+                },
+                'contas': [],
+                'resumo': {
+                    'total_divida': 0.0,
+                    'total_pago': 0.0,
+                    'total_aberto': 0.0,
+                    'qtd_contas': 0,
+                    'qtd_vencidas': 0,
+                    'qtd_pendentes': 0,
+                    'qtd_quitadas': 0
+                }
+            }
+
+        clientes_dict[cliente_id]['contas'].append({
+            'id': conta.id,
+            'descricao': conta.descricao,
+            'valor_original': float(conta.valor_original),
+            'valor_aberto': float(conta.valor_aberto),
+            'valor_pago': float(valor_pago),
+            'data_emissao': conta.data_emissao.isoformat() if conta.data_emissao else None,
+            'data_vencimento': conta.data_vencimento.isoformat() if conta.data_vencimento else None,
+            'status': conta.status.value,
+            'vencida': vencida,
+            'pendente': pendente,
+            'quitada': quitada
+        })
+
+        resumo = clientes_dict[cliente_id]['resumo']
+        resumo['total_divida'] += float(conta.valor_original)
+        resumo['total_pago'] += float(valor_pago)
+        resumo['total_aberto'] += float(conta.valor_aberto)
+        resumo['qtd_contas'] += 1
+
+        if vencida:
+            resumo['qtd_vencidas'] += 1
+            totais_gerais['qtd_vencidas'] += 1
+        elif pendente:
+            resumo['qtd_pendentes'] += 1
+            totais_gerais['qtd_pendentes'] += 1
+        elif quitada:
+            resumo['qtd_quitadas'] += 1
+            totais_gerais['qtd_quitadas'] += 1
+
+        totais_gerais['total_divida'] += float(conta.valor_original)
+        totais_gerais['total_pago'] += float(valor_pago)
+        totais_gerais['total_aberto'] += float(conta.valor_aberto)
+
+    return list(clientes_dict.values()), totais_gerais
+
 # ===== Cliente =====
 def create_cliente(db: Session, cliente: schemas.ClienteCreate):
     if cliente.documento and not validar_documento(cliente.documento):

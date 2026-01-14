@@ -2614,9 +2614,7 @@ canvas {
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  background-color: #f8f9fa;
   border-radius: 4px;
-  border: 1px solid #e9ecef;
 }
 
 .total-item label {
@@ -5422,4 +5420,423 @@ td {
     font-size: 48px;
     margin-bottom: 15px;
     opacity: 0.5;
+}
+/* CARD HEADER COMPACTO - TUDO NA MESMA LINHA COM CORES VIBRANTES */
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: var(--space-lg);
+    padding: var(--space-md) var(--space-lg);
+    background: linear-gradient(135deg, var(--bg-tertiary), var(--card-bg));
+    border-bottom: 2px solid var(--primary-color);
+    box-shadow: var(--shadow-md);
+}
+
+.card-header h3 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    color: var(--text-primary);
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-lg);
+    white-space: nowrap;
+    flex-shrink: 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.card-header h3 i {
+    color: var(--primary-light);
+    filter: drop-shadow(0 2px 3px rgba(108, 92, 231, 0.4));
+}
+
+/* RESUMO DE CLIENTES/CONTAS - com cores vibrantes */
+.card-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    padding: 6px 12px;
+    background: linear-gradient(135deg, rgba(108, 92, 231, 0.15), rgba(86, 73, 192, 0.1));
+    border-radius: var(--border-radius);
+    border: 1px solid rgba(108, 92, 231, 0.3);
+    white-space: nowrap;
+    box-shadow: var(--shadow-sm);
+}
+
+.card-summary span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+
+.card-summary span:nth-child(1) {
+    background: linear-gradient(135deg, rgba(0, 206, 201, 0.2), rgba(0, 168, 165, 0.15));
+    color: var(--secondary-color);
+    border: 1px solid rgba(0, 206, 201, 0.4);
+}
+
+.card-summary span:nth-child(2) {
+    background: linear-gradient(135deg, rgba(253, 121, 168, 0.2), rgba(232, 67, 147, 0.15));
+    color: var(--accent-color);
+    border: 1px solid rgba(253, 121, 168, 0.4);
+}
+
+/* TOTAIS GERAIS - com fundos coloridos vibrantes */
+.totais-gerais {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    padding: 8px 16px;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(44, 58, 80, 0.7));
+    border-radius: var(--border-radius);
+    border: 1px solid rgba(108, 92, 231, 0.2);
+    white-space: nowrap;
+    flex-shrink: 0;
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(10px);
+}
+
+.total-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    position: relative;
+    min-width: 110px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.total-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Cores específicas para cada card */
+.total-divida {
+    background: linear-gradient(135deg, 
+        rgba(214, 48, 49, 0.15), 
+        rgba(176, 35, 36, 0.1));
+    border-left: 3px solid var(--danger-color);
+    border-right: 1px solid rgba(214, 48, 49, 0.3);
+}
+
+.total-pago {
+    background: linear-gradient(135deg, 
+        rgba(0, 184, 148, 0.15), 
+        rgba(0, 140, 109, 0.1));
+    border-left: 3px solid var(--success-color);
+    border-right: 1px solid rgba(0, 184, 148, 0.3);
+}
+
+.total-aberto {
+    background: linear-gradient(135deg, 
+        rgba(253, 203, 110, 0.15), 
+        rgba(232, 169, 62, 0.1));
+    border-left: 3px solid var(--warning-color);
+    border-right: 1px solid rgba(253, 203, 110, 0.3);
+}
+
+.total-vencidas {
+    background: linear-gradient(135deg, 
+        rgba(253, 121, 168, 0.15), 
+        rgba(232, 67, 147, 0.1));
+    border-left: 3px solid var(--accent-color);
+    border-right: 1px solid rgba(253, 121, 168, 0.3);
+}
+
+.total-label {
+    font-size: 10px;
+    font-weight: var(--font-weight-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    opacity: 0.9;
+}
+
+/* Labels com cores específicas */
+.total-divida .total-label {
+    color: rgba(214, 48, 49, 0.9);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.total-pago .total-label {
+    color: rgba(0, 184, 148, 0.9);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.total-aberto .total-label {
+    color: rgba(253, 203, 110, 0.9);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.total-vencidas .total-label {
+    color: rgba(253, 121, 168, 0.9);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.total-valor {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-bold);
+    font-family: 'Inter', var(--font-family);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: -0.3px;
+}
+
+/* Valores com cores vibrantes e efeitos */
+.total-divida .total-valor {
+    color: var(--danger-color);
+    text-shadow: 0 2px 4px rgba(214, 48, 49, 0.3);
+    background: linear-gradient(135deg, var(--danger-color), var(--danger-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.total-divida .total-valor::before {
+    content: '↓';
+    color: var(--danger-color);
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 0 1px 3px rgba(214, 48, 49, 0.4);
+}
+
+.total-pago .total-valor {
+    color: var(--success-color);
+    text-shadow: 0 2px 4px rgba(0, 184, 148, 0.3);
+    background: linear-gradient(135deg, var(--success-color), var(--success-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.total-pago .total-valor::before {
+    content: '✓';
+    color: var(--success-color);
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 0 1px 3px rgba(0, 184, 148, 0.4);
+}
+
+.total-aberto .total-valor {
+    color: var(--warning-color);
+    text-shadow: 0 2px 4px rgba(253, 203, 110, 0.3);
+    background: linear-gradient(135deg, var(--warning-color), var(--warning-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.total-aberto .total-valor::before {
+    content: '⏳';
+    color: var(--warning-color);
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 0 1px 3px rgba(253, 203, 110, 0.4);
+}
+
+.total-vencidas .total-valor {
+    color: var(--accent-color);
+    text-shadow: 0 2px 4px rgba(253, 121, 168, 0.3);
+    background: linear-gradient(135deg, var(--accent-color), var(--accent-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.total-vencidas .total-valor::before {
+    content: '⚠';
+    color: var(--accent-color);
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 0 1px 3px rgba(253, 121, 168, 0.4);
+}
+
+/* Separador entre os itens */
+.total-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: -12px;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 24px;
+    width: 1px;
+    background: linear-gradient(180deg, 
+        transparent, 
+        rgba(108, 92, 231, 0.4), 
+        transparent);
+    opacity: 0.7;
+}
+
+/* Efeito de brilho nos hover */
+.total-item:hover::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.1), 
+        transparent);
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+/* Layout responsivo */
+@media (max-width: 1400px) {
+    .card-header {
+        gap: var(--space-md);
+    }
+    
+    .totais-gerais {
+        gap: var(--space-lg);
+    }
+    
+    .total-item {
+        min-width: 100px;
+        padding: 6px 10px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .card-header {
+        flex-wrap: wrap;
+        gap: var(--space-sm);
+        padding: var(--space-sm) var(--space-md);
+    }
+    
+    .card-header h3 {
+        order: 1;
+        flex-basis: 100%;
+        margin-bottom: var(--space-sm);
+        justify-content: center;
+    }
+    
+    .card-summary {
+        order: 2;
+        flex: 1;
+        justify-content: center;
+        gap: var(--space-sm);
+        padding: 4px 8px;
+    }
+    
+    .totais-gerais {
+        order: 3;
+        flex: 2;
+        justify-content: center;
+        gap: var(--space-md);
+        padding: 6px 12px;
+    }
+    
+    .total-item:not(:last-child)::after {
+        display: none;
+    }
+    
+    .total-item {
+        flex: 1;
+        align-items: center;
+        text-align: center;
+        min-width: auto;
+        padding: 4px 8px;
+    }
+}
+
+@media (max-width: 768px) {
+    .card-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-sm);
+        padding: var(--space-sm);
+    }
+    
+    .card-header h3 {
+        text-align: center;
+        margin-bottom: var(--space-xs);
+    }
+    
+    .card-summary {
+        justify-content: center;
+        margin-bottom: var(--space-sm);
+        border-left: none;
+        border-top: 2px solid var(--secondary-color);
+    }
+    
+    .totais-gerais {
+        flex-direction: column;
+        gap: var(--space-xs);
+        align-items: stretch;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 0;
+    }
+    
+    .total-item {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        margin-bottom: 4px;
+        border-radius: var(--border-radius);
+    }
+    
+    .total-item:last-child {
+        margin-bottom: 0;
+    }
+    
+    .total-item:not(:last-child)::after {
+        display: none;
+    }
+    
+    .total-label {
+        font-size: 9px;
+        order: 2;
+    }
+    
+    .total-valor {
+        order: 1;
+        font-size: var(--font-size-sm);
+    }
+    
+    .total-valor::before {
+        margin-right: var(--space-xs);
+        font-size: 12px;
+    }
+}
+.cliente-acoes {
+    display: flex;
+    gap: 8px;
+    margin: 0 15px;
+}
+
+.btn-pdf-relatorio {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color 0.3s;
+}
+
+.btn-pdf-relatorio:hover {
+    background-color: #c82333;
+}
+
+.btn-pdf-relatorio i {
+    font-size: 16px;
 }

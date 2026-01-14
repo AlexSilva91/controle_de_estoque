@@ -3,6 +3,7 @@ import time
 import logging
 from logging.handlers import RotatingFileHandler
 from flask import Flask, abort, request, g, send_from_directory, render_template
+from app.utils.format_data_moeda import format_currency, formatar_data_br, formatar_data_br2
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from werkzeug.exceptions import HTTPException
@@ -79,7 +80,9 @@ def create_app(config_name='development'):
     app.config.from_object(config[config_name])
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
     app.jinja_env.cache = {}
-
+    app.jinja_env.filters['moeda_br'] = format_currency
+    app.jinja_env.filters['data_br'] = formatar_data_br
+    app.jinja_env.filters['data_br2'] = formatar_data_br2
     configure_logging(app)
 
     db.init_app(app)

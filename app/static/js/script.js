@@ -5601,8 +5601,12 @@ setTimeout(inicializarBusca, 500);
           if (data.success) {
               renderContasAgrupadas(data.clientes_agrupados);
               
-              document.getElementById('totalClientes').textContent = `${data.total_clientes} clientes`;
-              document.getElementById('totalContas').textContent = `${data.total_contas} contas`;
+              // Atualizar os totais gerais
+              if (data.totais_gerais) {
+                  document.getElementById('totalGeralDivida').textContent = formatarMoeda(data.totais_gerais.total_divida);
+                  document.getElementById('totalGeralPago').textContent = formatarMoeda(data.totais_gerais.total_pago);
+                  document.getElementById('totalGeralAberto').textContent = formatarMoeda(data.totais_gerais.total_aberto);
+              }
               
               if (data.total_clientes === 0) {
                   showFlashMessage('warning', 'Nenhuma conta encontrada com os filtros aplicados');
@@ -5663,6 +5667,11 @@ setTimeout(inicializarBusca, 500);
                               <span class="resumo-label">Contas</span>
                               <span class="resumo-valor">${resumo.qtd_contas} (${resumo.qtd_vencidas} vencidas)</span>
                           </div>
+                          <div class="cliente-acoes">
+                            <button class="btn-acao btn-pdf-relatorio" data-cliente-documento="${cliente.nome}" title="Gerar PDF com contas do cliente">
+                                <i class="fas fa-file-pdf"></i> Gerar PDF
+                            </button>
+                         </div>
                       </div>
                       
                       <div class="cliente-toggle">
@@ -5748,6 +5757,22 @@ setTimeout(inicializarBusca, 500);
       setupContasActionButtons();
   }
 
+  function gerarPDFRelatorioFiltrado(clienteNome = '') {
+      try {
+          const params = new URLSearchParams();
+          
+          if (clienteNome) {
+              params.append('cliente_nome', clienteNome);
+          }
+          
+          const url = `/admin/contas-receber/pdf?${params.toString()}`;
+          window.open(url, '_blank');
+          
+      } catch (error) {
+          showFlashMessage('error', 'Erro ao gerar PDF do relatório');
+      }
+  }
+
   function setupContasToggleEvents() {
       document.querySelectorAll('.cliente-header').forEach(header => {
           header.addEventListener('click', function() {
@@ -5783,6 +5808,13 @@ setTimeout(inicializarBusca, 500);
               gerarPDFConta(contaId);
           });
       });
+      document.querySelectorAll('.btn-pdf-relatorio').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const clienteDocumento = this.getAttribute('data-cliente-documento');
+            gerarPDFRelatorioFiltrado(clienteDocumento);
+        });
+    });
   }
 
   async function abrirModalPagamentoConta(contaId, clienteNome) {
