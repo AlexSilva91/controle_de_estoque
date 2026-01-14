@@ -2310,8 +2310,6 @@ def get_contas_receber_cliente(cliente_id):
 
         contas = ContaReceber.query.filter_by(
             cliente_id=cliente_id
-        ).filter(
-            ContaReceber.status.in_([StatusPagamento.pendente, StatusPagamento.parcial])
         ).order_by(
             ContaReceber.data_emissao.desc()
         ).all()
