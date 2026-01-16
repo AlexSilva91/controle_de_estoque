@@ -5,7 +5,11 @@ document.addEventListener('DOMContentLoaded', function () {
   let caixasFechados = [];
   let itensVendaRetroativa = [];
   let pagamentosVendaRetroativa = [];
-  let vendasDespesasChart, formasPagamentoChart, caixasChart, vendasDiariasChart, produtosMaiorFluxoChart;
+  let vendasDespesasChart,
+    formasPagamentoChart,
+    caixasChart,
+    vendasDiariasChart,
+    produtosMaiorFluxoChart;
   let caixaIdAtual = null;
 
   // ===== CONFIGURAÇÃO DOS GRÁFICOS =====
@@ -13,34 +17,37 @@ document.addEventListener('DOMContentLoaded', function () {
   Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
 
   const chartColors = {
-      green: 'rgba(0, 245, 160, 0.8)',
-      greenBorder: 'rgba(0, 255, 170, 1)',
-      red: 'rgba(255, 65, 108, 0.8)',
-      redBorder: 'rgba(255, 100, 138, 1)',
-      blue: 'rgba(0, 150, 255, 0.8)',
-      blueBorder: 'rgba(0, 180, 255, 1)',
-      yellow: 'rgba(255, 220, 0, 0.8)',
-      yellowBorder: 'rgba(255, 235, 60, 1)',
-      purple: 'rgba(147, 51, 234, 0.8)',
-      purpleBorder: 'rgba(168, 85, 247, 1)',
-      orange: 'rgba(255, 105, 0, 0.8)',
-      orangeBorder: 'rgba(255, 140, 50, 1)',
-      teal: 'rgba(0, 212, 191, 0.8)',
-      tealBorder: 'rgba(0, 230, 210, 1)',
-      pink: 'rgba(255, 0, 128, 0.8)',
-      pinkBorder: 'rgba(255, 50, 150, 1)',
-      cyan: 'rgba(0, 255, 255, 0.8)',
-      cyanBorder: 'rgba(50, 255, 255, 1)'
+    green: 'rgba(0, 245, 160, 0.8)',
+    greenBorder: 'rgba(0, 255, 170, 1)',
+    red: 'rgba(255, 65, 108, 0.8)',
+    redBorder: 'rgba(255, 100, 138, 1)',
+    blue: 'rgba(0, 150, 255, 0.8)',
+    blueBorder: 'rgba(0, 180, 255, 1)',
+    yellow: 'rgba(255, 220, 0, 0.8)',
+    yellowBorder: 'rgba(255, 235, 60, 1)',
+    purple: 'rgba(147, 51, 234, 0.8)',
+    purpleBorder: 'rgba(168, 85, 247, 1)',
+    orange: 'rgba(255, 105, 0, 0.8)',
+    orangeBorder: 'rgba(255, 140, 50, 1)',
+    teal: 'rgba(0, 212, 191, 0.8)',
+    tealBorder: 'rgba(0, 230, 210, 1)',
+    pink: 'rgba(255, 0, 128, 0.8)',
+    pinkBorder: 'rgba(255, 50, 150, 1)',
+    cyan: 'rgba(0, 255, 255, 0.8)',
+    cyanBorder: 'rgba(50, 255, 255, 1)',
   };
 
   function formatMoney(value) {
     if (typeof value === 'string') {
       value = value.replace(/[^\d,]/g, '').replace(',', '.');
     }
-    return 'R$ ' + parseFloat(value).toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+    return (
+      'R$ ' +
+      parseFloat(value).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    );
   }
 
   // ===== FUNÇÕES UTILITÁRIAS =====
@@ -53,7 +60,7 @@ document.addEventListener('DOMContentLoaded', function () {
         month: '2-digit',
         year: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
       });
     }
   }
@@ -113,9 +120,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (typeof msg === 'string') return msg;
     if (Array.isArray(msg)) return msg.join(' ');
     if (typeof msg === 'object') {
-      return Object.values(msg)
-        .flat()
-        .join(' ');
+      return Object.values(msg).flat().join(' ');
     }
     return null;
   }
@@ -165,8 +170,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function formatPerfil(perfil) {
     const perfis = {
-      'admin': 'Administrador',
-      'operador': 'Operador'
+      admin: 'Administrador',
+      operador: 'Operador',
     };
     return perfis[perfil.toLowerCase()] || perfil;
   }
@@ -174,12 +179,12 @@ document.addEventListener('DOMContentLoaded', function () {
   function formatarMoeda(valor) {
     return parseFloat(valor || 0).toLocaleString('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     });
   }
 
   function formatarDataParaInput(date) {
-    const pad = num => num.toString().padStart(2, '0');
+    const pad = (num) => num.toString().padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
 
@@ -198,7 +203,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!value) return '-';
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   }
 
@@ -209,7 +214,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const modaisAbertos = document.querySelectorAll('.modal[style*="display: flex"]');
 
       // Fechar todos os modais abertos
-      modaisAbertos.forEach(modal => {
+      modaisAbertos.forEach((modal) => {
         closeModal(modal.id);
       });
 
@@ -237,7 +242,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function setupModalEvents() {
-    document.querySelectorAll('.close-modal').forEach(btn => {
+    document.querySelectorAll('.close-modal').forEach((btn) => {
       btn.addEventListener('click', function () {
         const modal = this.closest('.modal');
         if (modal) {
@@ -255,7 +260,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     });
 
-    document.querySelectorAll('.flash-message').forEach(message => {
+    document.querySelectorAll('.flash-message').forEach((message) => {
       const closeBtn = message.querySelector('.close-flash');
       if (closeBtn) {
         closeBtn.addEventListener('click', () => {
@@ -275,7 +280,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const mobileMenuToggle = document.getElementById('mobileMenuToggleInHeader');
     const sidebar = document.querySelector('.sidebar');
 
-   if (mobileMenuToggle && sidebar) {
+    if (mobileMenuToggle && sidebar) {
       mobileMenuToggle.addEventListener('click', function (e) {
         e.stopPropagation();
         this.classList.toggle('active');
@@ -293,25 +298,27 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       });
     }
-    document.querySelector('.sidebar-nav li[data-tab="contas-receber"]').addEventListener('click', function (e) {
-      e.preventDefault();
-      openModal('contasReceberModal');
-      loadContasReceber();
-    });
+    document
+      .querySelector('.sidebar-nav li[data-tab="contas-receber"]')
+      .addEventListener('click', function (e) {
+        e.preventDefault();
+        openModal('contasReceberModal');
+        loadContasReceber();
+      });
     const navItems = document.querySelectorAll('.sidebar-nav li');
     const tabContents = document.querySelectorAll('.tab-content');
     const pageTitle = document.getElementById('page-title');
     const breadcrumb = document.querySelector('.breadcrumb');
 
-    navItems.forEach(item => {
+    navItems.forEach((item) => {
       item.addEventListener('click', function () {
         if (mobileMenuToggle && sidebar && sidebar.classList.contains('active')) {
           mobileMenuToggle.classList.remove('active');
           sidebar.classList.remove('active');
         }
 
-        navItems.forEach(nav => nav.classList.remove('active'));
-        tabContents.forEach(content => content.classList.remove('active'));
+        navItems.forEach((nav) => nav.classList.remove('active'));
+        tabContents.forEach((content) => content.classList.remove('active'));
 
         this.classList.add('active');
         const tabId = this.getAttribute('data-tab');
@@ -340,8 +347,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       });
     });
-    
-    document.querySelectorAll('#logoutBtn').forEach(btn => {
+
+    document.querySelectorAll('#logoutBtn').forEach((btn) => {
       btn.addEventListener('click', () => {
         renderLogoutModal();
       });
@@ -612,10 +619,11 @@ document.addEventListener('DOMContentLoaded', function () {
       const novoStatus = !ativo;
 
       try {
-        const response = await fetch('/admin/configuracoes', { // Corrigi a URL aqui
+        const response = await fetch('/admin/configuracoes', {
+          // Corrigi a URL aqui
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ permitir_venda_sem_estoque: novoStatus })
+          body: JSON.stringify({ permitir_venda_sem_estoque: novoStatus }),
         });
 
         const data = await response.json();
@@ -652,11 +660,11 @@ document.addEventListener('DOMContentLoaded', function () {
       if (caixasChart) caixasChart.destroy();
       if (vendasDiariasChart) vendasDiariasChart.destroy();
       if (produtosMaiorFluxoChart) produtosMaiorFluxoChart.destroy();
-      
+
       // Obter datas dos filtros principais
       const startDate = document.getElementById('startDate')?.value;
       const endDate = document.getElementById('endDate')?.value;
-      
+
       // ===== FUNÇÃO PARA CONSTRUIR URL COM FILTROS =====
       function buildUrl(baseUrl) {
         const url = new URL(baseUrl, window.location.origin);
@@ -670,269 +678,294 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       // ===== ATUALIZAR TODOS OS GRÁFICOS COM FILTROS =====
-      
+
       // 1. Gráfico Vendas vs Despesas
-      const vendasMensaisData = await fetchWithErrorHandling(buildUrl('/admin/dashboard/vendas-mensais'));
+      const vendasMensaisData = await fetchWithErrorHandling(
+        buildUrl('/admin/dashboard/vendas-mensais')
+      );
       if (vendasMensaisData.success) {
-          const vendasDespesasCtx = document.getElementById('vendasDespesasChart').getContext('2d');
-          
-          vendasDespesasChart = new Chart(vendasDespesasCtx, {
-              type: 'bar',
-              data: {
-                  labels: vendasMensaisData.meses,
-                  datasets: [
-                      {
-                          label: 'Vendas',
-                          data: vendasMensaisData.vendas,
-                          backgroundColor: chartColors.green,
-                          borderColor: chartColors.greenBorder,
-                          borderWidth: 2
-                      },
-                      {
-                          label: 'Despesas',
-                          data: vendasMensaisData.despesas,
-                          backgroundColor: chartColors.red,
-                          borderColor: chartColors.redBorder,
-                          borderWidth: 2
-                      }
-                  ]
+        const vendasDespesasCtx = document
+          .getElementById('vendasDespesasChart')
+          .getContext('2d');
+
+        vendasDespesasChart = new Chart(vendasDespesasCtx, {
+          type: 'bar',
+          data: {
+            labels: vendasMensaisData.meses,
+            datasets: [
+              {
+                label: 'Vendas',
+                data: vendasMensaisData.vendas,
+                backgroundColor: chartColors.green,
+                borderColor: chartColors.greenBorder,
+                borderWidth: 2,
               },
-              options: {
-                  responsive: true,
-                  plugins: {
-                      legend: {
-                          position: 'top',
-                          labels: { color: '#e0e0e0' }
-                      },
-                      tooltip: {
-                          callbacks: {
-                              label: function (context) {
-                                  return `${context.dataset.label}: ${formatMoney(context.raw)}`;
-                              }
-                          }
-                      }
+              {
+                label: 'Despesas',
+                data: vendasMensaisData.despesas,
+                backgroundColor: chartColors.red,
+                borderColor: chartColors.redBorder,
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: { color: '#e0e0e0' },
+              },
+              tooltip: {
+                callbacks: {
+                  label: function (context) {
+                    return `${context.dataset.label}: ${formatMoney(context.raw)}`;
                   },
-                  scales: {
-                      y: {
-                          beginAtZero: true,
-                          grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                          ticks: { callback: value => formatMoney(value) }
-                      },
-                      x: { grid: { color: 'rgba(255, 255, 255, 0.1)' } }
-                  },
-                  // Configuração para capturar eventos de clique
-                  onClick: (event, elements) => {
-                      if (elements.length > 0) {
-                          const elementIndex = elements[0].index;
-                          const datasetIndex = elements[0].datasetIndex;
-                          
-                          // Obter o mês/ano do label
-                          const mesAno = vendasMensaisData.meses[elementIndex];
-                          
-                          // Converter de MM/YYYY para primeiro e último dia do mês
-                          const [mes, ano] = mesAno.split('/');
-                          const mesNum = parseInt(mes);
-                          const anoNum = parseInt(ano);
-                          
-                          // Calcular primeiro dia do mês (YYYY-MM-DD)
-                          const primeiroDia = new Date(anoNum, mesNum - 1, 1);
-                          const startDate = primeiroDia.toISOString().split('T')[0];
-                          
-                          // Calcular último dia do mês CORRETAMENTE
-                          const ultimoDia = new Date(anoNum, mesNum, 0); // Dia 0 do próximo mês = último dia do mês atual
-                          const endDate = ultimoDia.toISOString().split('T')[0];
-                          
-                          console.log(`Mês: ${mesNum}, Ano: ${anoNum}`);
-                          console.log(`Primeiro dia: ${startDate}`);
-                          console.log(`Último dia: ${endDate}`);
-                          console.log(`Dias no mês: ${ultimoDia.getDate()}`);
-                          
-                          // Determinar o tipo baseado no dataset clicado
-                          let tipo;
-                          if (datasetIndex === 0) {
-                              tipo = 'entrada'; // Vendas
-                          } else if (datasetIndex === 1) {
-                              tipo = 'saida'; // Despesas
-                          }
-                          
-                          if (tipo) {
-                              // Redirecionar para a rota de histórico com datas completas
-                              window.location.href = `/admin/financeiro/historico?tipo=${tipo}&start=${startDate}&end=${endDate}`;
-                          }
-                      }
-                  },
-                  // Melhorar a interatividade visual
-                  interaction: {
-                      mode: 'nearest',
-                      intersect: false
-                  },
-                  // Configurar cursor pointer
-                  onHover: (event, elements) => {
-                      event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
-                  }
+                },
+              },
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                ticks: { callback: (value) => formatMoney(value) },
+              },
+              x: { grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+            },
+            // Configuração para capturar eventos de clique
+            onClick: (event, elements) => {
+              if (elements.length > 0) {
+                const elementIndex = elements[0].index;
+                const datasetIndex = elements[0].datasetIndex;
+
+                // Obter o mês/ano do label
+                const mesAno = vendasMensaisData.meses[elementIndex];
+
+                // Converter de MM/YYYY para primeiro e último dia do mês
+                const [mes, ano] = mesAno.split('/');
+                const mesNum = parseInt(mes);
+                const anoNum = parseInt(ano);
+
+                // Calcular primeiro dia do mês (YYYY-MM-DD)
+                const primeiroDia = new Date(anoNum, mesNum - 1, 1);
+                const startDate = primeiroDia.toISOString().split('T')[0];
+
+                // Calcular último dia do mês CORRETAMENTE
+                const ultimoDia = new Date(anoNum, mesNum, 0); // Dia 0 do próximo mês = último dia do mês atual
+                const endDate = ultimoDia.toISOString().split('T')[0];
+
+                console.log(`Mês: ${mesNum}, Ano: ${anoNum}`);
+                console.log(`Primeiro dia: ${startDate}`);
+                console.log(`Último dia: ${endDate}`);
+                console.log(`Dias no mês: ${ultimoDia.getDate()}`);
+
+                // Determinar o tipo baseado no dataset clicado
+                let tipo;
+                if (datasetIndex === 0) {
+                  tipo = 'entrada'; // Vendas
+                } else if (datasetIndex === 1) {
+                  tipo = 'saida'; // Despesas
+                }
+
+                if (tipo) {
+                  // Redirecionar para a rota de histórico com datas completas
+                  window.location.href = `/admin/financeiro/historico?tipo=${tipo}&start=${startDate}&end=${endDate}`;
+                }
               }
-          });
+            },
+            // Melhorar a interatividade visual
+            interaction: {
+              mode: 'nearest',
+              intersect: false,
+            },
+            // Configurar cursor pointer
+            onHover: (event, elements) => {
+              event.native.target.style.cursor =
+                elements.length > 0 ? 'pointer' : 'default';
+            },
+          },
+        });
       }
 
       // 2. Gráfico Formas de Pagamento
-      const vendasDiariasData = await fetchWithErrorHandling(buildUrl('/admin/dashboard/vendas-diarias'));
+      const vendasDiariasData = await fetchWithErrorHandling(
+        buildUrl('/admin/dashboard/vendas-diarias')
+      );
       if (vendasDiariasData.success) {
-          const formasPagamentoMap = new Map();
-          // Criar um mapa para armazenar tanto o display quanto o valor original
-          const formasPagamentoOriginais = new Map();
-          
-          vendasDiariasData.dados.forEach(dia => {
-              dia.formas_pagamento.forEach(fp => {
-                  const formaOriginal = fp.forma;
-                  const formaDisplay = fp.forma.replace('pix_', '').replace(/_/g, ' ').replace('cartao', 'cartão');
-                  const total = parseFloat(fp.total.replace(/[^\d,]/g, '').replace(',', '.'));
+        const formasPagamentoMap = new Map();
+        // Criar um mapa para armazenar tanto o display quanto o valor original
+        const formasPagamentoOriginais = new Map();
 
-                  // Armazenar o mapeamento entre display e original
-                  formasPagamentoOriginais.set(formaDisplay, formaOriginal);
+        vendasDiariasData.dados.forEach((dia) => {
+          dia.formas_pagamento.forEach((fp) => {
+            const formaOriginal = fp.forma;
+            const formaDisplay = fp.forma
+              .replace('pix_', '')
+              .replace(/_/g, ' ')
+              .replace('cartao', 'cartão');
+            const total = parseFloat(fp.total.replace(/[^\d,]/g, '').replace(',', '.'));
 
-                  if (formasPagamentoMap.has(formaDisplay)) {
-                      formasPagamentoMap.set(formaDisplay, formasPagamentoMap.get(formaDisplay) + total);
-                  } else {
-                      formasPagamentoMap.set(formaDisplay, total);
-                  }
-              });
+            // Armazenar o mapeamento entre display e original
+            formasPagamentoOriginais.set(formaDisplay, formaOriginal);
+
+            if (formasPagamentoMap.has(formaDisplay)) {
+              formasPagamentoMap.set(
+                formaDisplay,
+                formasPagamentoMap.get(formaDisplay) + total
+              );
+            } else {
+              formasPagamentoMap.set(formaDisplay, total);
+            }
           });
+        });
 
-          const formasPagamentoCtx = document.getElementById('formasPagamentoChart').getContext('2d');
+        const formasPagamentoCtx = document
+          .getElementById('formasPagamentoChart')
+          .getContext('2d');
 
-          // Função que retorna posição/alinhamento da legenda
-          function getLegendConfig() {
-              const isSmall = window.innerWidth <= 600;
-              return {
-                  position: isSmall ? 'bottom' : 'right',
-                  align: isSmall ? 'center' : 'init'
-              };
-          }
+        // Função que retorna posição/alinhamento da legenda
+        function getLegendConfig() {
+          const isSmall = window.innerWidth <= 600;
+          return {
+            position: isSmall ? 'bottom' : 'right',
+            align: isSmall ? 'center' : 'init',
+          };
+        }
 
-          // Função que gera o texto da legenda (sempre com valor)
-          function generateLegendText(chart, index) {
-              const dataset = chart.data.datasets[0];
-              const value = dataset.data[index] || 0;
-              const label = chart.data.labels[index] || '';
-              return `${label}: ${formatMoney(value)}`;
-          }
+        // Função que gera o texto da legenda (sempre com valor)
+        function generateLegendText(chart, index) {
+          const dataset = chart.data.datasets[0];
+          const value = dataset.data[index] || 0;
+          const label = chart.data.labels[index] || '';
+          return `${label}: ${formatMoney(value)}`;
+        }
 
-          let legendCfg = getLegendConfig();
+        let legendCfg = getLegendConfig();
 
-          formasPagamentoChart = new Chart(formasPagamentoCtx, {
-              type: 'doughnut',
-              data: {
-                  labels: Array.from(formasPagamentoMap.keys()),
-                  datasets: [{
-                      data: Array.from(formasPagamentoMap.values()),
-                      backgroundColor: [
-                          chartColors.green,
-                          chartColors.blue,
-                          chartColors.yellow,
-                          chartColors.purple,
-                          chartColors.orange,
-                          chartColors.teal,
-                          chartColors.red
-                      ],
-                      borderColor: [
-                          chartColors.greenBorder,
-                          chartColors.blueBorder,
-                          chartColors.yellowBorder,
-                          chartColors.purpleBorder,
-                          chartColors.orangeBorder,
-                          chartColors.tealBorder,
-                          chartColors.redBorder
-                      ],
-                      borderWidth: 2
-                  }]
+        formasPagamentoChart = new Chart(formasPagamentoCtx, {
+          type: 'doughnut',
+          data: {
+            labels: Array.from(formasPagamentoMap.keys()),
+            datasets: [
+              {
+                data: Array.from(formasPagamentoMap.values()),
+                backgroundColor: [
+                  chartColors.green,
+                  chartColors.blue,
+                  chartColors.yellow,
+                  chartColors.purple,
+                  chartColors.orange,
+                  chartColors.teal,
+                  chartColors.red,
+                ],
+                borderColor: [
+                  chartColors.greenBorder,
+                  chartColors.blueBorder,
+                  chartColors.yellowBorder,
+                  chartColors.purpleBorder,
+                  chartColors.orangeBorder,
+                  chartColors.tealBorder,
+                  chartColors.redBorder,
+                ],
+                borderWidth: 2,
               },
-              options: {
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  cutout: '70%',
-                  plugins: {
-                      legend: {
-                          position: legendCfg.position,
-                          align: legendCfg.align,
-                          labels: {
-                              color: '#e0e0e0',
-                              font: { size: 12, weight: 'bold' },
-                              boxWidth: 20,
-                              generateLabels: function (chart) {
-                                  const dataset = chart.data.datasets[0];
-                                  const meta = chart.getDatasetMeta(0);
-                                  const labels = chart.data.labels;
-                                  return labels.map((label, i) => {
-                                      const arc = meta.data[i];
-                                      const hidden = arc && arc.hidden === true;
-                                      return {
-                                          text: generateLegendText(chart, i),
-                                          fillStyle: dataset.backgroundColor[i],
-                                          strokeStyle: dataset.borderColor[i],
-                                          lineWidth: dataset.borderWidth,
-                                          fontColor: '#e0e0e0',
-                                          hidden: hidden,
-                                          index: i,
-                                          datasetIndex: 0
-                                      };
-                                  });
-                              }
-                          },
-                          onClick: function (evt, legendItem, legend) {
-                              const index = legendItem.index;
-                              const chart = legend.chart;
-                              const meta = chart.getDatasetMeta(legendItem.datasetIndex);
-                              meta.data[index].hidden = !meta.data[index].hidden;
-                              chart.update();
-                          }
-                      },
-                      tooltip: {
-                          callbacks: {
-                              label: function (context) {
-                                  const label = context.label || '';
-                                  const value = context.raw || 0;
-                                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                  const percentage = Math.round((value / total) * 100);
-                                  return [
-                                      `${label}: ${formatMoney(value)} (${percentage}%)`,
-                                      'Clique para ver detalhes'
-                                  ];
-                              }
-                          }
-                      }
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: {
+              legend: {
+                position: legendCfg.position,
+                align: legendCfg.align,
+                labels: {
+                  color: '#e0e0e0',
+                  font: { size: 12, weight: 'bold' },
+                  boxWidth: 20,
+                  generateLabels: function (chart) {
+                    const dataset = chart.data.datasets[0];
+                    const meta = chart.getDatasetMeta(0);
+                    const labels = chart.data.labels;
+                    return labels.map((label, i) => {
+                      const arc = meta.data[i];
+                      const hidden = arc && arc.hidden === true;
+                      return {
+                        text: generateLegendText(chart, i),
+                        fillStyle: dataset.backgroundColor[i],
+                        strokeStyle: dataset.borderColor[i],
+                        lineWidth: dataset.borderWidth,
+                        fontColor: '#e0e0e0',
+                        hidden: hidden,
+                        index: i,
+                        datasetIndex: 0,
+                      };
+                    });
                   },
-                  // Evento de clique nas fatias do gráfico - CORRIGIDO
-                  onClick: function(evt, elements, chart) {
-                      if (elements.length > 0) {
-                          const elementIndex = elements[0].index;
-                          const formaPagamentoDisplay = this.data.labels[elementIndex];
-                          
-                          // Obter o valor original do mapa
-                          const formaPagamentoOriginal = formasPagamentoOriginais.get(formaPagamentoDisplay);
-                          
-                          if (formaPagamentoOriginal) {
-                              console.log(`Forma de pagamento clicada: ${formaPagamentoDisplay} -> ${formaPagamentoOriginal}`);
-                              
-                              // Redirecionar para a página de formas de pagamento com o filtro aplicado
-                              window.location.href = `/admin/formas-pagamento?forma_pagamento=${encodeURIComponent(formaPagamentoOriginal)}`;
-                          } else {
-                              console.error(`Não foi encontrado o valor original para: ${formaPagamentoDisplay}`);
-                          }
-                      }
+                },
+                onClick: function (evt, legendItem, legend) {
+                  const index = legendItem.index;
+                  const chart = legend.chart;
+                  const meta = chart.getDatasetMeta(legendItem.datasetIndex);
+                  meta.data[index].hidden = !meta.data[index].hidden;
+                  chart.update();
+                },
+              },
+              tooltip: {
+                callbacks: {
+                  label: function (context) {
+                    const label = context.label || '';
+                    const value = context.raw || 0;
+                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                    const percentage = Math.round((value / total) * 100);
+                    return [
+                      `${label}: ${formatMoney(value)} (${percentage}%)`,
+                      'Clique para ver detalhes',
+                    ];
                   },
-                  // Melhorar interatividade visual
-                  interaction: {
-                      mode: 'nearest',
-                      intersect: false
-                  },
-                  // Configurar cursor pointer
-                  onHover: function(evt, elements, chart) {
-                      if (evt.native && evt.native.target) {
-                          evt.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
-                      }
-                  }
+                },
+              },
+            },
+            // Evento de clique nas fatias do gráfico - CORRIGIDO
+            onClick: function (evt, elements, chart) {
+              if (elements.length > 0) {
+                const elementIndex = elements[0].index;
+                const formaPagamentoDisplay = this.data.labels[elementIndex];
+
+                // Obter o valor original do mapa
+                const formaPagamentoOriginal =
+                  formasPagamentoOriginais.get(formaPagamentoDisplay);
+
+                if (formaPagamentoOriginal) {
+                  console.log(
+                    `Forma de pagamento clicada: ${formaPagamentoDisplay} -> ${formaPagamentoOriginal}`
+                  );
+
+                  // Redirecionar para a página de formas de pagamento com o filtro aplicado
+                  window.location.href = `/admin/formas-pagamento?forma_pagamento=${encodeURIComponent(
+                    formaPagamentoOriginal
+                  )}`;
+                } else {
+                  console.error(
+                    `Não foi encontrado o valor original para: ${formaPagamentoDisplay}`
+                  );
+                }
               }
-          });
+            },
+            // Melhorar interatividade visual
+            interaction: {
+              mode: 'nearest',
+              intersect: false,
+            },
+            // Configurar cursor pointer
+            onHover: function (evt, elements, chart) {
+              if (evt.native && evt.native.target) {
+                evt.native.target.style.cursor =
+                  elements.length > 0 ? 'pointer' : 'default';
+              }
+            },
+          },
+        });
       }
 
       // 3. Gráfico Totais por Caixa
@@ -941,16 +974,18 @@ document.addEventListener('DOMContentLoaded', function () {
         caixasChart = new Chart(caixasCtx, {
           type: 'bar',
           data: {
-            labels: vendasDiariasData.vendas_mensais_caixa.map(c => c.data_abertura),
-            datasets: [{
-              label: 'Valor Total',
-              data: vendasDiariasData.vendas_mensais_caixa.map(c =>
-                parseFloat(c.total_vendas.replace(/[^\d,]/g, '').replace(',', '.'))
-              ),
-              backgroundColor: chartColors.blue,
-              borderColor: chartColors.blueBorder,
-              borderWidth: 2
-            }]
+            labels: vendasDiariasData.vendas_mensais_caixa.map((c) => c.data_abertura),
+            datasets: [
+              {
+                label: 'Valor Total',
+                data: vendasDiariasData.vendas_mensais_caixa.map((c) =>
+                  parseFloat(c.total_vendas.replace(/[^\d,]/g, '').replace(',', '.'))
+                ),
+                backgroundColor: chartColors.blue,
+                borderColor: chartColors.blueBorder,
+                borderWidth: 2,
+              },
+            ],
           },
           options: {
             responsive: true,
@@ -960,30 +995,32 @@ document.addEventListener('DOMContentLoaded', function () {
                 callbacks: {
                   label: function (context) {
                     return formatMoney(context.raw);
-                  }
-                }
-              }
+                  },
+                },
+              },
             },
             scales: {
               y: {
                 beginAtZero: true,
                 grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                ticks: { callback: value => formatMoney(value) }
+                ticks: { callback: (value) => formatMoney(value) },
               },
-              x: { grid: { color: 'rgba(255, 255, 255, 0.1)' } }
-            }
-          }
+              x: { grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+            },
+          },
         });
       }
 
       // 4. Gráfico Vendas Diárias
       if (vendasDiariasData?.success) {
-        const vendasDiariasCtx = document.getElementById('vendasDiariasChart').getContext('2d');
-        const labels = vendasDiariasData.dados.map(item => item.data);
-        const vendas = vendasDiariasData.dados.map(item =>
+        const vendasDiariasCtx = document
+          .getElementById('vendasDiariasChart')
+          .getContext('2d');
+        const labels = vendasDiariasData.dados.map((item) => item.data);
+        const vendas = vendasDiariasData.dados.map((item) =>
           parseFloat(item.total_vendas.replace(/[^\d,]/g, '').replace(',', '.'))
         );
-        const despesas = vendasDiariasData.dados.map(item =>
+        const despesas = vendasDiariasData.dados.map((item) =>
           parseFloat(item.total_despesas.replace(/[^\d,]/g, '').replace(',', '.'))
         );
 
@@ -999,7 +1036,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 borderColor: chartColors.greenBorder,
                 borderWidth: 3,
                 tension: 0.4,
-                fill: false
+                fill: false,
               },
               {
                 label: 'Despesas (R$)',
@@ -1008,54 +1045,60 @@ document.addEventListener('DOMContentLoaded', function () {
                 borderColor: chartColors.redBorder,
                 borderWidth: 3,
                 tension: 0.4,
-                fill: false
-              }
-            ]
+                fill: false,
+              },
+            ],
           },
           options: {
             responsive: true,
             plugins: {
               legend: {
                 position: 'top',
-                labels: { color: '#e0e0e0' }
+                labels: { color: '#e0e0e0' },
               },
               tooltip: {
                 callbacks: {
                   label: function (context) {
                     return `${context.dataset.label}: ${formatMoney(context.raw)}`;
-                  }
-                }
-              }
+                  },
+                },
+              },
             },
             scales: {
               y: {
                 beginAtZero: true,
                 grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                ticks: { callback: value => formatMoney(value) }
+                ticks: { callback: (value) => formatMoney(value) },
               },
-              x: { grid: { color: 'rgba(255, 255, 255, 0.1)' } }
-            }
-          }
+              x: { grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+            },
+          },
         });
       }
 
       // 5. Gráfico Produtos com Maior Fluxo
-      const produtosFluxoData = await fetchWithErrorHandling(buildUrl('/admin/dashboard/produtos-maior-fluxo'));
+      const produtosFluxoData = await fetchWithErrorHandling(
+        buildUrl('/admin/dashboard/produtos-maior-fluxo')
+      );
       if (produtosFluxoData.success) {
-        const produtosFluxoCtx = document.getElementById('ProdutosMaiorFluxoChart').getContext('2d');
-        
+        const produtosFluxoCtx = document
+          .getElementById('ProdutosMaiorFluxoChart')
+          .getContext('2d');
+
         const margensLucro = produtosFluxoData.valores_venda.map((venda, index) => {
           const compra = produtosFluxoData.valores_compra[index] || 0;
           return venda - compra;
         });
 
-        const percentuaisMargem = produtosFluxoData.valores_venda.map((venda, index) => {
-          const compra = produtosFluxoData.valores_compra[index] || 0;
-          return compra > 0 ? ((venda - compra) / compra * 100).toFixed(2) : '∞';
-        });
+        const percentuaisMargem = produtosFluxoData.valores_venda.map(
+          (venda, index) => {
+            const compra = produtosFluxoData.valores_compra[index] || 0;
+            return compra > 0 ? (((venda - compra) / compra) * 100).toFixed(2) : '∞';
+          }
+        );
 
         const isMobile = window.innerWidth <= 768;
-        
+
         produtosMaiorFluxoChart = new Chart(produtosFluxoCtx, {
           type: 'bar',
           data: {
@@ -1068,7 +1111,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 borderColor: 'rgb(76, 175, 80)',
                 borderWidth: 1,
                 order: 1,
-                barPercentage: isMobile ? 0.4 : 0.7
+                barPercentage: isMobile ? 0.4 : 0.7,
               },
               {
                 label: 'Valor de Compra (R$)',
@@ -1077,7 +1120,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 borderColor: 'rgb(244, 67, 54)',
                 borderWidth: 1,
                 order: 2,
-                barPercentage: isMobile ? 0.4 : 0.7
+                barPercentage: isMobile ? 0.4 : 0.7,
               },
               {
                 label: 'Margem de Lucro (R$)',
@@ -1086,9 +1129,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 borderColor: 'rgb(33, 150, 243)',
                 borderWidth: 3,
                 type: 'line',
-                order: 0
-              }
-            ]
+                order: 0,
+              },
+            ],
           },
           options: {
             responsive: true,
@@ -1096,7 +1139,7 @@ document.addEventListener('DOMContentLoaded', function () {
             plugins: {
               legend: {
                 position: 'top',
-                labels: { color: '#e0e0e0' }
+                labels: { color: '#e0e0e0' },
               },
               tooltip: {
                 callbacks: {
@@ -1105,31 +1148,32 @@ document.addEventListener('DOMContentLoaded', function () {
                   },
                   afterLabel: function (context) {
                     if (context.dataset.label === 'Margem de Lucro (R$)') {
-                      return `Margem Percentual: ${percentuaisMargem[context.dataIndex]}%`;
+                      return `Margem Percentual: ${
+                        percentuaisMargem[context.dataIndex]
+                      }%`;
                     }
                     return null;
-                  }
-                }
-              }
+                  },
+                },
+              },
             },
             scales: {
               y: {
                 beginAtZero: true,
                 grid: { color: 'rgba(255, 255, 255, 0.1)' },
                 ticks: {
-                  callback: value => formatMoney(value),
-                  color: '#e0e0e0'
-                }
+                  callback: (value) => formatMoney(value),
+                  color: '#e0e0e0',
+                },
               },
               x: {
                 grid: { display: false },
-                ticks: { color: '#e0e0e0' }
-              }
-            }
-          }
+                ticks: { color: '#e0e0e0' },
+              },
+            },
+          },
         });
       }
-
     } catch (error) {
       showFlashMessage('error', 'Erro ao atualizar gráficos');
     }
@@ -1150,15 +1194,21 @@ document.addEventListener('DOMContentLoaded', function () {
       if (movData.success) {
         const movTable = document.querySelector('#movimentacoesTable tbody');
         if (movTable) {
-          movTable.innerHTML = movData.movimentacoes.map(mov => `
+          movTable.innerHTML = movData.movimentacoes
+            .map(
+              (mov) => `
             <tr>
               <td>${mov.data}</td>
-              <td><span class="badge ${mov.tipo === 'Entrada' ? 'badge-success' : 'badge-danger'}">${mov.tipo}</span></td>
+              <td><span class="badge ${
+                mov.tipo === 'Entrada' ? 'badge-success' : 'badge-danger'
+              }">${mov.tipo}</span></td>
               <td>${mov.produto}</td>
               <td>${mov.quantidade}</td>
               <td>${mov.valor}</td>
             </tr>
-          `).join('');
+          `
+            )
+            .join('');
         }
       }
     } catch (error) {
@@ -1231,19 +1281,21 @@ document.addEventListener('DOMContentLoaded', function () {
               `;
 
           // Adiciona click nos cards de estoque somente
-          document.querySelectorAll('.metric-card[data-unidade]').forEach(card => {
+          document.querySelectorAll('.metric-card[data-unidade]').forEach((card) => {
             card.addEventListener('click', () => {
               const unidade = card.getAttribute('data-unidade');
               window.location.href = `/admin/produtos/unidade?unidade=${unidade}`;
             });
           });
-          document.querySelectorAll('.metric-card[data-tipo-financeiro]').forEach(card => {
-            card.addEventListener('click', () => {
-              const tipo = card.getAttribute('data-tipo-financeiro');
-              // Abre em nova guia a página de histórico financeiro passando o tipo
-              window.open(`/admin/financeiro/historico?tipo=${tipo}`, '_blank');
+          document
+            .querySelectorAll('.metric-card[data-tipo-financeiro]')
+            .forEach((card) => {
+              card.addEventListener('click', () => {
+                const tipo = card.getAttribute('data-tipo-financeiro');
+                // Abre em nova guia a página de histórico financeiro passando o tipo
+                window.open(`/admin/financeiro/historico?tipo=${tipo}`, '_blank');
+              });
             });
-          });
         }
       }
     } catch (error) {
@@ -1279,209 +1331,287 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  const toggleHeaders = document.querySelectorAll('.details-table-section .toggle-table-header');
-  toggleHeaders.forEach(header => {
+  const toggleHeaders = document.querySelectorAll(
+    '.details-table-section .toggle-table-header'
+  );
+  toggleHeaders.forEach((header) => {
     header.addEventListener('click', (e) => {
       if (!e.target.closest('button')) {
         toggleDetailsTable(header);
       }
     });
   });
-// ==========================================
-// SISTEMA DE ALTERNÂNCIA DE ABAS (SUBTABS)
-// ==========================================
+  // ==========================================
+  // SISTEMA DE ALTERNÂNCIA DE ABAS (SUBTABS)
+  // ==========================================
 
-function inicializarAbas() {
+  function inicializarAbas() {
     const subtabLinks = document.querySelectorAll('#vendas .subtab-link');
-    
+
     if (subtabLinks.length === 0) return;
-    
-    subtabLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            // Remove a classe 'active' de todos os links
-            subtabLinks.forEach(l => l.classList.remove('active'));
-            
-            // Adiciona a classe 'active' ao link clicado
-            this.classList.add('active');
-            
-            // Obtém o ID do conteúdo a ser exibido
-            const targetId = this.getAttribute('href').substring(1);
-            
-            // Esconde todos os conteúdos das subtabs
-            const allContents = document.querySelectorAll('#vendas .subtab-content');
-            allContents.forEach(content => {
-                content.classList.remove('active');
-                content.style.display = 'none';
-            });
-            
-            // Exibe o conteúdo da aba clicada
-            const targetContent = document.getElementById(targetId);
-            if (targetContent) {
-                targetContent.classList.add('active');
-                targetContent.style.display = 'block';
-            }
+
+    subtabLinks.forEach((link) => {
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+
+        // Remove a classe 'active' de todos os links
+        subtabLinks.forEach((l) => l.classList.remove('active'));
+
+        // Adiciona a classe 'active' ao link clicado
+        this.classList.add('active');
+
+        // Obtém o ID do conteúdo a ser exibido
+        const targetId = this.getAttribute('href').substring(1);
+
+        // Esconde todos os conteúdos das subtabs
+        const allContents = document.querySelectorAll('#vendas .subtab-content');
+        allContents.forEach((content) => {
+          content.classList.remove('active');
+          content.style.display = 'none';
         });
+
+        // Exibe o conteúdo da aba clicada
+        const targetContent = document.getElementById(targetId);
+        if (targetContent) {
+          targetContent.classList.add('active');
+          targetContent.style.display = 'block';
+        }
+      });
     });
-}
+  }
 
-// Inicializa quando o DOM estiver pronto
-if (document.readyState === 'loading') {
+  // Inicializa quando o DOM estiver pronto
+  if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', inicializarAbas);
-} else {
+  } else {
     inicializarAbas();
-}
+  }
 
-setTimeout(inicializarAbas, 500);
+  setTimeout(inicializarAbas, 500);
 
-// ==========================================
-// BUSCAR VENDA E PREENCHER DADOS
-// ==========================================
+  // ==========================================
+  // BUSCAR VENDA E PREENCHER DADOS
+  // ==========================================
 
-function inicializarBusca() {
+  function inicializarBusca() {
     const btnBuscar = document.getElementById('buscarVenda');
-    
+
     if (!btnBuscar) {
-        setTimeout(inicializarBusca, 500);
-        return;
+      setTimeout(inicializarBusca, 500);
+      return;
     }
-    
+
     btnBuscar.addEventListener('click', async () => {
-        const id = document.getElementById('vendaId').value;
-        if (!id) {
-            alert('Informe o ID da venda.');
-            return;
+      const id = document.getElementById('vendaId').value;
+      if (!id) {
+        alert('Informe o ID da venda.');
+        return;
+      }
+
+      try {
+        const resp = await fetch(`/admin/vendas/${id}`);
+        const data = await resp.json();
+
+        if (!data.success) {
+          alert(data.message || 'Erro ao buscar venda.');
+          return;
         }
 
-        try {
-            const resp = await fetch(`/admin/vendas/${id}`);
-            const data = await resp.json();
+        const v = data.data;
 
-            if (!data.success) {
-                alert(data.message || 'Erro ao buscar venda.');
-                return;
-            }
-
-            const v = data.data;
-
-            // Atualiza o card header com informações básicas
-            document.getElementById('vendaDetalhes').innerHTML = `
+        // Atualiza o card header com informações básicas
+        document.getElementById('vendaDetalhes').innerHTML = `
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                     <div>
                         <strong>ID da Venda:</strong> ${v.nota_fiscal.id}
                     </div>
                     <div>
-                        <strong>Data:</strong> ${new Date(v.nota_fiscal.data_emissao).toLocaleDateString('pt-BR')}
+                        <strong>Data:</strong> ${new Date(
+                          v.nota_fiscal.data_emissao
+                        ).toLocaleDateString('pt-BR')}
                     </div>
                     <div>
-                        <strong>Valor Total:</strong> R$ ${v.nota_fiscal.valor_total.toFixed(2)}
+                        <strong>Valor Total:</strong> R$ ${v.nota_fiscal.valor_total.toFixed(
+                          2
+                        )}
                     </div>
                     <div>
-                        <strong>Status:</strong> <span style="color: var(--success-color);">${v.nota_fiscal.status || 'N/A'}</span>
+                        <strong>Status:</strong> <span style="color: var(--success-color);">${
+                          v.nota_fiscal.status || 'N/A'
+                        }</span>
                     </div>
                 </div>
             `;
 
-            // --- Nota Fiscal ---
-            const nf = v.nota_fiscal;
-            document.getElementById('tabelaNota').innerHTML = `
+        // --- Nota Fiscal ---
+        const nf = v.nota_fiscal;
+        document.getElementById('tabelaNota').innerHTML = `
                 <tr><td><strong>ID:</strong></td><td>${nf.id}</td></tr>
-                <tr><td><strong>Data Emissão:</strong></td><td>${new Date(nf.data_emissao).toLocaleString('pt-BR')}</td></tr>
-                <tr><td><strong>Valor Total:</strong></td><td>R$ ${nf.valor_total.toFixed(2)}</td></tr>
-                <tr><td><strong>Desconto:</strong></td><td>R$ ${nf.valor_desconto.toFixed(2)}</td></tr>
-                <tr><td><strong>Valor Recebido:</strong></td><td>R$ ${nf.valor_recebido.toFixed(2)}</td></tr>
-                <tr><td><strong>Troco:</strong></td><td>R$ ${nf.troco.toFixed(2)}</td></tr>
-                <tr><td><strong>Forma de Pagamento:</strong></td><td>${nf.forma_pagamento || '-'}</td></tr>
-                <tr><td><strong>A Prazo:</strong></td><td>${nf.a_prazo ? 'Sim' : 'Não'}</td></tr>
+                <tr><td><strong>Data Emissão:</strong></td><td>${new Date(
+                  nf.data_emissao
+                ).toLocaleString('pt-BR')}</td></tr>
+                <tr><td><strong>Valor Total:</strong></td><td>R$ ${nf.valor_total.toFixed(
+                  2
+                )}</td></tr>
+                <tr><td><strong>Desconto:</strong></td><td>R$ ${nf.valor_desconto.toFixed(
+                  2
+                )}</td></tr>
+                <tr><td><strong>Valor Recebido:</strong></td><td>R$ ${nf.valor_recebido.toFixed(
+                  2
+                )}</td></tr>
+                <tr><td><strong>Troco:</strong></td><td>R$ ${nf.troco.toFixed(
+                  2
+                )}</td></tr>
+                <tr><td><strong>Forma de Pagamento:</strong></td><td>${
+                  nf.forma_pagamento || '-'
+                }</td></tr>
+                <tr><td><strong>A Prazo:</strong></td><td>${
+                  nf.a_prazo ? 'Sim' : 'Não'
+                }</td></tr>
                 <tr><td><strong>Status:</strong></td><td>${nf.status || '-'}</td></tr>
-                <tr><td><strong>Observação:</strong></td><td>${nf.observacao || '-'}</td></tr>
+                <tr><td><strong>Observação:</strong></td><td>${
+                  nf.observacao || '-'
+                }</td></tr>
             `;
 
-            // --- Cliente ---
-            const c = v.cliente;
-            document.getElementById('tabelaCliente').innerHTML = c ? `
+        // --- Cliente ---
+        const c = v.cliente;
+        document.getElementById('tabelaCliente').innerHTML = c
+          ? `
                 <tr><td><strong>ID:</strong></td><td>${c.id}</td></tr>
                 <tr><td><strong>Nome:</strong></td><td>${c.nome}</td></tr>
                 <tr><td><strong>CPF/CNPJ:</strong></td><td>${c.cpf_cnpj}</td></tr>
-                <tr><td><strong>Telefone:</strong></td><td>${c.telefone || '-'}</td></tr>
+                <tr><td><strong>Telefone:</strong></td><td>${
+                  c.telefone || '-'
+                }</td></tr>
                 <tr><td><strong>Email:</strong></td><td>${c.email || '-'}</td></tr>
-            ` : '<tr><td colspan="2">Cliente não informado.</td></tr>';
+            `
+          : '<tr><td colspan="2">Cliente não informado.</td></tr>';
 
-            // --- Itens ---
-            if (v.itens && v.itens.length > 0) {
-                const itensHTML = v.itens.map((item, index) => `
-                    <tr><td colspan="2" style="background: var(--bg-tertiary); padding: 12px; font-weight: bold; text-align: center;">Item ${index + 1}</td></tr>
-                    <tr><td><strong>Produto:</strong></td><td>${item.produto_nome || 'N/A'}</td></tr>
-                    <tr><td><strong>Quantidade:</strong></td><td>${item.quantidade}</td></tr>
-                    <tr><td><strong>Valor Unitário:</strong></td><td>R$ ${item.valor_unitario.toFixed(2)}</td></tr>
-                    <tr><td><strong>Desconto:</strong></td><td>${item.desconto_aplicado ? 'R$ ' + item.desconto_aplicado.toFixed(2) : '-'}</td></tr>
-                    <tr><td><strong>Valor Total:</strong></td><td>R$ ${item.valor_total.toFixed(2)}</td></tr>
-                `).join('');
-                document.getElementById('tabelaItens').innerHTML = itensHTML;
-            } else {
-                document.getElementById('tabelaItens').innerHTML = '<tr><td colspan="2">Nenhum item encontrado.</td></tr>';
-            }
-
-            // --- Pagamentos ---
-            if (v.pagamentos && v.pagamentos.length > 0) {
-                const pagHTML = v.pagamentos.map((pag, index) => `
-                    <tr><td colspan="2" style="background: var(--bg-tertiary); padding: 12px; font-weight: bold; text-align: center;">Pagamento ${index + 1}</td></tr>
-                    <tr><td><strong>Forma de Pagamento:</strong></td><td>${pag.forma_pagamento}</td></tr>
-                    <tr><td><strong>Valor:</strong></td><td>R$ ${pag.valor.toFixed(2)}</td></tr>
-                    <tr><td><strong>Data:</strong></td><td>${new Date(pag.data).toLocaleString('pt-BR')}</td></tr>
-                `).join('');
-                document.getElementById('tabelaPagamentos').innerHTML = pagHTML;
-            } else {
-                document.getElementById('tabelaPagamentos').innerHTML = '<tr><td colspan="2">Nenhum pagamento registrado.</td></tr>';
-            }
-
-            // --- Entrega ---
-            const e = v.entrega;
-            document.getElementById('tabelaEntrega').innerHTML = e ? `
-                <tr><td><strong>Endereço:</strong></td><td>${e.logradouro}, ${e.numero}</td></tr>
-                <tr><td><strong>Complemento:</strong></td><td>${e.complemento || '-'}</td></tr>
-                <tr><td><strong>Bairro:</strong></td><td>${e.bairro}</td></tr>
-                <tr><td><strong>Cidade/UF:</strong></td><td>${e.cidade} - ${e.estado}</td></tr>
-                <tr><td><strong>CEP:</strong></td><td>${e.cep}</td></tr>
-                <tr><td><strong>Instruções:</strong></td><td>${e.instrucoes || '-'}</td></tr>
-            ` : '<tr><td colspan="2">Nenhum dado de entrega.</td></tr>';
-
-            // --- Conta a Receber ---
-            const cr = v.conta_receber;
-            document.getElementById('tabelaConta').innerHTML = cr ? `
-                <tr><td><strong>ID:</strong></td><td>${cr.id}</td></tr>
-                <tr><td><strong>Valor Original:</strong></td><td>R$ ${cr.valor_original.toFixed(2)}</td></tr>
-                <tr><td><strong>Valor em Aberto:</strong></td><td>R$ ${cr.valor_aberto.toFixed(2)}</td></tr>
-                <tr><td><strong>Vencimento:</strong></td><td>${new Date(cr.data_vencimento).toLocaleDateString('pt-BR')}</td></tr>
-                <tr><td><strong>Status:</strong></td><td>${cr.status}</td></tr>
-            ` : '<tr><td colspan="2">Nenhuma conta a receber associada.</td></tr>';
-
-            // Volta para a primeira aba após carregar os dados
-            const primeiraAba = document.querySelector('#vendas .subtab-link');
-            if (primeiraAba) {
-                primeiraAba.click();
-            }
-
-        } catch (error) {
-            console.error('Erro ao buscar venda:', error);
-            alert('Erro ao buscar venda. Verifique o console para mais detalhes.');
+        // --- Itens ---
+        if (v.itens && v.itens.length > 0) {
+          const itensHTML = v.itens
+            .map(
+              (item, index) => `
+                    <tr><td colspan="2" style="background: var(--bg-tertiary); padding: 12px; font-weight: bold; text-align: center;">Item ${
+                      index + 1
+                    }</td></tr>
+                    <tr><td><strong>Produto:</strong></td><td>${
+                      item.produto_nome || 'N/A'
+                    }</td></tr>
+                    <tr><td><strong>Quantidade:</strong></td><td>${
+                      item.quantidade
+                    }</td></tr>
+                    <tr><td><strong>Valor Unitário:</strong></td><td>R$ ${item.valor_unitario.toFixed(
+                      2
+                    )}</td></tr>
+                    <tr><td><strong>Desconto:</strong></td><td>${
+                      item.desconto_aplicado
+                        ? 'R$ ' + item.desconto_aplicado.toFixed(2)
+                        : '-'
+                    }</td></tr>
+                    <tr><td><strong>Valor Total:</strong></td><td>R$ ${item.valor_total.toFixed(
+                      2
+                    )}</td></tr>
+                `
+            )
+            .join('');
+          document.getElementById('tabelaItens').innerHTML = itensHTML;
+        } else {
+          document.getElementById('tabelaItens').innerHTML =
+            '<tr><td colspan="2">Nenhum item encontrado.</td></tr>';
         }
+
+        // --- Pagamentos ---
+        if (v.pagamentos && v.pagamentos.length > 0) {
+          const pagHTML = v.pagamentos
+            .map(
+              (pag, index) => `
+                    <tr><td colspan="2" style="background: var(--bg-tertiary); padding: 12px; font-weight: bold; text-align: center;">Pagamento ${
+                      index + 1
+                    }</td></tr>
+                    <tr><td><strong>Forma de Pagamento:</strong></td><td>${
+                      pag.forma_pagamento
+                    }</td></tr>
+                    <tr><td><strong>Valor:</strong></td><td>R$ ${pag.valor.toFixed(
+                      2
+                    )}</td></tr>
+                    <tr><td><strong>Data:</strong></td><td>${new Date(
+                      pag.data
+                    ).toLocaleString('pt-BR')}</td></tr>
+                `
+            )
+            .join('');
+          document.getElementById('tabelaPagamentos').innerHTML = pagHTML;
+        } else {
+          document.getElementById('tabelaPagamentos').innerHTML =
+            '<tr><td colspan="2">Nenhum pagamento registrado.</td></tr>';
+        }
+
+        // --- Entrega ---
+        const e = v.entrega;
+        document.getElementById('tabelaEntrega').innerHTML = e
+          ? `
+                <tr><td><strong>Endereço:</strong></td><td>${e.logradouro}, ${
+              e.numero
+            }</td></tr>
+                <tr><td><strong>Complemento:</strong></td><td>${
+                  e.complemento || '-'
+                }</td></tr>
+                <tr><td><strong>Bairro:</strong></td><td>${e.bairro}</td></tr>
+                <tr><td><strong>Cidade/UF:</strong></td><td>${e.cidade} - ${
+              e.estado
+            }</td></tr>
+                <tr><td><strong>CEP:</strong></td><td>${e.cep}</td></tr>
+                <tr><td><strong>Instruções:</strong></td><td>${
+                  e.instrucoes || '-'
+                }</td></tr>
+            `
+          : '<tr><td colspan="2">Nenhum dado de entrega.</td></tr>';
+
+        // --- Conta a Receber ---
+        const cr = v.conta_receber;
+        document.getElementById('tabelaConta').innerHTML = cr
+          ? `
+                <tr><td><strong>ID:</strong></td><td>${cr.id}</td></tr>
+                <tr><td><strong>Valor Original:</strong></td><td>R$ ${cr.valor_original.toFixed(
+                  2
+                )}</td></tr>
+                <tr><td><strong>Valor em Aberto:</strong></td><td>R$ ${cr.valor_aberto.toFixed(
+                  2
+                )}</td></tr>
+                <tr><td><strong>Vencimento:</strong></td><td>${new Date(
+                  cr.data_vencimento
+                ).toLocaleDateString('pt-BR')}</td></tr>
+                <tr><td><strong>Status:</strong></td><td>${cr.status}</td></tr>
+            `
+          : '<tr><td colspan="2">Nenhuma conta a receber associada.</td></tr>';
+
+        // Volta para a primeira aba após carregar os dados
+        const primeiraAba = document.querySelector('#vendas .subtab-link');
+        if (primeiraAba) {
+          primeiraAba.click();
+        }
+      } catch (error) {
+        console.error('Erro ao buscar venda:', error);
+        alert('Erro ao buscar venda. Verifique o console para mais detalhes.');
+      }
     });
-}
+  }
 
-// Inicializa a busca
-if (document.readyState === 'loading') {
+  // Inicializa a busca
+  if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', inicializarBusca);
-} else {
+  } else {
     inicializarBusca();
-}
+  }
 
-setTimeout(inicializarBusca, 500);
+  setTimeout(inicializarBusca, 500);
   // ===== CLIENTES =====
   async function loadClientesData() {
     try {
-      const searchText = document.getElementById('searchCliente')?.value.toLowerCase() || '';
+      const searchText =
+        document.getElementById('searchCliente')?.value.toLowerCase() || '';
       const data = await fetchWithErrorHandling('/admin/clientes');
 
       if (data.success) {
@@ -1489,10 +1619,11 @@ setTimeout(inicializarBusca, 500);
         if (clientesTable) {
           clientesTable.innerHTML = '';
 
-          data.clientes.forEach(cliente => {
+          data.clientes.forEach((cliente) => {
             if (searchText && !cliente.nome.toLowerCase().includes(searchText)) return;
 
-            const status = cliente.ativo === 'Ativo' || cliente.ativo === true ? 'Ativo' : 'Inativo';
+            const status =
+              cliente.ativo === 'Ativo' || cliente.ativo === true ? 'Ativo' : 'Inativo';
 
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -1501,16 +1632,24 @@ setTimeout(inicializarBusca, 500);
               <td>${cliente.documento || ''}</td>
               <td>${cliente.telefone || ''}</td>
               <td>${cliente.email || ''}</td>
-              <td><span class="badge ${status === 'Ativo' ? 'badge-success' : 'badge-danger'}">${status}</span></td>
+              <td><span class="badge ${
+                status === 'Ativo' ? 'badge-success' : 'badge-danger'
+              }">${status}</span></td>
               <td>
                 <div class="table-actions">
-                  <button class="btn-icon btn-info detalhes-cliente" data-id="${cliente.id}" title="Detalhes">
+                  <button class="btn-icon btn-info detalhes-cliente" data-id="${
+                    cliente.id
+                  }" title="Detalhes">
                     <i class="fas fa-eye"></i>
                   </button>
-                  <button class="btn-icon btn-warning editar-cliente" data-id="${cliente.id}" title="Editar">
+                  <button class="btn-icon btn-warning editar-cliente" data-id="${
+                    cliente.id
+                  }" title="Editar">
                     <i class="fas fa-edit"></i>
                   </button>
-                  <button class="btn-icon btn-danger remover-cliente" data-id="${cliente.id}" title="Remover">
+                  <button class="btn-icon btn-danger remover-cliente" data-id="${
+                    cliente.id
+                  }" title="Remover">
                     <i class="fas fa-trash"></i>
                   </button>
                 </div>
@@ -1527,19 +1666,21 @@ setTimeout(inicializarBusca, 500);
     }
   }
   async function openDetalhesClienteModal(clienteId) {
-      const content = document.getElementById('detalhesClienteContent');
-      if (content) content.innerHTML = '<p class="loading-text">Carregando dados...</p>';
+    const content = document.getElementById('detalhesClienteContent');
+    if (content) content.innerHTML = '<p class="loading-text">Carregando dados...</p>';
 
-      try {
-          const response = await fetchWithErrorHandling(`/admin/clientes/${clienteId}/detalhes`);
-          if (!response.success) {
-              showFlashMessage('error', response.message || 'Erro ao carregar detalhes');
-              return;
-          }
+    try {
+      const response = await fetchWithErrorHandling(
+        `/admin/clientes/${clienteId}/detalhes`
+      );
+      if (!response.success) {
+        showFlashMessage('error', response.message || 'Erro ao carregar detalhes');
+        return;
+      }
 
-          const c = response.cliente;
+      const c = response.cliente;
 
-          let html = `
+      let html = `
               <div class="details-main-info">
                   <h3 class="section-title">Informações do Cliente</h3>
                   <div class="details-grid">
@@ -1569,7 +1710,9 @@ setTimeout(inicializarBusca, 500);
                       </div>
                       <div class="detail-item">
                           <label>Valor Total:</label>
-                          <div class="value monetary">${response.valor_total_compras_formatado}</div>
+                          <div class="value monetary">${
+                            response.valor_total_compras_formatado
+                          }</div>
                       </div>
                   </div>
               </div>
@@ -1579,7 +1722,9 @@ setTimeout(inicializarBusca, 500);
                   <div class="details-grid">
                       <div class="detail-item">
                           <label>Dívida Total:</label>
-                          <div class="value monetary">${response.dividas.valor_total_divida_formatado}</div>
+                          <div class="value monetary">${
+                            response.dividas.valor_total_divida_formatado
+                          }</div>
                       </div>
                       <div class="detail-item">
                           <label>Total em Aberto:</label>
@@ -1598,7 +1743,9 @@ setTimeout(inicializarBusca, 500);
 
               <div class="collapsible-section">
                   <button class="collapsible btn btn-outline">
-                      <i class="fas fa-shopping-bag"></i> Últimas compras (${response.produtos_comprados.length})
+                      <i class="fas fa-shopping-bag"></i> Últimas compras (${
+                        response.produtos_comprados.length
+                      })
                       <i class="fas fa-chevron-down toggle-icon"></i>
                   </button>
                   <div class="collapsible-content" style="display:none;">
@@ -1610,7 +1757,9 @@ setTimeout(inicializarBusca, 500);
                                   </tr>
                               </thead>
                               <tbody>
-                                  ${response.produtos_comprados.map(p => `
+                                  ${response.produtos_comprados
+                                    .map(
+                                      (p) => `
                                       <tr>
                                           <td>${p.nome}</td>
                                           <td>${p.quantidade_formatada}</td>
@@ -1619,7 +1768,9 @@ setTimeout(inicializarBusca, 500);
                                           <td class="monetary">${p.valor_total_formatado}</td>
                                           <td>${p.data_compra_br}</td>
                                       </tr>
-                                  `).join('')}
+                                  `
+                                    )
+                                    .join('')}
                               </tbody>
                           </table>
                       </div>
@@ -1628,7 +1779,9 @@ setTimeout(inicializarBusca, 500);
 
               <div class="collapsible-section">
                   <button class="collapsible btn btn-outline">
-                      <i class="fas fa-trophy"></i> Top Produtos Mais Comprados (${response.produtos_mais_comprados.length})
+                      <i class="fas fa-trophy"></i> Top Produtos Mais Comprados (${
+                        response.produtos_mais_comprados.length
+                      })
                       <i class="fas fa-chevron-down toggle-icon"></i>
                   </button>
                   <div class="collapsible-content" style="display:none;">
@@ -1640,14 +1793,18 @@ setTimeout(inicializarBusca, 500);
                                   </tr>
                               </thead>
                               <tbody>
-                                  ${response.produtos_mais_comprados.map(p => `
+                                  ${response.produtos_mais_comprados
+                                    .map(
+                                      (p) => `
                                       <tr>
                                           <td>${p.nome}</td>
                                           <td>${p.quantidade_total_formatada}</td>
                                           <td>${p.unidade}</td>
                                           <td>${p.vezes_comprado}x</td>
                                       </tr>
-                                  `).join('')}
+                                  `
+                                    )
+                                    .join('')}
                               </tbody>
                           </table>
                       </div>
@@ -1656,11 +1813,15 @@ setTimeout(inicializarBusca, 500);
 
               <div class="collapsible-section">
                   <button class="collapsible btn btn-outline">
-                      <i class="fas fa-clock"></i> Contas em Aberto (${response.contas_abertas.length})
+                      <i class="fas fa-clock"></i> Contas em Aberto (${
+                        response.contas_abertas.length
+                      })
                       <i class="fas fa-chevron-down toggle-icon"></i>
                   </button>
                   <div class="collapsible-content" style="display:none;">
-                      ${response.contas_abertas.length ? `
+                      ${
+                        response.contas_abertas.length
+                          ? `
                           <div class="details-table-container">
                               <table class="table compact-table contas-abertas-table">
                                   <thead>
@@ -1669,27 +1830,37 @@ setTimeout(inicializarBusca, 500);
                                       </tr>
                                   </thead>
                                   <tbody>
-                                      ${response.contas_abertas.map(ca => `
+                                      ${response.contas_abertas
+                                        .map(
+                                          (ca) => `
                                           <tr class="clickable-row" data-conta-id="${ca.id}" title="Clique para ver detalhes da conta">
                                               <td>${ca.descricao}</td>
                                               <td>${ca.data_vencimento_br}</td>
                                               <td class="monetary">${ca.valor_aberto_formatado}</td>
                                           </tr>
-                                      `).join('')}
+                                      `
+                                        )
+                                        .join('')}
                                   </tbody>
                               </table>
                           </div>
-                      ` : '<p class="no-data-message">Nenhuma conta em aberto</p>'}
+                      `
+                          : '<p class="no-data-message">Nenhuma conta em aberto</p>'
+                      }
                   </div>
               </div>
 
               <div class="collapsible-section">
                   <button class="collapsible btn btn-outline">
-                      <i class="fas fa-check-circle"></i> Contas Quitadas (${response.contas_quitadas.length})
+                      <i class="fas fa-check-circle"></i> Contas Quitadas (${
+                        response.contas_quitadas.length
+                      })
                       <i class="fas fa-chevron-down toggle-icon"></i>
                   </button>
                   <div class="collapsible-content" style="display:none;">
-                      ${response.contas_quitadas.length ? `
+                      ${
+                        response.contas_quitadas.length
+                          ? `
                           <div class="details-table-container">
                               <table class="table compact-table contas-quitadas-table">
                                   <thead>
@@ -1698,108 +1869,113 @@ setTimeout(inicializarBusca, 500);
                                       </tr>
                                   </thead>
                                   <tbody>
-                                      ${response.contas_quitadas.map(cq => `
+                                      ${response.contas_quitadas
+                                        .map(
+                                          (cq) => `
                                           <tr class="clickable-row" data-conta-id="${cq.id}" title="Clique para ver detalhes da conta">
                                               <td>${cq.descricao}</td>
                                               <td>${cq.data_emissao_br}</td>
                                               <td class="monetary">${cq.valor_original_formatado}</td>
                                           </tr>
-                                      `).join('')}
+                                      `
+                                        )
+                                        .join('')}
                                   </tbody>
                               </table>
                           </div>
-                      ` : '<p class="no-data-message">Nenhuma conta quitada</p>'}
+                      `
+                          : '<p class="no-data-message">Nenhuma conta quitada</p>'
+                      }
                   </div>
               </div>
           `;
-          
-          content.innerHTML = html;
 
-          // Ativar colapsáveis
-          document.querySelectorAll('.collapsible').forEach(btn => {
-              btn.addEventListener('click', function () {
-                  this.classList.toggle('active');
-                  const contentDiv = this.nextElementSibling;
-                  const toggleIcon = this.querySelector('.toggle-icon');
+      content.innerHTML = html;
 
-                  if (contentDiv.style.display === 'block') {
-                      contentDiv.style.display = 'none';
-                      toggleIcon.classList.remove('rotated');
-                  } else {
-                      contentDiv.style.display = 'block';
-                      toggleIcon.classList.add('rotated');
-                      
-                      // Adicionar event listeners para as linhas clicáveis após expandir
-                      setTimeout(() => {
-                          addClickableRowListeners(contentDiv);
-                      }, 100);
-                  }
-              });
-          });
+      // Ativar colapsáveis
+      document.querySelectorAll('.collapsible').forEach((btn) => {
+        btn.addEventListener('click', function () {
+          this.classList.toggle('active');
+          const contentDiv = this.nextElementSibling;
+          const toggleIcon = this.querySelector('.toggle-icon');
 
-          // Adicionar event listeners para as linhas clicáveis que já estão visíveis
-          setTimeout(() => {
-              // Verificar se alguma seção está expandida por padrão e adicionar listeners
-              document.querySelectorAll('.collapsible-content').forEach(contentDiv => {
-                  if (contentDiv.style.display === 'block') {
-                      addClickableRowListeners(contentDiv);
-                  }
-              });
-              
-              // Adicionar estilos CSS para as linhas clicáveis
-              addClickableRowStyles();
-          }, 100);
+          if (contentDiv.style.display === 'block') {
+            contentDiv.style.display = 'none';
+            toggleIcon.classList.remove('rotated');
+          } else {
+            contentDiv.style.display = 'block';
+            toggleIcon.classList.add('rotated');
 
-          openModal('detalhesClienteModal');
+            // Adicionar event listeners para as linhas clicáveis após expandir
+            setTimeout(() => {
+              addClickableRowListeners(contentDiv);
+            }, 100);
+          }
+        });
+      });
 
-      } catch (err) {
-          showFlashMessage('error', 'Erro ao carregar detalhes do cliente');
-      }
+      // Adicionar event listeners para as linhas clicáveis que já estão visíveis
+      setTimeout(() => {
+        // Verificar se alguma seção está expandida por padrão e adicionar listeners
+        document.querySelectorAll('.collapsible-content').forEach((contentDiv) => {
+          if (contentDiv.style.display === 'block') {
+            addClickableRowListeners(contentDiv);
+          }
+        });
+
+        // Adicionar estilos CSS para as linhas clicáveis
+        addClickableRowStyles();
+      }, 100);
+
+      openModal('detalhesClienteModal');
+    } catch (err) {
+      showFlashMessage('error', 'Erro ao carregar detalhes do cliente');
+    }
   }
 
   // Função para adicionar listeners às linhas clicáveis
   function addClickableRowListeners(container) {
-      const rows = container.querySelectorAll('.clickable-row');
-      rows.forEach(row => {
-          // Remover event listeners existentes para evitar duplicação
-          const newRow = row.cloneNode(true);
-          row.parentNode.replaceChild(newRow, row);
-          
-          // Adicionar novos listeners
-          newRow.style.cursor = 'pointer';
-          newRow.addEventListener('click', function(e) {
-              e.stopPropagation(); // Prevenir que o clique propague para outros elementos
-              const contaId = this.dataset.contaId;
-              if (contaId) {
-                  openDetalhesContaModal(contaId);
-              }
-          });
-          
-          // Efeitos de hover
-          newRow.addEventListener('mouseenter', function() {
-              this.style.backgroundColor = '#f0f8ff';
-              this.style.transition = 'background-color 0.2s ease';
-          });
-          
-          newRow.addEventListener('mouseleave', function() {
-              this.style.backgroundColor = '';
-          });
-          
-          // Indicador visual de que é clicável
-          newRow.title = newRow.title || 'Clique para ver detalhes da conta';
+    const rows = container.querySelectorAll('.clickable-row');
+    rows.forEach((row) => {
+      // Remover event listeners existentes para evitar duplicação
+      const newRow = row.cloneNode(true);
+      row.parentNode.replaceChild(newRow, row);
+
+      // Adicionar novos listeners
+      newRow.style.cursor = 'pointer';
+      newRow.addEventListener('click', function (e) {
+        e.stopPropagation(); // Prevenir que o clique propague para outros elementos
+        const contaId = this.dataset.contaId;
+        if (contaId) {
+          openDetalhesContaModal(contaId);
+        }
       });
+
+      // Efeitos de hover
+      newRow.addEventListener('mouseenter', function () {
+        this.style.backgroundColor = '#f0f8ff';
+        this.style.transition = 'background-color 0.2s ease';
+      });
+
+      newRow.addEventListener('mouseleave', function () {
+        this.style.backgroundColor = '';
+      });
+
+      // Indicador visual de que é clicável
+      newRow.title = newRow.title || 'Clique para ver detalhes da conta';
+    });
   }
 
   // Função para adicionar estilos CSS para as linhas clicáveis
   function addClickableRowStyles() {
-      // Verificar se os estilos já foram adicionados
-      if (document.getElementById('clickable-rows-styles')) {
-          return;
-      }
-      
-      const style = document.createElement('style');
-      style.id = 'clickable-rows-styles';
-      style.textContent = `
+    // Verificar se os estilos já foram adicionados
+    if (document.getElementById('clickable-rows-styles')) {
+      return;
+    }
+
+    const style = document.createElement('style');
+    style.id = 'clickable-rows-styles';
+    style.textContent = `
           .clickable-row {
               transition: background-color 0.2s ease, transform 0.1s ease;
           }
@@ -1821,36 +1997,41 @@ setTimeout(inicializarBusca, 500);
               border-color: #ccffcc;
           }
       `;
-      document.head.appendChild(style);
+    document.head.appendChild(style);
   }
 
   // Nova função para abrir detalhes da conta (você precisará implementar esta rota também)
   async function openDetalhesContaModal(contaId) {
-      try {
-          const response = await fetchWithErrorHandling(`/admin/cliente/contas/${contaId}/detalhes`);
-          if (!response.success) {
-              showFlashMessage('error', response.message || 'Erro ao carregar detalhes da conta');
-              return;
-          }
+    try {
+      const response = await fetchWithErrorHandling(
+        `/admin/cliente/contas/${contaId}/detalhes`
+      );
+      if (!response.success) {
+        showFlashMessage(
+          'error',
+          response.message || 'Erro ao carregar detalhes da conta'
+        );
+        return;
+      }
 
-          const conta = response.conta;
-          const produtos = response.produtos || [];
-          const pagamentos = response.pagamentos || [];
+      const conta = response.conta;
+      const produtos = response.produtos || [];
+      const pagamentos = response.pagamentos || [];
 
-          // Criar o overlay e o popup
-          const popupId = 'contaDetalhesPopup';
-          
-          // Remover popup anterior se existir
-          const existingPopup = document.getElementById(popupId);
-          if (existingPopup) {
-              existingPopup.remove();
-          }
+      // Criar o overlay e o popup
+      const popupId = 'contaDetalhesPopup';
 
-          // Criar overlay
-          const overlay = document.createElement('div');
-          overlay.id = 'contaDetalhesOverlay';
-          overlay.className = 'popup-overlay';
-          overlay.style.cssText = `
+      // Remover popup anterior se existir
+      const existingPopup = document.getElementById(popupId);
+      if (existingPopup) {
+        existingPopup.remove();
+      }
+
+      // Criar overlay
+      const overlay = document.createElement('div');
+      overlay.id = 'contaDetalhesOverlay';
+      overlay.className = 'popup-overlay';
+      overlay.style.cssText = `
               position: fixed;
               top: 0;
               left: 0;
@@ -1864,11 +2045,11 @@ setTimeout(inicializarBusca, 500);
               animation: fadeIn 0.3s ease;
           `;
 
-          // Criar popup
-          const popup = document.createElement('div');
-          popup.id = popupId;
-          popup.className = 'conta-detalhes-popup';
-          popup.style.cssText = `
+      // Criar popup
+      const popup = document.createElement('div');
+      popup.id = popupId;
+      popup.className = 'conta-detalhes-popup';
+      popup.style.cssText = `
               background: var(--bg-secondary);
               border-radius: var(--border-radius);
               box-shadow: var(--shadow-lg);
@@ -1881,8 +2062,8 @@ setTimeout(inicializarBusca, 500);
               border: 1px solid var(--border-color);
           `;
 
-          // Criar conteúdo do popup
-          let html = `
+      // Criar conteúdo do popup
+      let html = `
               <style>
                   @keyframes fadeIn {
                       from { opacity: 0; }
@@ -2199,7 +2380,9 @@ setTimeout(inicializarBusca, 500);
               </style>
               
               <div class="popup-header">
-                  <h2><i class="fas fa-file-invoice-dollar"></i> Detalhes da Conta #${conta.id}</h2>
+                  <h2><i class="fas fa-file-invoice-dollar"></i> Detalhes da Conta #${
+                    conta.id
+                  }</h2>
                   <button class="popup-close-btn" id="closePopupBtn">
                       <i class="fas fa-times"></i>
                   </button>
@@ -2215,39 +2398,59 @@ setTimeout(inicializarBusca, 500);
                               <span class="popup-detail-label">Status:</span>
                               <div class="popup-detail-value">
                                   <span class="status-badge status-${conta.status}">
-                                      ${conta.status === 'pendente' ? 'Pendente' : conta.status === 'parcial' ? 'Parcial' : 'Quitado'}
+                                      ${
+                                        conta.status === 'pendente'
+                                          ? 'Pendente'
+                                          : conta.status === 'parcial'
+                                          ? 'Parcial'
+                                          : 'Quitado'
+                                      }
                                   </span>
                               </div>
                           </div>
                           <div class="popup-detail-item">
                               <span class="popup-detail-label">Cliente:</span>
-                              <div class="popup-detail-value">${conta.cliente_nome || 'N/A'}</div>
+                              <div class="popup-detail-value">${
+                                conta.cliente_nome || 'N/A'
+                              }</div>
                           </div>
                           <div class="popup-detail-item">
                               <span class="popup-detail-label">Descrição:</span>
-                              <div class="popup-detail-value">${conta.descricao || '-'}</div>
+                              <div class="popup-detail-value">${
+                                conta.descricao || '-'
+                              }</div>
                           </div>
                           <div class="popup-detail-item">
                               <span class="popup-detail-label">Emissão:</span>
-                              <div class="popup-detail-value">${conta.data_emissao_br || '-'}</div>
+                              <div class="popup-detail-value">${
+                                conta.data_emissao_br || '-'
+                              }</div>
                           </div>
                           <div class="popup-detail-item">
                               <span class="popup-detail-label">Vencimento:</span>
-                              <div class="popup-detail-value">${conta.data_vencimento_br || '-'}</div>
+                              <div class="popup-detail-value">${
+                                conta.data_vencimento_br || '-'
+                              }</div>
                           </div>
-                          ${conta.data_pagamento_br ? `
+                          ${
+                            conta.data_pagamento_br
+                              ? `
                               <div class="popup-detail-item">
                                   <span class="popup-detail-label">Pagamento:</span>
                                   <div class="popup-detail-value">${conta.data_pagamento_br}</div>
                               </div>
-                          ` : ''}
+                          `
+                              : ''
+                          }
                       </div>
                       
                       <div class="popup-financial-summary">
                           <div class="popup-grid">
                               <div class="popup-detail-item">
                                   <span class="popup-detail-label">Valor Original:</span>
-                                  <div class="popup-detail-value highlight">${conta.valor_original_formatado}</div>
+                                  <div class="popup-detail-value highlight">${
+                                    conta.valor_original_formatado
+                                  }</div>
                               </div>
                               <div class="popup-detail-item">
                                   <span class="popup-detail-label">Valor Pago:</span>
@@ -2264,22 +2467,31 @@ setTimeout(inicializarBusca, 500);
                           </div>
                       </div>
                       
-                      ${conta.observacoes ? `
+                      ${
+                        conta.observacoes
+                          ? `
                           <div class="popup-detail-item full-width" style="margin-top: var(--space-md);">
                               <span class="popup-detail-label">Observações:</span>
                               <div class="popup-detail-value popup-notes-box">${conta.observacoes}</div>
                           </div>
-                      ` : ''}
+                      `
+                          : ''
+                      }
                   </div>
           `;
 
-          // Seção de Produtos (se houver)
-          if (produtos.length > 0) {
-              const totalProdutos = produtos.reduce((sum, p) => sum + (p.valor_total || 0), 0);
-              html += `
+      // Seção de Produtos (se houver)
+      if (produtos.length > 0) {
+        const totalProdutos = produtos.reduce(
+          (sum, p) => sum + (p.valor_total || 0),
+          0
+        );
+        html += `
                   <div class="popup-section">
                       <button class="popup-collapsible active" data-target="produtos-section">
-                          <span><i class="fas fa-boxes"></i> Produtos (${produtos.length})</span>
+                          <span><i class="fas fa-boxes"></i> Produtos (${
+                            produtos.length
+                          })</span>
                           <i class="fas fa-chevron-down popup-collapsible-icon rotated"></i>
                       </button>
                       <div class="popup-collapsible-content" id="produtos-section" style="display: block;">
@@ -2295,15 +2507,27 @@ setTimeout(inicializarBusca, 500);
                                       </tr>
                                   </thead>
                                   <tbody>
-                                      ${produtos.map(p => `
+                                      ${produtos
+                                        .map(
+                                          (p) => `
                                           <tr>
-                                              <td><strong>${p.nome || 'N/A'}</strong></td>
+                                              <td><strong>${
+                                                p.nome || 'N/A'
+                                              }</strong></td>
                                               <td>${p.quantidade_formatada || '0'}</td>
-                                              <td><span class="payment-method-badge">${p.unidade || 'un'}</span></td>
-                                              <td class="monetary">${p.valor_unitario_formatado || 'R$ 0,00'}</td>
-                                              <td class="monetary"><strong>${p.valor_total_formatado || 'R$ 0,00'}</strong></td>
+                                              <td><span class="payment-method-badge">${
+                                                p.unidade || 'un'
+                                              }</span></td>
+                                              <td class="monetary">${
+                                                p.valor_unitario_formatado || 'R$ 0,00'
+                                              }</td>
+                                              <td class="monetary"><strong>${
+                                                p.valor_total_formatado || 'R$ 0,00'
+                                              }</strong></td>
                                           </tr>
-                                      `).join('')}
+                                      `
+                                        )
+                                        .join('')}
                                   </tbody>
                                   <tfoot>
                                       <tr>
@@ -2320,8 +2544,8 @@ setTimeout(inicializarBusca, 500);
                       </div>
                   </div>
               `;
-          } else {
-              html += `
+      } else {
+        html += `
                   <div class="popup-section">
                       <h3 class="popup-section-title">
                           <i class="fas fa-boxes"></i> Produtos
@@ -2332,15 +2556,17 @@ setTimeout(inicializarBusca, 500);
                       </div>
                   </div>
               `;
-          }
+      }
 
-          // Seção de Pagamentos (se houver)
-          if (pagamentos.length > 0) {
-              const totalPago = pagamentos.reduce((sum, p) => sum + (p.valor_pago || 0), 0);
-              html += `
+      // Seção de Pagamentos (se houver)
+      if (pagamentos.length > 0) {
+        const totalPago = pagamentos.reduce((sum, p) => sum + (p.valor_pago || 0), 0);
+        html += `
                   <div class="popup-section">
                       <button class="popup-collapsible active" data-target="pagamentos-section">
-                          <span><i class="fas fa-credit-card"></i> Histórico de Pagamentos (${pagamentos.length})</span>
+                          <span><i class="fas fa-credit-card"></i> Histórico de Pagamentos (${
+                            pagamentos.length
+                          })</span>
                           <i class="fas fa-chevron-down popup-collapsible-icon rotated"></i>
                       </button>
                       <div class="popup-collapsible-content" id="pagamentos-section" style="display: block;">
@@ -2355,14 +2581,24 @@ setTimeout(inicializarBusca, 500);
                                       </tr>
                                   </thead>
                                   <tbody>
-                                      ${pagamentos.map(p => `
+                                      ${pagamentos
+                                        .map(
+                                          (p) => `
                                           <tr>
-                                              <td><strong>${p.data_pagamento_br || '-'}</strong></td>
-                                              <td class="monetary"><strong>${p.valor_pago_formatado || 'R$ 0,00'}</strong></td>
-                                              <td><span class="payment-method-badge">${p.forma_pagamento_label || 'N/A'}</span></td>
+                                              <td><strong>${
+                                                p.data_pagamento_br || '-'
+                                              }</strong></td>
+                                              <td class="monetary"><strong>${
+                                                p.valor_pago_formatado || 'R$ 0,00'
+                                              }</strong></td>
+                                              <td><span class="payment-method-badge">${
+                                                p.forma_pagamento_label || 'N/A'
+                                              }</span></td>
                                               <td>${p.observacoes || '-'}</td>
                                           </tr>
-                                      `).join('')}
+                                      `
+                                        )
+                                        .join('')}
                                   </tbody>
                                   <tfoot>
                                       <tr>
@@ -2380,8 +2616,8 @@ setTimeout(inicializarBusca, 500);
                       </div>
                   </div>
               `;
-          } else {
-              html += `
+      } else {
+        html += `
                   <div class="popup-section">
                       <h3 class="popup-section-title">
                           <i class="fas fa-credit-card"></i> Histórico de Pagamentos
@@ -2392,111 +2628,110 @@ setTimeout(inicializarBusca, 500);
                       </div>
                   </div>
               `;
-          }
+      }
 
-          html += `
+      html += `
               </div>
           `;
 
-          popup.innerHTML = html;
-          overlay.appendChild(popup);
-          document.body.appendChild(overlay);
-          
-          // Prevenir scroll do body
-          document.body.style.overflow = 'hidden';
+      popup.innerHTML = html;
+      overlay.appendChild(popup);
+      document.body.appendChild(overlay);
 
-          // Adicionar event listeners
-          setupPopupEventListeners(popupId);
+      // Prevenir scroll do body
+      document.body.style.overflow = 'hidden';
 
-      } catch (err) {
-          console.error('Erro ao carregar detalhes da conta:', err);
-          showFlashMessage('error', 'Erro ao carregar detalhes da conta');
-          
-          // Mostrar popup de erro com a paleta de cores
-          showErrorPopup('Erro ao carregar detalhes da conta. Por favor, tente novamente.');
-      }
+      // Adicionar event listeners
+      setupPopupEventListeners(popupId);
+    } catch (err) {
+      console.error('Erro ao carregar detalhes da conta:', err);
+      showFlashMessage('error', 'Erro ao carregar detalhes da conta');
+
+      // Mostrar popup de erro com a paleta de cores
+      showErrorPopup('Erro ao carregar detalhes da conta. Por favor, tente novamente.');
+    }
   }
 
   // Função auxiliar para formatar moeda
   function formatCurrency(value) {
-      return new Intl.NumberFormat('pt-BR', {
-          style: 'currency',
-          currency: 'BRL'
-      }).format(value);
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
   }
 
   // Configurar event listeners do popup
   function setupPopupEventListeners(popupId) {
-      // Fechar ao clicar no botão de fechar
-      const closeBtn = document.querySelector(`#${popupId} .popup-close-btn`);
-      if (closeBtn) {
-          closeBtn.addEventListener('click', closePopup);
+    // Fechar ao clicar no botão de fechar
+    const closeBtn = document.querySelector(`#${popupId} .popup-close-btn`);
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closePopup);
+    }
+
+    // Fechar ao clicar no overlay (fora do popup)
+    const overlay = document.getElementById('contaDetalhesOverlay');
+    if (overlay) {
+      overlay.addEventListener('click', function (e) {
+        if (e.target === this) {
+          closePopup();
+        }
+      });
+    }
+
+    // Fechar com tecla ESC
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        closePopup();
       }
-      
-      // Fechar ao clicar no overlay (fora do popup)
-      const overlay = document.getElementById('contaDetalhesOverlay');
-      if (overlay) {
-          overlay.addEventListener('click', function(e) {
-              if (e.target === this) {
-                  closePopup();
-              }
-          });
-      }
-      
-      // Fechar com tecla ESC
-      document.addEventListener('keydown', function(e) {
-          if (e.key === 'Escape') {
-              closePopup();
+    });
+
+    // Configurar colapsáveis
+    document.querySelectorAll('.popup-collapsible').forEach((btn) => {
+      btn.addEventListener('click', function () {
+        const targetId = this.getAttribute('data-target');
+        const content = document.getElementById(targetId);
+        const icon = this.querySelector('.popup-collapsible-icon');
+
+        if (content) {
+          if (content.style.display === 'block') {
+            content.style.display = 'none';
+            icon.classList.remove('rotated');
+            this.classList.remove('active');
+          } else {
+            content.style.display = 'block';
+            icon.classList.add('rotated');
+            this.classList.add('active');
           }
+        }
       });
-      
-      // Configurar colapsáveis
-      document.querySelectorAll('.popup-collapsible').forEach(btn => {
-          btn.addEventListener('click', function() {
-              const targetId = this.getAttribute('data-target');
-              const content = document.getElementById(targetId);
-              const icon = this.querySelector('.popup-collapsible-icon');
-              
-              if (content) {
-                  if (content.style.display === 'block') {
-                      content.style.display = 'none';
-                      icon.classList.remove('rotated');
-                      this.classList.remove('active');
-                  } else {
-                      content.style.display = 'block';
-                      icon.classList.add('rotated');
-                      this.classList.add('active');
-                  }
-              }
-          });
-      });
+    });
   }
 
   // Fechar popup
   function closePopup() {
-      const overlay = document.getElementById('contaDetalhesOverlay');
-      const popup = document.getElementById('contaDetalhesPopup');
-      
-      if (popup) {
-          popup.style.animation = 'slideUp 0.3s ease reverse';
-      }
-      
-      if (overlay) {
-          overlay.style.animation = 'fadeIn 0.3s ease reverse';
-          
-          setTimeout(() => {
-              overlay.remove();
-              // Restaurar scroll do body
-              document.body.style.overflow = '';
-          }, 300);
-      }
+    const overlay = document.getElementById('contaDetalhesOverlay');
+    const popup = document.getElementById('contaDetalhesPopup');
+
+    if (popup) {
+      popup.style.animation = 'slideUp 0.3s ease reverse';
+    }
+
+    if (overlay) {
+      overlay.style.animation = 'fadeIn 0.3s ease reverse';
+
+      setTimeout(() => {
+        overlay.remove();
+        // Restaurar scroll do body
+        document.body.style.overflow = '';
+      }, 300);
+    }
   }
 
   // Mostrar popup de erro com a paleta de cores
   function showErrorPopup(message) {
-      const overlay = document.createElement('div');
-      overlay.className = 'popup-overlay';
-      overlay.style.cssText = `
+    const overlay = document.createElement('div');
+    overlay.className = 'popup-overlay';
+    overlay.style.cssText = `
           position: fixed;
           top: 0;
           left: 0;
@@ -2510,8 +2745,8 @@ setTimeout(inicializarBusca, 500);
           animation: fadeIn 0.3s ease;
       `;
 
-      const popup = document.createElement('div');
-      popup.style.cssText = `
+    const popup = document.createElement('div');
+    popup.style.cssText = `
           background: var(--bg-secondary);
           border-radius: var(--border-radius);
           padding: var(--space-xl);
@@ -2523,7 +2758,7 @@ setTimeout(inicializarBusca, 500);
           box-shadow: var(--shadow-lg);
       `;
 
-      popup.innerHTML = `
+    popup.innerHTML = `
           <style>
               @keyframes fadeIn {
                   from { opacity: 0; }
@@ -2588,26 +2823,26 @@ setTimeout(inicializarBusca, 500);
           </button>
       `;
 
-      overlay.appendChild(popup);
-      document.body.appendChild(overlay);
-      document.body.style.overflow = 'hidden';
-      
-      // Fechar com ESC
-      document.addEventListener('keydown', function closeOnEsc(e) {
-          if (e.key === 'Escape') {
-              overlay.remove();
-              document.body.style.overflow = '';
-              document.removeEventListener('keydown', closeOnEsc);
-          }
-      });
-      
-      // Fechar ao clicar fora
-      overlay.addEventListener('click', function(e) {
-          if (e.target === this) {
-              overlay.remove();
-              document.body.style.overflow = '';
-          }
-      });
+    overlay.appendChild(popup);
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    // Fechar com ESC
+    document.addEventListener('keydown', function closeOnEsc(e) {
+      if (e.key === 'Escape') {
+        overlay.remove();
+        document.body.style.overflow = '';
+        document.removeEventListener('keydown', closeOnEsc);
+      }
+    });
+
+    // Fechar ao clicar fora
+    overlay.addEventListener('click', function (e) {
+      if (e.target === this) {
+        overlay.remove();
+        document.body.style.overflow = '';
+      }
+    });
   }
   async function openEditarClienteModal(clienteId) {
     const clienteForm = document.getElementById('clienteForm');
@@ -2630,13 +2865,22 @@ setTimeout(inicializarBusca, 500);
       if (response.success) {
         const cliente = response.cliente;
 
-        if (document.getElementById('clienteId')) document.getElementById('clienteId').value = cliente.id;
-        if (document.getElementById('clienteNome')) document.getElementById('clienteNome').value = cliente.nome;
-        if (document.getElementById('clienteDocumento')) document.getElementById('clienteDocumento').value = cliente.documento || '';
-        if (document.getElementById('clienteTelefone')) document.getElementById('clienteTelefone').value = cliente.telefone || '';
-        if (document.getElementById('clienteEmail')) document.getElementById('clienteEmail').value = cliente.email || '';
-        if (document.getElementById('clienteEndereco')) document.getElementById('clienteEndereco').value = cliente.endereco || '';
-        if (document.getElementById('clienteStatus')) document.getElementById('clienteStatus').value = cliente.ativo ? 'true' : 'false';
+        if (document.getElementById('clienteId'))
+          document.getElementById('clienteId').value = cliente.id;
+        if (document.getElementById('clienteNome'))
+          document.getElementById('clienteNome').value = cliente.nome;
+        if (document.getElementById('clienteDocumento'))
+          document.getElementById('clienteDocumento').value = cliente.documento || '';
+        if (document.getElementById('clienteTelefone'))
+          document.getElementById('clienteTelefone').value = cliente.telefone || '';
+        if (document.getElementById('clienteEmail'))
+          document.getElementById('clienteEmail').value = cliente.email || '';
+        if (document.getElementById('clienteEndereco'))
+          document.getElementById('clienteEndereco').value = cliente.endereco || '';
+        if (document.getElementById('clienteStatus'))
+          document.getElementById('clienteStatus').value = cliente.ativo
+            ? 'true'
+            : 'false';
       } else {
         showFlashMessage('error', 'Erro ao carregar dados do cliente');
         return;
@@ -2647,31 +2891,33 @@ setTimeout(inicializarBusca, 500);
     }
 
     openModal(document.getElementById('clienteModal'));
-
   }
 
   function setupClienteActions() {
-    document.querySelectorAll('.detalhes-cliente').forEach(btn => {
+    document.querySelectorAll('.detalhes-cliente').forEach((btn) => {
       btn.addEventListener('click', function () {
         const clienteId = this.getAttribute('data-id');
         openDetalhesClienteModal(clienteId);
       });
     });
 
-    document.querySelectorAll('.editar-cliente').forEach(btn => {
+    document.querySelectorAll('.editar-cliente').forEach((btn) => {
       btn.addEventListener('click', function () {
         const clienteId = this.getAttribute('data-id');
         openEditarClienteModal(clienteId);
       });
     });
 
-    document.querySelectorAll('.remover-cliente').forEach(btn => {
+    document.querySelectorAll('.remover-cliente').forEach((btn) => {
       btn.addEventListener('click', function () {
         const clienteId = this.getAttribute('data-id');
-        const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
+        const confirmarExclusaoTexto = document.getElementById(
+          'confirmarExclusaoTexto'
+        );
         const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
 
-        if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir o cliente ${clienteId}?`;
+        if (confirmarExclusaoTexto)
+          confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir o cliente ${clienteId}?`;
         if (confirmarExclusaoBtn) {
           confirmarExclusaoBtn.setAttribute('data-id', clienteId);
           confirmarExclusaoBtn.setAttribute('data-type', 'cliente');
@@ -2683,13 +2929,17 @@ setTimeout(inicializarBusca, 500);
 
   // Event Listeners para Clientes
   document.getElementById('searchCliente')?.addEventListener('input', loadClientesData);
-  document.getElementById('refreshClientes')?.addEventListener('click', loadClientesData);
+  document
+    .getElementById('refreshClientes')
+    ?.addEventListener('click', loadClientesData);
   document.getElementById('addCliente')?.addEventListener('click', () => {
     const clienteForm = document.getElementById('clienteForm');
     if (clienteForm) clienteForm.reset();
 
-    if (document.getElementById('clienteId')) document.getElementById('clienteId').value = '';
-    if (document.getElementById('clienteStatus')) document.getElementById('clienteStatus').value = 'true';
+    if (document.getElementById('clienteId'))
+      document.getElementById('clienteId').value = '';
+    if (document.getElementById('clienteStatus'))
+      document.getElementById('clienteStatus').value = 'true';
 
     const clienteModalTitle = document.getElementById('clienteModalTitle');
     if (clienteModalTitle) clienteModalTitle.textContent = 'Cadastrar Cliente';
@@ -2713,7 +2963,7 @@ setTimeout(inicializarBusca, 500);
         telefone: document.getElementById('clienteTelefone')?.value || '',
         email: document.getElementById('clienteEmail')?.value || '',
         endereco: document.getElementById('clienteEndereco')?.value || '',
-        ativo: document.getElementById('clienteStatus')?.value === 'true'
+        ativo: document.getElementById('clienteStatus')?.value === 'true',
       };
 
       const url = isEdit ? `/admin/clientes/${clienteId}` : '/admin/clientes';
@@ -2723,11 +2973,14 @@ setTimeout(inicializarBusca, 500);
         const response = await fetchWithErrorHandling(url, {
           method: method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+          body: JSON.stringify(formData),
         });
 
         if (response.success) {
-          showFlashMessage('success', `Cliente ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
+          showFlashMessage(
+            'success',
+            `Cliente ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`
+          );
           closeModal('clienteModal');
           loadClientesData();
         } else {
@@ -2742,17 +2995,22 @@ setTimeout(inicializarBusca, 500);
   // ===== PRODUTOS =====
   async function loadProdutosData() {
     try {
-      const searchText = document.getElementById('searchProduto')?.value.toLowerCase() || '';
-      const incluirInativos = document.getElementById('mostrarInativos')?.checked ? 'true' : 'false';
+      const searchText =
+        document.getElementById('searchProduto')?.value.toLowerCase() || '';
+      const incluirInativos = document.getElementById('mostrarInativos')?.checked
+        ? 'true'
+        : 'false';
 
-      const data = await fetchWithErrorHandling(`/admin/produtos?incluir_inativos=${incluirInativos}`);
+      const data = await fetchWithErrorHandling(
+        `/admin/produtos?incluir_inativos=${incluirInativos}`
+      );
 
       if (data.success) {
         const produtosTable = document.querySelector('#produtosTable tbody');
         if (produtosTable) {
           produtosTable.innerHTML = '';
 
-          data.produtos.forEach(produto => {
+          data.produtos.forEach((produto) => {
             if (searchText && !produto.nome.toLowerCase().includes(searchText)) return;
 
             const row = document.createElement('tr');
@@ -2763,7 +3021,9 @@ setTimeout(inicializarBusca, 500);
 
             row.innerHTML = `
                 <td>${produto.codigo}</td>
-                <td>${produto.nome} ${!produto.ativo ? '<span class="badge badge-danger">Inativo</span>' : ''}</td>
+                <td>${produto.nome} ${
+              !produto.ativo ? '<span class="badge badge-danger">Inativo</span>' : ''
+            }</td>
                 <td>${produto.unidade}</td>
                 <td>${produto.valor}</td>
                 <td>${produto.estoque_deposito}</td>
@@ -2771,13 +3031,19 @@ setTimeout(inicializarBusca, 500);
                 <td>${produto.estoque_fabrica}</td>
                 <td>
                   <div class="table-actions">
-                    <button class="btn-icon btn-primary gerenciar-lotes" data-id="${produto.id}" data-nome="${produto.nome}" title="Gerenciar Lotes">
+                    <button class="btn-icon btn-primary gerenciar-lotes" data-id="${
+                      produto.id
+                    }" data-nome="${produto.nome}" title="Gerenciar Lotes">
                       <i class="fas fa-boxes"></i>
                     </button>
-                    <button class="btn-icon btn-warning editar-produto" data-id="${produto.id}" title="Editar">
+                    <button class="btn-icon btn-warning editar-produto" data-id="${
+                      produto.id
+                    }" title="Editar">
                       <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn-icon btn-danger remover-produto" data-id="${produto.id}" title="Remover">
+                    <button class="btn-icon btn-danger remover-produto" data-id="${
+                      produto.id
+                    }" title="Remover">
                       <i class="fas fa-trash"></i>
                     </button>
                   </div>
@@ -2796,15 +3062,19 @@ setTimeout(inicializarBusca, 500);
   }
 
   // recarregar lista ao clicar no refresh ou trocar checkbox
-  document.getElementById('mostrarInativos').addEventListener('change', loadProdutosData);
+  document
+    .getElementById('mostrarInativos')
+    .addEventListener('change', loadProdutosData);
 
   function setupRowClickEvents() {
-    document.querySelectorAll('.produto-row.clickable-row').forEach(row => {
+    document.querySelectorAll('.produto-row.clickable-row').forEach((row) => {
       row.addEventListener('click', function (e) {
         // Previne a abertura do modal se o clique foi em um botão de ação
-        if (e.target.closest('.table-actions') ||
+        if (
+          e.target.closest('.table-actions') ||
           e.target.tagName === 'BUTTON' ||
-          e.target.closest('button')) {
+          e.target.closest('button')
+        ) {
           return;
         }
 
@@ -2816,14 +3086,14 @@ setTimeout(inicializarBusca, 500);
 
   function setupProdutoActions() {
     // Previne a propagação do evento de clique para a linha quando clicar nos botões
-    document.querySelectorAll('.table-actions button').forEach(btn => {
+    document.querySelectorAll('.table-actions button').forEach((btn) => {
       btn.addEventListener('click', function (e) {
         e.stopPropagation(); // Impede que o evento chegue à linha
       });
     });
 
     // NOVO: Botão para gerenciar lotes
-    document.querySelectorAll('.gerenciar-lotes').forEach(btn => {
+    document.querySelectorAll('.gerenciar-lotes').forEach((btn) => {
       btn.addEventListener('click', function (e) {
         const produtoId = this.getAttribute('data-id');
         const produtoNome = this.getAttribute('data-nome');
@@ -2839,20 +3109,23 @@ setTimeout(inicializarBusca, 500);
       });
     });
 
-    document.querySelectorAll('.editar-produto').forEach(btn => {
+    document.querySelectorAll('.editar-produto').forEach((btn) => {
       btn.addEventListener('click', async function (e) {
         const produtoId = this.getAttribute('data-id');
         await openEditarProdutoModal(produtoId);
       });
     });
 
-    document.querySelectorAll('.remover-produto').forEach(btn => {
+    document.querySelectorAll('.remover-produto').forEach((btn) => {
       btn.addEventListener('click', function (e) {
         const produtoId = this.getAttribute('data-id');
-        const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
+        const confirmarExclusaoTexto = document.getElementById(
+          'confirmarExclusaoTexto'
+        );
         const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
 
-        if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir o produto ${produtoId}?`;
+        if (confirmarExclusaoTexto)
+          confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir o produto ${produtoId}?`;
         if (confirmarExclusaoBtn) {
           confirmarExclusaoBtn.setAttribute('data-id', produtoId);
           confirmarExclusaoBtn.setAttribute('data-type', 'produto');
@@ -2861,7 +3134,7 @@ setTimeout(inicializarBusca, 500);
       });
     });
 
-    document.querySelectorAll('.movimentar-estoque').forEach(btn => {
+    document.querySelectorAll('.movimentar-estoque').forEach((btn) => {
       btn.addEventListener('click', function (e) {
         const produtoId = this.getAttribute('data-id');
         openTransferenciaModal(produtoId);
@@ -2870,9 +3143,13 @@ setTimeout(inicializarBusca, 500);
 
     document.getElementById('btnRelatorioProdutos').addEventListener('click', () => {
       const searchText = document.getElementById('searchProduto')?.value || '';
-      const incluirInativos = document.getElementById('mostrarInativos')?.checked ? 'true' : 'false';
+      const incluirInativos = document.getElementById('mostrarInativos')?.checked
+        ? 'true'
+        : 'false';
 
-      const url = `/admin/produtos/pdf?search=${encodeURIComponent(searchText)}&incluir_inativos=${incluirInativos}`;
+      const url = `/admin/produtos/pdf?search=${encodeURIComponent(
+        searchText
+      )}&incluir_inativos=${incluirInativos}`;
       window.open(url, '_blank');
     });
 
@@ -2891,15 +3168,16 @@ setTimeout(inicializarBusca, 500);
       }, 2000);
     });
 
-    document.getElementById("btnEntradaLotes").addEventListener("click", () => {
-        window.open("/admin/dashboard/entrada-lotes", "_blank");
+    document.getElementById('btnEntradaLotes').addEventListener('click', () => {
+      window.open('/admin/dashboard/entrada-lotes', '_blank');
     });
-
   }
 
   async function openEditarProdutoModal(produtoId) {
     try {
-      const produtoResponse = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`);
+      const produtoResponse = await fetchWithErrorHandling(
+        `/admin/produtos/${produtoId}`
+      );
 
       if (produtoResponse.success) {
         const produto = produtoResponse.produto;
@@ -2911,166 +3189,473 @@ setTimeout(inicializarBusca, 500);
 
           if (!formBody) return;
 
-          // FUNÇÃO PARA FORMATAR VALORES MONETÁRIOS PARA EXIBIÇÃO
           function formatarValorParaExibicao(valor) {
             if (!valor || valor === '' || valor === 0) return '';
 
-            // Converte para número se for string
-            const numero = typeof valor === 'string' ?
-              parseFloat(valor.replace(/[^\d,.-]/g, '').replace(',', '.')) :
-              parseFloat(valor);
+            const numero =
+              typeof valor === 'string'
+                ? parseFloat(valor.replace(/[^\d,.-]/g, '').replace(',', '.'))
+                : parseFloat(valor);
 
             if (isNaN(numero)) return '';
 
-            // Formata como moeda brasileira
             return numero.toLocaleString('pt-BR', {
               minimumFractionDigits: 2,
-              maximumFractionDigits: 2
+              maximumFractionDigits: 2,
             });
           }
 
-          // Formatar valores monetários para exibição
-          const valorUnitarioFormatado = formatarValorParaExibicao(produto.valor_unitario);
-          const valorCompraFormatado = formatarValorParaExibicao(produto.valor_unitario_compra);
-          const valorTotalCompraFormatado = formatarValorParaExibicao(produto.valor_total_compra);
+          const valorUnitarioFormatado = formatarValorParaExibicao(
+            produto.valor_unitario
+          );
+          const valorCompraFormatado = formatarValorParaExibicao(
+            produto.valor_unitario_compra
+          );
+          const valorTotalCompraFormatado = formatarValorParaExibicao(
+            produto.valor_total_compra
+          );
+
+          // Obter URL da foto do produto
+          const fotoUrl = produto.foto || '';
+
+          // Verificar se a foto existe
+          const temFoto = fotoUrl && fotoUrl !== '';
 
           const descontosAtuais = produto.descontos || [];
-          const descontosAtuaisIds = descontosAtuais.map(d => d.id);
-
+          const descontosAtuaisIds = descontosAtuais.map((d) => d.id);
           const todosDescontos = descontosResponse.descontos || [];
 
           formBody.innerHTML = `
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="editCodigo">Código*</label>
-                            <input type="text" id="editCodigo" class="form-control" value="${produto.codigo || ''}" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="editMarca">Marca*</label>
-                            <input type="text" id="editMarca" class="form-control" value="${produto.marca || ''}" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="editNome">Nome*</label>
-                            <input type="text" id="editNome" class="form-control" value="${produto.nome}" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="editTipo">Tipo*</label>
-                            <input type="text" id="editTipo" class="form-control" value="${produto.tipo}" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="editUnidade">Unidade</label>
-                            <input type="text" id="editUnidade" class="form-control" value="${produto.unidade}" disabled>
-                        </div>
-                        <div class="form-group">
-                            <label for="editValor">Valor Unitário*</label>
-                            <input type="text" id="editValor" class="form-control" value="${valorUnitarioFormatado}" placeholder="Ex: 2.100,30" required>
-                        </div>
-                    </div>
+          <!-- Cabeçalho da Seção -->
+          <div class="section-header mb-4">
+            <h4 class="section-title">
+              <i class="fas fa-box-open me-2"></i>Informações do Produto
+            </h4>
+            <div class="section-divider"></div>
+          </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="editValorCompra">Valor Unitário de Compra</label>
-                            <input type="text" id="editValorCompra" class="form-control" value="${valorCompraFormatado}" placeholder="Ex: 10.200,40">
-                        </div>
-                        <div class="form-group">
-                            <label for="editValorTotalCompra">Valor Total de Compra</label>
-                            <input type="text" id="editValorTotalCompra" class="form-control" value="${valorTotalCompraFormatado}" placeholder="Ex: 25.500,75">
-                        </div>
-                        <div class="form-group">
-                            <label for="editICMS">ICMS (%)</label>
-                            <input type="number" id="editICMS" class="form-control" value="${produto.imcs || ''}" step="0.01" min="0">
-                        </div>
-                    </div>
+          <!-- Informações Básicas -->
+          <div class="form-section mb-4">
+            <h5 class="form-section-title">
+              <i class="fas fa-info-circle me-2"></i>Informações Básicas
+            </h5>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="editCodigo" class="form-label">
+                  <i class="fas fa-barcode me-1"></i>Código*
+                </label>
+                <input type="text" id="editCodigo" class="form-control form-control-dark" value="${
+                  produto.codigo || ''
+                }" required>
+              </div>
+              <div class="form-group">
+                <label for="editMarca" class="form-label">
+                  <i class="fas fa-tag me-1"></i>Marca*
+                </label>
+                <input type="text" id="editMarca" class="form-control form-control-dark" value="${
+                  produto.marca || ''
+                }" required>
+              </div>
+              <div class="form-group">
+                <label for="editNome" class="form-label">
+                  <i class="fas fa-font me-1"></i>Nome*
+                </label>
+                <input type="text" id="editNome" class="form-control form-control-dark" value="${
+                  produto.nome
+                }" required>
+              </div>
+              <div class="form-group">
+                <label for="editTipo" class="form-label">
+                  <i class="fas fa-cubes me-1"></i>Tipo*
+                </label>
+                <input type="text" id="editTipo" class="form-control form-control-dark" value="${
+                  produto.tipo
+                }" required>
+              </div>
+              <div class="form-group">
+                <label for="editUnidade" class="form-label">
+                  <i class="fas fa-balance-scale me-1"></i>Unidade
+                </label>
+                <div class="form-control-static">
+                  <span class="badge badge-unidade">${produto.unidade}</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="editValor" class="form-label">
+                  <i class="fas fa-money-bill-wave me-1"></i>Valor Unitário*
+                </label>
+                <div class="input-with-icon">
+                  <i class="fas fa-dollar-sign input-icon"></i>
+                  <input type="text" id="editValor" class="form-control form-control-dark" value="${valorUnitarioFormatado}" placeholder="Ex: 2.100,30" required>
+                </div>
+              </div>
+            </div>
+          </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="editEstoqueLoja">Estoque Loja</label>
-                            <input type="number" id="editEstoqueLoja" class="form-control" value="${produto.estoque_loja}" step="0.001" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="editEstoqueDeposito">Estoque Depósito</label>
-                            <input type="number" id="editEstoqueDeposito" class="form-control" value="${produto.estoque_deposito}" step="0.001" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="editEstoqueFabrica">Estoque Fábrica</label>
-                            <input type="number" id="editEstoqueFabrica" class="form-control" value="${produto.estoque_fabrica}" step="0.001" min="0">
-                        </div>
-                    </div>
+          <!-- Valores de Compra -->
+          <div class="form-section mb-4">
+            <h5 class="form-section-title">
+              <i class="fas fa-shopping-cart me-2"></i>Valores de Compra
+            </h5>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="editValorCompra" class="form-label">
+                  <i class="fas fa-tag me-1"></i>Valor de Compra
+                </label>
+                <div class="input-with-icon">
+                  <i class="fas fa-dollar-sign input-icon"></i>
+                  <input type="text" id="editValorCompra" class="form-control form-control-dark" value="${valorCompraFormatado}" placeholder="Ex: 10.200,40">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="editValorTotalCompra" class="form-label">
+                  <i class="fas fa-calculator me-1"></i>Valor Total Compra
+                </label>
+                <div class="input-with-icon">
+                  <i class="fas fa-dollar-sign input-icon"></i>
+                  <input type="text" id="editValorTotalCompra" class="form-control form-control-dark" value="${valorTotalCompraFormatado}" placeholder="Ex: 25.500,75">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="editICMS" class="form-label">
+                  <i class="fas fa-percentage me-1"></i>ICMS (%)
+                </label>
+                <div class="input-with-icon">
+                  <i class="fas fa-percent input-icon"></i>
+                  <input type="number" id="editICMS" class="form-control form-control-dark" value="${
+                    produto.imcs || ''
+                  }" step="0.01" min="0">
+                </div>
+              </div>
+            </div>
+          </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="editEstoqueMinimo">Estoque Mínimo</label>
-                            <input type="number" id="editEstoqueMinimo" class="form-control" value="${produto.estoque_minimo || 0}" step="0.001" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="editEstoqueMaximo">Estoque Máximo</label>
-                            <input type="number" id="editEstoqueMaximo" class="form-control" value="${produto.estoque_maximo || ''}" step="0.001" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="editAtivo">Ativo</label>
-                            <select id="editAtivo" class="form-control">
-                                <option value="true" ${produto.ativo ? 'selected' : ''}>Sim</option>
-                                <option value="false" ${!produto.ativo ? 'selected' : ''}>Não</option>
-                            </select>
-                        </div>
-                    </div>
+          <!-- Estoques -->
+          <div class="form-section mb-4">
+            <h5 class="form-section-title">
+              <i class="fas fa-warehouse me-2"></i>Controle de Estoque
+            </h5>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="editEstoqueLoja" class="form-label">
+                  <i class="fas fa-store me-1"></i>Estoque Loja
+                </label>
+                <div class="input-with-icon">
+                  <i class="fas fa-box input-icon"></i>
+                  <input type="number" id="editEstoqueLoja" class="form-control form-control-dark" value="${
+                    produto.estoque_loja
+                  }" step="0.001" min="0">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="editEstoqueDeposito" class="form-label">
+                  <i class="fas fa-building me-1"></i>Estoque Depósito
+                </label>
+                <div class="input-with-icon">
+                  <i class="fas fa-box input-icon"></i>
+                  <input type="number" id="editEstoqueDeposito" class="form-control form-control-dark" value="${
+                    produto.estoque_deposito
+                  }" step="0.001" min="0">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="editEstoqueFabrica" class="form-label">
+                  <i class="fas fa-industry me-1"></i>Estoque Fábrica
+                </label>
+                <div class="input-with-icon">
+                  <i class="fas fa-box input-icon"></i>
+                  <input type="number" id="editEstoqueFabrica" class="form-control form-control-dark" value="${
+                    produto.estoque_fabrica
+                  }" step="0.001" min="0">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="editEstoqueMinimo" class="form-label">
+                  <i class="fas fa-exclamation-triangle me-1"></i>Estoque Mínimo
+                </label>
+                <div class="input-with-icon">
+                  <i class="fas fa-arrow-down input-icon"></i>
+                  <input type="number" id="editEstoqueMinimo" class="form-control form-control-dark" value="${
+                    produto.estoque_minimo || 0
+                  }" step="0.001" min="0">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="editEstoqueMaximo" class="form-label">
+                  <i class="fas fa-exclamation-circle me-1"></i>Estoque Máximo
+                </label>
+                <div class="input-with-icon">
+                  <i class="fas fa-arrow-up input-icon"></i>
+                  <input type="number" id="editEstoqueMaximo" class="form-control form-control-dark" value="${
+                    produto.estoque_maximo || ''
+                  }" step="0.001" min="0">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="editAtivo" class="form-label">
+                  <i class="fas fa-power-off me-1"></i>Status
+                </label>
+                <select id="editAtivo" class="form-control form-control-dark">
+                  <option value="true" ${produto.ativo ? 'selected' : ''}>
+                    <i class="fas fa-check-circle text-success me-1"></i>Ativo
+                  </option>
+                  <option value="false" ${!produto.ativo ? 'selected' : ''}>
+                    <i class="fas fa-times-circle text-danger me-1"></i>Inativo
+                  </option>
+                </select>
+              </div>
+            </div>
+          </div>
 
-                    <div class="form-row">
-                        <div class="form-group" style="width: 100%;">
-                            <label>Descontos Aplicados</label>
-                            <div id="descontosContainer" class="descontos-container">
-                                ${descontosAtuais.map(desconto => `
-                                    <div class="desconto-item" data-id="${desconto.id}">
-                                        <span>${desconto.identificador} - 
-                                        ${desconto.tipo === 'fixo' ? `R$ ${formatarValorParaExibicao(desconto.valor)}` : `${desconto.valor}%`} - 
-                                        Mín: ${desconto.quantidade_minima}${desconto.quantidade_maxima ? `, Máx: ${desconto.quantidade_maxima}` : ''}</span>
-                                        <button type="button" class="btn-icon btn-danger btn-remover-desconto">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
+          <!-- Seção de Foto -->
+          <div class="form-section mb-4">
+            <h5 class="form-section-title">
+              <i class="fas fa-camera me-2"></i>Imagem do Produto
+            </h5>
+            
+            <!-- Foto Atual -->
+            <div class="foto-container">
+              ${
+                fotoUrl
+                  ? `
+                <div class="foto-atual-container mb-3">
+                  <div class="foto-atual-header">
+                    <h6 class="foto-atual-title">
+                      <i class="fas fa-image me-2"></i>Foto Atual
+                    </h6>
+                  </div>
+                  <div class="foto-atual-body">
+                    <div class="foto-wrapper">
+                      <a href="${fotoUrl}" target="_blank" rel="noopener noreferrer">
+                        <img
+                          src="${fotoUrl}"
+                          alt="Foto atual do produto"
+                          class="foto-atual-img"
+                          onerror="handleImageError(this)"
+                          style="cursor: zoom-in;"
+                        >
+                      </a>
+                      <div class="foto-error-message" style="display: none;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Erro ao carregar imagem</span>
+                      </div>
                     </div>
+                    <div class="foto-actions mt-3">
+                      <div class="form-check form-check-danger">
+                        <input type="checkbox" id="deleteFoto" class="form-check-input">
+                        <label for="deleteFoto" class="form-check-label">
+                          <i class="fas fa-trash-alt me-2"></i>Remover foto atual
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `
+                  : `
+                <div class="foto-empty-state">
+                  <div class="foto-empty-icon">
+                    <i class="fas fa-image"></i>
+                  </div>
+                  <p class="foto-empty-text">Nenhuma foto cadastrada</p>
+                </div>
+              `
+              }
+            </div>
+              
+              <!-- Upload de Nova Foto -->
+              <div class="foto-upload-card mt-4">
+                <div class="foto-upload-header">
+                  <h6 class="foto-upload-title">
+                    <i class="fas fa-upload me-2"></i>
+                    ${temFoto ? 'Substituir Foto' : 'Adicionar Foto'}
+                  </h6>
+                </div>
+                <div class="foto-upload-body">
+                  <div class="file-upload-area">
+                    <div class="file-upload-icon">
+                      <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <p class="file-upload-text">Arraste ou clique para selecionar</p>
+                    <input type="file" id="editFoto" class="file-upload-input" accept="image/*">
+                    <small class="file-upload-hint">
+                      <i class="fas fa-info-circle me-1"></i>
+                      Formatos: JPG, PNG, GIF, WEBP. Tamanho máximo: 5MB.
+                    </small>
+                  </div>
+                  
+                  <!-- Preview da Nova Foto -->
+                  <div id="editFotoPreview" class="foto-preview mt-3" style="display: none;">
+                    <div class="foto-preview-header">
+                      <h6 class="foto-preview-title">
+                        <i class="fas fa-eye me-2"></i>Prévia
+                      </h6>
+                    </div>
+                    <div class="foto-preview-body">
+                      <img id="editFotoPreviewImg" src="#" alt="Preview da nova foto" class="foto-preview-img">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-                    <div class="form-row">
-                        <div class="form-group" style="width: 100%;">
-                            <label for="selecionarDesconto">Adicionar Desconto</label>
-                            <div class="desconto-select-container">
-                                <select id="selecionarDesconto" class="form-control">
-                                    <option value="">Selecione um desconto...</option>
-                                    ${todosDescontos
-              .filter(d => !descontosAtuaisIds.includes(d.id))
-              .map(desconto => `
-                                            <option value="${desconto.id}" 
-                                                data-quantidade-minima="${desconto.quantidade_minima}"
-                                                data-quantidade-maxima="${desconto.quantidade_maxima || ''}"
-                                                data-valor="${desconto.valor}"
-                                                data-tipo="${desconto.tipo}"
-                                                data-identificador="${desconto.identificador}">
-                                                ${desconto.identificador} - 
-                                                ${desconto.tipo === 'fixo' ? `R$ ${formatarValorParaExibicao(desconto.valor)}` : `${desconto.valor}%`} - 
-                                                Mín: ${desconto.quantidade_minima}${desconto.quantidade_maxima ? `, Máx: ${desconto.quantidade_maxima}` : ''}
-                                            </option>
-                                        `).join('')}
-                                </select>
-                                <button type="button" id="btnAdicionarDesconto" class="btn btn-primary">
-                                    <i class="fas fa-plus"></i> Adicionar
-                                </button>
-                            </div>
+          <!-- Seção de Descontos -->
+          <div class="form-section mb-4">
+            <h5 class="form-section-title">
+              <i class="fas fa-percent me-2"></i>Descontos Aplicados
+            </h5>
+            
+            <!-- Descontos Atuais -->
+            <div class="descontos-container mb-3">
+              <div id="descontosContainer" class="descontos-list">
+                ${descontosAtuais
+                  .map(
+                    (desconto) => `
+                    <div class="desconto-item" data-id="${desconto.id}">
+                      <div class="desconto-icon">
+                        <i class="fas fa-tag"></i>
+                      </div>
+                      <div class="desconto-content">
+                        <div class="desconto-header">
+                          <span class="desconto-identificador">${
+                            desconto.identificador
+                          }</span>
+                          <span class="desconto-tipo-badge badge-${
+                            desconto.tipo === 'fixo' ? 'primary' : 'secondary'
+                          }">
+                            ${desconto.tipo === 'fixo' ? 'Fixo' : 'Percentual'}
+                          </span>
                         </div>
+                        <div class="desconto-body">
+                          <div class="desconto-valor">
+                            ${
+                              desconto.tipo === 'fixo'
+                                ? `<i class="fas fa-dollar-sign me-1"></i>R$ ${formatarValorParaExibicao(
+                                    desconto.valor
+                                  )}`
+                                : `<i class="fas fa-percent me-1"></i>${desconto.valor}%`
+                            }
+                          </div>
+                          <div class="desconto-quantidades">
+                            <span class="desconto-quantidade">
+                              <i class="fas fa-arrow-up me-1"></i>Mín: ${
+                                desconto.quantidade_minima
+                              }
+                            </span>
+                            ${
+                              desconto.quantidade_maxima
+                                ? `
+                              <span class="desconto-quantidade">
+                                <i class="fas fa-arrow-down me-1"></i>Máx: ${desconto.quantidade_maxima}
+                              </span>
+                            `
+                                : ''
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      <button type="button" class="btn-remover-desconto">
+                        <i class="fas fa-times"></i>
+                      </button>
                     </div>
-                `;
+                  `
+                  )
+                  .join('')}
+              </div>
+              
+              ${
+                descontosAtuais.length === 0
+                  ? `
+                <div class="descontos-empty-state">
+                  <div class="descontos-empty-icon">
+                    <i class="fas fa-percent"></i>
+                  </div>
+                  <p class="descontos-empty-text">Nenhum desconto aplicado</p>
+                </div>
+              `
+                  : ''
+              }
+            </div>
+
+            <!-- Adicionar Novo Desconto -->
+            <div class="adicionar-desconto-card">
+              <div class="adicionar-desconto-header">
+                <h6 class="adicionar-desconto-title">
+                  <i class="fas fa-plus-circle me-2"></i>Adicionar Desconto
+                </h6>
+              </div>
+              <div class="adicionar-desconto-body">
+                <div class="desconto-select-container">
+                  <div class="input-with-icon mb-3">
+                    <i class="fas fa-search input-icon"></i>
+                    <select id="selecionarDesconto" class="form-control form-control-dark">
+                      <option value="">Selecione um desconto...</option>
+                      ${todosDescontos
+                        .filter((d) => !descontosAtuaisIds.includes(d.id))
+                        .map(
+                          (desconto) => `
+                            <option value="${desconto.id}" 
+                              data-quantidade-minima="${desconto.quantidade_minima}"
+                              data-quantidade-maxima="${
+                                desconto.quantidade_maxima || ''
+                              }"
+                              data-valor="${desconto.valor}"
+                              data-tipo="${desconto.tipo}"
+                              data-identificador="${desconto.identificador}">
+                              ${desconto.identificador} - 
+                              ${
+                                desconto.tipo === 'fixo'
+                                  ? `R$ ${formatarValorParaExibicao(desconto.valor)}`
+                                  : `${desconto.valor}%`
+                              } - Mín: ${desconto.quantidade_minima}${
+                            desconto.quantidade_maxima
+                              ? `, Máx: ${desconto.quantidade_maxima}`
+                              : ''
+                          }
+                            </option>
+                          `
+                        )
+                        .join('')}
+                    </select>
+                  </div>
+                  <button type="button" id="btnAdicionarDesconto" class="btn btn-gradient-primary">
+                    <i class="fas fa-plus me-2"></i>Adicionar Desconto
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
 
           const editarProdutoForm = document.getElementById('editarProdutoForm');
           if (editarProdutoForm) {
             editarProdutoForm.setAttribute('data-produto-id', produtoId);
           }
+
+          // Configurar eventos
           setupDescontoEvents();
+          setupFotoPreview('editFoto', 'editFotoPreview', 'editFotoPreviewImg');
+
+          // Configurar evento para checkbox de deletar foto
+          const deleteFotoCheckbox = document.getElementById('deleteFoto');
+          const fotoInput = document.getElementById('editFoto');
+
+          if (deleteFotoCheckbox && fotoInput) {
+            deleteFotoCheckbox.addEventListener('change', function () {
+              if (this.checked) {
+                fotoInput.disabled = true;
+                fotoInput.value = '';
+                const preview = document.getElementById('editFotoPreview');
+                if (preview) preview.style.display = 'none';
+              } else {
+                fotoInput.disabled = false;
+              }
+            });
+          }
+
+          // Configurar drag and drop para upload de foto
+          setupFileUpload('editFoto');
+
           openModal('editarProdutoModal');
         } else {
           throw new Error('Erro ao carregar descontos');
@@ -3079,8 +3664,42 @@ setTimeout(inicializarBusca, 500);
         throw new Error('Erro ao carregar dados do produto');
       }
     } catch (error) {
+      console.error('Erro ao abrir modal de edição:', error);
       showFlashMessage('error', 'Erro ao carregar dados do produto');
     }
+  }
+
+  // Função para configurar drag and drop
+  function setupFileUpload(inputId) {
+    const fileInput = document.getElementById(inputId);
+    const fileUploadArea = fileInput?.closest('.file-upload-area');
+
+    if (!fileUploadArea) return;
+
+    // Highlight quando arrasta arquivo sobre a área
+    fileUploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      fileUploadArea.classList.add('dragover');
+    });
+
+    fileUploadArea.addEventListener('dragleave', () => {
+      fileUploadArea.classList.remove('dragover');
+    });
+
+    fileUploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      fileUploadArea.classList.remove('dragover');
+
+      if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+
+    // Clique na área para abrir o seletor de arquivos
+    fileUploadArea.addEventListener('click', () => {
+      fileInput.click();
+    });
   }
 
   function setupDescontoEvents() {
@@ -3111,8 +3730,16 @@ setTimeout(inicializarBusca, 500);
         item.dataset.id = descontoId;
         item.innerHTML = `
           <span>${selectedOption.dataset.identificador} - 
-          ${selectedOption.dataset.tipo === 'fixo' ? `R$ ${selectedOption.dataset.valor}` : `${selectedOption.dataset.valor}%`} - 
-          Mín: ${selectedOption.dataset.quantidadeMinima}${selectedOption.dataset.quantidadeMaxima ? `, Máx: ${selectedOption.dataset.quantidadeMaxima}` : ''}</span>
+          ${
+            selectedOption.dataset.tipo === 'fixo'
+              ? `R$ ${selectedOption.dataset.valor}`
+              : `${selectedOption.dataset.valor}%`
+          } - 
+          Mín: ${selectedOption.dataset.quantidadeMinima}${
+          selectedOption.dataset.quantidadeMaxima
+            ? `, Máx: ${selectedOption.dataset.quantidadeMaxima}`
+            : ''
+        }</span>
           <button type="button" class="btn-icon btn-danger btn-remover-desconto">
             <i class="fas fa-times"></i>
           </button>
@@ -3131,7 +3758,7 @@ setTimeout(inicializarBusca, 500);
       });
     }
 
-    document.querySelectorAll('.btn-remover-desconto').forEach(btn => {
+    document.querySelectorAll('.btn-remover-desconto').forEach((btn) => {
       btn.addEventListener('click', function () {
         const item = this.closest('.desconto-item');
         if (item) {
@@ -3170,46 +3797,76 @@ setTimeout(inicializarBusca, 500);
   // ===== EVENT LISTENERS PARA PRODUTOS =====
   document.getElementById('addProduto')?.addEventListener('click', () => {
     const produtoForm = document.getElementById('produtoForm');
-    if (produtoForm) produtoForm.reset();
+    if (produtoForm) {
+      produtoForm.reset();
+      const fotoPreview = document.getElementById('fotoPreview');
+      if (fotoPreview) fotoPreview.style.display = 'none';
+    }
 
-    if (document.getElementById('produtoEstoqueTipo')) document.getElementById('produtoEstoqueTipo').value = 'loja';
-    if (document.getElementById('produtoUnidade')) document.getElementById('produtoUnidade').value = 'kg';
+    if (document.getElementById('produtoEstoqueTipo'))
+      document.getElementById('produtoEstoqueTipo').value = 'loja';
+    if (document.getElementById('produtoUnidade'))
+      document.getElementById('produtoUnidade').value = 'kg';
     openModal('produtoModal');
   });
 
   const produtoForm = document.getElementById('produtoForm');
   if (produtoForm) {
+    setupFotoPreview('produtoFoto', 'fotoPreview', 'fotoPreviewImg');
+
     produtoForm.addEventListener('submit', async function (e) {
       e.preventDefault();
 
-      const estoqueTipo = document.getElementById('produtoEstoqueTipo')?.value || 'loja';
-      const estoqueQuantidade = parseFloat(document.getElementById('produtoEstoque')?.value) || 0;
+      const estoqueTipo =
+        document.getElementById('produtoEstoqueTipo')?.value || 'loja';
+      const estoqueQuantidade =
+        parseFloat(document.getElementById('produtoEstoque')?.value) || 0;
+      const fotoFile = document.getElementById('produtoFoto')?.files[0];
 
-      // CONVERTER VALORES DO PADRÃO BRASILEIRO PARA NÚMERO
-      const formData = {
-        nome: document.getElementById('produtoNome')?.value || '',
-        tipo: document.getElementById('produtoTipo')?.value || '',
-        marca: document.getElementById('produtoMarca')?.value || '',
-        unidade: document.getElementById('produtoUnidade')?.value || 'kg',
-        valor_unitario: converterValorBrasileiro(document.getElementById('produtoValor')?.value),
-        estoque_loja: estoqueTipo === 'loja' ? estoqueQuantidade : 0,
-        estoque_deposito: estoqueTipo === 'deposito' ? estoqueQuantidade : 0,
-        estoque_fabrica: estoqueTipo === 'fabrica' ? estoqueQuantidade : 0
-      };
+      const formData = new FormData();
 
-      // Converter outros campos monetários
-      const valorCompra = converterValorBrasileiro(document.getElementById('produtoValorCompra')?.value);
-      const valorTotal = converterValorBrasileiro(document.getElementById('produtoValorTotalCompra')?.value);
+      formData.append('nome', document.getElementById('produtoNome')?.value || '');
+      formData.append('tipo', document.getElementById('produtoTipo')?.value || '');
+      formData.append('marca', document.getElementById('produtoMarca')?.value || '');
+      formData.append(
+        'unidade',
+        document.getElementById('produtoUnidade')?.value || 'kg'
+      );
+      formData.append(
+        'valor_unitario',
+        converterValorBrasileiro(document.getElementById('produtoValor')?.value)
+      );
+      formData.append('estoque_loja', estoqueTipo === 'loja' ? estoqueQuantidade : 0);
+      formData.append(
+        'estoque_deposito',
+        estoqueTipo === 'deposito' ? estoqueQuantidade : 0
+      );
+      formData.append(
+        'estoque_fabrica',
+        estoqueTipo === 'fabrica' ? estoqueQuantidade : 0
+      );
+
+      const valorCompra = converterValorBrasileiro(
+        document.getElementById('produtoValorCompra')?.value
+      );
+      const valorTotal = converterValorBrasileiro(
+        document.getElementById('produtoValorTotalCompra')?.value
+      );
       const icms = parseFloat(document.getElementById('produtoICMS')?.value);
-      const estoqueMinimo = parseFloat(document.getElementById('produtoEstoqueMinimo')?.value);
+      const estoqueMinimo = parseFloat(
+        document.getElementById('produtoEstoqueMinimo')?.value
+      );
 
-      if (valorCompra > 0) formData.valor_unitario_compra = valorCompra;
-      if (valorTotal > 0) formData.valor_total_compra = valorTotal;
-      if (!isNaN(icms)) formData.imcs = icms;
-      if (!isNaN(estoqueMinimo)) formData.estoque_minimo = estoqueMinimo;
+      if (valorCompra > 0) formData.append('valor_unitario_compra', valorCompra);
+      if (valorTotal > 0) formData.append('valor_total_compra', valorTotal);
+      if (!isNaN(icms)) formData.append('imcs', icms);
+      if (!isNaN(estoqueMinimo)) formData.append('estoque_minimo', estoqueMinimo);
 
-      // Validação
-      if (formData.valor_unitario <= 0) {
+      if (fotoFile) {
+        formData.append('foto', fotoFile);
+      }
+
+      if (parseFloat(formData.get('valor_unitario')) <= 0) {
         showFlashMessage('error', 'O valor unitário deve ser maior que zero');
         return;
       }
@@ -3217,10 +3874,7 @@ setTimeout(inicializarBusca, 500);
       try {
         const response = await fetchWithErrorHandling('/admin/produtos', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(formData)
+          body: formData,
         });
 
         if (response.success) {
@@ -3245,36 +3899,72 @@ setTimeout(inicializarBusca, 500);
       if (!produtoId) return;
 
       const descontos = [];
-      document.querySelectorAll('#descontosContainer .desconto-item').forEach(item => {
-        descontos.push(item.dataset.id);
-      });
+      document
+        .querySelectorAll('#descontosContainer .desconto-item')
+        .forEach((item) => {
+          descontos.push(item.dataset.id);
+        });
 
-      // CONVERTER VALORES DO PADRÃO BRASILEIRO PARA NÚMERO
-      const formData = {
-        codigo: document.getElementById('editCodigo')?.value || '',
-        nome: document.getElementById('editNome')?.value || '',
-        tipo: document.getElementById('editTipo')?.value || '',
-        marca: document.getElementById('editMarca')?.value || '',
-        valor_unitario: converterValorBrasileiro(document.getElementById('editValor')?.value),
-        valor_unitario_compra: converterValorBrasileiro(document.getElementById('editValorCompra')?.value),
-        valor_total_compra: converterValorBrasileiro(document.getElementById('editValorTotalCompra')?.value),
-        imcs: parseFloat(document.getElementById('editICMS')?.value) || 0,
-        estoque_loja: parseFloat(document.getElementById('editEstoqueLoja')?.value) || 0,
-        estoque_deposito: parseFloat(document.getElementById('editEstoqueDeposito')?.value) || 0,
-        estoque_fabrica: parseFloat(document.getElementById('editEstoqueFabrica')?.value) || 0,
-        estoque_minimo: parseFloat(document.getElementById('editEstoqueMinimo')?.value) || 0,
-        estoque_maximo: parseFloat(document.getElementById('editEstoqueMaximo')?.value) || 0,
-        ativo: document.getElementById('editAtivo')?.value === 'true',
-        descontos: descontos
-      };
+      const fotoFile = document.getElementById('editFoto')?.files[0];
+      const deleteFoto = document.getElementById('deleteFoto')?.checked || false;
+
+      const formData = new FormData();
+
+      formData.append('codigo', document.getElementById('editCodigo')?.value || '');
+      formData.append('nome', document.getElementById('editNome')?.value || '');
+      formData.append('tipo', document.getElementById('editTipo')?.value || '');
+      formData.append('marca', document.getElementById('editMarca')?.value || '');
+      formData.append(
+        'valor_unitario',
+        converterValorBrasileiro(document.getElementById('editValor')?.value)
+      );
+      formData.append(
+        'valor_unitario_compra',
+        converterValorBrasileiro(document.getElementById('editValorCompra')?.value)
+      );
+      formData.append(
+        'valor_total_compra',
+        converterValorBrasileiro(document.getElementById('editValorTotalCompra')?.value)
+      );
+      formData.append(
+        'imcs',
+        parseFloat(document.getElementById('editICMS')?.value) || 0
+      );
+      formData.append(
+        'estoque_loja',
+        parseFloat(document.getElementById('editEstoqueLoja')?.value) || 0
+      );
+      formData.append(
+        'estoque_deposito',
+        parseFloat(document.getElementById('editEstoqueDeposito')?.value) || 0
+      );
+      formData.append(
+        'estoque_fabrica',
+        parseFloat(document.getElementById('editEstoqueFabrica')?.value) || 0
+      );
+      formData.append(
+        'estoque_minimo',
+        parseFloat(document.getElementById('editEstoqueMinimo')?.value) || 0
+      );
+      formData.append(
+        'estoque_maximo',
+        parseFloat(document.getElementById('editEstoqueMaximo')?.value) || 0
+      );
+      formData.append('ativo', document.getElementById('editAtivo')?.value === 'true');
+      formData.append('delete_foto', deleteFoto);
+
+      if (fotoFile) {
+        formData.append('foto', fotoFile);
+      }
+
+      descontos.forEach((id) => {
+        formData.append('descontos[]', id);
+      });
 
       try {
         const response = await fetchWithErrorHandling(`/admin/produtos/${produtoId}`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(formData)
+          body: formData,
         });
 
         if (response.success) {
@@ -3290,42 +3980,68 @@ setTimeout(inicializarBusca, 500);
     });
   }
 
-  document.getElementById("btnEntradaEstoque").addEventListener("click", () => {
-    openModal("entradaEstoqueModal");
-  });
+  function setupFotoPreview(inputId, previewId, imgId) {
+    const input = document.getElementById(inputId);
+    const preview = document.getElementById(previewId);
+    const img = document.getElementById(imgId);
 
-  document.getElementById("entradaEstoqueForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const produtoId = document.getElementById("editarProdutoForm").getAttribute("data-produto-id");
-
-    const payload = {
-      estoque_loja: document.getElementById("entradaLoja").value || 0,
-      estoque_deposito: document.getElementById("entradaDeposito").value || 0,
-      estoque_fabrica: document.getElementById("entradaFabrica").value || 0,
-      valor_unitario_compra: document.getElementById("entradaValorCompra").value || null,
-      valor_unitario: document.getElementById("editValor").value, // fallback
-    };
-
-    try {
-      const response = await fetch(`/admin/produtos/${produtoId}/entrada-estoque`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+    if (input && preview && img) {
+      input.addEventListener('change', function (e) {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            img.src = e.target.result;
+            preview.style.display = 'block';
+          };
+          reader.readAsDataURL(file);
+        } else {
+          preview.style.display = 'none';
+        }
       });
-      const result = await response.json();
-
-      if (result.success) {
-        showFlashMessage("success", result.message);
-        closeModal("entradaEstoqueModal");
-        // Atualiza modal de edição para refletir novos estoques
-        await openEditarProdutoModal(produtoId);
-      } else {
-        showFlashMessage("error", result.message);
-      }
-    } catch (err) {
-      showFlashMessage("error", "Erro ao registrar entrada de estoque");
     }
+  }
+
+  document.getElementById('btnEntradaEstoque').addEventListener('click', () => {
+    openModal('entradaEstoqueModal');
   });
+
+  document
+    .getElementById('entradaEstoqueForm')
+    .addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const produtoId = document
+        .getElementById('editarProdutoForm')
+        .getAttribute('data-produto-id');
+
+      const payload = {
+        estoque_loja: document.getElementById('entradaLoja').value || 0,
+        estoque_deposito: document.getElementById('entradaDeposito').value || 0,
+        estoque_fabrica: document.getElementById('entradaFabrica').value || 0,
+        valor_unitario_compra:
+          document.getElementById('entradaValorCompra').value || null,
+        valor_unitario: document.getElementById('editValor').value,
+      };
+
+      try {
+        const response = await fetch(`/admin/produtos/${produtoId}/entrada-estoque`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+
+        if (result.success) {
+          showFlashMessage('success', result.message);
+          closeModal('entradaEstoqueModal');
+          await openEditarProdutoModal(produtoId);
+        } else {
+          showFlashMessage('error', result.message);
+        }
+      } catch (err) {
+        showFlashMessage('error', 'Erro ao registrar entrada de estoque');
+      }
+    });
 
   // ===== VENDAS RETROATIVAS =====
   function limparFormularioRetroativa() {
@@ -3367,16 +4083,17 @@ setTimeout(inicializarBusca, 500);
     tbody.innerHTML = '';
 
     pagamentosVendaRetroativa.forEach((pagamento, index) => {
-      const formaPagamentoTexto = {
-        'dinheiro': 'Dinheiro',
-        'pix_loja': 'PIX Loja',
-        'pix_fabiano': 'PIX Fabiano',
-        'pix_maquineta': 'PIX Maquineta',
-        'pix_edfrance': 'PIX Edfranci',
-        'cartao_credito': 'Cartão Crédito',
-        'cartao_debito': 'Cartão Débito',
-        'a_prazo': 'A Prazo'
-      }[pagamento.forma_pagamento] || pagamento.forma_pagamento;
+      const formaPagamentoTexto =
+        {
+          dinheiro: 'Dinheiro',
+          pix_loja: 'PIX Loja',
+          pix_fabiano: 'PIX Fabiano',
+          pix_maquineta: 'PIX Maquineta',
+          pix_edfrance: 'PIX Edfranci',
+          cartao_credito: 'Cartão Crédito',
+          cartao_debito: 'Cartão Débito',
+          a_prazo: 'A Prazo',
+        }[pagamento.forma_pagamento] || pagamento.forma_pagamento;
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -3396,17 +4113,26 @@ setTimeout(inicializarBusca, 500);
   }
 
   function calcularTotaisRetroativa() {
-    const totalVenda = itensVendaRetroativa.reduce((total, item) => total + item.valor_total, 0);
-    document.getElementById('totalVendaRetroativa').textContent = formatarMoeda(totalVenda);
+    const totalVenda = itensVendaRetroativa.reduce(
+      (total, item) => total + item.valor_total,
+      0
+    );
+    document.getElementById('totalVendaRetroativa').textContent =
+      formatarMoeda(totalVenda);
 
     const totalRecebido = pagamentosVendaRetroativa
-      .filter(p => p.forma_pagamento !== 'a_prazo')
+      .filter((p) => p.forma_pagamento !== 'a_prazo')
       .reduce((total, pg) => total + pg.valor, 0);
-    document.getElementById('totalRecebidoRetroativo').textContent = formatarMoeda(totalRecebido);
+    document.getElementById('totalRecebidoRetroativo').textContent =
+      formatarMoeda(totalRecebido);
 
-    const temDinheiro = pagamentosVendaRetroativa.some(p => p.forma_pagamento === 'dinheiro');
+    const temDinheiro = pagamentosVendaRetroativa.some(
+      (p) => p.forma_pagamento === 'dinheiro'
+    );
     const troco = temDinheiro ? totalRecebido - totalVenda : 0;
-    document.getElementById('trocoRetroativo').textContent = formatarMoeda(Math.max(troco, 0));
+    document.getElementById('trocoRetroativo').textContent = formatarMoeda(
+      Math.max(troco, 0)
+    );
   }
 
   async function carregarClientesRetroativa() {
@@ -3419,13 +4145,14 @@ setTimeout(inicializarBusca, 500);
 
         select.innerHTML = '<option value="">Selecione um cliente</option>';
 
-        response.clientes.forEach(cliente => {
+        response.clientes.forEach((cliente) => {
           const option = document.createElement('option');
           option.value = cliente.id;
-          option.textContent = `${cliente.nome} - ${cliente.documento || 'Sem documento'}`;
+          option.textContent = `${cliente.nome} - ${
+            cliente.documento || 'Sem documento'
+          }`;
           select.appendChild(option);
         });
-
       }
     } catch (error) {
       showFlashMessage('error', 'Erro ao carregar clientes');
@@ -3442,10 +4169,12 @@ setTimeout(inicializarBusca, 500);
 
         select.innerHTML = '<option value="">Selecione um produto</option>';
 
-        response.produtos.forEach(produto => {
+        response.produtos.forEach((produto) => {
           const option = document.createElement('option');
           option.value = produto.id;
-          option.textContent = `${produto.nome} - ${formatarMoeda(produto.valor_unitario)} (Estoque: ${produto.estoque_loja} ${produto.unidade})`;
+          option.textContent = `${produto.nome} - ${formatarMoeda(
+            produto.valor_unitario
+          )} (Estoque: ${produto.estoque_loja} ${produto.unidade})`;
           option.setAttribute('data-valor', produto.valor_unitario);
           option.setAttribute('data-unidade', produto.unidade);
           select.appendChild(option);
@@ -3466,7 +4195,7 @@ setTimeout(inicializarBusca, 500);
 
         select.innerHTML = '<option value="">Selecione o caixa</option>';
 
-        response.caixas.forEach(caixa => {
+        response.caixas.forEach((caixa) => {
           const option = document.createElement('option');
           option.value = caixa.id;
           option.textContent = `Caixa #${caixa.id} - ${caixa.operador} (${caixa.data_abertura} até ${caixa.data_fechamento})`;
@@ -3486,20 +4215,26 @@ setTimeout(inicializarBusca, 500);
     const quantidade = parseFloat(quantidadeInput.value);
 
     if (!produtoId || !quantidade || quantidade <= 0) {
-      showFlashMessage('warning', 'Selecione um produto e informe uma quantidade válida');
+      showFlashMessage(
+        'warning',
+        'Selecione um produto e informe uma quantidade válida'
+      );
       return;
     }
 
-    const produto = produtosVendaRetroativa.find(p => p.id == produtoId);
+    const produto = produtosVendaRetroativa.find((p) => p.id == produtoId);
     if (!produto) {
       showFlashMessage('error', 'Produto não encontrado');
       return;
     }
 
-    const itemExistente = itensVendaRetroativa.find(item => item.produto_id == produtoId);
+    const itemExistente = itensVendaRetroativa.find(
+      (item) => item.produto_id == produtoId
+    );
     if (itemExistente) {
       itemExistente.quantidade += quantidade;
-      itemExistente.valor_total = itemExistente.quantidade * itemExistente.valor_unitario;
+      itemExistente.valor_total =
+        itemExistente.quantidade * itemExistente.valor_unitario;
     } else {
       const selectedOption = produtoSelect.options[produtoSelect.selectedIndex];
       itensVendaRetroativa.push({
@@ -3508,7 +4243,7 @@ setTimeout(inicializarBusca, 500);
         quantidade: quantidade,
         valor_unitario: parseFloat(selectedOption.getAttribute('data-valor')),
         valor_total: quantidade * parseFloat(selectedOption.getAttribute('data-valor')),
-        unidade: selectedOption.getAttribute('data-unidade')
+        unidade: selectedOption.getAttribute('data-unidade'),
       });
     }
 
@@ -3529,13 +4264,16 @@ setTimeout(inicializarBusca, 500);
     const valor = parseFloat(valorInput.value);
 
     if (!forma || !valor || valor <= 0) {
-      showFlashMessage('warning', 'Selecione uma forma de pagamento e informe um valor válido');
+      showFlashMessage(
+        'warning',
+        'Selecione uma forma de pagamento e informe um valor válido'
+      );
       return;
     }
 
     pagamentosVendaRetroativa.push({
       forma_pagamento: forma,
-      valor: valor
+      valor: valor,
     });
 
     atualizarTabelaPagamentosRetroativa();
@@ -3576,35 +4314,40 @@ setTimeout(inicializarBusca, 500);
       return;
     }
 
-    const valorTotal = itensVendaRetroativa.reduce((total, item) => total + item.valor_total, 0);
-    const aPrazo = pagamentosVendaRetroativa.some(p => p.forma_pagamento === 'a_prazo');
+    const valorTotal = itensVendaRetroativa.reduce(
+      (total, item) => total + item.valor_total,
+      0
+    );
+    const aPrazo = pagamentosVendaRetroativa.some(
+      (p) => p.forma_pagamento === 'a_prazo'
+    );
 
     const dadosVenda = {
       cliente_id: clienteId,
       caixa_id: caixaId,
       data_emissao: dataEmissao.replace('T', ' ') + ':00',
-      itens: itensVendaRetroativa.map(item => ({
+      itens: itensVendaRetroativa.map((item) => ({
         produto_id: item.produto_id,
         quantidade: item.quantidade,
         valor_unitario: item.valor_unitario,
-        valor_total: item.valor_total
+        valor_total: item.valor_total,
       })),
       pagamentos: pagamentosVendaRetroativa,
       valor_total: valorTotal,
       valor_recebido: pagamentosVendaRetroativa
-        .filter(p => p.forma_pagamento !== 'a_prazo')
+        .filter((p) => p.forma_pagamento !== 'a_prazo')
         .reduce((total, pg) => total + pg.valor, 0),
       observacao: observacao,
-      a_prazo: aPrazo
+      a_prazo: aPrazo,
     };
 
     try {
       const response = await fetchWithErrorHandling('/admin/api/vendas/retroativa', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(dadosVenda)
+        body: JSON.stringify(dadosVenda),
       });
 
       if (response.success) {
@@ -3613,7 +4356,10 @@ setTimeout(inicializarBusca, 500);
         closeModal('modalVendaRetroativa');
         loadCaixasData();
       } else {
-        showFlashMessage('error', response.message || 'Erro ao registrar venda retroativa');
+        showFlashMessage(
+          'error',
+          response.message || 'Erro ao registrar venda retroativa'
+        );
       }
     } catch (error) {
       showFlashMessage('error', 'Erro ao enviar venda retroativa');
@@ -3636,33 +4382,47 @@ setTimeout(inicializarBusca, 500);
   }
 
   function setupVendaRetroativaModal() {
-    document.getElementById('btnAdicionarProdutoRetroativo').addEventListener('click', adicionarProdutoRetroativa);
-    document.getElementById('btnAdicionarPagamentoRetroativo').addEventListener('click', adicionarPagamentoRetroativo);
-    document.getElementById('btnSalvarVendaRetroativa').addEventListener('click', salvarVendaRetroativa);
+    document
+      .getElementById('btnAdicionarProdutoRetroativo')
+      .addEventListener('click', adicionarProdutoRetroativa);
+    document
+      .getElementById('btnAdicionarPagamentoRetroativo')
+      .addEventListener('click', adicionarPagamentoRetroativo);
+    document
+      .getElementById('btnSalvarVendaRetroativa')
+      .addEventListener('click', salvarVendaRetroativa);
 
-    document.getElementById('quantidadeRetroativa').addEventListener('keypress', function (e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        adicionarProdutoRetroativa();
-      }
-    });
+    document
+      .getElementById('quantidadeRetroativa')
+      .addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          adicionarProdutoRetroativa();
+        }
+      });
 
-    document.getElementById('valorPagamentoRetroativo').addEventListener('keypress', function (e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        adicionarPagamentoRetroativo();
-      }
-    });
+    document
+      .getElementById('valorPagamentoRetroativo')
+      .addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          adicionarPagamentoRetroativo();
+        }
+      });
 
     document.addEventListener('click', function (e) {
       if (e.target.closest('.btn-remover-produto')) {
-        const index = parseInt(e.target.closest('.btn-remover-produto').getAttribute('data-index'));
+        const index = parseInt(
+          e.target.closest('.btn-remover-produto').getAttribute('data-index')
+        );
         itensVendaRetroativa.splice(index, 1);
         atualizarTabelaProdutosRetroativa();
       }
 
       if (e.target.closest('.btn-remover-pagamento')) {
-        const index = parseInt(e.target.closest('.btn-remover-pagamento').getAttribute('data-index'));
+        const index = parseInt(
+          e.target.closest('.btn-remover-pagamento').getAttribute('data-index')
+        );
         pagamentosVendaRetroativa.splice(index, 1);
         atualizarTabelaPagamentosRetroativa();
       }
@@ -3670,24 +4430,24 @@ setTimeout(inicializarBusca, 500);
   }
 
   function formatarDataApenasData(dataString) {
-      if (!dataString) return '-';
-      
-      // Remove qualquer parte de hora
-      const dataPart = dataString.split(' ')[0].split('T')[0];
-      const [year, month, day] = dataPart.split('-');
-      
-      return `${day}/${month}/${year}`;
+    if (!dataString) return '-';
+
+    // Remove qualquer parte de hora
+    const dataPart = dataString.split(' ')[0].split('T')[0];
+    const [year, month, day] = dataPart.split('-');
+
+    return `${day}/${month}/${year}`;
   }
 
   // Funções auxiliares para formatação
   function formatarStatus(status) {
     const statusMap = {
-      'pendente': 'Pendente',
-      'atrasado': 'Atrasado',
-      'quitado': 'Quitado',
-      'paid': 'Quitado',       // Para compatibilidade
-      'pending': 'Pendente',   // Para compatibilidade
-      'overdue': 'Atrasado'    // Para compatibilidade
+      pendente: 'Pendente',
+      atrasado: 'Atrasado',
+      quitado: 'Quitado',
+      paid: 'Quitado', // Para compatibilidade
+      pending: 'Pendente', // Para compatibilidade
+      overdue: 'Atrasado', // Para compatibilidade
     };
     return statusMap[status.toLowerCase()] || status;
   }
@@ -3695,12 +4455,12 @@ setTimeout(inicializarBusca, 500);
   function getStatusBadgeClass(status) {
     const normalizedStatus = status.toLowerCase();
     const classMap = {
-      'pendente': 'badge-warning',
-      'pending': 'badge-warning',
-      'atrasado': 'badge-danger',
-      'overdue': 'badge-danger',
-      'quitado': 'badge-success',
-      'paid': 'badge-success'
+      pendente: 'badge-warning',
+      pending: 'badge-warning',
+      atrasado: 'badge-danger',
+      overdue: 'badge-danger',
+      quitado: 'badge-success',
+      paid: 'badge-success',
     };
     return classMap[normalizedStatus] || 'badge-secondary';
   }
@@ -3723,7 +4483,9 @@ setTimeout(inicializarBusca, 500);
     }
   });
 
-  document.getElementById('filtrarContasReceber')?.addEventListener('click', loadContasReceber);
+  document
+    .getElementById('filtrarContasReceber')
+    ?.addEventListener('click', loadContasReceber);
 
   // Event listener para abrir modal de detalhes
   document.addEventListener('click', function (e) {
@@ -3737,19 +4499,30 @@ setTimeout(inicializarBusca, 500);
   async function abrirModalDetalhesConta(contaId) {
     try {
       // Fazer a requisição para obter os detalhes da conta
-      const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
+      const response = await fetchWithErrorHandling(
+        `/admin/contas-receber/${contaId}/detalhes`
+      );
 
       if (response) {
         // 1. Preencher informações básicas da conta
-        document.getElementById('detalheClienteNome').textContent = response.cliente || '-';
-        document.getElementById('detalheClienteDocumento').textContent = response.cliente_documento || '-';
-        document.getElementById('detalheDescricao').textContent = response.descricao || '-';
-        document.getElementById('detalheValorTotal').textContent = formatarMoeda(response.valor_original);
-        document.getElementById('detalheValorPendente').textContent = formatarMoeda(response.valor_aberto);
+        document.getElementById('detalheClienteNome').textContent =
+          response.cliente || '-';
+        document.getElementById('detalheClienteDocumento').textContent =
+          response.cliente_documento || '-';
+        document.getElementById('detalheDescricao').textContent =
+          response.descricao || '-';
+        document.getElementById('detalheValorTotal').textContent = formatarMoeda(
+          response.valor_original
+        );
+        document.getElementById('detalheValorPendente').textContent = formatarMoeda(
+          response.valor_aberto
+        );
 
         // 2. Determinar o status para exibição
         const hoje = new Date();
-        const dataVencimento = new Date(response.data_vencimento.split('/').reverse().join('-'));
+        const dataVencimento = new Date(
+          response.data_vencimento.split('/').reverse().join('-')
+        );
         let statusExibicao = response.status.toLowerCase();
 
         // Se não estiver quitado, verificar se está atrasado
@@ -3767,7 +4540,7 @@ setTimeout(inicializarBusca, 500);
         pagamentosTbody.innerHTML = '';
 
         if (response.pagamentos && response.pagamentos.length > 0) {
-          response.pagamentos.forEach(pagamento => {
+          response.pagamentos.forEach((pagamento) => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                           <td>${pagamento.data_pagamento}</td>
@@ -3778,7 +4551,8 @@ setTimeout(inicializarBusca, 500);
             pagamentosTbody.appendChild(tr);
           });
         } else {
-          pagamentosTbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
+          pagamentosTbody.innerHTML =
+            '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
         }
 
         // 4. Preencher o select de caixas disponíveis
@@ -3786,7 +4560,7 @@ setTimeout(inicializarBusca, 500);
         caixaSelect.innerHTML = '<option value="">Selecione</option>';
 
         if (response.caixas && response.caixas.length > 0) {
-          response.caixas.forEach(caixa => {
+          response.caixas.forEach((caixa) => {
             const option = document.createElement('option');
             option.value = caixa.id;
 
@@ -3833,20 +4607,25 @@ setTimeout(inicializarBusca, 500);
   }
 
   // Event listeners para os botões de pagamento
-  document.getElementById('formPagamentoConta')?.addEventListener('submit', function (e) {
-    e.preventDefault();
-    const contaId = document.getElementById('contaIdPagamento').value;
-    const valor = parseFloat(document.getElementById('valorPagamento').value);
+  document
+    .getElementById('formPagamentoConta')
+    ?.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const contaId = document.getElementById('contaIdPagamento').value;
+      const valor = parseFloat(document.getElementById('valorPagamento').value);
 
-    if (contaId && valor) {
-      registrarPagamento(contaId, valor);
-    }
-  });
+      if (contaId && valor) {
+        registrarPagamento(contaId, valor);
+      }
+    });
 
   document.getElementById('btnPagarTotal')?.addEventListener('click', function () {
     const contaId = document.getElementById('contaIdPagamento').value;
-    const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
-    const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+    const valorPendenteText =
+      document.getElementById('detalheValorPendente').textContent;
+    const valorPendente = parseFloat(
+      valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.')
+    );
 
     if (contaId && valorPendente > 0) {
       // Preencher o valor total no campo
@@ -3860,14 +4639,16 @@ setTimeout(inicializarBusca, 500);
   // Função para atualizar a lista de pagamentos
   async function atualizarListaPagamentos(contaId) {
     try {
-      const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
+      const response = await fetchWithErrorHandling(
+        `/admin/contas-receber/${contaId}/detalhes`
+      );
 
       if (response && response.pagamentos) {
         const pagamentosTbody = document.getElementById('detalhePagamentos');
         pagamentosTbody.innerHTML = '';
 
         if (response.pagamentos.length > 0) {
-          response.pagamentos.forEach(pagamento => {
+          response.pagamentos.forEach((pagamento) => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                           <td>${pagamento.data_pagamento}</td>
@@ -3878,7 +4659,8 @@ setTimeout(inicializarBusca, 500);
             pagamentosTbody.appendChild(tr);
           });
         } else {
-          pagamentosTbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
+          pagamentosTbody.innerHTML =
+            '<tr><td colspan="4" class="text-center">Nenhum pagamento registrado</td></tr>';
         }
       }
     } catch (error) {
@@ -3889,7 +4671,8 @@ setTimeout(inicializarBusca, 500);
     try {
       // Mostrar loading
       const tbody = document.querySelector('#tabelaRelatorio tbody');
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center"><div class="spinner-border" role="status"><span class="sr-only">Carregando...</span></div></td></tr>';
+      tbody.innerHTML =
+        '<tr><td colspan="9" class="text-center"><div class="spinner-border" role="status"><span class="sr-only">Carregando...</span></div></td></tr>';
 
       // Obter valores dos filtros
       const dataInicio = document.getElementById('relatorioDataInicio').value;
@@ -3908,7 +4691,9 @@ setTimeout(inicializarBusca, 500);
       params.append('limite', 50);
 
       // Fazer a requisição
-      const response = await fetchWithErrorHandling(`/admin/relatorios/vendas-produtos?${params.toString()}`);
+      const response = await fetchWithErrorHandling(
+        `/admin/relatorios/vendas-produtos?${params.toString()}`
+      );
 
       if (response) {
         // Atualizar metadados
@@ -3919,7 +4704,8 @@ setTimeout(inicializarBusca, 500);
       }
     } catch (error) {
       const tbody = document.querySelector('#tabelaRelatorio tbody');
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">Erro ao carregar dados do relatório</td></tr>';
+      tbody.innerHTML =
+        '<tr><td colspan="9" class="text-center text-danger">Erro ao carregar dados do relatório</td></tr>';
       showFlashMessage('error', 'Erro ao carregar relatório de saídas');
     }
   }
@@ -3935,30 +4721,44 @@ setTimeout(inicializarBusca, 500);
     const inicioLocal = new Date(inicio.getTime() + inicio.getTimezoneOffset() * 60000);
     const fimLocal = new Date(fim.getTime() + fim.getTimezoneOffset() * 60000);
 
-    document.getElementById('relatorioPeriodoTexto').innerHTML =
-      `${inicioLocal.toLocaleDateString('pt-BR')}<br>${fimLocal.toLocaleDateString('pt-BR')}`;
+    document.getElementById(
+      'relatorioPeriodoTexto'
+    ).innerHTML = `${inicioLocal.toLocaleDateString(
+      'pt-BR'
+    )}<br>${fimLocal.toLocaleDateString('pt-BR')}`;
 
     // Atualizar totais
     document.getElementById('relatorioTotalProdutos').textContent = meta.total_produtos;
-    document.getElementById('relatorioTotalQuantidade').textContent = meta.total_quantidade_vendida;
-    document.getElementById('relatorioTotalValor').textContent = formatarMoeda(meta.total_valor_vendido);
-    document.getElementById('relatorioEstoqueCritico').textContent = meta.produtos_estoque_critico;
-    document.getElementById('relatorioCustoTotal').textContent = formatCurrency(meta.total_custo);
-    document.getElementById('relatorioLucroBruto').textContent = formatCurrency(meta.lucro_bruto);
-    document.getElementById('relatorioLucroLiquido').textContent = formatCurrency(meta.lucro_liquido);
+    document.getElementById('relatorioTotalQuantidade').textContent =
+      meta.total_quantidade_vendida;
+    document.getElementById('relatorioTotalValor').textContent = formatarMoeda(
+      meta.total_valor_vendido
+    );
+    document.getElementById('relatorioEstoqueCritico').textContent =
+      meta.produtos_estoque_critico;
+    document.getElementById('relatorioCustoTotal').textContent = formatCurrency(
+      meta.total_custo
+    );
+    document.getElementById('relatorioLucroBruto').textContent = formatCurrency(
+      meta.lucro_bruto
+    );
+    document.getElementById('relatorioLucroLiquido').textContent = formatCurrency(
+      meta.lucro_liquido
+    );
   }
 
   function preencherTabelaRelatorio(dados) {
     const tbody = document.querySelector('#tabelaRelatorio tbody');
 
     if (!dados || dados.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="10" class="text-center">Nenhum dado encontrado para os filtros selecionados</td></tr>';
+      tbody.innerHTML =
+        '<tr><td colspan="10" class="text-center">Nenhum dado encontrado para os filtros selecionados</td></tr>';
       return;
     }
 
     tbody.innerHTML = '';
 
-    dados.forEach(item => {
+    dados.forEach((item) => {
       const tr = document.createElement('tr');
 
       if (item.status_estoque === 'CRÍTICO') {
@@ -3969,7 +4769,9 @@ setTimeout(inicializarBusca, 500);
               <td>${item.produto_id}</td>
               <td>
                   <strong>${item.produto_nome}</strong><br>
-                  <small class="text-muted">${item.produto_codigo || 'Sem código'}</small>
+                  <small class="text-muted">${
+                    item.produto_codigo || 'Sem código'
+                  }</small>
               </td>
               <td>${item.unidade}</td>
               <td>${item.quantidade_vendida.toFixed(2)}</td>
@@ -3977,7 +4779,9 @@ setTimeout(inicializarBusca, 500);
               <td>
                   ${item.estoque_atual_loja.toFixed(2)}
                   <div class="progress mt-1" style="height: 5px;">
-                      <div class="progress-bar ${item.percentual_estoque < 100 ? 'bg-danger' : 'bg-success'}" 
+                      <div class="progress-bar ${
+                        item.percentual_estoque < 100 ? 'bg-danger' : 'bg-success'
+                      }" 
                           role="progressbar" 
                           style="width: ${Math.min(item.percentual_estoque, 100)}%" 
                           aria-valuenow="${item.percentual_estoque}" 
@@ -3988,7 +4792,9 @@ setTimeout(inicializarBusca, 500);
               </td>
               <td>${item.estoque_minimo.toFixed(2)}</td>
               <td>
-                  <span class="badge ${item.status_estoque === 'CRÍTICO' ? 'badge-danger' : 'badge-success'}">
+                  <span class="badge ${
+                    item.status_estoque === 'CRÍTICO' ? 'badge-danger' : 'badge-success'
+                  }">
                       ${item.status_estoque}
                   </span>
               </td>
@@ -4006,7 +4812,7 @@ setTimeout(inicializarBusca, 500);
     });
 
     // Evento do botão de detalhes
-    document.querySelectorAll('.btn-detalhes').forEach(btn => {
+    document.querySelectorAll('.btn-detalhes').forEach((btn) => {
       btn.addEventListener('click', function () {
         const produtoId = this.getAttribute('data-produto-id');
         abrirModalDetalhesProduto(produtoId); // Chama a rota /detalhes
@@ -4030,15 +4836,19 @@ setTimeout(inicializarBusca, 500);
       if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
 
       // Gerar PDF em nova guia
-      window.open(`/admin/relatorios/vendas-produtos/pdf?${params.toString()}`, '_blank');
-
+      window.open(
+        `/admin/relatorios/vendas-produtos/pdf?${params.toString()}`,
+        '_blank'
+      );
     } catch (error) {
       showFlashMessage('error', 'Erro ao gerar relatório em PDF');
     }
   }
 
   // Adicione este event listener no DOMContentLoaded ou onde você configura os eventos
-  document.getElementById('btnExportarPDF')?.addEventListener('click', exportarRelatorioPDF);
+  document
+    .getElementById('btnExportarPDF')
+    ?.addEventListener('click', exportarRelatorioPDF);
   async function abrirModalDetalhesProduto(produtoId) {
     try {
       // Obter valores dos filtros atuais
@@ -4054,11 +4864,14 @@ setTimeout(inicializarBusca, 500);
       // Mostrar modal de loading
       const modal = document.getElementById('detalhesSaidaModal');
       const modalBody = modal.querySelector('.modal-body');
-      modalBody.innerHTML = '<div class="text-center p-4"><div class="spinner-border" role="status"><span class="sr-only">Carregando...</span></div></div>';
+      modalBody.innerHTML =
+        '<div class="text-center p-4"><div class="spinner-border" role="status"><span class="sr-only">Carregando...</span></div></div>';
       openModal('detalhesSaidaModal');
 
       // Fazer requisição
-      const response = await fetchWithErrorHandling(`/admin/relatorios/vendas-produtos/detalhes?${params.toString()}`);
+      const response = await fetchWithErrorHandling(
+        `/admin/relatorios/vendas-produtos/detalhes?${params.toString()}`
+      );
 
       if (response && response.success) {
         const produto = response.produto;
@@ -4068,13 +4881,17 @@ setTimeout(inicializarBusca, 500);
         modalBody.innerHTML = `
                   <div class="detalhes-produto-header">
                       <h4>${produto.produto_nome}</h4>
-                      <p class="text-muted">Código: ${produto.produto_codigo || 'N/A'} | Categoria: ${produto.produto_tipo || 'N/A'}</p>
+                      <p class="text-muted">Código: ${
+                        produto.produto_codigo || 'N/A'
+                      } | Categoria: ${produto.produto_tipo || 'N/A'}</p>
                       <div class="row mb-3">
                           <div class="col-md-4">
                               <div class="card card-sm">
                                   <div class="card-body">
                                       <h6>Estoque Atual</h6>
-                                      <h3 class="text-primary">${produto.estoque_atual_loja} ${produto.unidade}</h3>
+                                      <h3 class="text-primary">${
+                                        produto.estoque_atual_loja
+                                      } ${produto.unidade}</h3>
                                   </div>
                               </div>
                           </div>
@@ -4082,7 +4899,13 @@ setTimeout(inicializarBusca, 500);
                               <div class="card card-sm">
                                   <div class="card-body">
                                       <h6>Estoque Mínimo</h6>
-                                      <h3 class="${produto.status_estoque === 'CRÍTICO' ? 'text-danger' : 'text-success'}">${produto.estoque_minimo} ${produto.unidade}</h3>
+                                      <h3 class="${
+                                        produto.status_estoque === 'CRÍTICO'
+                                          ? 'text-danger'
+                                          : 'text-success'
+                                      }">${produto.estoque_minimo} ${
+          produto.unidade
+        }</h3>
                                   </div>
                               </div>
                           </div>
@@ -4111,7 +4934,9 @@ setTimeout(inicializarBusca, 500);
                                   </tr>
                               </thead>
                               <tbody>
-                                  ${historico.map(item => `
+                                  ${historico
+                                    .map(
+                                      (item) => `
                                       <tr>
                                           <td>${formatarData(item.data_emissao)}</td>
                                           <td>${item.cliente_nome || 'Consumidor'}</td>
@@ -4119,14 +4944,18 @@ setTimeout(inicializarBusca, 500);
                                           <td>${formatarMoeda(item.valor_unitario)}</td>
                                           <td>${formatarMoeda(item.valor_total)}</td>
                                       </tr>
-                                  `).join('')}
+                                  `
+                                    )
+                                    .join('')}
                               </tbody>
                           </table>
                       </div>
                   </div>
               `;
       } else {
-        modalBody.innerHTML = `<div class="alert alert-danger">${response.message || 'Erro ao carregar detalhes'}</div>`;
+        modalBody.innerHTML = `<div class="alert alert-danger">${
+          response.message || 'Erro ao carregar detalhes'
+        }</div>`;
       }
     } catch (error) {
       const modalBody = document.querySelector('#modalDetalhesProduto .modal-body');
@@ -4158,14 +4987,18 @@ setTimeout(inicializarBusca, 500);
   function formatarMoeda(valor) {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(valor || 0);
   }
 
   function formatarData(dataString) {
     if (!dataString) return '-';
     const date = new Date(dataString);
-    return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return (
+      date.toLocaleDateString('pt-BR') +
+      ' ' +
+      date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    );
   }
 
   // Event Listeners
@@ -4185,11 +5018,18 @@ setTimeout(inicializarBusca, 500);
     loadRelatorioSaidasData();
   });
 
-  document.getElementById('filtrarRelatorio').addEventListener('click', loadRelatorioSaidasData);
-  document.getElementById('atualizarRelatorio').addEventListener('click', loadRelatorioSaidasData);
+  document
+    .getElementById('filtrarRelatorio')
+    .addEventListener('click', loadRelatorioSaidasData);
+  document
+    .getElementById('atualizarRelatorio')
+    .addEventListener('click', loadRelatorioSaidasData);
 
   // Permitir filtrar com Enter nos campos de texto
-  [document.getElementById('relatorioProdutoNome'), document.getElementById('relatorioProdutoCodigo')].forEach(input => {
+  [
+    document.getElementById('relatorioProdutoNome'),
+    document.getElementById('relatorioProdutoCodigo'),
+  ].forEach((input) => {
     if (input) {
       input.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') {
@@ -4203,7 +5043,7 @@ setTimeout(inicializarBusca, 500);
   async function loadOperadores() {
     try {
       // Aguarda um pouco para garantir que o DOM esteja pronto
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const select = document.getElementById('caixaOperador');
 
@@ -4219,13 +5059,12 @@ setTimeout(inicializarBusca, 500);
         select.innerHTML = '<option value="">Todos</option>';
 
         // Adiciona os operadores
-        data.data.forEach(operador => {
+        data.data.forEach((operador) => {
           const option = document.createElement('option');
           option.value = operador.id;
           option.textContent = operador.nome;
           select.appendChild(option);
         });
-
       }
     } catch (error) {
       console.error('Erro ao carregar operadores:', error);
@@ -4266,19 +5105,23 @@ setTimeout(inicializarBusca, 500);
         if (caixasTable) {
           caixasTable.innerHTML = '';
 
-          data.data.forEach(caixa => {
+          data.data.forEach((caixa) => {
             const row = document.createElement('tr');
 
             const dataAbertura = formatDateTime(caixa.data_abertura);
-            const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
+            const dataFechamento = caixa.data_fechamento
+              ? formatDateTime(caixa.data_fechamento)
+              : '-';
             const valorEntradas = formatarMoeda(caixa.total_vendas);
             const valorSaidas = formatarMoeda(caixa.total_despesas);
-            const valorConfirmado = caixa.valor_confirmado ? formatarMoeda(caixa.valor_confirmado) : '-';
+            const valorConfirmado = caixa.valor_confirmado
+              ? formatarMoeda(caixa.valor_confirmado)
+              : '-';
 
             // Determina classe e texto do status
             let statusClass = '';
             let statusText = '';
-            switch(caixa.status) {
+            switch (caixa.status) {
               case 'aberto':
                 statusClass = 'badge-success';
                 statusText = 'Aberto';
@@ -4326,16 +5169,24 @@ setTimeout(inicializarBusca, 500);
               <td><span class="badge ${statusClass}">${statusText}</span></td>
               <td>
                 <div class="table-actions">
-                  <button class="btn-icon btn-info visualizar-caixa" data-id="${caixa.id}" title="Visualizar">
+                  <button class="btn-icon btn-info visualizar-caixa" data-id="${
+                    caixa.id
+                  }" title="Visualizar">
                     <i class="fas fa-eye"></i>
                   </button>
-                  <button class="btn-icon btn-warning reabrir-caixa" data-id="${caixa.id}" title="Reabrir Caixa">
+                  <button class="btn-icon btn-warning reabrir-caixa" data-id="${
+                    caixa.id
+                  }" title="Reabrir Caixa">
                     <i class="fas fa-unlock"></i>
                   </button>
-                  <button class="btn-icon btn-danger fechar-caixa" data-id="${caixa.id}" title="Fechar Caixa">
+                  <button class="btn-icon btn-danger fechar-caixa" data-id="${
+                    caixa.id
+                  }" title="Fechar Caixa">
                     <i class="fas fa-lock"></i>
                   </button>
-                  <button class="btn-icon btn-primary venda-retroativa-caixa" data-id="${caixa.id}" title="Venda Retroativa">
+                  <button class="btn-icon btn-primary venda-retroativa-caixa" data-id="${
+                    caixa.id
+                  }" title="Venda Retroativa">
                     <i class="fas fa-history"></i>
                   </button>
                   ${aprovarButton}
@@ -4383,22 +5234,33 @@ setTimeout(inicializarBusca, 500);
     } else {
       paginationContainer.innerHTML = `
               <div class="pagination-info">
-                  Mostrando ${((currentPage - 1) * caixasPerPage) + 1} - ${Math.min(currentPage * caixasPerPage, totalItems)} de ${totalItems} caixas
+                  Mostrando ${(currentPage - 1) * caixasPerPage + 1} - ${Math.min(
+        currentPage * caixasPerPage,
+        totalItems
+      )} de ${totalItems} caixas
               </div>
               <div class="pagination-buttons">
-                  <button class="btn btn-outline pagination-btn" ${currentPage === 1 ? 'disabled' : ''} data-page="1">
+                  <button class="btn btn-outline pagination-btn" ${
+                    currentPage === 1 ? 'disabled' : ''
+                  } data-page="1">
                       <i class="fas fa-angle-double-left"></i>
                   </button>
-                  <button class="btn btn-outline pagination-btn" ${currentPage === 1 ? 'disabled' : ''} data-page="${currentPage - 1}">
+                  <button class="btn btn-outline pagination-btn" ${
+                    currentPage === 1 ? 'disabled' : ''
+                  } data-page="${currentPage - 1}">
                       <i class="fas fa-chevron-left"></i>
                   </button>
                   
                   <span class="pagination-current">Página ${currentPage} de ${totalPages}</span>
                   
-                  <button class="btn btn-outline pagination-btn" ${currentPage === totalPages ? 'disabled' : ''} data-page="${currentPage + 1}">
+                  <button class="btn btn-outline pagination-btn" ${
+                    currentPage === totalPages ? 'disabled' : ''
+                  } data-page="${currentPage + 1}">
                       <i class="fas fa-chevron-right"></i>
                   </button>
-                  <button class="btn btn-outline pagination-btn" ${currentPage === totalPages ? 'disabled' : ''} data-page="${totalPages}">
+                  <button class="btn btn-outline pagination-btn" ${
+                    currentPage === totalPages ? 'disabled' : ''
+                  } data-page="${totalPages}">
                       <i class="fas fa-angle-double-right"></i>
                   </button>
               </div>
@@ -4412,7 +5274,7 @@ setTimeout(inicializarBusca, 500);
     }
 
     // Adiciona event listeners aos botões de paginação
-    document.querySelectorAll('.pagination-btn').forEach(btn => {
+    document.querySelectorAll('.pagination-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         if (!btn.disabled) {
           const page = parseInt(btn.getAttribute('data-page'));
@@ -4492,21 +5354,20 @@ setTimeout(inicializarBusca, 500);
 
       // Abrir PDF em nova aba
       window.open(url, '_blank');
-
     } catch (error) {
       showFlashMessage('error', 'Erro ao gerar PDF');
     }
   }
 
   function setupCaixaActions() {
-    document.querySelectorAll('.visualizar-caixa').forEach(btn => {
+    document.querySelectorAll('.visualizar-caixa').forEach((btn) => {
       btn.addEventListener('click', function () {
         const caixaId = this.getAttribute('data-id');
         openVisualizarCaixaModal(caixaId);
       });
     });
 
-    document.querySelectorAll('.enviar-analise-caixa').forEach(btn => {
+    document.querySelectorAll('.enviar-analise-caixa').forEach((btn) => {
       btn.addEventListener('click', async function () {
         const caixaId = this.getAttribute('data-id');
 
@@ -4521,14 +5382,17 @@ setTimeout(inicializarBusca, 500);
 
           const observacoes = prompt('Observações (opcional):') || '';
 
-          const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/enviar_analise`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              valor_fechamento: parseFloat(valorFechamento),
-              observacoes: observacoes
-            })
-          });
+          const response = await fetchWithErrorHandling(
+            `/admin/caixas/${caixaId}/enviar_analise`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                valor_fechamento: parseFloat(valorFechamento),
+                observacoes: observacoes,
+              }),
+            }
+          );
 
           if (response.success) {
             showFlashMessage('success', 'Caixa enviado para análise com sucesso');
@@ -4540,12 +5404,12 @@ setTimeout(inicializarBusca, 500);
       });
     });
 
-   document.querySelectorAll('.aprovar-caixa').forEach(btn => {
+    document.querySelectorAll('.aprovar-caixa').forEach((btn) => {
       btn.addEventListener('click', async function () {
         const caixaId = this.getAttribute('data-id');
 
         // Remove popup existente
-        document.querySelectorAll('.popup-overlay').forEach(p => p.remove());
+        document.querySelectorAll('.popup-overlay').forEach((p) => p.remove());
 
         // Cria overlay + popup
         const overlay = document.createElement('div');
@@ -4569,7 +5433,9 @@ setTimeout(inicializarBusca, 500);
         document.body.appendChild(overlay);
 
         // Botão cancelar
-        overlay.querySelector('.cancelar').addEventListener('click', () => overlay.remove());
+        overlay
+          .querySelector('.cancelar')
+          .addEventListener('click', () => overlay.remove());
 
         // Botão confirmar
         overlay.querySelector('.confirmar').addEventListener('click', async () => {
@@ -4588,21 +5454,30 @@ setTimeout(inicializarBusca, 500);
           }
 
           try {
-            const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/aprovar`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                valor_confirmado: valorConfirmado,
-                observacoes: observacoes
-              })
-            });
+            const response = await fetchWithErrorHandling(
+              `/admin/caixas/${caixaId}/aprovar`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  valor_confirmado: valorConfirmado,
+                  observacoes: observacoes,
+                }),
+              }
+            );
 
             if (response.success) {
               overlay.remove();
               if (response.transferencia_realizada) {
-                showFlashMessage('success', 'Caixa aprovado com sucesso e saldo transferido para sua conta');
+                showFlashMessage(
+                  'success',
+                  'Caixa aprovado com sucesso e saldo transferido para sua conta'
+                );
               } else {
-                showFlashMessage('success', 'Caixa aprovado com sucesso (sem saldo para transferir)');
+                showFlashMessage(
+                  'success',
+                  'Caixa aprovado com sucesso (sem saldo para transferir)'
+                );
               }
               loadCaixasData();
             }
@@ -4687,8 +5562,7 @@ setTimeout(inicializarBusca, 500);
     `;
     document.head.appendChild(style);
 
-
-    document.querySelectorAll('.recusar-caixa').forEach(btn => {
+    document.querySelectorAll('.recusar-caixa').forEach((btn) => {
       btn.addEventListener('click', async function () {
         const caixaId = this.getAttribute('data-id');
 
@@ -4706,14 +5580,17 @@ setTimeout(inicializarBusca, 500);
             return;
           }
 
-          const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/recusar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              motivo: motivo,
-              valor_correto: valorCorreto ? parseFloat(valorCorreto) : null
-            })
-          });
+          const response = await fetchWithErrorHandling(
+            `/admin/caixas/${caixaId}/recusar`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                motivo: motivo,
+                valor_correto: valorCorreto ? parseFloat(valorCorreto) : null,
+              }),
+            }
+          );
 
           if (response.success) {
             showFlashMessage('success', 'Caixa recusado com sucesso');
@@ -4725,7 +5602,7 @@ setTimeout(inicializarBusca, 500);
       });
     });
 
-    document.querySelectorAll('.reabrir-caixa').forEach(btn => {
+    document.querySelectorAll('.reabrir-caixa').forEach((btn) => {
       btn.addEventListener('click', async function () {
         const caixaId = this.getAttribute('data-id');
 
@@ -4733,11 +5610,14 @@ setTimeout(inicializarBusca, 500);
           const motivo = prompt('Motivo da reabertura (opcional):') || '';
 
           if (confirm('Tem certeza que deseja reabrir este caixa?')) {
-            const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/reabrir`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ motivo: motivo })
-            });
+            const response = await fetchWithErrorHandling(
+              `/admin/caixas/${caixaId}/reabrir`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ motivo: motivo }),
+              }
+            );
 
             if (response.success) {
               showFlashMessage('success', 'Caixa reaberto com sucesso');
@@ -4750,14 +5630,14 @@ setTimeout(inicializarBusca, 500);
       });
     });
 
-    document.querySelectorAll('.venda-retroativa-caixa').forEach(btn => {
+    document.querySelectorAll('.venda-retroativa-caixa').forEach((btn) => {
       btn.addEventListener('click', function () {
         const caixaId = this.getAttribute('data-id');
         abrirModalVendaRetroativa(caixaId);
       });
     });
 
-    document.querySelectorAll('.fechar-caixa').forEach(btn => {
+    document.querySelectorAll('.fechar-caixa').forEach((btn) => {
       btn.addEventListener('click', function () {
         const caixaId = this.getAttribute('data-id');
 
@@ -4857,11 +5737,14 @@ setTimeout(inicializarBusca, 500);
           const observacoes = observacoesInput.value || '';
 
           try {
-            const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/fechar`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ valor_fechamento: valor, observacoes })
-            });
+            const response = await fetchWithErrorHandling(
+              `/admin/caixas/${caixaId}/fechar`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ valor_fechamento: valor, observacoes }),
+              }
+            );
             if (response.success) {
               showFlashMessage('success', 'Caixa fechado com sucesso');
               loadCaixasData();
@@ -4873,8 +5756,6 @@ setTimeout(inicializarBusca, 500);
         });
       });
     });
-
-
   }
 
   async function openVisualizarCaixaModal(caixaId) {
@@ -4884,10 +5765,17 @@ setTimeout(inicializarBusca, 500);
       if (response.success) {
         const caixa = response.data;
 
-        if (document.getElementById('visualizarCaixaId')) document.getElementById('visualizarCaixaId').textContent = caixa.id;
-        if (document.getElementById('visualizarCaixaOperador')) document.getElementById('visualizarCaixaOperador').textContent = caixa.operador?.nome || '-';
-        if (document.getElementById('visualizarCaixaDataAbertura')) document.getElementById('visualizarCaixaDataAbertura').textContent = formatDateTime(caixa.data_abertura);
-        if (document.getElementById('visualizarCaixaValorAbertura')) document.getElementById('visualizarCaixaValorAbertura').textContent = formatarMoeda(caixa.valor_abertura);
+        if (document.getElementById('visualizarCaixaId'))
+          document.getElementById('visualizarCaixaId').textContent = caixa.id;
+        if (document.getElementById('visualizarCaixaOperador'))
+          document.getElementById('visualizarCaixaOperador').textContent =
+            caixa.operador?.nome || '-';
+        if (document.getElementById('visualizarCaixaDataAbertura'))
+          document.getElementById('visualizarCaixaDataAbertura').textContent =
+            formatDateTime(caixa.data_abertura);
+        if (document.getElementById('visualizarCaixaValorAbertura'))
+          document.getElementById('visualizarCaixaValorAbertura').textContent =
+            formatarMoeda(caixa.valor_abertura);
 
         const statusElement = document.getElementById('visualizarCaixaStatus');
         if (statusElement) {
@@ -4916,9 +5804,15 @@ setTimeout(inicializarBusca, 500);
         }
 
         if (['fechado', 'analise', 'rejeitado'].includes(caixa.status)) {
-          if (document.getElementById('visualizarCaixaDataFechamento')) document.getElementById('visualizarCaixaDataFechamento').textContent = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
-          if (document.getElementById('visualizarCaixaValorFechamento')) document.getElementById('visualizarCaixaValorFechamento').textContent = caixa.valor_fechamento ? formatarMoeda(caixa.valor_fechamento) : '-';
-          if (document.getElementById('visualizarCaixaValorConfirmado')) document.getElementById('visualizarCaixaValorConfirmado').textContent = caixa.valor_confirmado ? formatarMoeda(caixa.valor_confirmado) : '-';
+          if (document.getElementById('visualizarCaixaDataFechamento'))
+            document.getElementById('visualizarCaixaDataFechamento').textContent =
+              caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
+          if (document.getElementById('visualizarCaixaValorFechamento'))
+            document.getElementById('visualizarCaixaValorFechamento').textContent =
+              caixa.valor_fechamento ? formatarMoeda(caixa.valor_fechamento) : '-';
+          if (document.getElementById('visualizarCaixaValorConfirmado'))
+            document.getElementById('visualizarCaixaValorConfirmado').textContent =
+              caixa.valor_confirmado ? formatarMoeda(caixa.valor_confirmado) : '-';
 
           const caixaFechamentoInfo = document.getElementById('caixaFechamentoInfo');
           if (caixaFechamentoInfo) caixaFechamentoInfo.style.display = 'block';
@@ -4927,8 +5821,12 @@ setTimeout(inicializarBusca, 500);
           if (caixaFechamentoInfo) caixaFechamentoInfo.style.display = 'none';
         }
 
-        if (document.getElementById('visualizarCaixaObsOperador')) document.getElementById('visualizarCaixaObsOperador').textContent = caixa.observacoes_operador || 'Nenhuma observação';
-        if (document.getElementById('visualizarCaixaObsAdmin')) document.getElementById('visualizarCaixaObsAdmin').textContent = caixa.observacoes_admin || 'Nenhuma observação';
+        if (document.getElementById('visualizarCaixaObsOperador'))
+          document.getElementById('visualizarCaixaObsOperador').textContent =
+            caixa.observacoes_operador || 'Nenhuma observação';
+        if (document.getElementById('visualizarCaixaObsAdmin'))
+          document.getElementById('visualizarCaixaObsAdmin').textContent =
+            caixa.observacoes_admin || 'Nenhuma observação';
 
         await loadCaixaFinanceiro(caixaId);
         openModal(document.getElementById('visualizarCaixaModal'));
@@ -4943,8 +5841,10 @@ setTimeout(inicializarBusca, 500);
     document.getElementById('estornoVendaId').value = vendaId;
     document.getElementById('estornoVendaValor').textContent = formatarMoeda(valor);
     document.getElementById('estornoVendaData').textContent = formatDateTime(data);
-    document.getElementById('estornoVendaCliente').textContent = cliente || 'Não informado';
-    document.getElementById('estornoVendaDescricao').textContent = descricao || 'Não informado';
+    document.getElementById('estornoVendaCliente').textContent =
+      cliente || 'Não informado';
+    document.getElementById('estornoVendaDescricao').textContent =
+      descricao || 'Não informado';
 
     // Limpar o campo de motivo
     document.getElementById('motivoEstorno').value = '';
@@ -4965,15 +5865,18 @@ setTimeout(inicializarBusca, 500);
 
     try {
       showLoading(true);
-      const response = await fetchWithErrorHandling(`/admin/caixa/venda/${vendaId}/estornar`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          motivo_estorno: motivoEstorno
-        })
-      });
+      const response = await fetchWithErrorHandling(
+        `/admin/caixa/venda/${vendaId}/estornar`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            motivo_estorno: motivoEstorno,
+          }),
+        }
+      );
 
       if (response.success) {
         showFlashMessage('success', response.message || 'Venda estornada com sucesso');
@@ -4995,7 +5898,9 @@ setTimeout(inicializarBusca, 500);
 
   async function loadCaixaFinanceiro(caixaId) {
     try {
-      const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/financeiro`);
+      const response = await fetchWithErrorHandling(
+        `/admin/caixas/${caixaId}/financeiro`
+      );
       caixaIdAtual = caixaId;
 
       if (response.success) {
@@ -5003,7 +5908,7 @@ setTimeout(inicializarBusca, 500);
         if (tableBody) {
           tableBody.innerHTML = '';
 
-          response.data.forEach(item => {
+          response.data.forEach((item) => {
             const row = document.createElement('tr');
             const valor = parseFloat(item.valor);
 
@@ -5011,22 +5916,39 @@ setTimeout(inicializarBusca, 500);
             const isVendaEstornavel = item.tipo === 'entrada' && item.nota_fiscal_id;
 
             // Format payment methods as tags
-            const paymentTags = item.formas_pagamento && item.formas_pagamento.length > 0
-              ? item.formas_pagamento.map(p => `<span class="badge badge-info">${p}</span>`).join(' ')
-              : '-';
+            const paymentTags =
+              item.formas_pagamento && item.formas_pagamento.length > 0
+                ? item.formas_pagamento
+                    .map((p) => `<span class="badge badge-info">${p}</span>`)
+                    .join(' ')
+                : '-';
 
             row.innerHTML = `
                         <td>${formatDateTime(item.data)}</td>
-                        <td><span class="badge ${item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'}">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
+                        <td><span class="badge ${
+                          item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'
+                        }">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
                         <td>${item.categoria || '-'}</td>
                         <td>${formatarMoeda(valor)}</td>
                         <td>
                             ${item.descricao || '-'}
-                            ${item.cliente_nome ? `<br><small>Cliente: ${item.cliente_nome}</small>` : ''}
-                            ${paymentTags !== '-' ? `<br><small>Pagamento: ${paymentTags}</small>` : ''}
-                            ${item.nota_fiscal_id ? `
+                            ${
+                              item.cliente_nome
+                                ? `<br><small>Cliente: ${item.cliente_nome}</small>`
+                                : ''
+                            }
+                            ${
+                              paymentTags !== '-'
+                                ? `<br><small>Pagamento: ${paymentTags}</small>`
+                                : ''
+                            }
+                            ${
+                              item.nota_fiscal_id
+                                ? `
                                 <br>
-                                <button class="btn btn-sm btn-info btn-editar-pagamento" data-venda-id="${item.nota_fiscal_id}">
+                                <button class="btn btn-sm btn-info btn-editar-pagamento" data-venda-id="${
+                                  item.nota_fiscal_id
+                                }">
                                     <i class="fas fa-edit"></i> Editar Pagamentos
                                 </button>
                                 <button class="btn btn-sm btn-danger btn-estornar-venda" 
@@ -5037,12 +5959,14 @@ setTimeout(inicializarBusca, 500);
                                         data-descricao="${item.descricao || ''}">
                                     <i class="fas fa-undo"></i> Estornar
                                 </button>
-                            ` : ''}
+                            `
+                                : ''
+                            }
                         </td>
                     `;
 
             // Adicionar eventos aos botões de editar pagamento
-            row.querySelectorAll('.btn-editar-pagamento').forEach(btn => {
+            row.querySelectorAll('.btn-editar-pagamento').forEach((btn) => {
               btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const vendaId = btn.getAttribute('data-venda-id');
@@ -5051,7 +5975,7 @@ setTimeout(inicializarBusca, 500);
             });
 
             // Adicionar eventos aos botões de estornar
-            row.querySelectorAll('.btn-estornar-venda').forEach(btn => {
+            row.querySelectorAll('.btn-estornar-venda').forEach((btn) => {
               btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const vendaId = btn.getAttribute('data-venda-id');
@@ -5077,37 +6001,67 @@ setTimeout(inicializarBusca, 500);
 
           // USE OS TOTAIS DO BACKEND (response.totais) EM VEZ DE CALCULAR NOVAMENTE
           if (document.getElementById('caixaTotalEntradas')) {
-            document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(response.totais.entradas);
+            document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(
+              response.totais.entradas
+            );
           }
           if (document.getElementById('caixaTotalSaidas')) {
-            document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(response.totais.saidas);
+            document.getElementById('caixaTotalSaidas').textContent = formatarMoeda(
+              response.totais.saidas
+            );
           }
           if (document.getElementById('caixaSaldo')) {
-            document.getElementById('caixaSaldo').textContent = formatarMoeda(response.totais.saldo);
+            document.getElementById('caixaSaldo').textContent = formatarMoeda(
+              response.totais.saldo
+            );
           }
           if (document.getElementById('caixaValorFisico')) {
-            document.getElementById('caixaValorFisico').textContent = formatarMoeda(response.totais.valor_fisico || 0);
+            document.getElementById('caixaValorFisico').textContent = formatarMoeda(
+              response.totais.valor_fisico || 0
+            );
           }
           if (document.getElementById('caixaValorDigital')) {
-            document.getElementById('caixaValorDigital').textContent = formatarMoeda(response.totais.valor_digital || 0);
+            document.getElementById('caixaValorDigital').textContent = formatarMoeda(
+              response.totais.valor_digital || 0
+            );
           }
           if (document.getElementById('caixaAPrazo')) {
-            document.getElementById('caixaAPrazo').textContent = formatarMoeda(response.totais.a_prazo || 0);
+            document.getElementById('caixaAPrazo').textContent = formatarMoeda(
+              response.totais.a_prazo || 0
+            );
           }
           if (document.getElementById('totalAPrazoRecebido')) {
-            document.getElementById('totalAPrazoRecebido').textContent = formatarMoeda(response.totais.contas_prazo_recebidas || 0);
+            document.getElementById('totalAPrazoRecebido').textContent = formatarMoeda(
+              response.totais.contas_prazo_recebidas || 0
+            );
           }
 
           const formasPagamento = response.vendas_por_forma_pagamento || {};
 
-          document.getElementById('totalPixFabiano').textContent = formatarMoeda(formasPagamento.pix_fabiano || 0);
-          document.getElementById('totalPixMaquineta').textContent = formatarMoeda(formasPagamento.pix_maquineta || 0);
-          document.getElementById('totalPixEdFrance').textContent = formatarMoeda(formasPagamento.pix_edfrance || 0);
-          document.getElementById('totalPixLoja').textContent = formatarMoeda(formasPagamento.pix_loja || 0);
-          document.getElementById('totalDinheiro').textContent = formatarMoeda(formasPagamento.dinheiro || 0);
-          document.getElementById('totalCartaoCredito').textContent = formatarMoeda(formasPagamento.cartao_credito || 0);
-          document.getElementById('totalCartaoDebito').textContent = formatarMoeda(formasPagamento.cartao_debito || 0);
-          document.getElementById('totalAPrazo').textContent = formatarMoeda(formasPagamento.a_prazo || 0);
+          document.getElementById('totalPixFabiano').textContent = formatarMoeda(
+            formasPagamento.pix_fabiano || 0
+          );
+          document.getElementById('totalPixMaquineta').textContent = formatarMoeda(
+            formasPagamento.pix_maquineta || 0
+          );
+          document.getElementById('totalPixEdFrance').textContent = formatarMoeda(
+            formasPagamento.pix_edfrance || 0
+          );
+          document.getElementById('totalPixLoja').textContent = formatarMoeda(
+            formasPagamento.pix_loja || 0
+          );
+          document.getElementById('totalDinheiro').textContent = formatarMoeda(
+            formasPagamento.dinheiro || 0
+          );
+          document.getElementById('totalCartaoCredito').textContent = formatarMoeda(
+            formasPagamento.cartao_credito || 0
+          );
+          document.getElementById('totalCartaoDebito').textContent = formatarMoeda(
+            formasPagamento.cartao_debito || 0
+          );
+          document.getElementById('totalAPrazo').textContent = formatarMoeda(
+            formasPagamento.a_prazo || 0
+          );
 
           // Adiciona eventos de clique para os cards de formas de pagamento
           addFormaPagamentoClickEvents(caixaId);
@@ -5143,23 +6097,28 @@ setTimeout(inicializarBusca, 500);
   // Função para adicionar eventos de clique aos cards de formas de pagamento
   function addFormaPagamentoClickEvents(caixaId) {
     const formasPagamentoIds = [
-      'totalPixFabiano', 'totalPixMaquineta', 'totalPixEdFrance',
-      'totalPixLoja', 'totalDinheiro', 'totalCartaoCredito',
-      'totalCartaoDebito', 'totalAPrazo'
+      'totalPixFabiano',
+      'totalPixMaquineta',
+      'totalPixEdFrance',
+      'totalPixLoja',
+      'totalDinheiro',
+      'totalCartaoCredito',
+      'totalCartaoDebito',
+      'totalAPrazo',
     ];
 
     const formaPagamentoMap = {
-      'totalPixFabiano': 'pix_fabiano',
-      'totalPixMaquineta': 'pix_maquineta',
-      'totalPixEdFrance': 'pix_edfrance',
-      'totalPixLoja': 'pix_loja',
-      'totalDinheiro': 'dinheiro',
-      'totalCartaoCredito': 'cartao_credito',
-      'totalCartaoDebito': 'cartao_debito',
-      'totalAPrazo': 'a_prazo'
+      totalPixFabiano: 'pix_fabiano',
+      totalPixMaquineta: 'pix_maquineta',
+      totalPixEdFrance: 'pix_edfrance',
+      totalPixLoja: 'pix_loja',
+      totalDinheiro: 'dinheiro',
+      totalCartaoCredito: 'cartao_credito',
+      totalCartaoDebito: 'cartao_debito',
+      totalAPrazo: 'a_prazo',
     };
 
-    formasPagamentoIds.forEach(id => {
+    formasPagamentoIds.forEach((id) => {
       const element = document.getElementById(id);
       if (element) {
         // Encontra o elemento pai (total-item) para tornar clicável
@@ -5179,7 +6138,9 @@ setTimeout(inicializarBusca, 500);
   // Função para abrir modal de vendas por forma de pagamento
   async function openVendasFormaPagamentoModal(caixaId, formaPagamento) {
     try {
-      const response = await fetchWithErrorHandling(`/admin/caixas/${caixaId}/vendas-por-pagamento?forma_pagamento=${formaPagamento}`);
+      const response = await fetchWithErrorHandling(
+        `/admin/caixas/${caixaId}/vendas-por-pagamento?forma_pagamento=${formaPagamento}`
+      );
 
       if (response.success) {
         const modal = document.getElementById('vendasFormaPagamentoModal');
@@ -5193,7 +6154,7 @@ setTimeout(inicializarBusca, 500);
         tableBody.innerHTML = '';
 
         // Preenche tabela com vendas
-        response.vendas.forEach(venda => {
+        response.vendas.forEach((venda) => {
           const row = document.createElement('tr');
           row.innerHTML = `
                     <td>${formatDateTime(venda.data_emissao)}</td>
@@ -5211,7 +6172,7 @@ setTimeout(inicializarBusca, 500);
         });
 
         // Adiciona eventos de clique para os botões de visualização
-        document.querySelectorAll('.btn-view-venda').forEach(btn => {
+        document.querySelectorAll('.btn-view-venda').forEach((btn) => {
           btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const vendaId = btn.getAttribute('data-venda-id');
@@ -5235,18 +6196,22 @@ setTimeout(inicializarBusca, 500);
     }
   }
   // Configurar botão de PDF de movimentações
-  document.getElementById('abrirPdfMovimentacoes')?.addEventListener('click', function () {
-    if (caixaIdAtual) {
-      const url = `/admin/caixas/${caixaIdAtual}/financeiro/movimentacoes/pdf`;
-      window.open(url, '_blank');
-    } else {
-      showFlashMessage('error', 'Nenhum caixa selecionado');
-    }
-  });
+  document
+    .getElementById('abrirPdfMovimentacoes')
+    ?.addEventListener('click', function () {
+      if (caixaIdAtual) {
+        const url = `/admin/caixas/${caixaIdAtual}/financeiro/movimentacoes/pdf`;
+        window.open(url, '_blank');
+      } else {
+        showFlashMessage('error', 'Nenhum caixa selecionado');
+      }
+    });
   // Função para abrir modal de detalhes da venda
   async function openDetalhesVendaModal(vendaId) {
     try {
-      const response = await fetchWithErrorHandling(`/admin/vendas/${vendaId}/detalhes`);
+      const response = await fetchWithErrorHandling(
+        `/admin/vendas/${vendaId}/detalhes`
+      );
 
       if (response.success) {
         const modal = document.getElementById('detalhesVendaModal');
@@ -5254,31 +6219,41 @@ setTimeout(inicializarBusca, 500);
 
         // Preenche informações básicas
         document.getElementById('detalheNotaFiscalId').textContent = venda.id;
-        document.getElementById('detalheDataVenda').textContent = formatDateTime(venda.data_emissao);
-        document.getElementById('detalheCliente').textContent = venda.cliente_nome || 'Não informado';
-        document.getElementById('detalheValorTotal').textContent = formatarMoeda(venda.valor_total);
+        document.getElementById('detalheDataVenda').textContent = formatDateTime(
+          venda.data_emissao
+        );
+        document.getElementById('detalheCliente').textContent =
+          venda.cliente_nome || 'Não informado';
+        document.getElementById('detalheValorTotal').textContent = formatarMoeda(
+          venda.valor_total
+        );
 
         // Preence informações de desconto
-        const desconto = venda.valor_desconto > 0
-          ? `${formatarMoeda(venda.valor_desconto)} (${venda.tipo_desconto || 'N/A'})`
-          : 'Nenhum';
+        const desconto =
+          venda.valor_desconto > 0
+            ? `${formatarMoeda(venda.valor_desconto)} (${venda.tipo_desconto || 'N/A'})`
+            : 'Nenhum';
         document.getElementById('detalheDesconto').textContent = desconto;
 
         // Preenche formas de pagamento
-        const formasPagamento = venda.pagamentos.map(p =>
-          `${p.forma_pagamento}: ${formatarMoeda(p.valor)}`
-        ).join(', ');
-        document.getElementById('detalheFormasPagamento').textContent = formasPagamento || 'Nenhuma';
+        const formasPagamento = venda.pagamentos
+          .map((p) => `${p.forma_pagamento}: ${formatarMoeda(p.valor)}`)
+          .join(', ');
+        document.getElementById('detalheFormasPagamento').textContent =
+          formasPagamento || 'Nenhuma';
 
         // Preenche tabela de produtos
         const produtosTable = document.querySelector('#detalhesProdutosTable tbody');
         produtosTable.innerHTML = '';
 
-        venda.itens.forEach(item => {
+        venda.itens.forEach((item) => {
           const row = document.createElement('tr');
-          const descontoInfo = item.desconto_aplicado > 0
-            ? `${formatarMoeda(item.desconto_aplicado)} (${item.tipo_desconto || 'N/A'})`
-            : 'Nenhum';
+          const descontoInfo =
+            item.desconto_aplicado > 0
+              ? `${formatarMoeda(item.desconto_aplicado)} (${
+                  item.tipo_desconto || 'N/A'
+                })`
+              : 'Nenhum';
 
           row.innerHTML = `
                     <td>${item.produto_nome}</td>
@@ -5292,12 +6267,17 @@ setTimeout(inicializarBusca, 500);
         });
 
         // Atualiza título do modal
-        document.getElementById('detalhesVendaTitulo').textContent = `Detalhes da Venda #${venda.id}`;
+        document.getElementById(
+          'detalhesVendaTitulo'
+        ).textContent = `Detalhes da Venda #${venda.id}`;
 
         // Abre o modal
         openModal(modal);
       } else {
-        showFlashMessage('error', response.error || 'Erro ao carregar detalhes da venda');
+        showFlashMessage(
+          'error',
+          response.error || 'Erro ao carregar detalhes da venda'
+        );
       }
     } catch (error) {
       showFlashMessage('error', 'Erro ao carregar detalhes da venda');
@@ -5307,14 +6287,14 @@ setTimeout(inicializarBusca, 500);
   // Função auxiliar para formatar o nome da forma de pagamento
   function formatFormaPagamento(forma) {
     const formatMap = {
-      'pix_fabiano': 'PIX Fabiano',
-      'pix_maquineta': 'PIX Maquineta',
-      'pix_edfrance': 'PIX Edfranci',
-      'pix_loja': 'PIX Loja',
-      'dinheiro': 'Dinheiro',
-      'cartao_credito': 'Cartão Crédito',
-      'cartao_debito': 'Cartão Débito',
-      'a_prazo': 'A Prazo'
+      pix_fabiano: 'PIX Fabiano',
+      pix_maquineta: 'PIX Maquineta',
+      pix_edfrance: 'PIX Edfranci',
+      pix_loja: 'PIX Loja',
+      dinheiro: 'Dinheiro',
+      cartao_credito: 'Cartão Crédito',
+      cartao_debito: 'Cartão Débito',
+      a_prazo: 'A Prazo',
     };
 
     return formatMap[forma] || forma;
@@ -5368,7 +6348,9 @@ setTimeout(inicializarBusca, 500);
   async function openEditarFormasPagamentoModal(vendaId) {
     try {
       // Busca os detalhes da venda
-      const response = await fetchWithErrorHandling(`/admin/vendas/${vendaId}/detalhes`);
+      const response = await fetchWithErrorHandling(
+        `/admin/vendas/${vendaId}/detalhes`
+      );
 
       if (response.success) {
         vendaEmEdicao = response.venda;
@@ -5376,7 +6358,9 @@ setTimeout(inicializarBusca, 500);
 
         // Atualiza o modal
         document.getElementById('editarPagamentoVendaId').textContent = vendaId;
-        document.getElementById('totalVendaValor').textContent = formatarMoeda(vendaEmEdicao.valor_total);
+        document.getElementById('totalVendaValor').textContent = formatarMoeda(
+          vendaEmEdicao.valor_total
+        );
 
         // Renderiza as formas de pagamento atuais
         renderFormasPagamento();
@@ -5388,7 +6372,10 @@ setTimeout(inicializarBusca, 500);
         const modal = document.getElementById('editarFormasPagamentoModal');
         openModal(modal);
       } else {
-        showFlashMessage('error', response.error || 'Erro ao carregar detalhes da venda');
+        showFlashMessage(
+          'error',
+          response.error || 'Erro ao carregar detalhes da venda'
+        );
       }
     } catch (error) {
       showFlashMessage('error', 'Erro ao carregar detalhes da venda');
@@ -5404,7 +6391,9 @@ setTimeout(inicializarBusca, 500);
       const item = document.createElement('div');
       item.className = 'forma-pagamento-item';
       item.innerHTML = `
-            <span class="badge badge-info">${formatFormaPagamento(pagamento.forma_pagamento)}</span>
+            <span class="badge badge-info">${formatFormaPagamento(
+              pagamento.forma_pagamento
+            )}</span>
             <span class="forma-pagamento-valor">${formatarMoeda(pagamento.valor)}</span>
             <button class="btn-remover-forma" data-index="${index}">
                 <i class="fas fa-times"></i>
@@ -5414,7 +6403,7 @@ setTimeout(inicializarBusca, 500);
     });
 
     // Adiciona eventos de clique para os botões de remover
-    document.querySelectorAll('.btn-remover-forma').forEach(btn => {
+    document.querySelectorAll('.btn-remover-forma').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const index = parseInt(e.currentTarget.getAttribute('data-index'));
         formasPagamentoEditadas.splice(index, 1);
@@ -5426,10 +6415,14 @@ setTimeout(inicializarBusca, 500);
 
   // Função para calcular totais dos pagamentos
   function calcularTotaisPagamentos() {
-    const totalPagamentos = formasPagamentoEditadas.reduce((sum, pagamento) => sum + pagamento.valor, 0);
+    const totalPagamentos = formasPagamentoEditadas.reduce(
+      (sum, pagamento) => sum + pagamento.valor,
+      0
+    );
     const totalVenda = vendaEmEdicao.valor_total;
 
-    document.getElementById('totalPagamentosValor').textContent = formatarMoeda(totalPagamentos);
+    document.getElementById('totalPagamentosValor').textContent =
+      formatarMoeda(totalPagamentos);
 
     // Verifica se há diferença
     const diferencaContainer = document.getElementById('diferencaContainer');
@@ -5438,7 +6431,9 @@ setTimeout(inicializarBusca, 500);
     if (Math.abs(totalPagamentos - totalVenda) > 0.01) {
       const diferenca = totalVenda - totalPagamentos;
       diferencaValor.textContent = formatarMoeda(diferenca);
-      diferencaValor.className = `total-value ${diferenca < 0 ? 'negative' : 'positive'}`;
+      diferencaValor.className = `total-value ${
+        diferenca < 0 ? 'negative' : 'positive'
+      }`;
       diferencaContainer.style.display = 'block';
     } else {
       diferencaContainer.style.display = 'none';
@@ -5464,7 +6459,10 @@ setTimeout(inicializarBusca, 500);
       const restante = vendaEmEdicao.valor_total - totalAtual;
 
       if (restante <= 0) {
-        showFlashMessage('error', 'O valor total já foi distribuído entre as formas de pagamento');
+        showFlashMessage(
+          'error',
+          'O valor total já foi distribuído entre as formas de pagamento'
+        );
         return;
       }
 
@@ -5474,7 +6472,7 @@ setTimeout(inicializarBusca, 500);
     // Adiciona a nova forma de pagamento
     formasPagamentoEditadas.push({
       forma_pagamento: forma,
-      valor: valor
+      valor: valor,
     });
 
     // Limpa os campos
@@ -5490,24 +6488,34 @@ setTimeout(inicializarBusca, 500);
   async function salvarFormasPagamento() {
     try {
       // Verifica se a soma dos pagamentos corresponde ao valor total
-      const totalPagamentos = formasPagamentoEditadas.reduce((sum, pagamento) => sum + pagamento.valor, 0);
+      const totalPagamentos = formasPagamentoEditadas.reduce(
+        (sum, pagamento) => sum + pagamento.valor,
+        0
+      );
 
       if (Math.abs(totalPagamentos - vendaEmEdicao.valor_total) > 0.01) {
-        if (!confirm('A soma dos pagamentos não corresponde ao valor total da venda. Deseja continuar mesmo assim?')) {
+        if (
+          !confirm(
+            'A soma dos pagamentos não corresponde ao valor total da venda. Deseja continuar mesmo assim?'
+          )
+        ) {
           return;
         }
       }
 
       // Envia as alterações para o servidor
-      const response = await fetchWithErrorHandling(`/admin/vendas/${vendaEmEdicao.id}/atualizar-pagamentos`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          pagamentos: formasPagamentoEditadas
-        })
-      });
+      const response = await fetchWithErrorHandling(
+        `/admin/vendas/${vendaEmEdicao.id}/atualizar-pagamentos`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            pagamentos: formasPagamentoEditadas,
+          }),
+        }
+      );
 
       if (response.success) {
         showFlashMessage('success', 'Formas de pagamento atualizadas com sucesso!');
@@ -5520,7 +6528,10 @@ setTimeout(inicializarBusca, 500);
           await loadCaixaFinanceiro(caixaIdAtual);
         }
       } else {
-        showFlashMessage('error', response.error || 'Erro ao atualizar formas de pagamento');
+        showFlashMessage(
+          'error',
+          response.error || 'Erro ao atualizar formas de pagamento'
+        );
       }
     } catch (error) {
       showFlashMessage('error', 'Erro ao atualizar formas de pagamento');
@@ -5530,14 +6541,14 @@ setTimeout(inicializarBusca, 500);
   // Função auxiliar para formatar o nome da forma de pagamento
   function formatFormaPagamento(forma) {
     const formatMap = {
-      'pix_fabiano': 'PIX Fabiano',
-      'pix_maquineta': 'PIX Maquineta',
-      'pix_edfrance': 'PIX Edfranci',
-      'pix_loja': 'PIX Loja',
-      'dinheiro': 'Dinheiro',
-      'cartao_credito': 'Cartão Crédito',
-      'cartao_debito': 'Cartão Débito',
-      'a_prazo': 'A Prazo'
+      pix_fabiano: 'PIX Fabiano',
+      pix_maquineta: 'PIX Maquineta',
+      pix_edfrance: 'PIX Edfranci',
+      pix_loja: 'PIX Loja',
+      dinheiro: 'Dinheiro',
+      cartao_credito: 'Cartão Crédito',
+      cartao_debito: 'Cartão Débito',
+      a_prazo: 'A Prazo',
     };
 
     return formatMap[forma] || forma;
@@ -5577,98 +6588,119 @@ setTimeout(inicializarBusca, 500);
   }
 
   async function loadContasReceber() {
-      try {
-          const dataInicio = document.getElementById('contasReceberDataInicio')?.value || '';
-          const dataFim = document.getElementById('contasReceberDataFim')?.value || '';
-          const status = document.getElementById('contasReceberStatus')?.value || '';
-          const clienteNome = document.getElementById('contasReceberCliente')?.value.trim() || '';
+    try {
+      const dataInicio =
+        document.getElementById('contasReceberDataInicio')?.value || '';
+      const dataFim = document.getElementById('contasReceberDataFim')?.value || '';
+      const status = document.getElementById('contasReceberStatus')?.value || '';
+      const clienteNome =
+        document.getElementById('contasReceberCliente')?.value.trim() || '';
 
-          const params = new URLSearchParams();
+      const params = new URLSearchParams();
 
-          if (dataInicio) params.append('data_emissao_inicio', dataInicio);
-          if (dataFim) params.append('data_emissao_fim', dataFim);
-          if (status) params.append('status', status);
-          if (clienteNome) params.append('cliente_nome', clienteNome);
+      if (dataInicio) params.append('data_emissao_inicio', dataInicio);
+      if (dataFim) params.append('data_emissao_fim', dataFim);
+      if (status) params.append('status', status);
+      if (clienteNome) params.append('cliente_nome', clienteNome);
 
-          const response = await fetch(`/admin/contas-receber?${params.toString()}`);
+      const response = await fetch(`/admin/contas-receber?${params.toString()}`);
 
-          if (!response.ok) {
-              throw new Error('Erro na requisição');
-          }
-
-          const data = await response.json();
-
-          if (data.success) {
-              renderContasAgrupadas(data.clientes_agrupados);
-              
-              // Atualizar os totais gerais
-              if (data.totais_gerais) {
-                  document.getElementById('totalGeralDivida').textContent = formatarMoeda(data.totais_gerais.total_divida);
-                  document.getElementById('totalGeralPago').textContent = formatarMoeda(data.totais_gerais.total_pago);
-                  document.getElementById('totalGeralAberto').textContent = formatarMoeda(data.totais_gerais.total_aberto);
-              }
-              
-              if (data.total_clientes === 0) {
-                  showFlashMessage('warning', 'Nenhuma conta encontrada com os filtros aplicados');
-              }
-              
-          } else {
-              showFlashMessage('error', data.message || 'Erro ao carregar contas');
-          }
-
-      } catch (error) {
-          showFlashMessage('error', 'Erro ao carregar contas a receber');
+      if (!response.ok) {
+        throw new Error('Erro na requisição');
       }
+
+      const data = await response.json();
+
+      if (data.success) {
+        renderContasAgrupadas(data.clientes_agrupados);
+
+        // Atualizar os totais gerais
+        if (data.totais_gerais) {
+          document.getElementById('totalGeralDivida').textContent = formatarMoeda(
+            data.totais_gerais.total_divida
+          );
+          document.getElementById('totalGeralPago').textContent = formatarMoeda(
+            data.totais_gerais.total_pago
+          );
+          document.getElementById('totalGeralAberto').textContent = formatarMoeda(
+            data.totais_gerais.total_aberto
+          );
+        }
+
+        if (data.total_clientes === 0) {
+          showFlashMessage(
+            'warning',
+            'Nenhuma conta encontrada com os filtros aplicados'
+          );
+        }
+      } else {
+        showFlashMessage('error', data.message || 'Erro ao carregar contas');
+      }
+    } catch (error) {
+      showFlashMessage('error', 'Erro ao carregar contas a receber');
+    }
   }
 
   function renderContasAgrupadas(clientesAgrupados) {
-      const container = document.getElementById('contasReceberContainer');
-      
-      if (!clientesAgrupados || clientesAgrupados.length === 0) {
-          container.innerHTML = `
+    const container = document.getElementById('contasReceberContainer');
+
+    if (!clientesAgrupados || clientesAgrupados.length === 0) {
+      container.innerHTML = `
               <div class="no-contas">
                   <i class="fas fa-file-invoice-dollar"></i>
                   <h3>Nenhuma conta encontrada</h3>
                   <p>Não há contas a receber com os filtros atuais.</p>
               </div>
           `;
-          return;
-      }
+      return;
+    }
 
-      let html = '';
+    let html = '';
 
-      clientesAgrupados.forEach(clienteData => {
-          const cliente = clienteData.cliente;
-          const resumo = clienteData.resumo;
-          const contas = clienteData.contas;
-          
-          html += `
+    clientesAgrupados.forEach((clienteData) => {
+      const cliente = clienteData.cliente;
+      const resumo = clienteData.resumo;
+      const contas = clienteData.contas;
+
+      html += `
               <div class="cliente-card" data-cliente-id="${cliente.id}">
                   <div class="cliente-header">
                       <div class="cliente-info">
                           <div class="cliente-nome">${cliente.nome}</div>
-                          <div class="cliente-documento">${cliente.documento || 'Sem documento'}</div>
+                          <div class="cliente-documento">${
+                            cliente.documento || 'Sem documento'
+                          }</div>
                       </div>
                       
                       <div class="cliente-resumo">
                           <div class="resumo-item">
                               <span class="resumo-label">Total Dívida</span>
-                              <span class="resumo-valor resumo-total">${formatarMoeda(resumo.total_divida)}</span>
+                              <span class="resumo-valor resumo-total">${formatarMoeda(
+                                resumo.total_divida
+                              )}</span>
                           </div>
                           <div class="resumo-item">
                               <span class="resumo-label">Total Pago</span>
-                              <span class="resumo-valor resumo-pago">${formatarMoeda(resumo.total_pago)}</span>
+                              <span class="resumo-valor resumo-pago">${formatarMoeda(
+                                resumo.total_pago
+                              )}</span>
                           </div>
                           <div class="resumo-item">
                               <span class="resumo-label">Total em Aberto</span>
-                              <span class="resumo-valor resumo-aberto">${formatarMoeda(resumo.total_aberto)}</span>
+                              <span class="resumo-valor resumo-aberto">${formatarMoeda(
+                                resumo.total_aberto
+                              )}</span>
                           </div>
                           <div class="resumo-item">
                               <span class="resumo-label">Contas</span>
-                              <span class="resumo-valor">${resumo.qtd_contas} (${resumo.qtd_vencidas} vencidas)</span>
+                              <span class="resumo-valor">${resumo.qtd_contas} (${
+        resumo.qtd_vencidas
+      } vencidas)</span>
                           </div>
                           <div class="cliente-acoes">
-                            <button class="btn-acao btn-pdf-relatorio" data-cliente-documento="${cliente.nome}" title="Gerar PDF com contas do cliente">
+                            <button class="btn-acao btn-pdf-relatorio" data-cliente-documento="${
+                              cliente.nome
+                            }" title="Gerar PDF com contas do cliente">
                                 <i class="fas fa-file-pdf"></i> Gerar PDF
                             </button>
                          </div>
@@ -5694,204 +6726,222 @@ setTimeout(inicializarBusca, 500);
                               </tr>
                           </thead>
                           <tbody>
-                              ${contas.map(conta => {
+                              ${contas
+                                .map((conta) => {
                                   let statusClass = 'status-pendente';
                                   let statusText = 'Pendente';
-                                  
+
                                   if (conta.quitada) {
-                                      statusClass = 'status-quitada';
-                                      statusText = 'Quitada';
+                                    statusClass = 'status-quitada';
+                                    statusText = 'Quitada';
                                   } else if (conta.vencida) {
-                                      statusClass = 'status-vencida';
-                                      statusText = 'Vencida';
+                                    statusClass = 'status-vencida';
+                                    statusText = 'Vencida';
                                   } else if (conta.status === 'parcial') {
-                                      statusClass = 'status-parcial';
-                                      statusText = 'Parcial';
+                                    statusClass = 'status-parcial';
+                                    statusText = 'Parcial';
                                   }
-                                  
+
                                   const hoje = new Date();
                                   const vencimento = new Date(conta.data_vencimento);
                                   const diffTime = vencimento - hoje;
-                                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                  
+                                  const diffDays = Math.ceil(
+                                    diffTime / (1000 * 60 * 60 * 24)
+                                  );
+
                                   let vencimentoClass = '';
                                   if (diffDays === 0) {
-                                      vencimentoClass = 'vencimento-hoje';
+                                    vencimentoClass = 'vencimento-hoje';
                                   } else if (diffDays <= 3 && diffDays > 0) {
-                                      vencimentoClass = 'vencimento-proximo';
+                                    vencimentoClass = 'vencimento-proximo';
                                   }
-                                  
+
                                   return `
                                       <tr>
                                           <td>${conta.descricao || 'Sem descrição'}</td>
-                                          <td>${formatarDataApenasData(conta.data_emissao)}</td>
-                                          <td class="${vencimentoClass}">${formatarDataApenasData(conta.data_vencimento)}</td>
-                                          <td>${formatarMoeda(conta.valor_original)}</td>
+                                          <td>${formatarDataApenasData(
+                                            conta.data_emissao
+                                          )}</td>
+                                          <td class="${vencimentoClass}">${formatarDataApenasData(
+                                    conta.data_vencimento
+                                  )}</td>
+                                          <td>${formatarMoeda(
+                                            conta.valor_original
+                                          )}</td>
                                           <td>${formatarMoeda(conta.valor_pago)}</td>
                                           <td>${formatarMoeda(conta.valor_aberto)}</td>
                                           <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                                           <td>
                                               <div class="acoes-conta">
-                                                  <button class="btn-acao btn-detalhes btn-detalhes-conta" data-id="${conta.id}">
+                                                  <button class="btn-acao btn-detalhes btn-detalhes-conta" data-id="${
+                                                    conta.id
+                                                  }">
                                                       <i class="fas fa-eye"></i> Detalhes
                                                   </button>
-                                                  <button class="btn-acao btn-pdf btn-pdf-conta" data-pdf-id="${conta.id}">
+                                                  <button class="btn-acao btn-pdf btn-pdf-conta" data-pdf-id="${
+                                                    conta.id
+                                                  }">
                                                       <i class="fas fa-file-pdf"></i> PDF
                                                   </button>
                                               </div>
                                           </td>
                                       </tr>
                                   `;
-                              }).join('')}
+                                })
+                                .join('')}
                           </tbody>
                       </table>
                   </div>
               </div>
           `;
-      });
+    });
 
-      container.innerHTML = html;
-      
-      setupContasToggleEvents();
-      
-      setupContasActionButtons();
+    container.innerHTML = html;
+
+    setupContasToggleEvents();
+
+    setupContasActionButtons();
   }
 
   function gerarPDFRelatorioFiltrado(clienteNome = '') {
-      try {
-          const params = new URLSearchParams();
-          
-          if (clienteNome) {
-              params.append('cliente_nome', clienteNome);
-          }
-          
-          const url = `/admin/contas-receber/pdf?${params.toString()}`;
-          window.open(url, '_blank');
-          
-      } catch (error) {
-          showFlashMessage('error', 'Erro ao gerar PDF do relatório');
+    try {
+      const params = new URLSearchParams();
+
+      if (clienteNome) {
+        params.append('cliente_nome', clienteNome);
       }
+
+      const url = `/admin/contas-receber/pdf?${params.toString()}`;
+      window.open(url, '_blank');
+    } catch (error) {
+      showFlashMessage('error', 'Erro ao gerar PDF do relatório');
+    }
   }
 
   function setupContasToggleEvents() {
-      document.querySelectorAll('.cliente-header').forEach(header => {
-          header.addEventListener('click', function() {
-              const card = this.closest('.cliente-card');
-              const contasDiv = card.querySelector('.cliente-contas');
-              const toggleIcon = this.querySelector('.cliente-toggle i');
-              
-              contasDiv.classList.toggle('expanded');
-              toggleIcon.classList.toggle('rotated');
-              
-              if (contasDiv.classList.contains('expanded')) {
-                  setTimeout(() => {
-                      contasDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                  }, 300);
-              }
-          });
+    document.querySelectorAll('.cliente-header').forEach((header) => {
+      header.addEventListener('click', function () {
+        const card = this.closest('.cliente-card');
+        const contasDiv = card.querySelector('.cliente-contas');
+        const toggleIcon = this.querySelector('.cliente-toggle i');
+
+        contasDiv.classList.toggle('expanded');
+        toggleIcon.classList.toggle('rotated');
+
+        if (contasDiv.classList.contains('expanded')) {
+          setTimeout(() => {
+            contasDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }, 300);
+        }
       });
+    });
   }
 
   function setupContasActionButtons() {
-      document.querySelectorAll('.btn-detalhes-conta').forEach(btn => {
-          btn.addEventListener('click', function(e) {
-              e.stopPropagation(); 
-              const contaId = this.getAttribute('data-id');
-              abrirModalDetalhesConta(contaId);
-          });
+    document.querySelectorAll('.btn-detalhes-conta').forEach((btn) => {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const contaId = this.getAttribute('data-id');
+        abrirModalDetalhesConta(contaId);
       });
-    
-      document.querySelectorAll('.btn-pdf-conta').forEach(btn => {
-          btn.addEventListener('click', function(e) {
-              e.stopPropagation();
-              const contaId = this.getAttribute('data-pdf-id');
-              gerarPDFConta(contaId);
-          });
+    });
+
+    document.querySelectorAll('.btn-pdf-conta').forEach((btn) => {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const contaId = this.getAttribute('data-pdf-id');
+        gerarPDFConta(contaId);
       });
-      document.querySelectorAll('.btn-pdf-relatorio').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const clienteDocumento = this.getAttribute('data-cliente-documento');
-            gerarPDFRelatorioFiltrado(clienteDocumento);
-        });
+    });
+    document.querySelectorAll('.btn-pdf-relatorio').forEach((btn) => {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const clienteDocumento = this.getAttribute('data-cliente-documento');
+        gerarPDFRelatorioFiltrado(clienteDocumento);
+      });
     });
   }
 
   async function abrirModalPagamentoConta(contaId, clienteNome) {
-      try {
-          const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
-          
-          if (response) {
-              const conta = response;
-              
-              document.getElementById('contaIdPagamento').value = contaId;
-              document.getElementById('clienteNomePagamento').textContent = clienteNome;
-              document.getElementById('valorPendentePagamento').textContent = formatarMoeda(conta.valor_aberto);
-              document.getElementById('valorPagamento').value = conta.valor_aberto;
-              document.getElementById('valorPagamento').max = conta.valor_aberto;
-              
-              openModal('modalPagamentoConta');
-          }
-      } catch (error) {
-          showFlashMessage('error', 'Erro ao carregar dados para pagamento');
+    try {
+      const response = await fetchWithErrorHandling(
+        `/admin/contas-receber/${contaId}/detalhes`
+      );
+
+      if (response) {
+        const conta = response;
+
+        document.getElementById('contaIdPagamento').value = contaId;
+        document.getElementById('clienteNomePagamento').textContent = clienteNome;
+        document.getElementById('valorPendentePagamento').textContent = formatarMoeda(
+          conta.valor_aberto
+        );
+        document.getElementById('valorPagamento').value = conta.valor_aberto;
+        document.getElementById('valorPagamento').max = conta.valor_aberto;
+
+        openModal('modalPagamentoConta');
       }
+    } catch (error) {
+      showFlashMessage('error', 'Erro ao carregar dados para pagamento');
+    }
   }
 
   function setupContasReceberDates() {
-      const hoje = new Date();
-      const trintaDiasAtras = new Date();
-      trintaDiasAtras.setDate(hoje.getDate() - 30);
+    const hoje = new Date();
+    const trintaDiasAtras = new Date();
+    trintaDiasAtras.setDate(hoje.getDate() - 30);
 
-      document.getElementById('contasReceberDataFim').valueAsDate = hoje;
-      document.getElementById('contasReceberDataInicio').valueAsDate = trintaDiasAtras;
+    document.getElementById('contasReceberDataFim').valueAsDate = hoje;
+    document.getElementById('contasReceberDataInicio').valueAsDate = trintaDiasAtras;
   }
 
-  document.addEventListener('DOMContentLoaded', function() {
-      setupContasReceberDates();
-      
-      const btnFiltrar = document.getElementById('filtrarContasReceber');
-      if (btnFiltrar) {
-          btnFiltrar.addEventListener('click', loadContasReceber);
-      }
-      
-      document.getElementById('contasReceberCliente')?.addEventListener('keypress', function(e) {
-          if (e.key === 'Enter') {
-              loadContasReceber();
-          }
+  document.addEventListener('DOMContentLoaded', function () {
+    setupContasReceberDates();
+
+    const btnFiltrar = document.getElementById('filtrarContasReceber');
+    if (btnFiltrar) {
+      btnFiltrar.addEventListener('click', loadContasReceber);
+    }
+
+    document
+      .getElementById('contasReceberCliente')
+      ?.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+          loadContasReceber();
+        }
       });
   });
 
   async function gerarPDFConta(contaId) {
-      try {
-          const btnPDF = document.querySelector(`button[data-pdf-id="${contaId}"]`);
-          if (btnPDF) {
-              const originalHTML = btnPDF.innerHTML;
-              btnPDF.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-              btnPDF.disabled = true;
+    try {
+      const btnPDF = document.querySelector(`button[data-pdf-id="${contaId}"]`);
+      if (btnPDF) {
+        const originalHTML = btnPDF.innerHTML;
+        btnPDF.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btnPDF.disabled = true;
 
-              setTimeout(() => {
-                  btnPDF.innerHTML = originalHTML;
-                  btnPDF.disabled = false;
-              }, 3000);
-          }
-
-          const response = await fetch(`/admin/contas-receber/${contaId}/pdf`);
-          
-          if (!response.ok) {
-              throw new Error('Erro ao gerar PDF');
-          }
-
-          const pdfBlob = await response.blob();
-          const pdfUrl = window.URL.createObjectURL(pdfBlob);
-          window.open(pdfUrl, '_blank');
-
-          setTimeout(() => {
-              window.URL.revokeObjectURL(pdfUrl);
-          }, 1000);
-
-      } catch (error) {
-          showFlashMessage('error', 'Erro ao gerar PDF da conta');
+        setTimeout(() => {
+          btnPDF.innerHTML = originalHTML;
+          btnPDF.disabled = false;
+        }, 3000);
       }
+
+      const response = await fetch(`/admin/contas-receber/${contaId}/pdf`);
+
+      if (!response.ok) {
+        throw new Error('Erro ao gerar PDF');
+      }
+
+      const pdfBlob = await response.blob();
+      const pdfUrl = window.URL.createObjectURL(pdfBlob);
+      window.open(pdfUrl, '_blank');
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(pdfUrl);
+      }, 1000);
+    } catch (error) {
+      showFlashMessage('error', 'Erro ao gerar PDF da conta');
+    }
   }
 
   function formatarData(dataString) {
@@ -5902,7 +6952,9 @@ setTimeout(inicializarBusca, 500);
 
   async function abrirModalDetalhesConta(contaId) {
     try {
-      const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
+      const response = await fetchWithErrorHandling(
+        `/admin/contas-receber/${contaId}/detalhes`
+      );
 
       if (response) {
         const conta = response;
@@ -5910,10 +6962,16 @@ setTimeout(inicializarBusca, 500);
         // Preencher detalhes básicos
         document.getElementById('contaIdPagamento').value = conta.id;
         document.getElementById('detalheClienteNome').textContent = conta.cliente.nome;
-        document.getElementById('detalheClienteDocumento').textContent = conta.cliente_documento || 'Não informado';
-        document.getElementById('detalheDescricao').textContent = conta.descricao || 'Sem descrição';
-        document.getElementById('detalheValorTotal').textContent = formatarMoeda(conta.valor_original);
-        document.getElementById('detalheValorPendente').textContent = formatarMoeda(conta.valor_aberto);
+        document.getElementById('detalheClienteDocumento').textContent =
+          conta.cliente_documento || 'Não informado';
+        document.getElementById('detalheDescricao').textContent =
+          conta.descricao || 'Sem descrição';
+        document.getElementById('detalheValorTotal').textContent = formatarMoeda(
+          conta.valor_original
+        );
+        document.getElementById('detalheValorPendente').textContent = formatarMoeda(
+          conta.valor_aberto
+        );
 
         // Status
         const statusElement = document.getElementById('detalheStatus');
@@ -5925,7 +6983,6 @@ setTimeout(inicializarBusca, 500);
             // Ocultar área de pagamento
             const pagamentoSection = document.getElementById('areaPagamento');
             if (pagamentoSection) pagamentoSection.style.display = 'none';
-
           } else if (conta.status === 'parcial') {
             statusElement.textContent = 'Parcial';
             statusElement.className = 'value badge badge-info';
@@ -5933,7 +6990,6 @@ setTimeout(inicializarBusca, 500);
             // Mostrar área de pagamento
             const pagamentoSection = document.getElementById('areaPagamento');
             if (pagamentoSection) pagamentoSection.style.display = '';
-
           } else {
             const hoje = new Date();
             const vencimento = new Date(conta.data_vencimento);
@@ -5958,14 +7014,16 @@ setTimeout(inicializarBusca, 500);
           const nf = conta.nota_fiscal;
 
           document.getElementById('areaNotaFiscal').style.display = '';
-          document.getElementById('nfValorDesconto').textContent = formatarMoeda(nf.valor_desconto);
+          document.getElementById('nfValorDesconto').textContent = formatarMoeda(
+            nf.valor_desconto
+          );
 
           // -------- ITENS ----------
           const itensTbody = document.getElementById('nfItens');
           itensTbody.innerHTML = '';
 
           if (nf.itens.length) {
-            nf.itens.forEach(i => {
+            nf.itens.forEach((i) => {
               itensTbody.innerHTML += `
                 <tr>
                   <td>${i.produto}</td>
@@ -5985,7 +7043,7 @@ setTimeout(inicializarBusca, 500);
           nfPagTbody.innerHTML = '';
 
           if (nf.pagamentos_nota.length) {
-            nf.pagamentos_nota.forEach(p => {
+            nf.pagamentos_nota.forEach((p) => {
               nfPagTbody.innerHTML += `
                 <tr>
                   <td>${p.data}</td>
@@ -6007,8 +7065,8 @@ setTimeout(inicializarBusca, 500);
         if (pagamentosTbody) {
           pagamentosTbody.innerHTML = '';
 
-         if (conta.pagamentos_efetuados && conta.pagamentos_efetuados.length > 0) {
-            conta.pagamentos_efetuados.forEach(p => {
+          if (conta.pagamentos_efetuados && conta.pagamentos_efetuados.length > 0) {
+            conta.pagamentos_efetuados.forEach((p) => {
               pagamentosTbody.innerHTML += `
                 <tr>
                   <td>${p.data_pagamento}</td>
@@ -6031,10 +7089,12 @@ setTimeout(inicializarBusca, 500);
           selectCaixa.innerHTML = '<option value="">Selecione</option>';
 
           if (conta.caixas && conta.caixas.length > 0) {
-            conta.caixas.forEach(caixa => {
+            conta.caixas.forEach((caixa) => {
               const option = document.createElement('option');
               option.value = caixa.id;
-              option.textContent = `Caixa ${caixa.id} - ${caixa.operador} - ${formatarData(caixa.data_abertura)} (${caixa.status})`;
+              option.textContent = `Caixa ${caixa.id} - ${
+                caixa.operador
+              } - ${formatarData(caixa.data_abertura)} (${caixa.status})`;
               selectCaixa.appendChild(option);
             });
           } else {
@@ -6068,14 +7128,14 @@ setTimeout(inicializarBusca, 500);
   // Função para formatar forma de pagamento
   function formatarFormaPagamento(forma) {
     const formas = {
-      'dinheiro': 'Dinheiro',
-      'pix_loja': 'PIX Loja',
-      'pix_fabiano': 'PIX Fabiano',
-      'pix_maquineta': 'PIX Maquineta',
-      'pix_edfrance': 'PIX Edfranci',
-      'cartao_credito': 'Cartão Crédito',
-      'cartao_debito': 'Cartão Débito',
-      'a_prazo': 'A Prazo'
+      dinheiro: 'Dinheiro',
+      pix_loja: 'PIX Loja',
+      pix_fabiano: 'PIX Fabiano',
+      pix_maquineta: 'PIX Maquineta',
+      pix_edfrance: 'PIX Edfranci',
+      cartao_credito: 'Cartão Crédito',
+      cartao_debito: 'Cartão Débito',
+      a_prazo: 'A Prazo',
     };
 
     return formas[forma] || forma;
@@ -6093,10 +7153,12 @@ setTimeout(inicializarBusca, 500);
         if (select) {
           select.innerHTML = '<option value="">Selecione</option>';
 
-          caixasAbertos.forEach(caixa => {
+          caixasAbertos.forEach((caixa) => {
             const option = document.createElement('option');
             option.value = caixa.id;
-            option.textContent = `Caixa #${caixa.id} - ${caixa.operador} (${formatarData(caixa.data_abertura)})`;
+            option.textContent = `Caixa #${caixa.id} - ${
+              caixa.operador
+            } (${formatarData(caixa.data_abertura)})`;
             select.appendChild(option);
           });
         }
@@ -6136,27 +7198,35 @@ setTimeout(inicializarBusca, 500);
         return;
       }
 
-      const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/pagar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          valor_pago: valor,
-          forma_pagamento: formaPagamento,
-          caixa_id: caixaPagamento || null,
-          observacoes: observacaoPagamento || '',
-          data_pagamento: dataPagamento
-        })
-      });
+      const response = await fetchWithErrorHandling(
+        `/admin/contas-receber/${contaId}/pagar`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            valor_pago: valor,
+            forma_pagamento: formaPagamento,
+            caixa_id: caixaPagamento || null,
+            observacoes: observacaoPagamento || '',
+            data_pagamento: dataPagamento,
+          }),
+        }
+      );
 
       if (response && response.success) {
         showFlashMessage('success', 'Pagamento registrado com sucesso');
 
-        document.getElementById('detalheValorPendente').textContent = formatarMoeda(response.valor_aberto);
+        document.getElementById('detalheValorPendente').textContent = formatarMoeda(
+          response.valor_aberto
+        );
 
         const statusElement = document.getElementById('detalheStatus');
         if (statusElement) {
-          statusElement.textContent = response.status === 'quitado' ? 'Quitado' : 'Pendente';
-          statusElement.className = 'value badge ' + (response.status === 'quitado' ? 'badge-success' : 'badge-warning');
+          statusElement.textContent =
+            response.status === 'quitado' ? 'Quitado' : 'Pendente';
+          statusElement.className =
+            'value badge ' +
+            (response.status === 'quitado' ? 'badge-success' : 'badge-warning');
         }
 
         await atualizarListaPagamentos(contaId);
@@ -6174,21 +7244,26 @@ setTimeout(inicializarBusca, 500);
   }
 
   // Evento submit do formulário de pagamento
-  document.getElementById('formPagamentoConta')?.addEventListener('submit', function (e) {
-    e.preventDefault();
-    const contaId = document.getElementById('contaIdPagamento').value;
-    const valor = parseFloat(document.getElementById('valorPagamento').value);
-    if (contaId && valor) {
-      registrarPagamento(contaId, valor);
-    }
-  });
+  document
+    .getElementById('formPagamentoConta')
+    ?.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const contaId = document.getElementById('contaIdPagamento').value;
+      const valor = parseFloat(document.getElementById('valorPagamento').value);
+      if (contaId && valor) {
+        registrarPagamento(contaId, valor);
+      }
+    });
 
   // Corrigido: prevenir submit duplo quando clicar em "Pagar Total"
   document.getElementById('btnPagarTotal')?.addEventListener('click', function (e) {
     e.preventDefault(); // impede que o botão envie o form automaticamente
     const contaId = document.getElementById('contaIdPagamento').value;
-    const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
-    const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+    const valorPendenteText =
+      document.getElementById('detalheValorPendente').textContent;
+    const valorPendente = parseFloat(
+      valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.')
+    );
 
     if (contaId && valorPendente > 0) {
       document.getElementById('valorPagamento').value = valorPendente.toFixed(2);
@@ -6196,18 +7271,19 @@ setTimeout(inicializarBusca, 500);
     }
   });
 
-
   // Função para atualizar a lista de pagamentos
   async function atualizarListaPagamentos(contaId) {
     try {
-      const response = await fetchWithErrorHandling(`/admin/contas-receber/${contaId}/detalhes`);
+      const response = await fetchWithErrorHandling(
+        `/admin/contas-receber/${contaId}/detalhes`
+      );
 
       if (response && response.pagamentos) {
         const tbody = document.getElementById('detalhePagamentos');
         if (tbody) {
           tbody.innerHTML = '';
 
-          response.pagamentos.forEach(pag => {
+          response.pagamentos.forEach((pag) => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                           <td>${pag.data_pagamento}</td>
@@ -6227,7 +7303,9 @@ setTimeout(inicializarBusca, 500);
   // Event Listeners
   document.addEventListener('DOMContentLoaded', function () {
     // Adicionar item ao menu sidebar
-    const financeiroNavItem = document.querySelector('.sidebar-nav li[data-tab="financeiro"]');
+    const financeiroNavItem = document.querySelector(
+      '.sidebar-nav li[data-tab="financeiro"]'
+    );
     if (financeiroNavItem) {
       const contasReceberItem = document.createElement('li');
       contasReceberItem.innerHTML = `
@@ -6236,7 +7314,10 @@ setTimeout(inicializarBusca, 500);
                   <span class="nav-text">Contas a Receber</span>
               </a>
           `;
-      financeiroNavItem.parentNode.insertBefore(contasReceberItem, financeiroNavItem.nextSibling);
+      financeiroNavItem.parentNode.insertBefore(
+        contasReceberItem,
+        financeiroNavItem.nextSibling
+      );
 
       // Adicionar evento de clique
       contasReceberItem.addEventListener('click', function (e) {
@@ -6246,21 +7327,28 @@ setTimeout(inicializarBusca, 500);
     }
 
     // Filtro
-    document.getElementById('btnFiltrarContas')?.addEventListener('click', loadContasReceber);
+    document
+      .getElementById('btnFiltrarContas')
+      ?.addEventListener('click', loadContasReceber);
 
     // Formulário de pagamento
-    document.getElementById('formPagamentoConta')?.addEventListener('submit', function (e) {
-      e.preventDefault();
-      const contaId = document.getElementById('contaIdPagamento').value;
-      const valor = parseFloat(document.getElementById('valorPagamento').value);
-      registrarPagamento(contaId, valor);
-    });
+    document
+      .getElementById('formPagamentoConta')
+      ?.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const contaId = document.getElementById('contaIdPagamento').value;
+        const valor = parseFloat(document.getElementById('valorPagamento').value);
+        registrarPagamento(contaId, valor);
+      });
 
     // Botão pagar total
     document.getElementById('btnPagarTotal')?.addEventListener('click', function () {
       const contaId = document.getElementById('contaIdPagamento').value;
-      const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
-      const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+      const valorPendenteText =
+        document.getElementById('detalheValorPendente').textContent;
+      const valorPendente = parseFloat(
+        valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.')
+      );
 
       if (confirm(`Confirmar pagamento total de ${valorPendenteText}?`)) {
         document.getElementById('valorPagamento').value = valorPendente;
@@ -6269,17 +7357,21 @@ setTimeout(inicializarBusca, 500);
     });
 
     // Permitir filtrar com Enter nos campos de texto
-    document.getElementById('filtroClienteNome')?.addEventListener('keypress', function (e) {
-      if (e.key === 'Enter') {
-        loadContasReceber();
-      }
-    });
+    document
+      .getElementById('filtroClienteNome')
+      ?.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+          loadContasReceber();
+        }
+      });
 
-    document.getElementById('filtroClienteDocumento')?.addEventListener('keypress', function (e) {
-      if (e.key === 'Enter') {
-        loadContasReceber();
-      }
-    });
+    document
+      .getElementById('filtroClienteDocumento')
+      ?.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+          loadContasReceber();
+        }
+      });
     // Adicione isso no final do arquivo, dentro do DOMContentLoaded
     document.addEventListener('DOMContentLoaded', function () {
       // Formulário de pagamento
@@ -6295,8 +7387,11 @@ setTimeout(inicializarBusca, 500);
             return;
           }
 
-          const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
-          const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+          const valorPendenteText =
+            document.getElementById('detalheValorPendente').textContent;
+          const valorPendente = parseFloat(
+            valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.')
+          );
 
           if (valor > valorPendente) {
             showFlashMessage('error', 'Valor informado é maior que o valor pendente');
@@ -6312,8 +7407,11 @@ setTimeout(inicializarBusca, 500);
       if (btnPagarTotal) {
         btnPagarTotal.addEventListener('click', function () {
           const contaId = document.getElementById('contaIdPagamento').value;
-          const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
-          const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+          const valorPendenteText =
+            document.getElementById('detalheValorPendente').textContent;
+          const valorPendente = parseFloat(
+            valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.')
+          );
 
           if (confirm(`Confirmar pagamento total de ${valorPendenteText}?`)) {
             document.getElementById('valorPagamento').value = valorPendente;
@@ -6326,7 +7424,9 @@ setTimeout(inicializarBusca, 500);
   // Adicione esta função para configurar os eventos dos botões de pagamento
   function setupPagamentoButtons() {
     // Botão Pagamento Parcial
-    const btnParcial = document.querySelector('#formPagamentoConta button[type="submit"]');
+    const btnParcial = document.querySelector(
+      '#formPagamentoConta button[type="submit"]'
+    );
     if (btnParcial) {
       btnParcial.addEventListener('click', function (e) {
         e.preventDefault();
@@ -6340,8 +7440,11 @@ setTimeout(inicializarBusca, 500);
       btnConfirmarParcial.addEventListener('click', function () {
         const contaId = document.getElementById('contaIdPagamento').value;
         const valor = parseFloat(document.getElementById('valorParcialInput').value);
-        const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
-        const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+        const valorPendenteText =
+          document.getElementById('detalheValorPendente').textContent;
+        const valorPendente = parseFloat(
+          valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.')
+        );
 
         if (isNaN(valor) || valor <= 0) {
           showFlashMessage('error', 'Informe um valor válido');
@@ -6362,8 +7465,11 @@ setTimeout(inicializarBusca, 500);
     if (btnPagarTotal) {
       btnPagarTotal.addEventListener('click', function () {
         const contaId = document.getElementById('contaIdPagamento').value;
-        const valorPendenteText = document.getElementById('detalheValorPendente').textContent;
-        const valorPendente = parseFloat(valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.'));
+        const valorPendenteText =
+          document.getElementById('detalheValorPendente').textContent;
+        const valorPendente = parseFloat(
+          valorPendenteText.replace(/[^\d,]/g, '').replace(',', '.')
+        );
 
         if (confirm(`Confirmar pagamento total de ${valorPendenteText}?`)) {
           document.getElementById('valorPagamento').value = valorPendente;
@@ -6398,7 +7504,7 @@ setTimeout(inicializarBusca, 500);
         if (table) {
           table.innerHTML = '';
 
-          data.transferencias.forEach(transf => {
+          data.transferencias.forEach((transf) => {
             const row = document.createElement('tr');
             row.innerHTML = `
               <td>${transf.data}</td>
@@ -6419,12 +7525,15 @@ setTimeout(inicializarBusca, 500);
   }
 
   // Event Listeners para Movimentações
-  document.getElementById('filterMovimentacoes')?.addEventListener('click', loadMovimentacoesData);
+  document
+    .getElementById('filterMovimentacoes')
+    ?.addEventListener('click', loadMovimentacoesData);
 
   // ===== USUÁRIOS =====
   async function loadUsuariosData() {
     try {
-      const searchText = document.getElementById('searchUsuario')?.value.toLowerCase() || '';
+      const searchText =
+        document.getElementById('searchUsuario')?.value.toLowerCase() || '';
       const data = await fetchWithErrorHandling('/admin/usuarios');
 
       if (data.success) {
@@ -6432,12 +7541,15 @@ setTimeout(inicializarBusca, 500);
         if (usuariosTable) {
           usuariosTable.innerHTML = '';
 
-          data.usuarios.forEach(usuario => {
+          data.usuarios.forEach((usuario) => {
             if (searchText && !usuario.nome.toLowerCase().includes(searchText)) {
               return;
             }
 
-            const statusBool = usuario.status === true || usuario.status === 'true' || usuario.status === 'Ativo';
+            const statusBool =
+              usuario.status === true ||
+              usuario.status === 'true' ||
+              usuario.status === 'Ativo';
             const status = statusBool ? 'Ativo' : 'Inativo';
 
             // Verificar se o usuário tem conta
@@ -6447,34 +7559,54 @@ setTimeout(inicializarBusca, 500);
             row.innerHTML = `
                         <td>${usuario.id}</td>
                         <td>${usuario.nome}</td>
-                        <td><span class="badge badge-${usuario.tipo.toLowerCase()}">${formatPerfil(usuario.tipo)}</span></td>
-                        <td><span class="badge ${statusBool ? 'badge-success' : 'badge-danger'}">${status}</span></td>
+                        <td><span class="badge badge-${usuario.tipo.toLowerCase()}">${formatPerfil(
+              usuario.tipo
+            )}</span></td>
+                        <td><span class="badge ${
+                          statusBool ? 'badge-success' : 'badge-danger'
+                        }">${status}</span></td>
                         <td>
-                            <span class="badge ${temConta ? 'badge-success' : 'badge-warning'}">
+                            <span class="badge ${
+                              temConta ? 'badge-success' : 'badge-warning'
+                            }">
                                 ${temConta ? 'Com conta' : 'Sem conta'}
                             </span>
                         </td>
                         <td>${usuario.ultimo_acesso || 'Nunca'}</td>
                         <td>
                             <div class="table-actions">
-                                ${!temConta ? `
+                                ${
+                                  !temConta
+                                    ? `
                                     <button class="btn-icon btn-info criar-conta-usuario" data-id="${usuario.id}" title="Criar Conta">
                                         <i class="fa-solid fa-landmark">‌</i>
                                     </button>
-                                ` : ''}
-                                <button class="btn-icon btn-primary visualizar-usuario" data-id="${usuario.id}" title="Visualizar">
+                                `
+                                    : ''
+                                }
+                                <button class="btn-icon btn-primary visualizar-usuario" data-id="${
+                                  usuario.id
+                                }" title="Visualizar">
                                     <i class="fas fa-eye"></i>
                                 </button>
-                                <button class="btn-icon btn-warning editar-usuario" data-id="${usuario.id}" title="Editar">
+                                <button class="btn-icon btn-warning editar-usuario" data-id="${
+                                  usuario.id
+                                }" title="Editar">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn-icon ${statusBool ? 'btn-danger' : 'btn-success'} alterar-status-usuario" 
+                                <button class="btn-icon ${
+                                  statusBool ? 'btn-danger' : 'btn-success'
+                                } alterar-status-usuario" 
                                         data-id="${usuario.id}" 
                                         data-status="${status}"
                                         title="${statusBool ? 'Desativar' : 'Ativar'}">
-                                    <i class="fas ${statusBool ? 'fa-user-slash' : 'fa-user-check'}"></i>
+                                    <i class="fas ${
+                                      statusBool ? 'fa-user-slash' : 'fa-user-check'
+                                    }"></i>
                                 </button>
-                                <button class="btn-icon btn-danger remover-usuario" data-id="${usuario.id}" title="Remover">
+                                <button class="btn-icon btn-danger remover-usuario" data-id="${
+                                  usuario.id
+                                }" title="Remover">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
@@ -6496,8 +7628,8 @@ setTimeout(inicializarBusca, 500);
       const response = await fetchWithErrorHandling(`/admin/conta/criar/${usuarioId}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+        },
       });
 
       if (response.success) {
@@ -6530,20 +7662,20 @@ setTimeout(inicializarBusca, 500);
     if (isEdit) {
       if (senhaInput) {
         senhaInput.required = false;
-        senhaInput.placeholder = "Deixe em branco para manter a senha atual";
+        senhaInput.placeholder = 'Deixe em branco para manter a senha atual';
       }
       if (confirmaSenhaInput) {
         confirmaSenhaInput.required = false;
-        confirmaSenhaInput.placeholder = "Repita a nova senha se for alterar";
+        confirmaSenhaInput.placeholder = 'Repita a nova senha se for alterar';
       }
     } else {
       if (senhaInput) {
         senhaInput.required = true;
-        senhaInput.placeholder = "";
+        senhaInput.placeholder = '';
       }
       if (confirmaSenhaInput) {
         confirmaSenhaInput.required = true;
-        confirmaSenhaInput.placeholder = "";
+        confirmaSenhaInput.placeholder = '';
       }
     }
 
@@ -6565,15 +7697,26 @@ setTimeout(inicializarBusca, 500);
 
         const usuario = response.usuario;
 
-        if (document.getElementById('usuarioId')) document.getElementById('usuarioId').value = usuario.id;
-        if (document.getElementById('usuarioNome')) document.getElementById('usuarioNome').value = usuario.nome;
-        if (document.getElementById('usuarioCpf')) document.getElementById('usuarioCpf').value = usuario.cpf;
-        if (document.getElementById('usuarioPerfil')) document.getElementById('usuarioPerfil').value = usuario.tipo.toLowerCase();
-        if (document.getElementById('usuarioStatus')) document.getElementById('usuarioStatus').value = usuario.status ? 'true' : 'false';
-        if (document.getElementById('usuarioObservacoes')) document.getElementById('usuarioObservacoes').value = usuario.observacoes || '';
+        if (document.getElementById('usuarioId'))
+          document.getElementById('usuarioId').value = usuario.id;
+        if (document.getElementById('usuarioNome'))
+          document.getElementById('usuarioNome').value = usuario.nome;
+        if (document.getElementById('usuarioCpf'))
+          document.getElementById('usuarioCpf').value = usuario.cpf;
+        if (document.getElementById('usuarioPerfil'))
+          document.getElementById('usuarioPerfil').value = usuario.tipo.toLowerCase();
+        if (document.getElementById('usuarioStatus'))
+          document.getElementById('usuarioStatus').value = usuario.status
+            ? 'true'
+            : 'false';
+        if (document.getElementById('usuarioObservacoes'))
+          document.getElementById('usuarioObservacoes').value =
+            usuario.observacoes || '';
 
-        if (document.getElementById('usuarioSenha')) document.getElementById('usuarioSenha').value = '';
-        if (document.getElementById('usuarioConfirmaSenha')) document.getElementById('usuarioConfirmaSenha').value = '';
+        if (document.getElementById('usuarioSenha'))
+          document.getElementById('usuarioSenha').value = '';
+        if (document.getElementById('usuarioConfirmaSenha'))
+          document.getElementById('usuarioConfirmaSenha').value = '';
       } catch (error) {
         showFlashMessage('error', error.message || 'Erro ao carregar dados do usuário');
         return;
@@ -6591,11 +7734,19 @@ setTimeout(inicializarBusca, 500);
         const usuario = response.usuario;
 
         // Informações básicas do usuário
-        if (document.getElementById('visualizarUsuarioNome')) document.getElementById('visualizarUsuarioNome').textContent = usuario.nome;
-        if (document.getElementById('visualizarUsuarioCPF')) document.getElementById('visualizarUsuarioCPF').textContent = usuario.cpf;
-        if (document.getElementById('visualizarUsuarioUltimoAcesso')) document.getElementById('visualizarUsuarioUltimoAcesso').textContent = usuario.ultimo_acesso || 'Nunca acessou';
-        if (document.getElementById('visualizarUsuarioDataCadastro')) document.getElementById('visualizarUsuarioDataCadastro').textContent = usuario.data_cadastro || 'Data não disponível';
-        if (document.getElementById('visualizarUsuarioObservacoes')) document.getElementById('visualizarUsuarioObservacoes').textContent = usuario.observacoes || 'Nenhuma observação';
+        if (document.getElementById('visualizarUsuarioNome'))
+          document.getElementById('visualizarUsuarioNome').textContent = usuario.nome;
+        if (document.getElementById('visualizarUsuarioCPF'))
+          document.getElementById('visualizarUsuarioCPF').textContent = usuario.cpf;
+        if (document.getElementById('visualizarUsuarioUltimoAcesso'))
+          document.getElementById('visualizarUsuarioUltimoAcesso').textContent =
+            usuario.ultimo_acesso || 'Nunca acessou';
+        if (document.getElementById('visualizarUsuarioDataCadastro'))
+          document.getElementById('visualizarUsuarioDataCadastro').textContent =
+            usuario.data_cadastro || 'Data não disponível';
+        if (document.getElementById('visualizarUsuarioObservacoes'))
+          document.getElementById('visualizarUsuarioObservacoes').textContent =
+            usuario.observacoes || 'Nenhuma observação';
 
         // Badges de perfil e status
         const perfilBadge = document.getElementById('visualizarUsuarioPerfil');
@@ -6632,31 +7783,48 @@ setTimeout(inicializarBusca, 500);
                             </div>
                             <div class="detail-item">
                                 <label>Saldo Total:</label>
-                                <span class="valor-saldo-total">${usuario.conta.saldo_total}</span>
+                                <span class="valor-saldo-total">${
+                                  usuario.conta.saldo_total
+                                }</span>
                             </div>
                             <div class="detail-item">
                                 <label>Atualizado em:</label>
-                                <span>${usuario.conta.atualizado_em || 'Data não disponível'}</span>
+                                <span>${
+                                  usuario.conta.atualizado_em || 'Data não disponível'
+                                }</span>
                             </div>
-                            ${Object.keys(usuario.conta.saldos_por_forma).length > 0 ? `
+                            ${
+                              Object.keys(usuario.conta.saldos_por_forma).length > 0
+                                ? `
                                 <div class="saldos-forma-pagamento">
                                     <label>Saldos por Forma de Pagamento:</label>
                                     <div class="saldos-list">
-                                        ${Object.entries(usuario.conta.saldos_por_forma).map(([forma, saldo]) => `
+                                        ${Object.entries(usuario.conta.saldos_por_forma)
+                                          .map(
+                                            ([forma, saldo]) => `
                                             <div class="saldo-item">
-                                                <span class="forma-pagamento">${formatFormaPagamento(forma)}:</span>
-                                                <span class="valor-saldo ${saldo >= 'R$ 0,00' ? 'positivo' : 'negativo'}">${saldo}</span>
+                                                <span class="forma-pagamento">${formatFormaPagamento(
+                                                  forma
+                                                )}:</span>
+                                                <span class="valor-saldo ${
+                                                  saldo >= 'R$ 0,00'
+                                                    ? 'positivo'
+                                                    : 'negativo'
+                                                }">${saldo}</span>
                                             </div>
-                                        `).join('')}
+                                        `
+                                          )
+                                          .join('')}
                                     </div>
                                 </div>
-                            ` : '<p class="no-saldos">Nenhum saldo registrado</p>'}
+                            `
+                                : '<p class="no-saldos">Nenhum saldo registrado</p>'
+                            }
                         </div>
                     `;
 
             // Adicionar botões de entrada/saída
             addBotoesMovimentacao(contaInfoDiv, usuario);
-
           } else {
             // Esconder botão de transferência se não tiver conta
             if (btnTransferir) {
@@ -6673,22 +7841,28 @@ setTimeout(inicializarBusca, 500);
                     `;
 
             // Adicionar evento ao botão de criar conta no modal
-            document.querySelector('.criar-conta-modal')?.addEventListener('click', function () {
-              const usuarioId = this.getAttribute('data-id');
-              if (confirm('Deseja criar uma conta para este usuário?')) {
-                criarContaUsuario(usuarioId);
-                closeModal('visualizarUsuarioModal');
-              }
-            });
+            document
+              .querySelector('.criar-conta-modal')
+              ?.addEventListener('click', function () {
+                const usuarioId = this.getAttribute('data-id');
+                if (confirm('Deseja criar uma conta para este usuário?')) {
+                  criarContaUsuario(usuarioId);
+                  closeModal('visualizarUsuarioModal');
+                }
+              });
           }
         }
 
         // Badge de status da conta
-        const contaStatusBadge = document.getElementById('visualizarUsuarioContaStatus');
+        const contaStatusBadge = document.getElementById(
+          'visualizarUsuarioContaStatus'
+        );
         if (contaStatusBadge) {
           contaStatusBadge.textContent = usuario.conta ? 'Com conta' : 'Sem conta';
           contaStatusBadge.className = 'badge';
-          contaStatusBadge.classList.add(usuario.conta ? 'badge-info' : 'badge-warning');
+          contaStatusBadge.classList.add(
+            usuario.conta ? 'badge-info' : 'badge-warning'
+          );
         }
 
         openModal('visualizarUsuarioModal');
@@ -6707,11 +7881,13 @@ setTimeout(inicializarBusca, 500);
       const confirmarBtn = document.getElementById('confirmarMovimentacao');
 
       if (modalTitle) {
-        modalTitle.textContent = tipo === 'entrada' ? 'Entrada na Conta' : 'Saída da Conta';
+        modalTitle.textContent =
+          tipo === 'entrada' ? 'Entrada na Conta' : 'Saída da Conta';
       }
 
       if (confirmarBtn) {
-        confirmarBtn.className = tipo === 'entrada' ? 'btn btn-success' : 'btn btn-danger';
+        confirmarBtn.className =
+          tipo === 'entrada' ? 'btn btn-success' : 'btn btn-danger';
         confirmarBtn.innerHTML = `
                 <i class="fas fa-${tipo === 'entrada' ? 'arrow-down' : 'arrow-up'}"></i>
                 <span>Confirmar ${tipo === 'entrada' ? 'Entrada' : 'Saída'}</span>
@@ -6740,7 +7916,6 @@ setTimeout(inicializarBusca, 500);
       }
 
       openModal('movimentacaoContaModal');
-
     } catch (error) {
       showFlashMessage('error', 'Erro ao abrir modal de movimentação');
     }
@@ -6771,13 +7946,14 @@ setTimeout(inicializarBusca, 500);
   }
 
   window.processarMovimentacao = async function () {
-
     // Capturar tipo ANTES do try para usar no catch
     const tipo = document.getElementById('movimentacaoTipo').value;
 
     try {
       const contaId = document.getElementById('movimentacaoContaId').value;
-      const formaPagamento = document.getElementById('movimentacaoFormaPagamento').value;
+      const formaPagamento = document.getElementById(
+        'movimentacaoFormaPagamento'
+      ).value;
       const valorInput = document.getElementById('movimentacaoValor').value;
       const descricao = document.getElementById('movimentacaoDescricao').value;
 
@@ -6787,7 +7963,12 @@ setTimeout(inicializarBusca, 500);
         return;
       }
 
-      if (!valorInput || valorInput.trim() === '' || isNaN(valorInput) || parseFloat(valorInput) <= 0) {
+      if (
+        !valorInput ||
+        valorInput.trim() === '' ||
+        isNaN(valorInput) ||
+        parseFloat(valorInput) <= 0
+      ) {
         showFlashMessage('error', 'Informe um valor válido maior que zero');
         return;
       }
@@ -6807,18 +7988,22 @@ setTimeout(inicializarBusca, 500);
         descricao: descricao || `${tipo === 'entrada' ? 'Entrada' : 'Saída'} na conta`,
       };
 
-      const endpoint = tipo === 'entrada' ? '/admin/conta/entrada' : '/admin/conta/saida';
+      const endpoint =
+        tipo === 'entrada' ? '/admin/conta/entrada' : '/admin/conta/saida';
 
       const response = await fetchWithErrorHandling(endpoint, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(movimentacaoData)
+        body: JSON.stringify(movimentacaoData),
       });
 
       if (response.success) {
-        showFlashMessage('success', response.message || `Movimentação de ${tipo} realizada com sucesso!`);
+        showFlashMessage(
+          'success',
+          response.message || `Movimentação de ${tipo} realizada com sucesso!`
+        );
         closeModal('movimentacaoContaModal');
 
         // Recarregar dados
@@ -6829,18 +8014,17 @@ setTimeout(inicializarBusca, 500);
         // Atualizar modal de visualização se estiver aberto
         const visualizarModal = document.getElementById('visualizarUsuarioModal');
         if (visualizarModal && visualizarModal.style.display === 'block') {
-          const usuarioIdVisualizar = document.querySelector('.visualizar-usuario[data-id]')?.getAttribute('data-id');
+          const usuarioIdVisualizar = document
+            .querySelector('.visualizar-usuario[data-id]')
+            ?.getAttribute('data-id');
           if (usuarioIdVisualizar) {
             setTimeout(() => openVisualizarUsuarioModal(usuarioIdVisualizar), 500);
           }
         }
       } else {
         showFlashMessage('error', response.message || `Erro ao realizar ${tipo}`);
-
       }
-
     } catch (error) {
-
       // CORREÇÃO: Usar a variável tipo capturada fora do try
       showFlashMessage('error', `Erro ao processar ${tipo}. Tente novamente.`);
     }
@@ -6882,7 +8066,6 @@ setTimeout(inicializarBusca, 500);
 
   async function openTransferenciaModalContas(usuarioDestino) {
     try {
-
       // Carregar lista de usuários com conta para seleção da origem
       const response = await fetchWithErrorHandling('/admin/usuarios');
 
@@ -6891,14 +8074,17 @@ setTimeout(inicializarBusca, 500);
       }
 
       // Filtrar apenas usuários com conta (excluindo o usuário destino)
-      const usuariosComConta = response.usuarios.filter(u => {
+      const usuariosComConta = response.usuarios.filter((u) => {
         const temConta = u.conta !== null && u.conta !== undefined;
         const naoEhDestino = u.id !== usuarioDestino.id;
         return temConta && naoEhDestino;
       });
 
       if (usuariosComConta.length === 0) {
-        showFlashMessage('warning', 'Não há outras contas disponíveis para transferência');
+        showFlashMessage(
+          'warning',
+          'Não há outras contas disponíveis para transferência'
+        );
         return;
       }
 
@@ -6913,17 +8099,21 @@ setTimeout(inicializarBusca, 500);
       if (selectOrigem) {
         selectOrigem.innerHTML = `
                 <option value="">Selecione a conta de origem</option>
-                ${usuariosComConta.map(usuario => {
-          const saldoTotal = usuario.conta
-            ? (usuario.conta.saldo_total_formatado || usuario.conta.saldo_total || 'R$ 0,00')
-            : 'R$ 0,00';
+                ${usuariosComConta
+                  .map((usuario) => {
+                    const saldoTotal = usuario.conta
+                      ? usuario.conta.saldo_total_formatado ||
+                        usuario.conta.saldo_total ||
+                        'R$ 0,00'
+                      : 'R$ 0,00';
 
-          return `
+                    return `
                         <option value="${usuario.conta.id}" data-usuario-id="${usuario.id}">
                             ${usuario.nome} (Saldo: ${saldoTotal})
                         </option>
                     `;
-        }).join('')}
+                  })
+                  .join('')}
             `;
       }
 
@@ -6958,7 +8148,6 @@ setTimeout(inicializarBusca, 500);
       setupTransferenciaEvents();
 
       openModal('transferenciaModalContas');
-
     } catch (error) {
       showFlashMessage('error', 'Erro ao carregar dados para transferência');
     }
@@ -6975,7 +8164,10 @@ setTimeout(inicializarBusca, 500);
 
       // Validações básicas
       if (!contaOrigemId || !formaPagamento || !valor || valor <= 0) {
-        showFlashMessage('error', 'Preencha todos os campos obrigatórios com valores válidos');
+        showFlashMessage(
+          'error',
+          'Preencha todos os campos obrigatórios com valores válidos'
+        );
         return;
       }
 
@@ -6984,15 +8176,15 @@ setTimeout(inicializarBusca, 500);
         conta_destino_id: parseInt(contaDestinoId),
         forma_pagamento: formaPagamento,
         valor: valor,
-        descricao: descricao || `Transferência entre contas`
+        descricao: descricao || `Transferência entre contas`,
       };
 
       const response = await fetchWithErrorHandling('/admin/conta/transferir', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(transferenciaData)
+        body: JSON.stringify(transferenciaData),
       });
 
       if (response.success) {
@@ -7003,7 +8195,6 @@ setTimeout(inicializarBusca, 500);
       } else {
         showFlashMessage('error', response.error || 'Erro ao realizar transferência');
       }
-
     } catch (error) {
       showFlashMessage('error', 'Erro ao processar transferência');
     }
@@ -7020,7 +8211,9 @@ setTimeout(inicializarBusca, 500);
       btnConfirmarTransferencia.replaceWith(btnConfirmarTransferencia.cloneNode(true));
 
       // Adicionar novo event listener
-      document.getElementById('confirmarTransferencia').addEventListener('click', processarTransferenciaContas);
+      document
+        .getElementById('confirmarTransferencia')
+        .addEventListener('click', processarTransferenciaContas);
     }
   }
 
@@ -7037,7 +8230,7 @@ setTimeout(inicializarBusca, 500);
   }
 
   function setupUsuarioActions() {
-    document.querySelectorAll('.criar-conta-usuario').forEach(btn => {
+    document.querySelectorAll('.criar-conta-usuario').forEach((btn) => {
       btn.addEventListener('click', function () {
         const usuarioId = this.getAttribute('data-id');
         if (confirm('Deseja criar uma conta para este usuário?')) {
@@ -7046,43 +8239,58 @@ setTimeout(inicializarBusca, 500);
       });
     });
 
-    document.querySelectorAll('.visualizar-usuario').forEach(btn => {
+    document.querySelectorAll('.visualizar-usuario').forEach((btn) => {
       btn.addEventListener('click', function () {
         const usuarioId = this.getAttribute('data-id');
         openVisualizarUsuarioModal(usuarioId);
       });
     });
 
-    document.querySelectorAll('.editar-usuario').forEach(btn => {
+    document.querySelectorAll('.editar-usuario').forEach((btn) => {
       btn.addEventListener('click', function () {
         const usuarioId = this.getAttribute('data-id');
         openEditarUsuarioModal(usuarioId);
       });
     });
 
-    document.querySelectorAll('.alterar-status-usuario').forEach(btn => {
+    document.querySelectorAll('.alterar-status-usuario').forEach((btn) => {
       btn.addEventListener('click', async function () {
         const usuarioId = this.getAttribute('data-id');
         const currentStatus = this.getAttribute('data-status') === 'Ativo';
         const newStatus = !currentStatus;
 
-        if (confirm(`Tem certeza que deseja ${currentStatus ? 'desativar' : 'ativar'} este usuário?`)) {
+        if (
+          confirm(
+            `Tem certeza que deseja ${
+              currentStatus ? 'desativar' : 'ativar'
+            } este usuário?`
+          )
+        ) {
           try {
-            const response = await fetchWithErrorHandling(`/admin/usuarios/${usuarioId}`, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                status: newStatus
-              })
-            });
+            const response = await fetchWithErrorHandling(
+              `/admin/usuarios/${usuarioId}`,
+              {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  status: newStatus,
+                }),
+              }
+            );
 
             if (response.success) {
-              showFlashMessage('success', `Usuário ${newStatus ? 'ativado' : 'desativado'} com sucesso`);
+              showFlashMessage(
+                'success',
+                `Usuário ${newStatus ? 'ativado' : 'desativado'} com sucesso`
+              );
               loadUsuariosData();
             } else {
-              showFlashMessage('error', response.message || 'Erro ao alterar status do usuário');
+              showFlashMessage(
+                'error',
+                response.message || 'Erro ao alterar status do usuário'
+              );
             }
           } catch (error) {
             showFlashMessage('error', 'Erro ao alterar status do usuário');
@@ -7091,13 +8299,16 @@ setTimeout(inicializarBusca, 500);
       });
     });
 
-    document.querySelectorAll('.remover-usuario').forEach(btn => {
+    document.querySelectorAll('.remover-usuario').forEach((btn) => {
       btn.addEventListener('click', function () {
         const usuarioId = this.getAttribute('data-id');
-        const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
+        const confirmarExclusaoTexto = document.getElementById(
+          'confirmarExclusaoTexto'
+        );
         const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
 
-        if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir permanentemente o usuário ${usuarioId}?`;
+        if (confirmarExclusaoTexto)
+          confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir permanentemente o usuário ${usuarioId}?`;
         if (confirmarExclusaoBtn) {
           confirmarExclusaoBtn.setAttribute('data-id', usuarioId);
           confirmarExclusaoBtn.setAttribute('data-type', 'usuario');
@@ -7111,8 +8322,12 @@ setTimeout(inicializarBusca, 500);
 
   // Event Listeners para Usuários
   document.getElementById('searchUsuario')?.addEventListener('input', loadUsuariosData);
-  document.getElementById('refreshUsuarios')?.addEventListener('click', loadUsuariosData);
-  document.getElementById('addUsuario')?.addEventListener('click', () => openEditarUsuarioModal());
+  document
+    .getElementById('refreshUsuarios')
+    ?.addEventListener('click', loadUsuariosData);
+  document
+    .getElementById('addUsuario')
+    ?.addEventListener('click', () => openEditarUsuarioModal());
 
   const usuarioForm = document.getElementById('usuarioForm');
   if (usuarioForm) {
@@ -7127,11 +8342,12 @@ setTimeout(inicializarBusca, 500);
         cpf: document.getElementById('usuarioCpf')?.value || '',
         tipo: document.getElementById('usuarioPerfil')?.value || '',
         status: document.getElementById('usuarioStatus')?.value === 'true',
-        observacoes: document.getElementById('usuarioObservacoes')?.value || ''
+        observacoes: document.getElementById('usuarioObservacoes')?.value || '',
       };
 
       const senha = document.getElementById('usuarioSenha')?.value || '';
-      const confirmaSenha = document.getElementById('usuarioConfirmaSenha')?.value || '';
+      const confirmaSenha =
+        document.getElementById('usuarioConfirmaSenha')?.value || '';
 
       if (senha || confirmaSenha) {
         if (senha !== confirmaSenha) {
@@ -7151,20 +8367,29 @@ setTimeout(inicializarBusca, 500);
         const response = await fetchWithErrorHandling(url, {
           method: method,
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
-          body: JSON.stringify(formData)
+          body: JSON.stringify(formData),
         });
 
         if (response.success) {
-          showFlashMessage('success', `Usuário ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
+          showFlashMessage(
+            'success',
+            `Usuário ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`
+          );
           closeModal('usuarioModal');
           loadUsuariosData();
         } else {
-          showFlashMessage('error', response.message || `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
+          showFlashMessage(
+            'error',
+            response.message || `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`
+          );
         }
       } catch (error) {
-        showFlashMessage('error', `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`);
+        showFlashMessage(
+          'error',
+          `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} usuário`
+        );
       }
     });
   }
@@ -7198,7 +8423,8 @@ setTimeout(inicializarBusca, 500);
   // ===== DESCONTOS =====
   async function loadDescontosData() {
     try {
-      const searchText = document.getElementById('searchDesconto')?.value.toLowerCase() || '';
+      const searchText =
+        document.getElementById('searchDesconto')?.value.toLowerCase() || '';
       const data = await fetchWithErrorHandling('/admin/descontos');
 
       if (data.success) {
@@ -7206,8 +8432,11 @@ setTimeout(inicializarBusca, 500);
         if (descontosTable) {
           descontosTable.innerHTML = '';
 
-          data.descontos.forEach(desconto => {
-            if (searchText && !(desconto.identificador || '').toLowerCase().includes(searchText)) {
+          data.descontos.forEach((desconto) => {
+            if (
+              searchText &&
+              !(desconto.identificador || '').toLowerCase().includes(searchText)
+            ) {
               return;
             }
 
@@ -7221,13 +8450,19 @@ setTimeout(inicializarBusca, 500);
               <td>${desconto.quantidade_maxima}</td>
               <td>${desconto.valor_unitario_com_desconto || '0,00'}</td>
               <td>${desconto.valido_ate || '-'}</td>
-              <td><span class="badge ${desconto.ativo ? 'badge-success' : 'badge-danger'}">${desconto.ativo ? 'Ativo' : 'Inativo'}</span></td>
+              <td><span class="badge ${
+                desconto.ativo ? 'badge-success' : 'badge-danger'
+              }">${desconto.ativo ? 'Ativo' : 'Inativo'}</span></td>
               <td>
                 <div class="table-actions">
-                  <button class="btn-icon btn-warning editar-desconto" data-id="${desconto.id}" title="Editar">
+                  <button class="btn-icon btn-warning editar-desconto" data-id="${
+                    desconto.id
+                  }" title="Editar">
                     <i class="fas fa-edit"></i>
                   </button>
-                  <button class="btn-icon btn-danger remover-desconto" data-id="${desconto.id}" title="Remover">
+                  <button class="btn-icon btn-danger remover-desconto" data-id="${
+                    desconto.id
+                  }" title="Remover">
                     <i class="fas fa-trash"></i>
                   </button>
                 </div>
@@ -7239,7 +8474,7 @@ setTimeout(inicializarBusca, 500);
           setupDescontoActions();
 
           // Adiciona evento de clique nas linhas da tabela
-          document.querySelectorAll('.desconto-row').forEach(row => {
+          document.querySelectorAll('.desconto-row').forEach((row) => {
             row.addEventListener('click', function (e) {
               // Evita abrir o modal se o clique foi em um botão de ação
               if (!e.target.closest('.table-actions')) {
@@ -7258,48 +8493,69 @@ setTimeout(inicializarBusca, 500);
   async function openProdutosDescontoModal(descontoId) {
     try {
       // Busca os dados do desconto
-      const responseDesconto = await fetchWithErrorHandling(`/admin/descontos/${descontoId}`);
+      const responseDesconto = await fetchWithErrorHandling(
+        `/admin/descontos/${descontoId}`
+      );
 
       if (responseDesconto.success) {
         const desconto = responseDesconto.desconto;
 
         // Preenche as informações do desconto
-        document.getElementById('descontoInfoIdentificador').textContent = desconto.identificador || '-';
-        document.getElementById('descontoInfoDescricao').textContent = desconto.descricao || '-';
-        document.getElementById('descontoInfoValidade').textContent = desconto.valido_ate || '-';
+        document.getElementById('descontoInfoIdentificador').textContent =
+          desconto.identificador || '-';
+        document.getElementById('descontoInfoDescricao').textContent =
+          desconto.descricao || '-';
+        document.getElementById('descontoInfoValidade').textContent =
+          desconto.valido_ate || '-';
 
         const statusElement = document.getElementById('descontoInfoStatus');
         statusElement.textContent = desconto.ativo ? 'Ativo' : 'Inativo';
-        statusElement.className = desconto.ativo ? 'badge badge-success' : 'badge badge-danger';
+        statusElement.className = desconto.ativo
+          ? 'badge badge-success'
+          : 'badge badge-danger';
 
         // Busca os produtos associados a este desconto
-        const responseProdutos = await fetchWithErrorHandling(`/admin/descontos/${descontoId}/produtos`);
+        const responseProdutos = await fetchWithErrorHandling(
+          `/admin/descontos/${descontoId}/produtos`
+        );
 
         const tableBody = document.querySelector('#produtosDescontoTable tbody');
         tableBody.innerHTML = '';
 
-        if (responseProdutos.success && responseProdutos.produtos && responseProdutos.produtos.length > 0) {
-          responseProdutos.produtos.forEach(produto => {
+        if (
+          responseProdutos.success &&
+          responseProdutos.produtos &&
+          responseProdutos.produtos.length > 0
+        ) {
+          responseProdutos.produtos.forEach((produto) => {
             const row = document.createElement('tr');
             row.innerHTML = `
               <td>${produto.codigo || '-'}</td>
               <td>${produto.nome || '-'}</td>
               <td>${produto.tipo || '-'}</td>
-              <td><span class="badge ${produto.ativo ? 'badge-success' : 'badge-danger'}">${produto.ativo ? 'Ativo' : 'Inativo'}</span></td>
+              <td><span class="badge ${
+                produto.ativo ? 'badge-success' : 'badge-danger'
+              }">${produto.ativo ? 'Ativo' : 'Inativo'}</span></td>
             `;
             tableBody.appendChild(row);
           });
         } else {
-          tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum produto associado a este desconto</td></tr>';
+          tableBody.innerHTML =
+            '<tr><td colspan="4" class="text-center">Nenhum produto associado a este desconto</td></tr>';
         }
 
         // Atualiza o título do modal
-        document.getElementById('produtosDescontoModalTitle').textContent = `Produtos do Desconto: ${desconto.identificador}`;
+        document.getElementById(
+          'produtosDescontoModalTitle'
+        ).textContent = `Produtos do Desconto: ${desconto.identificador}`;
 
         // Abre o modal
         openModal('produtosDescontoModal');
       } else {
-        showFlashMessage('error', responseDesconto.erro || 'Erro ao carregar dados do desconto');
+        showFlashMessage(
+          'error',
+          responseDesconto.erro || 'Erro ao carregar dados do desconto'
+        );
       }
     } catch (error) {
       showFlashMessage('error', 'Erro ao carregar produtos do desconto');
@@ -7313,12 +8569,23 @@ setTimeout(inicializarBusca, 500);
       if (response.success) {
         const desconto = response.desconto;
 
-        if (document.getElementById('descontoId')) document.getElementById('descontoId').value = desconto.id;
-        if (document.getElementById('descontoProdutoId')) document.getElementById('descontoProdutoId').value = desconto.produto_id;
-        if (document.getElementById('descontoIdentificador')) document.getElementById('descontoIdentificador').value = desconto.identificador;
-        if (document.getElementById('descontoQuantidadeMinima')) document.getElementById('descontoQuantidadeMinima').value = desconto.quantidade_minima;
-        if (document.getElementById('descontoQuantidadeMaxima')) document.getElementById('descontoQuantidadeMaxima').value = desconto.quantidade_maxima;
-        if (document.getElementById('descontoValorUnitario')) document.getElementById('descontoValorUnitario').value = limparValor(desconto.valor_unitario_com_desconto);
+        if (document.getElementById('descontoId'))
+          document.getElementById('descontoId').value = desconto.id;
+        if (document.getElementById('descontoProdutoId'))
+          document.getElementById('descontoProdutoId').value = desconto.produto_id;
+        if (document.getElementById('descontoIdentificador'))
+          document.getElementById('descontoIdentificador').value =
+            desconto.identificador;
+        if (document.getElementById('descontoQuantidadeMinima'))
+          document.getElementById('descontoQuantidadeMinima').value =
+            desconto.quantidade_minima;
+        if (document.getElementById('descontoQuantidadeMaxima'))
+          document.getElementById('descontoQuantidadeMaxima').value =
+            desconto.quantidade_maxima;
+        if (document.getElementById('descontoValorUnitario'))
+          document.getElementById('descontoValorUnitario').value = limparValor(
+            desconto.valor_unitario_com_desconto
+          );
 
         if (desconto.valido_ate) {
           let dataValidoAte = desconto.valido_ate;
@@ -7327,19 +8594,28 @@ setTimeout(inicializarBusca, 500);
             dataValidoAte = dataValidoAte.split(' ')[0];
           }
 
-          if (document.getElementById('descontoValidoAte')) document.getElementById('descontoValidoAte').value = dataValidoAte;
+          if (document.getElementById('descontoValidoAte'))
+            document.getElementById('descontoValidoAte').value = dataValidoAte;
         } else {
-          if (document.getElementById('descontoValidoAte')) document.getElementById('descontoValidoAte').value = '';
+          if (document.getElementById('descontoValidoAte'))
+            document.getElementById('descontoValidoAte').value = '';
         }
 
-        if (document.getElementById('descontoDescricao')) document.getElementById('descontoDescricao').value = desconto.descricao || '';
-        if (document.getElementById('descontoAtivo')) document.getElementById('descontoAtivo').value = desconto.ativo ? 'true' : 'false';
+        if (document.getElementById('descontoDescricao'))
+          document.getElementById('descontoDescricao').value = desconto.descricao || '';
+        if (document.getElementById('descontoAtivo'))
+          document.getElementById('descontoAtivo').value = desconto.ativo
+            ? 'true'
+            : 'false';
 
         const descontoModalTitle = document.getElementById('descontoModalTitle');
         if (descontoModalTitle) descontoModalTitle.textContent = 'Editar Desconto';
         openModal('descontoModal');
       } else {
-        showFlashMessage('error', response.erro || 'Erro ao carregar dados do desconto');
+        showFlashMessage(
+          'error',
+          response.erro || 'Erro ao carregar dados do desconto'
+        );
       }
     } catch (error) {
       showFlashMessage('error', 'Erro ao carregar dados do desconto');
@@ -7347,20 +8623,23 @@ setTimeout(inicializarBusca, 500);
   }
 
   function setupDescontoActions() {
-    document.querySelectorAll('.editar-desconto').forEach(btn => {
+    document.querySelectorAll('.editar-desconto').forEach((btn) => {
       btn.addEventListener('click', function () {
         const descontoId = this.getAttribute('data-id');
         openEditarDescontoModal(descontoId);
       });
     });
 
-    document.querySelectorAll('.remover-desconto').forEach(btn => {
+    document.querySelectorAll('.remover-desconto').forEach((btn) => {
       btn.addEventListener('click', function () {
         const descontoId = this.getAttribute('data-id');
-        const confirmarExclusaoTexto = document.getElementById('confirmarExclusaoTexto');
+        const confirmarExclusaoTexto = document.getElementById(
+          'confirmarExclusaoTexto'
+        );
         const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
 
-        if (confirmarExclusaoTexto) confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir este desconto?`;
+        if (confirmarExclusaoTexto)
+          confirmarExclusaoTexto.textContent = `Tem certeza que deseja excluir este desconto?`;
         if (confirmarExclusaoBtn) {
           confirmarExclusaoBtn.setAttribute('data-id', descontoId);
           confirmarExclusaoBtn.setAttribute('data-type', 'desconto');
@@ -7371,14 +8650,20 @@ setTimeout(inicializarBusca, 500);
   }
 
   // Event Listeners para Descontos
-  document.getElementById('searchDesconto')?.addEventListener('input', loadDescontosData);
-  document.getElementById('refreshDescontos')?.addEventListener('click', loadDescontosData);
+  document
+    .getElementById('searchDesconto')
+    ?.addEventListener('input', loadDescontosData);
+  document
+    .getElementById('refreshDescontos')
+    ?.addEventListener('click', loadDescontosData);
   document.getElementById('addDesconto')?.addEventListener('click', () => {
     const descontoForm = document.getElementById('descontoForm');
     if (descontoForm) descontoForm.reset();
 
-    if (document.getElementById('descontoId')) document.getElementById('descontoId').value = '';
-    if (document.getElementById('descontoAtivo')) document.getElementById('descontoAtivo').value = 'true';
+    if (document.getElementById('descontoId'))
+      document.getElementById('descontoId').value = '';
+    if (document.getElementById('descontoAtivo'))
+      document.getElementById('descontoAtivo').value = 'true';
 
     const descontoModalTitle = document.getElementById('descontoModalTitle');
     if (descontoModalTitle) descontoModalTitle.textContent = 'Cadastrar Desconto';
@@ -7395,12 +8680,15 @@ setTimeout(inicializarBusca, 500);
 
       const formData = {
         identificador: document.getElementById('descontoIdentificador')?.value || '',
-        quantidade_minima: document.getElementById('descontoQuantidadeMinima')?.value || 0,
-        quantidade_maxima: document.getElementById('descontoQuantidadeMaxima')?.value || 0,
-        valor_unitario_com_desconto: document.getElementById('descontoValorUnitario')?.value || 0,
+        quantidade_minima:
+          document.getElementById('descontoQuantidadeMinima')?.value || 0,
+        quantidade_maxima:
+          document.getElementById('descontoQuantidadeMaxima')?.value || 0,
+        valor_unitario_com_desconto:
+          document.getElementById('descontoValorUnitario')?.value || 0,
         valido_ate: document.getElementById('descontoValidoAte')?.value || null,
         descricao: document.getElementById('descontoDescricao')?.value || '',
-        ativo: document.getElementById('descontoAtivo')?.value === 'true'
+        ativo: document.getElementById('descontoAtivo')?.value === 'true',
       };
 
       const url = isEdit ? `/admin/descontos/${descontoId}` : '/admin/descontos';
@@ -7410,11 +8698,14 @@ setTimeout(inicializarBusca, 500);
         const response = await fetchWithErrorHandling(url, {
           method: method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+          body: JSON.stringify(formData),
         });
 
         if (response.success) {
-          showFlashMessage('success', `Desconto ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`);
+          showFlashMessage(
+            'success',
+            `Desconto ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso`
+          );
           closeModal('descontoModal');
           loadDescontosData();
         } else {
@@ -7441,52 +8732,55 @@ setTimeout(inicializarBusca, 500);
     setTimeout(initializeConfiguracoes, 100);
   }
 
-  document.getElementById('confirmarExclusaoBtn')?.addEventListener('click', async function () {
-    const id = this.getAttribute('data-id');
-    const type = this.getAttribute('data-type');
+  document
+    .getElementById('confirmarExclusaoBtn')
+    ?.addEventListener('click', async function () {
+      const id = this.getAttribute('data-id');
+      const type = this.getAttribute('data-type');
 
-    try {
-      let url;
-      if (type === 'produto') {
-        url = `/admin/produtos/${id}`;
-      } else if (type === 'cliente') {
-        url = `/admin/clientes/${id}`;
-      } else if (type === 'usuario') {
-        url = `/admin/usuarios/${id}`;
-      } else if (type === 'desconto') {
-        url = `/admin/descontos/${id}`;
-      } else if (type === 'caixa') {
-        url = `/admin/caixas/${id}`;
+      try {
+        let url;
+        if (type === 'produto') {
+          url = `/admin/produtos/${id}`;
+        } else if (type === 'cliente') {
+          url = `/admin/clientes/${id}`;
+        } else if (type === 'usuario') {
+          url = `/admin/usuarios/${id}`;
+        } else if (type === 'desconto') {
+          url = `/admin/descontos/${id}`;
+        } else if (type === 'caixa') {
+          url = `/admin/caixas/${id}`;
+        }
+
+        if (!url) return;
+
+        const response = await fetchWithErrorHandling(url, {
+          method: 'DELETE',
+        });
+
+        if (response.success) {
+          showFlashMessage(
+            'success',
+            `${type.charAt(0).toUpperCase() + type.slice(1)} excluído com sucesso`
+          );
+          closeModal('confirmarExclusaoModal');
+
+          if (type === 'produto') loadProdutosData();
+          if (type === 'cliente') loadClientesData();
+          if (type === 'usuario') loadUsuariosData();
+          if (type === 'desconto') loadDescontosData();
+          if (type === 'caixa') loadCaixasData();
+        } else {
+          showFlashMessage('error', response.message || `Erro ao excluir ${type}`);
+        }
+      } catch (error) {
+        showFlashMessage('error', `Erro ao excluir ${type}`);
       }
-
-      if (!url) return;
-
-      const response = await fetchWithErrorHandling(url, {
-        method: 'DELETE'
-      });
-
-      if (response.success) {
-        showFlashMessage('success', `${type.charAt(0).toUpperCase() + type.slice(1)} excluído com sucesso`);
-        closeModal('confirmarExclusaoModal');
-
-        if (type === 'produto') loadProdutosData();
-        if (type === 'cliente') loadClientesData();
-        if (type === 'usuario') loadUsuariosData();
-        if (type === 'desconto') loadDescontosData();
-        if (type === 'caixa') loadCaixasData();
-      } else {
-        showFlashMessage('error', response.message || `Erro ao excluir ${type}`);
-      }
-    } catch (error) {
-      showFlashMessage('error', `Erro ao excluir ${type}`);
-    }
-  });
+    });
 
   async function loadInitialData() {
     try {
-      await Promise.all([
-        loadDashboardData()
-      ]);
+      await Promise.all([loadDashboardData()]);
 
       const activeTab = document.querySelector('.sidebar-nav li.active');
       if (activeTab) {

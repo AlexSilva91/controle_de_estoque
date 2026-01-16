@@ -1147,7 +1147,7 @@
                     </h3>
                     <button class="close-modal" aria-label="Fechar">&times;</button>
                 </div>
-                <form id="produtoForm">
+                <form id="produtoForm" enctype="multipart/form-data">
                     <div class="modal-body">
                         <div class="form-row">
                             <div class="form-group">
@@ -1178,8 +1178,7 @@
                             </div>
                             <div class="form-group">
                                 <label for="produtoValor">Valor Unitário*</label>
-                                <input type="text" id="produtoValor" class="form-control" placeholder="Ex: 2.100,30"
-                                    required>
+                                <input type="text" id="produtoValor" class="form-control" placeholder="Ex: 2.100,30" required>
                             </div>
                         </div>
                         <div class="form-row">
@@ -1193,20 +1192,17 @@
                             </div>
                             <div class="form-group">
                                 <label for="produtoEstoque">Quantidade em Estoque*</label>
-                                <input type="number" id="produtoEstoque" class="form-control" step="0.001" min="0"
-                                    required>
+                                <input type="number" id="produtoEstoque" class="form-control" step="0.001" min="0" required>
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="produtoValorCompra">Valor Unitário de Compra</label>
-                                <input type="text" id="produtoValorCompra" class="form-control"
-                                    placeholder="Ex: 10.200,40">
+                                <input type="text" id="produtoValorCompra" class="form-control" placeholder="Ex: 10.200,40">
                             </div>
                             <div class="form-group">
                                 <label for="produtoValorTotalCompra">Valor Total de Compra</label>
-                                <input type="text" id="produtoValorTotalCompra" class="form-control"
-                                    placeholder="Ex: 25.500,75">
+                                <input type="text" id="produtoValorTotalCompra" class="form-control" placeholder="Ex: 25.500,75">
                             </div>
                         </div>
                         <div class="form-row">
@@ -1216,8 +1212,17 @@
                             </div>
                             <div class="form-group">
                                 <label for="produtoEstoqueMinimo">Estoque Mínimo</label>
-                                <input type="number" id="produtoEstoqueMinimo" class="form-control" step="0.001"
-                                    min="0">
+                                <input type="number" id="produtoEstoqueMinimo" class="form-control" step="0.001" min="0">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="width: 100%;">
+                                <label for="produtoFoto">Foto do Produto</label>
+                                <input type="file" id="produtoFoto" class="form-control" accept="image/*">
+                                <small class="form-text text-muted">Formatos: JPG, PNG, GIF. Tamanho máximo: 5MB.</small>
+                                <div id="fotoPreview" class="mt-2" style="display: none;">
+                                    <img id="fotoPreviewImg" src="#" alt="Preview" style="max-width: 200px; max-height: 150px; border: 1px solid #ddd; border-radius: 4px;">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1234,33 +1239,33 @@
     </div>
     <!-- Modal Editar Produto -->
     <div id="editarProdutoModal" class="modal">
-        <div class="modal-overlay"></div>
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">
-                        <i class="fas fa-edit"></i>
-                        <span>Editar Produto</span>
-                    </h3>
-                    <button class="close-modal" aria-label="Fechar">&times;</button>
-                </div>
-                <form id="editarProdutoForm">
-                    <div class="modal-body">
-                        <!-- Conteúdo será preenchido dinamicamente via JavaScript -->
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" id="btnEntradaEstoque">
-                            <i class="fas fa-box"></i> Entrada de Estoque
-                        </button>
-                        <button type="button" class="btn btn-outline close-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i>
-                            <span>Salvar Alterações</span>
-                        </button>
-                    </div>
-                </form>
+    <div class="modal-overlay"></div>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fas fa-edit"></i>
+                    <span>Editar Produto</span>
+                </h3>
+                <button class="close-modal" aria-label="Fechar">&times;</button>
             </div>
+            <form id="editarProdutoForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <!-- Conteúdo será preenchido dinamicamente via JavaScript -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btnEntradaEstoque">
+                        <i class="fas fa-box"></i> Entrada de Estoque
+                    </button>
+                    <button type="button" class="btn btn-outline close-modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        <span>Salvar Alterações</span>
+                    </button>
+                </div>
+            </form>
         </div>
+    </div>
     </div>
 
     <div id="entradaEstoqueModal" class="modal">
