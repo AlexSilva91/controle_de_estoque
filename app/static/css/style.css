@@ -52,8 +52,9 @@
   --space-xxl: clamp(24px, 3vw, 32px);
 
   /* Tipografia */
-  --font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    Oxygen, Ubuntu, Cantarell, sans-serif;
+  --font-family:
+    'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+    Cantarell, sans-serif;
   --font-size-xs: clamp(12px, 2vw, 14px);
   --font-size-sm: clamp(14px, 2.5vw, 16px);
   --font-size-md: clamp(16px, 3vw, 18px);
@@ -1426,7 +1427,9 @@ footer {
   color: var(--text-3);
   border-top: 1px solid var(--border-color);
   background-color: var(--bg-2);
-  transition: background 0.3s ease, color 0.3s ease;
+  transition:
+    background 0.3s ease,
+    color 0.3s ease;
 }
 
 /* Links discretos no footer */
@@ -3196,7 +3199,9 @@ canvas {
   /* altura consistente */
   padding: var(--space-md);
   box-sizing: border-box;
-  transition: transform 0.2s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.3s ease;
 }
 
 .metric-card[data-usuario-id]:hover {
@@ -4015,7 +4020,9 @@ td {
   justify-content: space-between;
   padding: var(--space-md) 0;
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.5);
-  transition: transform 0.3s ease, width 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    width 0.3s ease;
   z-index: 1000;
   overflow-y: auto;
 }
@@ -4263,7 +4270,9 @@ td {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: background 0.3s ease, transform 0.2s ease;
+  transition:
+    background 0.3s ease,
+    transform 0.2s ease;
   box-shadow: var(--shadow-sm);
 }
 
@@ -4448,7 +4457,9 @@ td {
   backdrop-filter: blur(12px) saturate(150%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
-  transition: background 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .main-header::after {
@@ -4640,7 +4651,9 @@ td {
   background-color: var(--card-bg);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-md);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 #configuracoes .card:hover {
@@ -4769,7 +4782,9 @@ td {
   padding: 8px 12px;
   border-radius: var(--border-radius-sm);
   font-size: var(--font-size-sm);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
   width: 100%;
   box-sizing: border-box;
 }
@@ -4794,7 +4809,9 @@ td {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: transform 0.2s ease, background 0.3s ease;
+  transition:
+    transform 0.2s ease,
+    background 0.3s ease;
   white-space: nowrap;
   min-height: 40px;
 }
@@ -4931,7 +4948,9 @@ td {
   box-shadow: var(--shadow-sm);
   opacity: 0;
   transform: translateY(10px);
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
   overflow-x: auto;
 }
 
