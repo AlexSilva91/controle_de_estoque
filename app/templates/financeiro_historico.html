@@ -158,6 +158,7 @@
         gap: 8px;
         transition: all 0.3s ease;
         box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3);
+        cursor: pointer;
       }
 
       .btn-modern:hover {
@@ -511,40 +512,55 @@
             </tr>
           </thead>
           <tbody>
-            {% for f in historico %}
-            <tr>
-              <td>
-                <span class="badge-modern badge-primary">#{{ f.id_financeiro }}</span>
-              </td>
-              <td>{{ f.categoria }}</td>
-              <td class="value-positive">R$ {{ "%.2f"|format(f.valor_total_nota) }}</td>
-              <td>{{ f.descricao }}</td>
-              <td>{{ f.data.strftime('%d/%m/%Y %H:%M') }}</td>
-              <td>{{ f.cliente }}</td>
-              <td>{{ f.caixa }}</td>
-              <td>
-                {% if f.operador_nome %}
-                  <span class="badge-modern badge-operador">
-                    <i class="fas fa-user-tie me-1"></i>{{ f.operador_nome }}
-                  </span>
-                {% endif %}
-              </td>
-              <td>
-                {% if f.nota_fiscal_id %}
-                <div><strong>NF: {{ f.nota_fiscal_id }}</strong></div>
-                <ul class="payment-list">
-                  {% for p in f.pagamentos %}
-                  <li class="payment-item">
-                    <i class="fas fa-money-bill-wave"></i>
-                    {{ p.forma_pagamento.value if p.forma_pagamento else '-' }}: R$ {{
-                    "%.2f"|format(p.valor) }}
-                  </li>
-                  {% endfor %}
-                </ul>
-                {% else %}-{% endif %}
-              </td>
-            </tr>
-            {% endfor %}
+            {% if historico %}
+              {% for f in historico %}
+              <tr>
+                <td>
+                  <span class="badge-modern badge-primary">#{{ f.id_financeiro }}</span>
+                </td>
+                <td>{{ f.categoria }}</td>
+                <td class="value-positive">R$ {{ "%.2f"|format(f.valor_total_nota) }}</td>
+                <td>{{ f.descricao }}</td>
+                <td>{{ f.data.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>{{ f.cliente }}</td>
+                <td>{{ f.caixa }}</td>
+                <td>
+                  {% if f.operador_nome %}
+                    <span class="badge-modern badge-operador">
+                      <i class="fas fa-user-tie me-1"></i>{{ f.operador_nome }}
+                    </span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if f.nota_fiscal_id %}
+                  <div><strong>NF: {{ f.nota_fiscal_id }}</strong></div>
+                  <ul class="payment-list">
+                    {% for p in f.pagamentos %}
+                    <li class="payment-item">
+                      <i class="fas fa-money-bill-wave"></i>
+                      {{ p.forma_pagamento.value if p.forma_pagamento else '-' }}: R$ {{
+                      "%.2f"|format(p.valor) }}
+                    </li>
+                    {% endfor %}
+                  </ul>
+                  {% else %}-{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="9" style="text-align: center; padding: 60px 20px;">
+                  <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                    <i class="fas fa-inbox" style="font-size: 64px; color: var(--text-muted); opacity: 0.5;"></i>
+                    <h3 style="color: var(--text-secondary); font-weight: 600; margin: 0;">Nenhum registro encontrado</h3>
+                    <p style="color: var(--text-muted); margin: 0;">Não há movimentações financeiras para o período e filtros selecionados.</p>
+                    <button onclick="document.getElementById('btnLimparFiltro').click()" class="btn-modern btn-secondary-modern" style="margin-top: 10px;">
+                      <i class="fas fa-redo"></i> Limpar Filtros
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            {% endif %}
           </tbody>
         </table>
       </div>
@@ -557,44 +573,56 @@
 
     <script>
       $(document).ready(function () {
-        var headerCount = $('#financeiroTable thead th').length;
-        var firstRowCount = $('#financeiroTable tbody tr:first-child td').length;
+        var tbody = $('#financeiroTable tbody tr');
         
-        if (headerCount !== firstRowCount) {
-          return;
+        if (tbody.length > 0) {
+          var headerCount = $('#financeiroTable thead th').length;
+          var firstRowCount = $('#financeiroTable tbody tr:first-child td').length;
+          
+          if (headerCount === firstRowCount) {
+            try {
+              var table = $('#financeiroTable').DataTable({
+                paging: true,
+                pageLength: 10,
+                lengthMenu: [10, 25, 50, 100],
+                ordering: true,
+                order: [[4, 'desc']], 
+                language: {
+                  "search": "Pesquisar:",
+                  "lengthMenu": "Exibir _MENU_ registros por página",
+                  "zeroRecords": "Nenhum registro encontrado",
+                  "info": "Mostrando página _PAGE_ de _PAGES_",
+                  "infoEmpty": "Nenhum registro disponível",
+                  "infoFiltered": "(filtrado de _MAX_ registros totais)",
+                  "paginate": {
+                    "first": "Primeira",
+                    "last": "Última",
+                    "next": "Próxima",
+                    "previous": "Anterior"
+                  }
+                },
+                columnDefs: [
+                  {
+                    targets: [7, 8], 
+                    orderable: false
+                  }
+                ]
+              });
+            } catch (error) {
+              console.error('Erro ao inicializar DataTable:', error);
+            }
+          }
         }
         
-        try {
-          var table = $('#financeiroTable').DataTable({
-            paging: true,
-            pageLength: 10,
-            lengthMenu: [10, 25, 50, 100],
-            ordering: true,
-            order: [[4, 'desc']], 
-            language: {
-              "search": "Pesquisar:",
-              "lengthMenu": "Exibir _MENU_ registros por página",
-              "zeroRecords": "Nenhum registro encontrado",
-              "info": "Mostrando página _PAGE_ de _PAGES_",
-              "infoEmpty": "Nenhum registro disponível",
-              "infoFiltered": "(filtrado de _MAX_ registros totais)",
-              "paginate": {
-                "first": "Primeira",
-                "last": "Última",
-                "next": "Próxima",
-                "previous": "Anterior"
-              }
-            },
-            columnDefs: [
-              {
-                targets: [7, 8], 
-                orderable: false
-              }
-            ]
-          });
+        function getDatasDoMesAtual() {
+          var today = new Date();
+          var firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+          var lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
           
-        } catch (error) {
-          console.error('Erro ao inicializar DataTable:', error);
+          return {
+            start: firstDay.toISOString().split('T')[0],
+            end: lastDay.toISOString().split('T')[0]
+          };
         }
         
         function atualizarSubtitulo(start, end, operadorId) {
@@ -603,8 +631,8 @@
     
           var periodoTexto = '';
           if (start && end) {
-            var startDate = new Date(start);
-            var endDate = new Date(end);
+            var startDate = new Date(start + 'T00:00:00');
+            var endDate = new Date(end + 'T00:00:00');
             periodoTexto =
               startDate.toLocaleDateString('pt-BR') +
               ' a ' +
@@ -632,21 +660,21 @@
             return;
           }
     
-          var params = {
+          var params = new URLSearchParams({
             tipo: '{{ tipo_movimentacao }}',
             start: start,
             end: end
-          };
+          });
     
           if (operadorId) {
-            params.operador_id = operadorId;
+            params.append('operador_id', operadorId);
           }
     
-          var queryString = new URLSearchParams(params).toString();
-          window.location.href = "{{ url_for('admin.historico_financeiro') }}?" + queryString;
+          window.location.href = "{{ url_for('admin.historico_financeiro') }}?" + params.toString();
         }
     
-        $('#btnFiltrar').click(function () {
+        $('#btnFiltrar').on('click', function (e) {
+          e.preventDefault();
           var start = $('#startDate').val();
           var end = $('#endDate').val();
           var operadorId = $('#operadorSelect').val();
@@ -654,28 +682,40 @@
           recarregarComFiltros(start, end, operadorId);
         });
     
-        $('#btnLimparFiltro').click(function () {
-          window.location.href = "{{ url_for('admin.historico_financeiro') }}?tipo={{ tipo_movimentacao }}";
+        $('#btnLimparFiltro').on('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          var datas = getDatasDoMesAtual();
+          
+          var params = new URLSearchParams({
+            tipo: '{{ tipo_movimentacao }}',
+            start: datas.start,
+            end: datas.end
+          });
+          
+          var novaUrl = window.location.origin + window.location.pathname + '?' + params.toString();
+          window.location.replace(novaUrl);
         });
     
-        $('#btnPdf').click(function (e) {
+        $('#btnPdf').on('click', function (e) {
           e.preventDefault();
           var tipo = '{{ tipo_movimentacao }}';
           var start = $('#startDate').val();
           var end = $('#endDate').val();
           var operadorId = $('#operadorSelect').val();
     
-          var url = "{{ url_for('admin.historico_financeiro_pdf') }}?tipo=" + tipo;
-          if (start) url += '&start=' + encodeURIComponent(start);
-          if (end) url += '&end=' + encodeURIComponent(end);
-          if (operadorId) url += '&operador_id=' + encodeURIComponent(operadorId);
+          var params = new URLSearchParams({ tipo: tipo });
+          if (start) params.append('start', start);
+          if (end) params.append('end', end);
+          if (operadorId) params.append('operador_id', operadorId);
     
-          window.open(url, '_blank');
+          window.open("{{ url_for('admin.historico_financeiro_pdf') }}?" + params.toString(), '_blank');
         });
     
         function getUrlParam(name) {
-          var url = new URL(window.location.href);
-          return url.searchParams.get(name);
+          var params = new URLSearchParams(window.location.search);
+          return params.get(name);
         }
     
         var startParam = getUrlParam('start');
@@ -687,12 +727,9 @@
         if (operadorParam) $('#operadorSelect').val(operadorParam);
         
         if (!startParam && !endParam) {
-          var today = new Date();
-          var firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-          var lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    
-          $('#startDate').val(firstDay.toISOString().split('T')[0]);
-          $('#endDate').val(lastDay.toISOString().split('T')[0]);
+          var datas = getDatasDoMesAtual();
+          $('#startDate').val(datas.start);
+          $('#endDate').val(datas.end);
         }
         
         atualizarSubtitulo(startParam, endParam, operadorParam);
