@@ -1,479 +1,553 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
+  <head>
+    <meta charset="UTF-8" />
     <title>Histórico Financeiro - {{ tipo_movimentacao|capitalize }}</title>
-    <link rel="icon" href="{{ url_for('static', filename='assets/logo1.ico') }}" type="image/x-icon">
-    
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+    <link
+      rel="icon"
+      href="{{ url_for('static', filename='assets/logo1.ico') }}"
+      type="image/x-icon"
+    />
+
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
     <style>
-        :root {
-            /* Cores principais - Tema escuro elegante */
-            --bg-primary: #0f1422;
-            --bg-secondary: #1a2238;
-            --bg-card: #212b45;
-            --bg-element: #2a3655;
-            
-            --text-primary: #ffffff;
-            --text-secondary: #b4c6f0;
-            --text-muted: #8a9cc9;
-            
-            --accent-primary: #6c5ce7;
-            --accent-secondary: #00cec9;
-            --accent-success: #00b894;
-            --accent-danger: #ff6b6b;
-            --accent-warning: #feca57;
-            
-            --border-color: #34416d;
-            --border-radius: 12px;
-            --shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-            color: var(--text-primary);
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            min-height: 100vh;
-            padding: 20px;
-            line-height: 1.6;
-            font-weight: 400;
-        }
-        
-        .glass-card {
-            background: rgba(33, 43, 69, 0.8);
-            backdrop-filter: blur(10px);
-            border-radius: var(--border-radius);
-            border: 1px solid var(--border-color);
-            box-shadow: var(--shadow);
-            overflow: hidden;
-        }
-        
-        .container-main {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        
-        /* Header Styles */
+      :root {
+        /* Cores principais - Tema escuro elegante */
+        --bg-primary: #0f1422;
+        --bg-secondary: #1a2238;
+        --bg-card: #212b45;
+        --bg-element: #2a3655;
+
+        --text-primary: #ffffff;
+        --text-secondary: #b4c6f0;
+        --text-muted: #8a9cc9;
+
+        --accent-primary: #6c5ce7;
+        --accent-secondary: #00cec9;
+        --accent-success: #00b894;
+        --accent-danger: #ff6b6b;
+        --accent-warning: #feca57;
+
+        --border-color: #34416d;
+        --border-radius: 12px;
+        --shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: linear-gradient(
+          135deg,
+          var(--bg-primary) 0%,
+          var(--bg-secondary) 100%
+        );
+        color: var(--text-primary);
+        font-family:
+          'Segoe UI',
+          system-ui,
+          -apple-system,
+          sans-serif;
+        min-height: 100vh;
+        padding: 20px;
+        line-height: 1.6;
+        font-weight: 400;
+      }
+
+      .glass-card {
+        background: rgba(33, 43, 69, 0.8);
+        backdrop-filter: blur(10px);
+        border-radius: var(--border-radius);
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .container-main {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      /* Header Styles */
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding: 25px;
+        background: var(--bg-card);
+        border-radius: var(--border-radius);
+        border-left: 5px solid var(--accent-primary);
+      }
+
+      .page-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 5px;
+      }
+
+      .page-subtitle {
+        font-size: 16px;
+        color: var(--text-secondary);
+        font-weight: 400;
+      }
+
+      .stats-container {
+        display: flex;
+        gap: 20px;
+      }
+
+      .stat-card {
+        background: var(--bg-element);
+        padding: 20px;
+        border-radius: 10px;
+        min-width: 180px;
+        text-align: center;
+        border-bottom: 3px solid var(--accent-secondary);
+      }
+
+      .stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 5px;
+      }
+
+      .stat-label {
+        font-size: 14px;
+        color: var(--text-muted);
+        font-weight: 500;
+      }
+
+      /* Controls Section */
+      .controls-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+        flex-wrap: wrap;
+        gap: 15px;
+      }
+
+      .btn-modern {
+        background: linear-gradient(135deg, var(--accent-primary) 0%, #5d4fcf 100%);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3);
+      }
+
+      .btn-modern:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(108, 92, 231, 0.4);
+        color: white;
+      }
+
+      .btn-secondary-modern {
+        background: var(--bg-element);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+      }
+
+      .btn-secondary-modern:hover {
+        background: var(--bg-card);
+        color: var(--text-primary);
+        border-color: var(--accent-primary);
+      }
+
+      .filters-container {
+        display: flex;
+        gap: 15px;
+        align-items: end;
+        flex-wrap: wrap;
+      }
+
+      .filter-group {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .filter-label {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 8px;
+        font-weight: 500;
+      }
+
+      .filter-input {
+        background: var(--bg-element);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 10px 15px;
+        color: var(--text-primary);
+        font-size: 14px;
+        min-width: 180px;
+        transition: all 0.3s ease;
+      }
+
+      .filter-input:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.2);
+      }
+
+      /* Table Styles */
+      .table-container {
+        background: var(--bg-card);
+        border-radius: var(--border-radius);
+        overflow: hidden;
+        box-shadow: var(--shadow);
+      }
+
+      .table-modern {
+        width: 100%;
+        border-collapse: collapse;
+        color: var(--text-primary);
+      }
+
+      .table-modern thead {
+        background: linear-gradient(135deg, var(--accent-primary) 0%, #5d4fcf 100%);
+      }
+
+      .table-modern th {
+        padding: 18px 16px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 14px;
+        color: white;
+        border: none;
+      }
+
+      .table-modern td {
+        padding: 16px;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 14px;
+        vertical-align: top;
+      }
+
+      .table-modern tbody tr {
+        transition: all 0.2s ease;
+      }
+
+      .table-modern tbody tr:hover {
+        background: rgba(108, 92, 231, 0.1);
+        transform: translateX(5px);
+      }
+
+      .table-modern tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      /* Badges and Status */
+      .badge-modern {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .badge-primary {
+        background: rgba(108, 92, 231, 0.2);
+        color: var(--text-primary);
+        border: 1px solid rgba(108, 92, 231, 0.3);
+      }
+
+      .badge-operador {
+        background: rgba(0, 206, 201, 0.2);
+        color: var(--text-primary);
+        border: 1px solid rgba(0, 206, 201, 0.3);
+      }
+
+      .value-positive {
+        color: var(--accent-success);
+        font-weight: 700;
+        font-size: 15px;
+      }
+
+      .value-negative {
+        color: var(--accent-danger);
+        font-weight: 700;
+        font-size: 15px;
+      }
+
+      /* Payment List */
+      .payment-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .payment-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+
+      .payment-item i {
+        color: var(--accent-secondary);
+        font-size: 12px;
+      }
+
+      /* DataTables Customization */
+      .dataTables_wrapper {
+        padding: 20px;
+      }
+
+      .dataTables_length select,
+      .dataTables_filter input {
+        background: var(--bg-element);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 8px 12px;
+        color: var(--text-primary);
+      }
+
+      .dataTables_paginate .paginate_button {
+        background: var(--bg-element) !important;
+        border: 1px solid var(--border-color) !important;
+        color: var(--text-primary) !important;
+        border-radius: 6px !important;
+        margin: 0 3px !important;
+        padding: 8px 12px !important;
+      }
+
+      .dataTables_paginate .paginate_button.current {
+        background: linear-gradient(
+          135deg,
+          var(--accent-primary) 0%,
+          #5d4fcf 100%
+        ) !important;
+        border: none !important;
+        color: white !important;
+      }
+
+      .dataTables_info {
+        color: var(--text-muted) !important;
+      }
+
+      /* Responsive Design */
+      @media (max-width: 992px) {
         .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-            padding: 25px;
-            background: var(--bg-card);
-            border-radius: var(--border-radius);
-            border-left: 5px solid var(--accent-primary);
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 20px;
         }
-        
-        .page-title {
-            font-size: 28px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 5px;
-        }
-        
-        .page-subtitle {
-            font-size: 16px;
-            color: var(--text-secondary);
-            font-weight: 400;
-        }
-        
+
         .stats-container {
-            display: flex;
-            gap: 20px;
+          width: 100%;
+          justify-content: space-between;
         }
-        
-        .stat-card {
-            background: var(--bg-element);
-            padding: 20px;
-            border-radius: 10px;
-            min-width: 180px;
-            text-align: center;
-            border-bottom: 3px solid var(--accent-secondary);
-        }
-        
-        .stat-value {
-            font-size: 28px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 5px;
-        }
-        
-        .stat-label {
-            font-size: 14px;
-            color: var(--text-muted);
-            font-weight: 500;
-        }
-        
-        /* Controls Section */
+      }
+
+      @media (max-width: 768px) {
         .controls-section {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-            flex-wrap: wrap;
-            gap: 15px;
+          flex-direction: column;
+          align-items: stretch;
         }
-        
-        .btn-modern {
-            background: linear-gradient(135deg, var(--accent-primary) 0%, #5d4fcf 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3);
-        }
-        
-        .btn-modern:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(108, 92, 231, 0.4);
-            color: white;
-        }
-        
-        .btn-secondary-modern {
-            background: var(--bg-element);
-            color: var(--text-secondary);
-            border: 1px solid var(--border-color);
-        }
-        
-        .btn-secondary-modern:hover {
-            background: var(--bg-card);
-            color: var(--text-primary);
-            border-color: var(--accent-primary);
-        }
-        
+
         .filters-container {
-            display: flex;
-            gap: 15px;
-            align-items: end;
-            flex-wrap: wrap;
+          width: 100%;
         }
-        
+
         .filter-group {
-            display: flex;
-            flex-direction: column;
+          flex: 1;
         }
-        
-        .filter-label {
-            font-size: 14px;
-            color: var(--text-secondary);
-            margin-bottom: 8px;
-            font-weight: 500;
-        }
-        
-        .filter-input {
-            background: var(--bg-element);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 10px 15px;
-            color: var(--text-primary);
-            font-size: 14px;
-            min-width: 180px;
-            transition: all 0.3s ease;
-        }
-        
-        .filter-input:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.2);
-        }
-        
-        /* Table Styles */
-        .table-container {
-            background: var(--bg-card);
-            border-radius: var(--border-radius);
-            overflow: hidden;
-            box-shadow: var(--shadow);
-        }
-        
+
         .table-modern {
-            width: 100%;
-            border-collapse: collapse;
-            color: var(--text-primary);
+          font-size: 13px;
         }
-        
-        .table-modern thead {
-            background: linear-gradient(135deg, var(--accent-primary) 0%, #5d4fcf 100%);
-        }
-        
-        .table-modern th {
-            padding: 18px 16px;
-            text-align: left;
-            font-weight: 600;
-            font-size: 14px;
-            color: white;
-            border: none;
-        }
-        
+
+        .table-modern th,
         .table-modern td {
-            padding: 16px;
-            border-bottom: 1px solid var(--border-color);
-            font-size: 14px;
-            vertical-align: top;
+          padding: 12px 10px;
         }
-        
-        .table-modern tbody tr {
-            transition: all 0.2s ease;
+
+        .stats-container {
+          flex-direction: column;
         }
-        
-        .table-modern tbody tr:hover {
-            background: rgba(108, 92, 231, 0.1);
-            transform: translateX(5px);
+
+        .stat-card {
+          min-width: auto;
         }
-        
-        .table-modern tbody tr:last-child td {
-            border-bottom: none;
+      }
+
+      /* Animation for table rows */
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
         }
-        
-        /* Badges and Status */
-        .badge-modern {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
+        to {
+          opacity: 1;
+          transform: translateY(0);
         }
-        
-        .badge-primary {
-            background: rgba(108, 92, 231, 0.2);
-            color: var(--text-primary);
-            border: 1px solid rgba(108, 92, 231, 0.3);
-        }
-        
-        .value-positive {
-            color: var(--accent-success);
-            font-weight: 700;
-            font-size: 15px;
-        }
-        
-        .value-negative {
-            color: var(--accent-danger);
-            font-weight: 700;
-            font-size: 15px;
-        }
-        
-        /* Payment List */
-        .payment-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        
-        .payment-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 6px;
-            font-size: 13px;
-            color: var(--text-secondary);
-        }
-        
-        .payment-item i {
-            color: var(--accent-secondary);
-            font-size: 12px;
-        }
-        
-        /* DataTables Customization */
-        .dataTables_wrapper {
-            padding: 20px;
-        }
-        
-        .dataTables_length select, 
-        .dataTables_filter input {
-            background: var(--bg-element);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 8px 12px;
-            color: var(--text-primary);
-        }
-        
-        .dataTables_paginate .paginate_button {
-            background: var(--bg-element) !important;
-            border: 1px solid var(--border-color) !important;
-            color: var(--text-primary) !important;
-            border-radius: 6px !important;
-            margin: 0 3px !important;
-            padding: 8px 12px !important;
-        }
-        
-        .dataTables_paginate .paginate_button.current {
-            background: linear-gradient(135deg, var(--accent-primary) 0%, #5d4fcf 100%) !important;
-            border: none !important;
-            color: white !important;
-        }
-        
-        .dataTables_info {
-            color: var(--text-muted) !important;
-        }
-        
-        /* Responsive Design */
-        @media (max-width: 992px) {
-            .page-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 20px;
-            }
-            
-            .stats-container {
-                width: 100%;
-                justify-content: space-between;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .controls-section {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .filters-container {
-                width: 100%;
-            }
-            
-            .filter-group {
-                flex: 1;
-            }
-            
-            .table-modern {
-                font-size: 13px;
-            }
-            
-            .table-modern th, 
-            .table-modern td {
-                padding: 12px 10px;
-            }
-            
-            .stats-container {
-                flex-direction: column;
-            }
-            
-            .stat-card {
-                min-width: auto;
-            }
-        }
-        
-        /* Animation for table rows */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .table-modern tbody tr {
-            animation: fadeIn 0.5s ease forwards;
-        }
-        
-        .table-modern tbody tr:nth-child(odd) {
-            background: rgba(255, 255, 255, 0.02);
-        }
+      }
+
+      .table-modern tbody tr {
+        animation: fadeIn 0.5s ease forwards;
+      }
+
+      .table-modern tbody tr:nth-child(odd) {
+        background: rgba(255, 255, 255, 0.02);
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container-main">
-        <!-- Page Header -->
-        <div class="page-header glass-card">
-            <div>
-                <h1 class="page-title">
-                    <i class="fas fa-chart-line me-2"></i>
-                    Histórico Financeiro - {{ tipo_movimentacao|capitalize }}
-                </h1>
-                <p class="page-subtitle" id="periodoSubtitle">
-                    Período: {{ mes_ano }} | Visualize e gerencie todas as movimentações financeiras
-                </p>
-            </div>
+      <!-- Page Header -->
+      <div class="page-header glass-card">
+        <div>
+          <h1 class="page-title">
+            <i class="fas fa-chart-line me-2"></i>
+            Histórico Financeiro - {{ tipo_movimentacao|capitalize }}
+          </h1>
+          <p class="page-subtitle" id="periodoSubtitle">
+            Período: {{ mes_ano }} | Visualize e gerencie todas as movimentações
+            financeiras
+          </p>
         </div>
-        
-        <!-- Controls Section -->
-        <div class="controls-section">
-            <div class="filters-container">
-                <div class="filter-group">
-                    <label class="filter-label" for="startDate">
-                        <i class="fas fa-calendar-alt me-1"></i>Data Inicial
-                    </label>
-                    <input type="date" id="startDate" class="filter-input" value="{{ start_date if start_date else '' }}">
-                </div>
-                <div class="filter-group">
-                    <label class="filter-label" for="endDate">
-                        <i class="fas fa-calendar-alt me-1"></i>Data Final
-                    </label>
-                    <input type="date" id="endDate" class="filter-input" value="{{ end_date if end_date else '' }}">
-                </div>
-                <button id="btnFiltrar" class="btn-modern">
-                    <i class="fas fa-filter"></i> Filtrar
-                </button>
-                <button id="btnLimparFiltro" class="btn-modern btn-secondary-modern">
-                    <i class="fas fa-times"></i> Limpar
-                </button>
-            </div>
-            
-            <div class="buttons-container">
-                <a href="{{ url_for('admin.dashboard') }}" class="btn-modern btn-secondary-modern">
-                    <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
-                </a>
-                <a href="#" id="btnPdf" class="btn-modern" target="_blank">
-                    <i class="fas fa-file-pdf"></i> Gerar PDF
-                </a>
-            </div>
+      </div>
+
+      <!-- Controls Section -->
+      <div class="controls-section">
+        <div class="filters-container">
+          <div class="filter-group">
+            <label class="filter-label" for="startDate">
+              <i class="fas fa-calendar-alt me-1"></i>Data Inicial
+            </label>
+            <input
+              type="date"
+              id="startDate"
+              class="filter-input"
+              value="{{ start_date if start_date else '' }}"
+            />
+          </div>
+          <div class="filter-group">
+            <label class="filter-label" for="endDate">
+              <i class="fas fa-calendar-alt me-1"></i>Data Final
+            </label>
+            <input
+              type="date"
+              id="endDate"
+              class="filter-input"
+              value="{{ end_date if end_date else '' }}"
+            />
+          </div>
+          <div class="filter-group">
+            <label class="filter-label" for="operadorSelect">
+              <i class="fas fa-user me-1"></i>Operador
+            </label>
+            <select id="operadorSelect" class="filter-input">
+              <option value="">Todos os operadores</option>
+              {% for operador in operadores %}
+                <option value="{{ operador.id }}" {% if operador.id == operador_id %}selected{% endif %}>
+                  {{ operador.nome }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <button id="btnFiltrar" class="btn-modern">
+            <i class="fas fa-filter"></i> Filtrar
+          </button>
+          <button id="btnLimparFiltro" class="btn-modern btn-secondary-modern">
+            <i class="fas fa-times"></i> Limpar
+          </button>
         </div>
-        
-        <!-- Table Section -->
-        <div class="table-container glass-card">
-            <table id="financeiroTable" class="table-modern">
-                <thead>
-                    <tr>
-                        <th><i class="fas fa-hashtag me-1"></i> ID</th>
-                        <th><i class="fas fa-tag me-1"></i> Categoria</th>
-                        <th><i class="fas fa-dollar-sign me-1"></i> Valor</th>
-                        <th><i class="fas fa-align-left me-1"></i> Descrição</th>
-                        <th><i class="fas fa-calendar me-1"></i> Data</th>
-                        <th><i class="fas fa-user me-1"></i> Cliente</th>
-                        <th><i class="fas fa-cash-register me-1"></i> Caixa</th>
-                        <th><i class="fas fa-receipt me-1"></i> Pagamentos</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for f in historico %}
-                    <tr>
-                        <td><span class="badge-modern badge-primary">#{{ f.id_financeiro }}</span></td>
-                        <td>{{ f.categoria }}</td>
-                        <td class="value-positive">R$ {{ "%.2f"|format(f.valor_total_nota) }}</td>
-                        <td>{{ f.descricao }}</td>
-                        <td>{{ f.data.strftime('%d/%m/%Y %H:%M') }}</td>
-                        <td>{{ f.cliente }}</td>
-                        <td>{{ f.caixa }}</td>
-                        <td>
-                            {% if f.nota_fiscal_id %}
-                            <div><strong>NF: {{ f.nota_fiscal_id }}</strong></div>
-                            <ul class="payment-list">
-                                {% for p in f.pagamentos %}
-                                <li class="payment-item">
-                                    <i class="fas fa-money-bill-wave"></i>
-                                    {{ p.forma_pagamento.value if p.forma_pagamento else '-' }}: 
-                                    R$ {{ "%.2f"|format(p.valor) }}
-                                </li>
-                                {% endfor %}
-                            </ul>
-                            {% else %}-{% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+
+        <div class="buttons-container">
+          <a
+            href="{{ url_for('admin.dashboard') }}"
+            class="btn-modern btn-secondary-modern"
+          >
+            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+          </a>
+          <a href="#" id="btnPdf" class="btn-modern" target="_blank">
+            <i class="fas fa-file-pdf"></i> Gerar PDF
+          </a>
         </div>
+      </div>
+
+      <!-- Table Section -->
+      <div class="table-container glass-card">
+        <table id="financeiroTable" class="table-modern">
+          <thead>
+            <tr>
+              <th><i class="fas fa-hashtag me-1"></i> ID</th>
+              <th><i class="fas fa-tag me-1"></i> Categoria</th>
+              <th><i class="fas fa-dollar-sign me-1"></i> Valor</th>
+              <th><i class="fas fa-align-left me-1"></i> Descrição</th>
+              <th><i class="fas fa-calendar me-1"></i> Data</th>
+              <th><i class="fas fa-user me-1"></i> Cliente</th>
+              <th><i class="fas fa-cash-register me-1"></i> Caixa</th>
+              <th><i class="fas fa-user-tie me-1"></i> Operador</th>
+              <th><i class="fas fa-receipt me-1"></i> Pagamentos</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in historico %}
+            <tr>
+              <td>
+                <span class="badge-modern badge-primary">#{{ f.id_financeiro }}</span>
+              </td>
+              <td>{{ f.categoria }}</td>
+              <td class="value-positive">R$ {{ "%.2f"|format(f.valor_total_nota) }}</td>
+              <td>{{ f.descricao }}</td>
+              <td>{{ f.data.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td>{{ f.cliente }}</td>
+              <td>{{ f.caixa }}</td>
+              <td>
+                {% if f.operador_nome %}
+                  <span class="badge-modern badge-operador">
+                    <i class="fas fa-user-tie me-1"></i>{{ f.operador_nome }}
+                  </span>
+                {% endif %}
+              </td>
+              <td>
+                {% if f.nota_fiscal_id %}
+                <div><strong>NF: {{ f.nota_fiscal_id }}</strong></div>
+                <ul class="payment-list">
+                  {% for p in f.pagamentos %}
+                  <li class="payment-item">
+                    <i class="fas fa-money-bill-wave"></i>
+                    {{ p.forma_pagamento.value if p.forma_pagamento else '-' }}: R$ {{
+                    "%.2f"|format(p.valor) }}
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% else %}-{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
@@ -482,159 +556,147 @@
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
     <script>
-        $(document).ready(function () {
-            // Inicializa DataTable
-            var table = $('#financeiroTable').DataTable({
-                "paging": true,
-                "pageLength": 10,
-                "lengthMenu": [10, 25, 50, 100],
-                "ordering": true,
-                "order": [[4, "desc"]],
-                "language": { 
-                    "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json",
-                    "search": "Pesquisar:",
-                    "lengthMenu": "Exibir _MENU_ registros por página",
-                    "zeroRecords": "Nenhum registro encontrado",
-                    "info": "Mostrando página _PAGE_ de _PAGES_",
-                    "infoEmpty": "Nenhum registro disponível",
-                    "infoFiltered": "(filtrado de _MAX_ registros totais)",
-                    "paginate": {
-                        "first": "Primeira",
-                        "last": "Última",
-                        "next": "Próxima",
-                        "previous": "Anterior"
-                    }
-                }
-            });
-
-            // Função para atualizar o subtítulo do período
-            function atualizarSubtitulo(start, end) {
-                if (start && end) {
-                    var startDate = new Date(start);
-                    var endDate = new Date(end);
-                    var periodo = startDate.toLocaleDateString('pt-BR') + ' a ' + endDate.toLocaleDateString('pt-BR');
-                    $('#periodoSubtitle').html('Período: ' + periodo + ' | Visualize e gerencie todas as movimentações financeiras');
-                } else {
-                    $('#periodoSubtitle').html('Período: {{ mes_ano }} | Visualize e gerencie todas as movimentações financeiras');
-                }
-            }
-
-            // Função para atualizar a tabela via AJAX
-            function atualizarTabela(start, end) {
-                var tipo = "{{ tipo_movimentacao }}";
-                $.ajax({
-                    url: "{{ url_for('admin.historico_financeiro_json') }}",
-                    data: { tipo: tipo, start: start, end: end },
-                    dataType: "json",
-                    success: function (data) {
-                        table.clear();
-                        data.forEach(function (f) {
-                            var pagamentos_html = '-';
-                            if (f.nota_fiscal_id && f.pagamentos.length) {
-                                pagamentos_html = `<div><strong>NF: ${f.nota_fiscal_id}</strong></div><ul class="payment-list">`;
-                                f.pagamentos.forEach(function (p) {
-                                    pagamentos_html += `<li class="payment-item"><i class="fas fa-money-bill-wave"></i>${p.forma_pagamento}: R$ ${parseFloat(p.valor).toFixed(2)}</li>`;
-                                });
-                                pagamentos_html += '</ul>';
-                            }
-
-                            table.row.add([
-                                `<span class="badge-modern badge-primary">#${f.id_financeiro}</span>`,
-                                f.categoria,
-                                `<span class="value-positive">R$ ${parseFloat(f.valor_total_nota).toFixed(2)}</span>`,
-                                f.descricao,
-                                f.data,
-                                f.cliente,
-                                f.caixa,
-                                pagamentos_html
-                            ]);
-                        });
-                        table.draw();
-                        atualizarSubtitulo(start, end);
-                    },
-                    error: function (xhr) {
-                        alert("Erro ao buscar dados: " + (xhr.responseJSON?.error || xhr.statusText));
-                    }
-                });
-            }
-
-            // Filtrar por datas
-            $('#btnFiltrar').click(function () {
-                var start = $('#startDate').val();
-                var end = $('#endDate').val();
-                
-                if (!start || !end) {
-                    alert('Por favor, selecione ambas as datas (inicial e final)');
-                    return;
-                }
-                
-                // Atualizar a URL sem recarregar a página completamente
-                var novaUrl = "{{ url_for('admin.historico_financeiro') }}?tipo={{ tipo_movimentacao }}&start=" + start + "&end=" + end;
-                window.history.pushState({}, '', novaUrl);
-                
-                atualizarTabela(start, end);
-            });
-
-            // Limpar filtro
-            $('#btnLimparFiltro').click(function () {
-                $('#startDate').val('');
-                $('#endDate').val('');
-                
-                // Voltar para a URL sem filtros
-                var novaUrl = "{{ url_for('admin.historico_financeiro') }}?tipo={{ tipo_movimentacao }}";
-                window.history.pushState({}, '', novaUrl);
-                
-                // Recarregar a página sem filtros
-                window.location.href = novaUrl;
-            });
-
-            // Botão Gerar PDF
-            $('#btnPdf').click(function (e) {
-                e.preventDefault();
-                var tipo = "{{ tipo_movimentacao }}";
-                var start = $('#startDate').val();
-                var end = $('#endDate').val();
-                var url = "{{ url_for('admin.historico_financeiro_pdf') }}?tipo=" + tipo;
-                if (start) url += "&start=" + start;
-                if (end) url += "&end=" + end;
-                window.open(url, '_blank');
-            });
-
-            // Verificar se há parâmetros de data na URL e definir valores padrão
-            function inicializarDatas() {
-                const urlParams = new URLSearchParams(window.location.search);
-                const startParam = urlParams.get('start');
-                const endParam = urlParams.get('end');
-                
-                if (startParam && endParam) {
-                    // Usar as datas da URL
-                    $('#startDate').val(startParam);
-                    $('#endDate').val(endParam);
-                    atualizarSubtitulo(startParam, endParam);
-                } else {
-                    // Só definir mês atual se não houver nenhum filtro
-                    var today = new Date();
-                    var firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-                    var lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                    
-                    // Preencher os campos mas não aplicar o filtro automaticamente
-                    $('#startDate').val(firstDay.toISOString().split('T')[0]);
-                    $('#endDate').val(lastDay.toISOString().split('T')[0]);
-                }
-            }
-
-            // Inicializar as datas quando a página carregar
-            inicializarDatas();
-
-            // Se veio com parâmetros de data, aplicar o filtro automaticamente
-            const urlParams = new URLSearchParams(window.location.search);
-            const startParam = urlParams.get('start');
-            const endParam = urlParams.get('end');
-            
-            if (startParam && endParam) {
-                atualizarTabela(startParam, endParam);
-            }
+      $(document).ready(function () {
+        var headerCount = $('#financeiroTable thead th').length;
+        var firstRowCount = $('#financeiroTable tbody tr:first-child td').length;
+        
+        if (headerCount !== firstRowCount) {
+          return;
+        }
+        
+        try {
+          var table = $('#financeiroTable').DataTable({
+            paging: true,
+            pageLength: 10,
+            lengthMenu: [10, 25, 50, 100],
+            ordering: true,
+            order: [[4, 'desc']], 
+            language: {
+              "search": "Pesquisar:",
+              "lengthMenu": "Exibir _MENU_ registros por página",
+              "zeroRecords": "Nenhum registro encontrado",
+              "info": "Mostrando página _PAGE_ de _PAGES_",
+              "infoEmpty": "Nenhum registro disponível",
+              "infoFiltered": "(filtrado de _MAX_ registros totais)",
+              "paginate": {
+                "first": "Primeira",
+                "last": "Última",
+                "next": "Próxima",
+                "previous": "Anterior"
+              }
+            },
+            columnDefs: [
+              {
+                targets: [7, 8], 
+                orderable: false
+              }
+            ]
+          });
+          
+        } catch (error) {
+          console.error('Erro ao inicializar DataTable:', error);
+        }
+        
+        function atualizarSubtitulo(start, end, operadorId) {
+          var operadorSelect = $('#operadorSelect');
+          var operadorNome = operadorSelect.find('option:selected').text();
+    
+          var periodoTexto = '';
+          if (start && end) {
+            var startDate = new Date(start);
+            var endDate = new Date(end);
+            periodoTexto =
+              startDate.toLocaleDateString('pt-BR') +
+              ' a ' +
+              endDate.toLocaleDateString('pt-BR');
+          } else {
+            periodoTexto = '{{ mes_ano }}';
+          }
+    
+          var filtroOperador = '';
+          if (operadorId) {
+            filtroOperador = ' | Operador: ' + operadorNome;
+          }
+    
+          $('#periodoSubtitle').html(
+            'Período: ' +
+              periodoTexto +
+              filtroOperador +
+              ' | Visualize e gerencie todas as movimentações financeiras'
+          );
+        }
+    
+        function recarregarComFiltros(start, end, operadorId) {
+          if (!start || !end) {
+            alert('Por favor, selecione ambas as datas (inicial e final)');
+            return;
+          }
+    
+          var params = {
+            tipo: '{{ tipo_movimentacao }}',
+            start: start,
+            end: end
+          };
+    
+          if (operadorId) {
+            params.operador_id = operadorId;
+          }
+    
+          var queryString = new URLSearchParams(params).toString();
+          window.location.href = "{{ url_for('admin.historico_financeiro') }}?" + queryString;
+        }
+    
+        $('#btnFiltrar').click(function () {
+          var start = $('#startDate').val();
+          var end = $('#endDate').val();
+          var operadorId = $('#operadorSelect').val();
+          
+          recarregarComFiltros(start, end, operadorId);
         });
+    
+        $('#btnLimparFiltro').click(function () {
+          window.location.href = "{{ url_for('admin.historico_financeiro') }}?tipo={{ tipo_movimentacao }}";
+        });
+    
+        $('#btnPdf').click(function (e) {
+          e.preventDefault();
+          var tipo = '{{ tipo_movimentacao }}';
+          var start = $('#startDate').val();
+          var end = $('#endDate').val();
+          var operadorId = $('#operadorSelect').val();
+    
+          var url = "{{ url_for('admin.historico_financeiro_pdf') }}?tipo=" + tipo;
+          if (start) url += '&start=' + encodeURIComponent(start);
+          if (end) url += '&end=' + encodeURIComponent(end);
+          if (operadorId) url += '&operador_id=' + encodeURIComponent(operadorId);
+    
+          window.open(url, '_blank');
+        });
+    
+        function getUrlParam(name) {
+          var url = new URL(window.location.href);
+          return url.searchParams.get(name);
+        }
+    
+        var startParam = getUrlParam('start');
+        var endParam = getUrlParam('end');
+        var operadorParam = getUrlParam('operador_id');
+    
+        if (startParam) $('#startDate').val(startParam);
+        if (endParam) $('#endDate').val(endParam);
+        if (operadorParam) $('#operadorSelect').val(operadorParam);
+        
+        if (!startParam && !endParam) {
+          var today = new Date();
+          var firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+          var lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+          $('#startDate').val(firstDay.toISOString().split('T')[0]);
+          $('#endDate').val(lastDay.toISOString().split('T')[0]);
+        }
+        
+        atualizarSubtitulo(startParam, endParam, operadorParam);
+      });
     </script>
-</body>
+  </body>
 </html>

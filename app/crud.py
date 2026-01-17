@@ -20,7 +20,7 @@ from decimal import Decimal
 from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy import func,  extract
 from typing import Dict, Any, List, Union, Tuple
-
+from . import db
 
 from app.models.entities import (
     Caixa,
@@ -425,7 +425,7 @@ def get_caixa_atual(db: Session, operador_id: int):
         )
         .first()
     )
-    
+
 def get_caixas_abertos(db: Session):
     """
     Retorna todos os caixas com status 'aberto'.
@@ -452,7 +452,7 @@ def get_caixas_fechado(db: Session, operador_id: int):
         extract('year', Caixa.data_abertura) == now.year,
         Caixa.operador_id == operador_id
     ).all()
-    
+
 def get_caixa_by_id(db: Session, caixa_id: int) -> Optional[entities.Caixa]:
     """Retorna um caixa pelo ID"""
     return db.query(entities.Caixa).filter(entities.Caixa.id == caixa_id).first()
@@ -710,7 +710,7 @@ def buscar_detalhes_produto(db: Session, produto_id: int):
         }
     finally:
         db.close()
-        
+
 # ===== Movimentação Estoque =====
 def registrar_movimentacao(db: Session, mov: schemas.MovimentacaoEstoqueCreate):
     if mov.quantidade <= 0:
@@ -1476,8 +1476,8 @@ def buscar_pagamentos_notas_fiscais(db: Session, ids_pagamentos: Union[int, List
         "data": resultados,
         "success": True
     }
-    
-    
+
+
 # ===== Contas a Receber =====
 def create_conta_receber(db: Session, conta: schemas.ContaReceberCreate) -> entities.ContaReceber:
     if conta.valor_original <= 0:
@@ -2324,7 +2324,7 @@ def obter_detalhes_vendas_dia(data=None, caixa_id=None, operador_id=None):
             'success': False,
             'message': f'Erro ao obter detalhes das vendas: {str(e)}'
         }
-        
+
 '''
     Secção de descontos de produtos
 '''
@@ -2747,7 +2747,7 @@ def atualizar_caixa(session: Session, caixa_id: int, dados_atualizacao: dict):
         # Faz rollback explícito em caso de erro
         session.rollback()
         return None, f"Erro ao atualizar caixa: {str(e)}"
-    
+
 def buscar_produtos_por_unidade(unidade: str):
     """
     Busca todos os produtos ativos de uma determinada unidade de medida.
@@ -2780,7 +2780,7 @@ def buscar_historico_financeiro(
     """
     if data is None:
         data = datetime.now(ZoneInfo('America/Sao_Paulo'))
-    
+
     mes = data.month
     ano = data.year
 
@@ -2828,113 +2828,192 @@ def buscar_historico_financeiro(
 
 
 def buscar_historico_financeiro_agrupado(
-        tipo_movimentacao: TipoMovimentacao,
-        data: datetime = None,
-        incluir_outros: bool = False,
-        start_date: datetime = None,
-        end_date: datetime = None
-    ):
+    tipo_movimentacao: TipoMovimentacao,
+    data: datetime = None,
+    incluir_outros: bool = False,
+    start_date: datetime = None,
+    end_date: datetime = None,
+    operador_id: int = None, 
+):
     """
     Retorna histórico financeiro agrupado por nota fiscal.
-    Filtra por datas específicas e ignora estornos na exibição.
+    Filtra por datas específicas, operador e ignora estornos na exibição.
     """
     if data is None and not start_date:
-        data = datetime.now(ZoneInfo('America/Sao_Paulo'))
+        data = datetime.now(ZoneInfo("America/Sao_Paulo"))
 
     mes = data.month if data else None
     ano = data.year if data else None
 
     # -------------------- Financeiro --------------------
-    query_financeiro = Financeiro.query.filter(Financeiro.tipo == tipo_movimentacao)
+    # CARREGA OS RELACIONAMENTOS COM joinedload
+    from sqlalchemy.orm import joinedload
+    
+    query_financeiro = Financeiro.query.options(
+        joinedload(Financeiro.caixa).joinedload(Caixa.operador),
+        joinedload(Financeiro.nota_fiscal).joinedload(NotaFiscal.operador),
+        joinedload(Financeiro.cliente)
+    ).filter(Financeiro.tipo == tipo_movimentacao)
+
+    if operador_id is not None:
+        from sqlalchemy import or_
+        
+        # Busca caixas e notas do operador
+        caixas_operador = Caixa.query.filter(Caixa.operador_id == operador_id).with_entities(Caixa.id).all()
+        caixa_ids = [c.id for c in caixas_operador]
+        
+        notas_operador = NotaFiscal.query.filter(NotaFiscal.operador_id == operador_id).with_entities(NotaFiscal.id).all()
+        nota_ids = [n.id for n in notas_operador]
+        
+        if caixa_ids or nota_ids:
+            conditions = []
+            if caixa_ids:
+                conditions.append(Financeiro.caixa_id.in_(caixa_ids))
+            if nota_ids:
+                conditions.append(Financeiro.nota_fiscal_id.in_(nota_ids))
+            
+            if len(conditions) == 1:
+                query_financeiro = query_financeiro.filter(conditions[0])
+            elif len(conditions) > 1:
+                query_financeiro = query_financeiro.filter(or_(*conditions))
+            else:
+                query_financeiro = query_financeiro.filter(False)
 
     if start_date:
         query_financeiro = query_financeiro.filter(Financeiro.data >= start_date)
     elif mes and ano:
         query_financeiro = query_financeiro.filter(
-            extract('month', Financeiro.data) == mes,
-            extract('year', Financeiro.data) == ano
+            extract("month", Financeiro.data) == mes,
+            extract("year", Financeiro.data) == ano,
         )
     if end_date:
         query_financeiro = query_financeiro.filter(Financeiro.data <= end_date)
 
     if not incluir_outros:
         query_financeiro = query_financeiro.filter(
-            Financeiro.categoria.notin_(['abertura_caixa', 'fechamento_caixa', 'estorno'])
+            Financeiro.categoria.notin_(
+                ["abertura_caixa", "fechamento_caixa", "estorno"]
+            )
         )
 
     financeiros = query_financeiro.order_by(Financeiro.data.desc()).all()
 
     # -------------------- Pagamentos --------------------
-    query_pagamentos = PagamentoNotaFiscal.query.join(Financeiro, isouter=True).filter(PagamentoNotaFiscal.valor > 0)
+    query_pagamentos = PagamentoNotaFiscal.query.options(
+        joinedload(PagamentoNotaFiscal.nota_fiscal).joinedload(NotaFiscal.operador)
+    ).filter(PagamentoNotaFiscal.valor > 0)
+
+    if operador_id is not None:
+        query_pagamentos = query_pagamentos.join(
+            NotaFiscal, PagamentoNotaFiscal.nota_fiscal_id == NotaFiscal.id
+        ).filter(NotaFiscal.operador_id == operador_id)
+
     if start_date:
-        query_pagamentos = query_pagamentos.filter(PagamentoNotaFiscal.data >= start_date)
+        query_pagamentos = query_pagamentos.filter(
+            PagamentoNotaFiscal.data >= start_date
+        )
     elif mes and ano:
         query_pagamentos = query_pagamentos.filter(
-            extract('month', PagamentoNotaFiscal.data) == mes,
-            extract('year', PagamentoNotaFiscal.data) == ano
+            extract("month", PagamentoNotaFiscal.data) == mes,
+            extract("year", PagamentoNotaFiscal.data) == ano,
         )
     if end_date:
         query_pagamentos = query_pagamentos.filter(PagamentoNotaFiscal.data <= end_date)
     if not incluir_outros:
         query_pagamentos = query_pagamentos.filter(
             PagamentoNotaFiscal.nota_fiscal.has(
-                Financeiro.categoria.notin_(['abertura_caixa', 'fechamento_caixa', 'estorno'])
+                Financeiro.categoria.notin_(
+                    ["abertura_caixa", "fechamento_caixa", "estorno"]
+                )
             )
         )
     pagamentos_nf = query_pagamentos.all()
 
-    # Agrupar por nota
     pagamentos_por_nota = {}
     for p in pagamentos_nf:
         pagamentos_por_nota.setdefault(p.nota_fiscal_id, []).append(p)
 
-    # CORREÇÃO: AGRUPAR POR NOTA FISCAL PARA EVITAR DUPLICAÇÃO
     resultado_agrupado = {}
-    
+
     for f in financeiros:
         nota_id = f.nota_fiscal.id if f.nota_fiscal else None
-        
-        # Se é um registro sem nota fiscal, adiciona diretamente
+
         if not nota_id:
+            # Registro sem nota fiscal (ex: despesas, abertura/fechamento)
+            caixa = f.caixa
+            
+            if operador_id is not None:
+                if not caixa or caixa.operador_id != operador_id:
+                    continue  
+            
+            # Obtém o nome do operador do caixa
+            operador_nome = "-"
+            if caixa and caixa.operador:
+                operador_nome = caixa.operador.nome
+            elif f.nota_fiscal and f.nota_fiscal.operador:
+                operador_nome = f.nota_fiscal.operador.nome
+            
             resultado_agrupado[f.id] = {
-                'id_financeiro': f.id,
-                'categoria': f.categoria.value,
-                'valor': float(f.valor),
-                'descricao': f.descricao or '-',
-                'data': f.data,
-                'cliente': f.cliente.nome if f.cliente else '-',
-                'caixa': f.caixa_id or '-',
-                'nota_fiscal_id': None,
-                'valor_total_nota': float(f.valor),
-                'pagamentos': []
+                "id_financeiro": f.id,
+                "categoria": f.categoria.value,
+                "valor": float(f.valor),
+                "descricao": f.descricao or "-",
+                "data": f.data,
+                "cliente": f.cliente.nome if f.cliente else "-",
+                "caixa": f.caixa_id or "-",
+                "nota_fiscal_id": None,
+                "valor_total_nota": float(f.valor),
+                "pagamentos": [],
+                "operador_id": caixa.operador_id if caixa else None,
+                "operador_nome": operador_nome,
             }
         else:
-            # Se já existe uma entrada para esta nota fiscal, usa a existente
+            # Registro com nota fiscal
+            nota_fiscal = f.nota_fiscal
+            
+            if operador_id is not None:
+                if not nota_fiscal or nota_fiscal.operador_id != operador_id:
+                    continue  
+
             if nota_id in resultado_agrupado:
-                # Mantém o registro existente (não duplica)
                 continue
             else:
-                # Cria nova entrada para a nota fiscal
+                # Obtém o nome do operador da nota fiscal
+                operador_nome = "-"
+                if nota_fiscal and nota_fiscal.operador:
+                    operador_nome = nota_fiscal.operador.nome
+                elif f.caixa and f.caixa.operador:
+                    operador_nome = f.caixa.operador.nome
+                
                 resultado_agrupado[nota_id] = {
-                    'id_financeiro': f.id,
-                    'categoria': f.categoria.value,
-                    'valor': float(f.nota_fiscal.valor_total) if f.nota_fiscal else float(f.valor),
-                    'descricao': f.descricao or '-',
-                    'data': f.data,
-                    'cliente': f.cliente.nome if f.cliente else '-',
-                    'caixa': f.caixa_id or '-',
-                    'nota_fiscal_id': nota_id,
-                    'valor_total_nota': float(f.nota_fiscal.valor_total) if f.nota_fiscal else float(f.valor),
-                    'pagamentos': pagamentos_por_nota.get(nota_id, [])
+                    "id_financeiro": f.id,
+                    "categoria": f.categoria.value,
+                    "valor": (
+                        float(nota_fiscal.valor_total)
+                        if nota_fiscal
+                        else float(f.valor)
+                    ),
+                    "descricao": f.descricao or "-",
+                    "data": f.data,
+                    "cliente": f.cliente.nome if f.cliente else "-",
+                    "caixa": f.caixa_id or "-",
+                    "nota_fiscal_id": nota_id,
+                    "valor_total_nota": (
+                        float(nota_fiscal.valor_total)
+                        if nota_fiscal
+                        else float(f.valor)
+                    ),
+                    "pagamentos": pagamentos_por_nota.get(nota_id, []),
+                    "operador_id": nota_fiscal.operador_id if nota_fiscal else None,
+                    "operador_nome": operador_nome,
                 }
 
-    # Converter dicionário de volta para lista
     resultado = list(resultado_agrupado.values())
-    
-    # Ordenar por data (mais recente primeiro)
-    resultado.sort(key=lambda x: x['data'], reverse=True)
-    
+
+    resultado.sort(key=lambda x: x["data"], reverse=True)
+
     return resultado
+
 
 def criar_ou_atualizar_lote(db: Session, produto_id, quantidade, valor_unitario_compra, data_entrada=None, observacao=None):
     """
@@ -3212,7 +3291,7 @@ def transferir_todo_saldo(conta_origem_id, conta_destino_id, usuario_id, session
 
     except Exception as e:
         raise ValueError(f'Erro ao realizar transferência total: {str(e)}')
-    
+
 def criar_ou_atualizar_lote(db: Session, produto_id, quantidade, valor_unitario_compra, data_entrada=None, observacao=None):
     """
     Cria ou atualiza um lote para o produto na data especificada.
@@ -3329,7 +3408,7 @@ def atualizar_estoque_produto_apos_lote(db: Session, produto_id, lote_id_atualiz
     except Exception as e:
         db.rollback()
         logger.info(f"Erro ao atualizar estoque do produto {produto_id}: {str(e)}")
-        
+
 def listar_despesas_dia_atual(db: Session):
     """Retorna lista de despesas do dia atual (horário de São Paulo)."""
     tz = ZoneInfo("America/Sao_Paulo")

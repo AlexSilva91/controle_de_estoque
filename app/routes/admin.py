@@ -8550,9 +8550,10 @@ def baixar_pdf_produtos():
 @admin_required
 def historico_financeiro():
     tipo = request.args.get("tipo")
-    data_str = request.args.get("data")  # formato MM-YYYY
-    start_str = request.args.get("start")  # data inicial filtro
-    end_str = request.args.get("end")  # data final filtro
+    data_str = request.args.get("data")  
+    start_str = request.args.get("start")  
+    end_str = request.args.get("end")  
+    operador_id = request.args.get("operador_id", type=int) 
     incluir_outros = request.args.get("incluir_outros", "false").lower() == "true"
 
     if not tipo:
@@ -8563,16 +8564,13 @@ def historico_financeiro():
     except ValueError:
         return "Tipo de movimentação inválido", 400
 
-    # Variáveis para o período
     start_date = None
     end_date = None
     mes_ano_display = None
 
-    # Priorizar start/end se fornecidos
     if start_str and end_str:
         try:
             start_date = datetime.strptime(start_str, "%Y-%m-%d")
-            # Ajustar end_date para incluir todo o último dia (até 23:59:59)
             end_date = datetime.strptime(end_str, "%Y-%m-%d").replace(
                 hour=23, minute=59, second=59, microsecond=999999
             )
@@ -8580,12 +8578,10 @@ def historico_financeiro():
         except Exception as e:
             return f"Datas de filtro inválidas. Use YYYY-MM-DD. Erro: {str(e)}", 400
 
-    # Se não tem start/end, usar data_str (MM-YYYY)
     elif data_str:
         try:
             mes, ano = map(int, data_str.split("-"))
             start_date = datetime(ano, mes, 1)
-            # Calcular último dia do mês corretamente
             if mes == 12:
                 end_date = datetime(ano, 12, 31)
             else:
@@ -8597,7 +8593,6 @@ def historico_financeiro():
         except Exception as e:
             return f"Data inválida. Use MM-YYYY. Erro: {str(e)}", 400
 
-    # Se nenhuma data foi fornecida, usar mês atual
     else:
         hoje = datetime.now()
         start_date = datetime(hoje.year, hoje.month, 1)
@@ -8608,16 +8603,23 @@ def historico_financeiro():
         end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
         mes_ano_display = hoje.strftime("%m/%Y")
 
-    # Log para debug (opcional)
-    print(f"Período selecionado: {start_date} até {end_date}")
-    print(f"Tipo: {tipo_movimentacao}")
+    from app.models.entities import Usuario, TipoUsuario
+    
+    operadores = Usuario.query.filter(
+        Usuario.tipo == TipoUsuario.operador
+    ).order_by(Usuario.nome).all()
+    
+    operador_selecionado = None
+    if operador_id:
+        operador_selecionado = Usuario.query.get(operador_id)
 
     historico_agrupado = buscar_historico_financeiro_agrupado(
         tipo_movimentacao,
-        data=None,  # Não usar mais o parâmetro data, usar start_date e end_date
+        data=None, 
         incluir_outros=incluir_outros,
         start_date=start_date,
         end_date=end_date,
+        operador_id=operador_id  
     )
 
     return render_template(
@@ -8627,8 +8629,10 @@ def historico_financeiro():
         mes_ano=mes_ano_display,
         start_date=start_date.strftime("%Y-%m-%d") if start_date else "",
         end_date=end_date.strftime("%Y-%m-%d") if end_date else "",
+        operadores=operadores,
+        operador_id=operador_id, 
+        operador_selecionado=operador_selecionado 
     )
-
 
 @admin_bp.route("/financeiro/historico/json", methods=["GET"])
 @login_required
