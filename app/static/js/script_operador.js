@@ -171,7 +171,7 @@ function handleKeyDown(e) {
       } else if (key === 'Enter') {
         e.preventDefault();
         const selectedItem = activeSearchDropdown.querySelector(
-          '.search-result-item.selected'
+          '.search-result-item.selected',
         );
         if (selectedItem) {
           selectedItem.click();
@@ -391,7 +391,7 @@ function renderClientsTable() {
                 </div>
             </td>
         </tr>
-    `
+    `,
     )
     .join('');
 }
@@ -484,12 +484,12 @@ function filterClients(filterType) {
   switch (filterType) {
     case 'recent':
       filteredClients = clients.filter(
-        (client) => new Date(client.data_cadastro) >= thirtyDaysAgo
+        (client) => new Date(client.data_cadastro) >= thirtyDaysAgo,
       );
       break;
     case 'frequent':
       filteredClients = clients.filter(
-        (client) => client.total_vendas && client.total_vendas > 5
+        (client) => client.total_vendas && client.total_vendas > 5,
       );
       break;
     default:
@@ -684,12 +684,12 @@ async function searchClient() {
   try {
     const response = await fetch(
       `/operador/api/clientes/buscar?q=${encodeURIComponent(
-        searchTerm
+        searchTerm,
       )}&timestamp=${new Date().getTime()}`,
       {
         ...preventCacheConfig,
         method: 'GET',
-      }
+      },
     );
     if (!response.ok) throw new Error('Erro ao buscar clientes');
     const results = await response.json();
@@ -915,7 +915,7 @@ async function saveClient() {
     showMessage(
       currentEditingClient
         ? 'Cliente atualizado com sucesso!'
-        : 'Cliente cadastrado com sucesso!'
+        : 'Cliente cadastrado com sucesso!',
     );
     await loadClients();
     closeModal();
@@ -943,7 +943,7 @@ async function viewClientDetails(clientId) {
 
     // Separar contas abertas e pagas
     const contasAbertas = contasReceber.filter(
-      (conta) => conta.status === 'pendente' || conta.status === 'parcial'
+      (conta) => conta.status === 'pendente' || conta.status === 'parcial',
     );
 
     const contasPagas = contasReceber.filter((conta) => conta.status === 'quitado');
@@ -989,19 +989,19 @@ async function viewClientDetails(clientId) {
                             <div class="summary-card">
                                 <div class="summary-label">Total em Aberto</div>
                                 <div class="summary-value open-value">${formatCurrency(
-                                  totalValorAberto
+                                  totalValorAberto,
                                 )}</div>
                             </div>
                             <div class="summary-card">
                                 <div class="summary-label">Total Pago</div>
                                 <div class="summary-value paid-value">${formatCurrency(
-                                  totalValorPago
+                                  totalValorPago,
                                 )}</div>
                             </div>
                             <div class="summary-card">
                                 <div class="summary-label">Total Original</div>
                                 <div class="summary-value original-value">${formatCurrency(
-                                  totalValorOriginal
+                                  totalValorOriginal,
                                 )}</div>
                             </div>
                         </div>
@@ -1127,15 +1127,15 @@ function createContaCard(conta) {
                 <h5>${conta.descricao || 'Conta sem descrição'}</h5>
                 <span class="summary-divider">|</span>
                 <span class="summary-inline">Data: <strong>${formatDate(
-                  conta.data_emissao
+                  conta.data_emissao,
                 )}</strong></span>
                 <span class="summary-divider">|</span>
                 <span class="summary-inline">Em Aberto: <strong class="highlight-open">${formatCurrency(
-                  valorAindaAberto
+                  valorAindaAberto,
                 )}</strong></span>
                 <span class="summary-divider">|</span>
                 <span class="summary-inline">Pago: <strong class="highlight-paid">${formatCurrency(
-                  valorPagoConta
+                  valorPagoConta,
                 )}</strong></span>
                 <span class="status-badge ${conta.status}">${conta.status}</span>
             </div>
@@ -1177,7 +1177,7 @@ function createContaCard(conta) {
                                             <td>${formatCurrency(pag.valor)}</td>
                                             <td>${formatDate(pag.data)}</td>
                                         </tr>
-                                    `
+                                    `,
                                       )
                                       .join('')}
                                 </tbody>
@@ -1203,7 +1203,7 @@ function createContaCard(conta) {
                                         <th>Data</th>
                                         ${
                                           conta.pagamentos_conta_receber.some(
-                                            (p) => p.observacoes
+                                            (p) => p.observacoes,
                                           )
                                             ? '<th>Observações</th>'
                                             : ''
@@ -1220,13 +1220,13 @@ function createContaCard(conta) {
                                             <td>${formatDate(pag.data_pagamento)}</td>
                                             ${
                                               conta.pagamentos_conta_receber.some(
-                                                (p) => p.observacoes
+                                                (p) => p.observacoes,
                                               )
                                                 ? `<td>${pag.observacoes || ''}</td>`
                                                 : ''
                                             }
                                         </tr>
-                                    `
+                                    `,
                                       )
                                       .join('')}
                                 </tbody>
@@ -1264,21 +1264,21 @@ function createContaCard(conta) {
                                         <tr>
                                             <td>${item.produto_nome}</td>
                                             <td>${item.quantidade} ${
-                                          item.unidade_medida
-                                        }</td>
+                                              item.unidade_medida
+                                            }</td>
                                             <td>
                                             ${
                                               item.valor_pos_desconto > 0
                                                 ? `
                                                     <span class="valor-desconto">
                                                     ${formatCurrency(
-                                                      item.valor_pos_desconto
+                                                      item.valor_pos_desconto,
                                                     )}
                                                     </span>
                                                     <br>
                                                     <small class="valor-original">
                                                     <s>${formatCurrency(
-                                                      item.valor_unitario
+                                                      item.valor_unitario,
                                                     )}</s>
                                                     </small>
                                                 `
@@ -1289,7 +1289,7 @@ function createContaCard(conta) {
                                                 ${
                                                   temDesconto
                                                     ? `${formatCurrency(
-                                                        item.desconto_aplicado
+                                                        item.desconto_aplicado,
                                                       )} 
                                                      ${
                                                        item.tipo_desconto
@@ -1303,12 +1303,12 @@ function createContaCard(conta) {
                                                 ${
                                                   temDesconto
                                                     ? `<span style="text-decoration: line-through; color: #999; font-size: 0.9em;">${formatCurrency(
-                                                        valorBrutoItem
+                                                        valorBrutoItem,
                                                       )}</span><br>`
                                                     : ''
                                                 }
                                                 <strong>${formatCurrency(
-                                                  item.valor_total
+                                                  item.valor_total,
                                                 )}</strong>
                                             </td>
                                         </tr>
@@ -1322,8 +1322,8 @@ function createContaCard(conta) {
                                         <td><strong>${formatCurrency(
                                           conta.itens_nota_fiscal.reduce(
                                             (sum, item) => sum + item.valor_total,
-                                            0
-                                          )
+                                            0,
+                                          ),
                                         )}</strong></td>
                                     </tr>
                                     ${
@@ -1338,7 +1338,7 @@ function createContaCard(conta) {
                                                 }:</strong>
                                             </td>
                                             <td><strong style="color: var(--danger);">-${formatCurrency(
-                                              conta.valor_desconto_nota
+                                              conta.valor_desconto_nota,
                                             )}</strong></td>
                                         </tr>
                                     `
@@ -1347,7 +1347,7 @@ function createContaCard(conta) {
                                     <tr style="border-top: 2px solid var(--secondary);">
                                         <td colspan="4"><strong>Total da Nota:</strong></td>
                                         <td><strong style="color: var(--success); font-size: 1.1em;">${formatCurrency(
-                                          conta.valor_total_nota
+                                          conta.valor_total_nota,
                                         )}</strong></td>
                                     </tr>
                                 </tfoot>
@@ -1363,15 +1363,15 @@ function createContaCard(conta) {
                                 <span>Quantidade Total:</span>
                                 <strong>${conta.itens_nota_fiscal.reduce(
                                   (sum, item) => sum + item.quantidade,
-                                  0
+                                  0,
                                 )} unidades</strong>
                             </div>
                         </div>
                     </div>
                 `
                     : conta.nota_fiscal_id
-                    ? '<p class="no-products">Nota fiscal sem produtos cadastrados</p>'
-                    : '<p class="no-products">Sem nota fiscal associada</p>'
+                      ? '<p class="no-products">Nota fiscal sem produtos cadastrados</p>'
+                      : '<p class="no-products">Sem nota fiscal associada</p>'
                 }
             
                 <div class="conta-actions">
@@ -1438,7 +1438,7 @@ async function generateReceipt(contaId) {
         headers: {
           'Content-Type': 'application/json',
         },
-      }
+      },
     );
 
     if (response.ok) {
@@ -1569,7 +1569,7 @@ function showPartialPaymentModal(contaId, valorAberto) {
           contaId,
           valorPago,
           formaPagamento,
-          observacoes
+          observacoes,
         );
 
         if (response.success) {
@@ -1608,7 +1608,7 @@ async function confirmFullPayment(contaId, valorAberto) {
             </div>
             <div class="modal-body">
                 <p>Deseja registrar o pagamento total de ${formatCurrency(
-                  valorAberto
+                  valorAberto,
                 )}?</p>
                 <form id="full-payment-form">
                     <div class="form-group">
@@ -1676,7 +1676,7 @@ async function confirmFullPayment(contaId, valorAberto) {
           contaId,
           valorAberto,
           formaPagamento,
-          observacoes
+          observacoes,
         );
 
         if (response.success) {
@@ -1984,7 +1984,7 @@ function searchProductsInModal() {
     (product) =>
       product.nome.toLowerCase().includes(searchTerm) ||
       (product.marca && product.marca.toLowerCase().includes(searchTerm)) ||
-      (product.codigo && product.codigo.toLowerCase().includes(searchTerm))
+      (product.codigo && product.codigo.toLowerCase().includes(searchTerm)),
   );
 
   displayProductSearchResults(filteredProducts);
@@ -2005,11 +2005,11 @@ function displayProductSearchResults(products) {
     item.innerHTML = `
             <h4>${product.nome}</h4>
             <p>Marca: ${product.marca || 'Não informada'} | Código: ${
-      product.codigo || 'Não informado'
-    }</p>
+              product.codigo || 'Não informado'
+            }</p>
             <p>Preço: ${formatCurrency(product.valor_unitario)} | Estoque Loja: ${
-      product.estoque_loja
-    } ${product.unidade}</p>
+              product.estoque_loja
+            } ${product.unidade}</p>
         `;
     item.addEventListener('click', () => {
       addProductToSale(product);
@@ -2083,7 +2083,7 @@ async function addProductToSale(product, initialQuantity = 1) {
   const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(
     product.valor_unitario,
     initialQuantity,
-    discounts
+    discounts,
   );
 
   const uniqueId = `${product.id}_${Date.now()}`;
@@ -2104,7 +2104,7 @@ async function addProductToSale(product, initialQuantity = 1) {
     const newPriceInfo = calculateDiscountedPrice(
       product.valor_unitario,
       newQuantity,
-      discounts
+      discounts,
     );
 
     selectedProducts[existingProductIndex].price = newPriceInfo.finalPrice;
@@ -2156,7 +2156,7 @@ function addDiscountRefreshButton() {
 async function fetchProductDiscounts(productId) {
   try {
     const response = await fetch(
-      `/operador/api/produtos/${productId}/descontos?timestamp=${new Date().getTime()}`
+      `/operador/api/produtos/${productId}/descontos?timestamp=${new Date().getTime()}`,
     );
     if (!response.ok) return [];
     return await response.json();
@@ -2259,7 +2259,7 @@ async function updateAllProductDiscounts() {
       const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(
         product.originalPrice,
         product.quantity,
-        discounts
+        discounts,
       );
 
       selectedProducts[i] = {
@@ -2371,14 +2371,14 @@ function renderProductsList() {
                                 data-icon="${stockType.icon}">
                                 ${stockType.name}
                             </option>
-                        `
+                        `,
                           )
                           .join('')}
                     </select>
                     <div class="stock-info">
                         Disponível: ${getStockByType(product, product.stockType)} ${
-        product.unit
-      }
+                          product.unit
+                        }
                     </div>
                 </div>
             `;
@@ -2425,7 +2425,7 @@ function renderProductsList() {
                 ${
                   product.hasDiscount
                     ? `<small class="original-price">${formatCurrency(
-                        product.originalPrice
+                        product.originalPrice,
                       )}</small>`
                     : ''
                 }
@@ -2446,7 +2446,7 @@ function renderProductsList() {
                 ${
                   product.hasDiscount
                     ? `<small class="discount-value">(Economia: ${formatCurrency(
-                        discountValue
+                        discountValue,
                       )})</small>`
                     : ''
                 }
@@ -2539,14 +2539,14 @@ function renderProductsList() {
 
         // Atualiza a quantidade disponível para o novo estoque
         const product = products.find(
-          (p) => p.id === selectedProducts[productIndex].id
+          (p) => p.id === selectedProducts[productIndex].id,
         );
         if (product) {
           selectedProducts[productIndex].stock = getStockByType(product, newStockType);
 
           // Atualiza o texto de estoque disponível
           const stockInfo = this.closest('.stock-selector-container').querySelector(
-            '.stock-info'
+            '.stock-info',
           );
           if (stockInfo) {
             stockInfo.textContent = `Disponível: ${selectedProducts[productIndex].stock} ${selectedProducts[productIndex].unit}`;
@@ -2725,7 +2725,7 @@ async function updateProductQuantity(input) {
     const { finalPrice, discountApplied, discountInfo } = calculateDiscountedPrice(
       product.originalPrice,
       newQuantity,
-      discounts
+      discounts,
     );
 
     selectedProducts[productIndex] = {
@@ -2751,7 +2751,7 @@ async function updateProductQuantity(input) {
                 ${
                   updatedProduct.hasDiscount
                     ? `<small class="original-price">${formatCurrency(
-                        updatedProduct.originalPrice
+                        updatedProduct.originalPrice,
                       )}</small>`
                     : ''
                 }
@@ -2793,7 +2793,7 @@ async function updateProductQuantity(input) {
                 ${
                   updatedProduct.hasDiscount
                     ? `<small class="discount-value">(Economia: ${formatCurrency(
-                        discountValue
+                        discountValue,
                       )})</small>`
                     : ''
                 }
@@ -2803,7 +2803,7 @@ async function updateProductQuantity(input) {
   document.dispatchEvent(
     new CustomEvent('quantityUpdated', {
       detail: { uniqueId, newQuantity },
-    })
+    }),
   );
 }
 
@@ -2839,7 +2839,7 @@ async function registerSale() {
     paymentItems.forEach((item) => {
       const method = item.querySelector('input[name="payment_methods[]"]').value;
       const amount = parseFloat(
-        item.querySelector('input[name="payment_amounts[]"]').value.replace(',', '.')
+        item.querySelector('input[name="payment_amounts[]"]').value.replace(',', '.'),
       );
       if (!isNaN(amount) && amount > 0) {
         paymentMethods.push({
@@ -2869,7 +2869,7 @@ async function registerSale() {
     if (totalPagamentos < total) {
       const remaining = total - totalPagamentos;
       const pagamentoDinheiroExistente = paymentMethods.find(
-        (pm) => pm.forma_pagamento === 'dinheiro'
+        (pm) => pm.forma_pagamento === 'dinheiro',
       );
 
       if (pagamentoDinheiroExistente) {
@@ -2969,7 +2969,7 @@ async function registerSale() {
     const paymentIdsStr = result.pagamentos_ids.join(',');
     window.open(
       `/operador/pdf/nota/${paymentIdsStr}?timestamp=${new Date().getTime()}`,
-      '_blank'
+      '_blank',
     );
   } catch (error) {
     console.error('Erro ao registrar venda:', error);
@@ -3035,7 +3035,7 @@ function formatCurrencyInput(input) {
   const separators = value.match(/[,.]/g);
   if (separators && separators.length > 1) {
     value = value.replace(/[,.]/g, (m, i) =>
-      i === value.lastIndexOf('.') || i === value.lastIndexOf(',') ? m : ''
+      i === value.lastIndexOf('.') || i === value.lastIndexOf(',') ? m : '',
     );
   }
   value = value.replace(/([,.])(?=.*\1)/g, '');
@@ -3231,11 +3231,11 @@ function showDeliveryInfo() {
   deliveryInfo.innerHTML = `
         <p><strong>Endereço de Entrega:</strong></p>
         <p>${deliveryAddress.logradouro}, ${deliveryAddress.numero}${
-    deliveryAddress.complemento ? ', ' + deliveryAddress.complemento : ''
-  }</p>
+          deliveryAddress.complemento ? ', ' + deliveryAddress.complemento : ''
+        }</p>
         <p>${deliveryAddress.bairro} - ${deliveryAddress.cidade}/${
-    deliveryAddress.estado
-  }</p>
+          deliveryAddress.estado
+        }</p>
         ${deliveryAddress.cep ? `<p>CEP: ${deliveryAddress.cep}</p>` : ''}
         ${
           deliveryAddress.instrucoes
@@ -3776,7 +3776,7 @@ async function openSaleDetailsModal(saleId) {
     safeSetText('sale-details-id', saleId);
     safeSetText(
       'sale-details-date',
-      new Date(venda.data_emissao).toLocaleString('pt-BR')
+      new Date(venda.data_emissao).toLocaleString('pt-BR'),
     );
     safeSetText(
       'sale-details-client',
@@ -3784,7 +3784,7 @@ async function openSaleDetailsModal(saleId) {
         venda.cliente?.documento
           ? ' (' + formatDocument(venda.cliente.documento) + ')'
           : ''
-      }`
+      }`,
     );
     safeSetText('sale-details-operator', venda.operador?.nome || 'N/A');
     safeSetText('sale-details-total', formatCurrency(venda.valor_total));
@@ -3817,7 +3817,7 @@ async function openSaleDetailsModal(saleId) {
 function handleDeliveryInfo(venda) {
   const deliveryContainer = document.getElementById('sale-details-delivery-container');
   const deliveryInstructions = document.getElementById(
-    'sale-details-delivery-instructions'
+    'sale-details-delivery-instructions',
   );
 
   if (deliveryContainer) {
@@ -3883,14 +3883,14 @@ function handleProductsTable(itens) {
     row.innerHTML = `
             <td>${item.produto_nome || item.nome || 'Produto não encontrado'}</td>
             <td class="text-right">${parseFloat(item.quantidade || 0).toLocaleString(
-              'pt-BR'
+              'pt-BR',
             )}</td>
             <td class="text-right">${formatCurrency(item.valor_unitario || 0)}</td>
             <td class="text-right">${
               item.desconto_aplicado ? formatCurrency(item.desconto_aplicado) : '-'
             }</td>
             <td class="text-right">${formatCurrency(
-              item.valor_total || item.total || 0
+              item.valor_total || item.total || 0,
             )}</td>
         `;
     productsTable.appendChild(row);
@@ -3923,14 +3923,14 @@ function handlePaymentsTable(venda) {
     if (pagamentosAgregados.length > 1) {
       const totalPagamentos = pagamentosAgregados.reduce(
         (sum, pag) => sum + parseFloat(pag.valor),
-        0
+        0,
       );
       const row = document.createElement('tr');
       row.className = 'total-row';
       row.innerHTML = `
                 <td><strong>Total</strong></td>
                 <td class="text-right"><strong>${formatCurrency(
-                  totalPagamentos
+                  totalPagamentos,
                 )}</strong></td>
                 <td></td>
             `;
@@ -4257,27 +4257,49 @@ function showSearchResults(results, containerId, type) {
 
     if (type === 'client') {
       resultItem.innerHTML = `
-                <h4>${item.nome}</h4>
-                <p>Documento: ${item.documento || 'Não informado'}</p>
-                <p>Telefone: ${item.telefone || 'Não informado'}</p>
-            `;
+        <div class="client-info">
+          <strong>${item.nome}</strong>
+          <div class="client-details">
+            ${item.documento ? `<span>Documento: ${formatDocument(item.documento)}</span>` : ''}
+            ${item.telefone ? `<span>Telefone: ${formatPhone(item.telefone)}</span>` : ''}
+          </div>
+        </div>
+      `;
       resultItem.addEventListener('click', () => {
         selectClient(item);
         resultsContainer.style.display = 'none';
         if (clientSearchInput) clientSearchInput.value = '';
       });
     } else if (type === 'product') {
+      const productImage = item.foto
+        ? `<img src="${item.foto}" alt="${item.nome}" class="product-image">`
+        : `<div class="product-image-placeholder">Sem imagem</div>`;
+
       resultItem.innerHTML = `
-                <h4>${item.nome}</h4>
-                <p>Código: ${item.codigo || 'Não informado'} | Marca: ${
-        item.marca || 'Não informada'
-      }</p>
-                <p>Preço: ${formatCurrency(item.valor_unitario)} | Estoque loja: ${
-        item.estoque_loja
-      } ${item.unidade || 'un'} | Estoque depósito: ${item.estoque_deposito || 0} ${
-        item.unidade || 'un'
-      }</p>
-            `;
+        <div class="product-result-item">
+          <div class="product-image-container">
+            ${productImage}
+          </div>
+          <div class="product-info">
+            <h4>${item.nome}</h4>
+            <div class="product-details">
+              <span class="product-detail-item">Código: ${item.codigo || 'N/A'}</span>
+              ${item.marca ? `<span class="product-detail-item">Marca: ${item.marca}</span>` : ''}
+              <span class="product-price">${formatCurrency(item.valor_unitario)}</span>
+            </div>
+            <div class="product-stock">
+              <div class="stock-item loja">
+                <span>Loja:</span>
+                <strong>${item.estoque_loja || 0} ${item.unidade || 'un'}</strong>
+              </div>
+              <div class="stock-item deposito">
+                <span>Depósito:</span>
+                <strong>${item.estoque_deposito || 0} ${item.unidade || 'un'}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
       resultItem.addEventListener('click', () => {
         addProductToSale(item);
         resultsContainer.style.display = 'none';
@@ -4309,12 +4331,12 @@ async function searchClients(searchTerm) {
   try {
     const response = await fetch(
       `/operador/api/clientes/buscar?q=${encodeURIComponent(
-        searchTerm
+        searchTerm,
       )}&timestamp=${new Date().getTime()}`,
       {
         ...preventCacheConfig,
         method: 'GET',
-      }
+      },
     );
     if (!response.ok) throw new Error('Erro ao buscar clientes');
     const results = await response.json();
@@ -4329,42 +4351,90 @@ function showClientResultsDropdown(clients) {
   if (!dropdown) return;
   dropdown.innerHTML = '';
 
+  if (clients.length === 0) {
+    dropdown.innerHTML = '<div class="no-results">Nenhum cliente encontrado</div>';
+    dropdown.style.display = 'block';
+    return;
+  }
+
   clients.forEach((client) => {
     const item = document.createElement('div');
     item.className = 'client-result-item';
     item.innerHTML = `
-            <div class="client-info">
-                <strong>${client.nome}</strong>
-                <div class="client-details">
-                    <span>${
-                      client.documento ? 'CPF: ' + formatDocument(client.documento) : ''
-                    }</span>
-                    <span>${
-                      client.telefone ? 'Tel: ' + formatPhone(client.telefone) : ''
-                    }</span>
-                </div>
-            </div>
-        `;
+      <div class="client-info">
+        <strong>${client.nome}</strong>
+        <div class="client-details">
+          ${client.documento ? `<span>CPF: ${formatDocument(client.documento)}</span>` : ''}
+          ${client.telefone ? `<span>Tel: ${formatPhone(client.telefone)}</span>` : ''}
+        </div>
+      </div>
+    `;
     item.addEventListener('click', () => {
       selectClient(client);
       dropdown.innerHTML = '';
       clientSearchInput.value = '';
     });
+
+    // Adiciona funcionalidade de teclado
+    item.tabIndex = 0;
+    item.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        item.click();
+      }
+    });
+
     dropdown.appendChild(item);
   });
+
+  // Seleciona automaticamente o primeiro item
+  if (clients.length > 0) {
+    dropdown.querySelector('.client-result-item').classList.add('selected');
+  }
+
   dropdown.style.display = 'block';
+}
+
+// Funções auxiliares para formatação (caso não existam)
+function formatDocument(doc) {
+  // Formata CPF ou CNPJ
+  if (doc.length === 11) {
+    return doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  } else if (doc.length === 14) {
+    return doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  }
+  return doc;
+}
+
+function formatPhone(phone) {
+  // Formata telefone
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 11) {
+    return cleaned.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+  } else if (cleaned.length === 10) {
+    return cleaned.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+  }
+  return phone;
+}
+
+function formatCurrency(value) {
+  // Formata valor monetário
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value || 0);
 }
 
 async function searchProducts(searchTerm) {
   try {
     const response = await fetch(
       `/operador/api/produtos/buscar?q=${encodeURIComponent(
-        searchTerm
+        searchTerm,
       )}&timestamp=${new Date().getTime()}`,
       {
         ...preventCacheConfig,
         method: 'GET',
-      }
+      },
     );
     if (!response.ok) throw new Error('Erro ao buscar produtos');
     const results = await response.json();
@@ -4424,7 +4494,7 @@ function formatCurrency(value) {
 function switchTab(tabId) {
   tabBtns.forEach((btn) => btn.classList.toggle('active', btn.dataset.tab === tabId));
   tabContents.forEach((content) =>
-    content.classList.toggle('active', content.id === tabId)
+    content.classList.toggle('active', content.id === tabId),
   );
   const activeTabBtn = document.querySelector(`.menu-item[data-tab="${tabId}"]`);
   if (activeTabBtn && currentTabTitle) {
@@ -4739,7 +4809,7 @@ function applyProductDiscount(productIndex, discountType, discountValue) {
     }
     if (discountValue >= product.originalPrice) {
       throw new Error(
-        `Desconto não pode ser maior que ${formatCurrency(product.originalPrice)}`
+        `Desconto não pode ser maior que ${formatCurrency(product.originalPrice)}`,
       );
     }
     product.price = product.originalPrice - discountValue;
@@ -4782,7 +4852,7 @@ function updateProductRow(productIndex) {
             ${
               product.hasDiscount
                 ? `<small class="original-price">${formatCurrency(
-                    product.originalPrice
+                    product.originalPrice,
                   )}</small>`
                 : ''
             }
@@ -4819,7 +4889,7 @@ function updateProductRow(productIndex) {
             ${
               product.hasDiscount
                 ? `<small class="discount-value">(Economia: ${formatCurrency(
-                    discountValue
+                    discountValue,
                   )})</small>`
                 : ''
             }

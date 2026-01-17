@@ -377,7 +377,9 @@ body {
   align-items: center;
   gap: 12px;
   cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
+  transition:
+    background-color 0.3s ease,
+    transform 0.2s ease;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
 }
 
@@ -3461,7 +3463,10 @@ body {
   cursor: pointer;
 
   /* Animações */
-  transition: background-color 0.25s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background-color 0.25s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
 }
@@ -3556,4 +3561,217 @@ body {
 .valor-original {
   font-weight: 600;
   color: #dc3545;
+}
+/* Estilos para os resultados de busca */
+.search-results-container {
+  background-color: var(--background);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 1000;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+}
+
+.search-result-item {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: var(--transition);
+  background-color: white;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.search-result-item:hover {
+  background-color: var(--primary-light);
+  transform: translateX(4px);
+}
+
+.search-result-item.selected {
+  background-color: var(--primary-light);
+  border-left: 4px solid var(--primary);
+  padding-left: 12px;
+}
+
+.search-result-item:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Estilo específico para clientes */
+.client-result-item {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: var(--transition);
+  background-color: white;
+}
+
+.client-result-item:hover {
+  background-color: var(--primary-light);
+  transform: translateX(4px);
+}
+
+.client-result-item:last-child {
+  border-bottom: none;
+}
+
+.client-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.client-info strong {
+  color: var(--secondary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.client-details {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.client-details span {
+  background-color: var(--background);
+  padding: 2px 8px;
+  border-radius: 12px;
+  display: inline-block;
+}
+
+/* Estilo específico para produtos */
+.product-result-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+}
+
+.product-image-container {
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: white;
+}
+
+.product-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-image-placeholder {
+  width: 100%;
+  height: 100%;
+  background-color: var(--background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--secondary);
+  font-size: 12px;
+  text-align: center;
+  padding: 4px;
+}
+
+.product-info {
+  flex: 1;
+  min-width: 0; /* Permite que o texto quebre corretamente */
+}
+
+.product-info h4 {
+  color: var(--secondary);
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 6px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.product-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.product-detail-item {
+  background-color: var(--background);
+  padding: 2px 8px;
+  border-radius: 10px;
+  display: inline-block;
+}
+
+.product-price {
+  color: var(--primary-dark);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.product-stock {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.stock-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stock-item.loja {
+  color: var(--success);
+}
+
+.stock-item.deposito {
+  color: var(--info);
+}
+
+/* Estado quando não há resultados */
+.no-results {
+  padding: 20px;
+  text-align: center;
+  color: var(--secondary);
+  font-style: italic;
+  background-color: white;
+  border-radius: var(--radius);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .search-result-item {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .product-image-container {
+    align-self: center;
+  }
+
+  .client-details {
+    flex-direction: column;
+    gap: 8px;
+  }
 }

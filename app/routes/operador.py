@@ -97,6 +97,8 @@ from app.crud import (
 )
 import logging
 
+from app.utils.upload import get_product_photo_url
+
 operador_bp = Blueprint("operador", __name__, url_prefix="/operador")
 logger = logging.getLogger(__name__)
 
@@ -2204,6 +2206,11 @@ def api_buscar_produtos():
                 resultados.append(
                     {
                         "id": produto.id,
+                        "foto": (
+                            get_product_photo_url(produto.foto, current_app)
+                            if produto.foto
+                            else None
+                        ),
                         "nome": produto.nome,
                         "marca": produto.marca,
                         "codigo": produto.codigo,
