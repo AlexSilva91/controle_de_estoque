@@ -1871,227 +1871,163 @@ def criar_produto():
 @admin_required
 def atualizar_produto(produto_id):
     try:
-        # Verificar se é um formulário multipart (com arquivo)
-        if request.content_type.startswith("multipart/form-data"):
+        # -----------------------------
+        # Entrada de dados
+        # -----------------------------
+        if request.content_type and request.content_type.startswith("multipart/form-data"):
             form_data = request.form
             foto_file = request.files.get("foto")
             delete_foto = form_data.get("delete_foto") == "true"
         else:
-            data = request.get_json()
-            form_data = data
+            form_data = request.get_json() or {}
             foto_file = None
-            delete_foto = data.get("delete_foto", False)
+            delete_foto = form_data.get("delete_foto", False)
 
         produto = get_produto(db.session, produto_id)
-
         if not produto:
             return jsonify({"success": False, "message": "Produto não encontrado"}), 404
 
-        # Validação e conversão de todos os campos numéricos
         update_fields = {}
 
+        # -----------------------------
         # Campos básicos
+        # -----------------------------
         for campo in ["nome", "tipo", "marca", "unidade", "ativo", "codigo"]:
             if campo in form_data:
                 update_fields[campo] = form_data[campo]
 
-        # Campos monetários (2 casas decimais)
-        campos_monetarios = [
-            "valor_unitario",
-            "valor_unitario_compra",
-            "valor_total_compra",
-            "imcs",
-        ]
-        for campo in campos_monetarios:
+        # -----------------------------
+        # Campos monetários
+        # -----------------------------
+        for campo in ["valor_unitario", "valor_unitario_compra", "valor_total_compra", "imcs"]:
             if campo in form_data:
                 valor = to_decimal_2(form_data[campo])
                 if valor is None:
-                    return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "message": f"Valor inválido para {campo}",
-                            }
-                        ),
-                        400,
-                    )
+                    return jsonify({
+                        "success": False,
+                        "message": f"Valor inválido para {campo}"
+                    }), 400
                 update_fields[campo] = valor
 
-        # Campos de estoque (3 casas decimais, mas vamos arredondar para 2)
-        campos_estoque = [
+        # -----------------------------
+        # Campos de estoque
+        # -----------------------------
+        for campo in [
             "estoque_loja",
             "estoque_deposito",
             "estoque_fabrica",
             "estoque_minimo",
             "estoque_maximo",
-        ]
-        for campo in campos_estoque:
+        ]:
             if campo in form_data:
                 try:
-                    # Converte para Decimal com 3 casas e depois arredonda para 2
-                    str_value = str(form_data[campo]).strip()
-                    if not str_value:
-                        continue
                     valor = (
-                        Decimal(str_value)
+                        Decimal(str(form_data[campo]))
                         .quantize(Decimal("0.001"))
                         .quantize(Decimal("0.01"))
                     )
                     update_fields[campo] = valor
-                except (InvalidOperation, ValueError):
-                    return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "message": f"Valor de estoque inválido para {campo}",
-                            }
-                        ),
-                        400,
-                    )
+                except Exception:
+                    return jsonify({
+                        "success": False,
+                        "message": f"Valor inválido para {campo}"
+                    }), 400
 
-        # Campos de conversão de unidades
+        # -----------------------------
+        # Conversões de unidade
+        # -----------------------------
         for campo in ["peso_kg_por_saco", "pacotes_por_saco", "pacotes_por_fardo"]:
             if campo in form_data:
                 try:
-                    if campo.startswith("peso"):
-                        valor = Decimal(str(form_data[campo])).quantize(
-                            Decimal("0.001")
-                        )
-                    else:
-                        valor = int(form_data[campo])
-                    update_fields[campo] = valor
-                except (ValueError, InvalidOperation):
-                    return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "message": f"Valor inválido para {campo}",
-                            }
-                        ),
-                        400,
+                    update_fields[campo] = (
+                        Decimal(form_data[campo]).quantize(Decimal("0.001"))
+                        if campo.startswith("peso")
+                        else int(form_data[campo])
                     )
+                except Exception:
+                    return jsonify({
+                        "success": False,
+                        "message": f"Valor inválido para {campo}"
+                    }), 400
 
-        # Processar foto
-        if delete_foto and produto.foto:
-            # Deletar foto existente
-            delete_product_photo(produto.foto, current_app)
-            update_fields["foto"] = None
-
-        if foto_file and foto_file.filename != "":
-            try:
-                # Deletar foto antiga se existir
-                if produto.foto:
-                    delete_product_photo(produto.foto, current_app)
-
-                # Salvar nova foto
-                foto_path = save_product_photo(foto_file, current_app, produto_id)
-                if foto_path:
-                    update_fields["foto"] = foto_path
-            except Exception as e:
-                logger.error(f"Erro ao processar foto: {e}")
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "message": f"Erro ao processar foto: {str(e)}",
-                        }
-                    ),
-                    400,
-                )
-
-        # Processar descontos
-        descontos = []
-        if "descontos[]" in form_data:
-            # Para formulários multipart
-            if isinstance(form_data.getlist("descontos[]"), list):
-                descontos = [int(id) for id in form_data.getlist("descontos[]") if id]
-        elif "descontos" in form_data:
-            # Para JSON
-            if isinstance(form_data["descontos"], list):
-                descontos = [int(id) for id in form_data["descontos"] if id]
-
-        # Criar objeto de atualização
+        # -----------------------------
+        # Atualizar dados do produto
+        # -----------------------------
         produto_data = ProdutoUpdate(**update_fields)
-
-        # Atualizar o produto
         produto = update_produto(db.session, produto_id, produto_data)
 
-        # Atualizar descontos
-        try:
-            produto.descontos = []
-            db.session.flush()
+        db.session.flush()  # 🔴 FUNDAMENTAL
 
-            for desconto_id in descontos:
-                desconto = buscar_desconto_by_id(db.session, desconto_id)
-                if not desconto:
-                    return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "message": f"Desconto com ID {desconto_id} não encontrado",
-                            }
-                        ),
-                        400,
-                    )
-                produto.descontos.append(desconto)
+        # -----------------------------
+        # FOTO – REMOVER
+        # -----------------------------
+        if delete_foto and produto.foto:
+            delete_product_photo(produto.foto, current_app)
+            produto.foto = None
 
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "message": f"Erro ao atualizar descontos: {str(e)}",
-                    }
-                ),
-                400,
+        # -----------------------------
+        # FOTO – SUBSTITUIR / ADICIONAR
+        # -----------------------------
+        if foto_file and foto_file.filename:
+            if produto.foto:
+                delete_product_photo(produto.foto, current_app)
+
+            produto.foto = save_product_photo(
+                foto_file,
+                current_app,
+                produto.id
             )
 
-        # Formatar os valores para retorno
-        foto_url = (
-            get_product_photo_url(produto.foto, current_app) if produto.foto else None
-        )
+        # -----------------------------
+        # DESCONTOS
+        # -----------------------------
+        descontos_ids = []
 
-        produto_dict = {
-            "id": produto.id,
-            "nome": produto.nome,
-            "valor_unitario": format_number(produto.valor_unitario),
-            "estoque_loja": f"{float(produto.estoque_loja):.2f}",
-            "foto": produto.foto,
-            "foto_url": foto_url,
-            "descontos": [
-                {
-                    "id": d.id,
-                    "identificador": d.identificador,
-                    "valor": format_number(d.valor),
-                    "quantidade_minima": f"{float(d.quantidade_minima):.2f}",
-                    "tipo": d.tipo.name,
-                }
-                for d in produto.descontos
-            ],
-        }
+        if "descontos[]" in form_data:
+            descontos_ids = [
+                int(i) for i in form_data.getlist("descontos[]") if i
+            ]
+        elif isinstance(form_data.get("descontos"), list):
+            descontos_ids = [int(i) for i in form_data["descontos"]]
 
-        logger.info(f"Produto {produto.id} atualizado por usuário {current_user.nome}")
-        logger.debug(f"Dados do produto {produto.id} atualizados: {produto_data}")
+        produto.descontos.clear()
+        db.session.flush()
 
-        return jsonify(
-            {
-                "success": True,
-                "message": "Produto atualizado com sucesso",
-                "produto": produto_dict,
+        for desconto_id in descontos_ids:
+            desconto = buscar_desconto_by_id(db.session, desconto_id)
+            if not desconto:
+                return jsonify({
+                    "success": False,
+                    "message": f"Desconto {desconto_id} não encontrado"
+                }), 400
+            produto.descontos.append(desconto)
+
+        # -----------------------------
+        # COMMIT FINAL
+        # -----------------------------
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Produto atualizado com sucesso",
+            "produto": {
+                "id": produto.id,
+                "nome": produto.nome,
+                "foto": produto.foto,
+                "foto_url": (
+                    get_product_photo_url(produto.foto, current_app)
+                    if produto.foto else None
+                ),
             }
-        )
+        })
 
     except Exception as e:
-        logger.error(f"Erro ao atualizar produto: {str(e)}")
         db.session.rollback()
-        return (
-            jsonify(
-                {"success": False, "message": f"Erro ao atualizar produto: {str(e)}"}
-            ),
-            400,
-        )
+        logger.error(f"Erro ao atualizar produto: {e}")
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 400
 
 
 @admin_bp.route("/produtos/<int:produto_id>/entrada-estoque", methods=["POST"])
