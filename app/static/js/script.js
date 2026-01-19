@@ -3153,25 +3153,129 @@ document.addEventListener('DOMContentLoaded', function () {
       window.open(url, '_blank');
     });
 
-    let relatorioAberto = false;
-
-    document.getElementById('btnRelatorioEntradas').addEventListener('click', () => {
-      if (relatorioAberto) return;
-
-      relatorioAberto = true;
-
-      const url = `/admin/lotes/pdf`;
-      window.open(url, '_blank');
-
-      setTimeout(() => {
-        relatorioAberto = false;
-      }, 2000);
-    });
-
     document.getElementById('btnEntradaLotes').addEventListener('click', () => {
       window.open('/admin/dashboard/entrada-lotes', '_blank');
     });
   }
+
+  let gerandoRelatorio = false;
+
+  document.getElementById('btnRelatorioEntradas').addEventListener('click', async (e) => {
+      e.preventDefault();
+      
+      if (gerandoRelatorio) {
+          mostrarFlashMessage('Aguarde, relatório em andamento...', 'warning');
+          return;
+      }
+      
+      await carregarProdutosAtivos();
+      
+      abrirModalRelatorioEntradas();
+  });
+
+  async function carregarProdutosAtivos() {
+      try {
+          const response = await fetch('/admin/api/produtos/ativos');
+          
+          if (!response.ok) {
+              throw new Error('Erro ao carregar produtos');
+          }
+          
+          const produtos = await response.json();
+          const selectProduto = document.getElementById('selectProduto');
+          
+          while (selectProduto.options.length > 1) {
+              selectProduto.remove(1);
+          }
+          
+          let listaProdutos;
+          if (Array.isArray(produtos)) {
+              listaProdutos = produtos;
+          } else if (produtos.success && Array.isArray(produtos.produtos)) {
+              listaProdutos = produtos.produtos;
+          } else {
+              throw new Error('Formato de resposta inválido');
+          }
+          
+          listaProdutos.forEach(produto => {
+              const option = document.createElement('option');
+              option.value = produto.id;
+              option.textContent = `${produto.nome}${produto.marca ? ` - ${produto.marca}` : ''}${produto.codigo ? ` (${produto.codigo})` : ''}`;
+              selectProduto.appendChild(option);
+          });
+          
+      } catch (error) {
+          mostrarFlashMessage('Erro ao carregar lista de produtos', 'error');
+      }
+  }
+
+  function abrirModalRelatorioEntradas() {
+      document.getElementById('selectProduto').value = '';
+      document.getElementById('dataInicio').value = '';
+      document.getElementById('dataFim').value = '';
+      
+      openModal('relatorioEntradasModal');
+  }
+
+  document.getElementById('gerarRelatorioEntradasBtn').addEventListener('click', async function() {
+      if (gerandoRelatorio) return;
+      
+      gerandoRelatorio = true;
+      this.disabled = true;
+      this.textContent = 'Gerando...';
+      
+      try {
+          const formData = {
+              produto_id: document.getElementById('selectProduto').value || '',
+              data_inicio: document.getElementById('dataInicio').value || '',
+              data_fim: document.getElementById('dataFim').value || ''
+          };
+          
+          const dataInicio = document.getElementById('dataInicio').value;
+          const dataFim = document.getElementById('dataFim').value;
+          
+          if (!dataInicio && dataFim) {
+              mostrarFlashMessage('Preencha a data inicial primeiro', 'warning');
+              gerandoRelatorio = false;
+              this.disabled = false;
+              this.textContent = 'Gerar PDF';
+              return;
+          }
+          
+          let url = '/admin/lotes/pdf?';
+          const params = [];
+          
+          if (formData.produto_id) {
+              params.push(`produto_id=${encodeURIComponent(formData.produto_id)}`);
+          }
+          
+          if (dataInicio) {
+              if (dataFim) {
+                  params.push(`data_inicio=${encodeURIComponent(dataInicio)}`);
+                  params.push(`data_fim=${encodeURIComponent(dataFim)}`);
+              } else {
+                  params.push(`data=${encodeURIComponent(dataInicio)}`);
+              }
+          }
+          
+          url += params.join('&');
+          
+          window.open(url, '_blank');
+          
+          closeModal('relatorioEntradasModal');
+          mostrarFlashMessage('Relatório sendo gerado...', 'success');
+          
+      } catch (error) {
+          console.error('Erro ao gerar relatório:', error);
+          mostrarFlashMessage('Erro ao gerar relatório', 'error');
+      } finally {
+          setTimeout(() => {
+              gerandoRelatorio = false;
+              this.disabled = false;
+              this.textContent = 'Gerar PDF';
+          }, 2000);
+      }
+  });
 
   async function openEditarProdutoModal(produtoId) {
       try {
@@ -3654,7 +3758,6 @@ document.addEventListener('DOMContentLoaded', function () {
       }
   }
 
-  // Função para configurar drag and drop
   function setupFileUpload(inputId) {
       const fileInput = document.getElementById(inputId);
       const fileUploadArea = fileInput?.closest('.file-upload-area');
@@ -3821,7 +3924,6 @@ document.addEventListener('DOMContentLoaded', function () {
       });
   }
 
-  // Função auxiliar para remover desconto selecionado
   function removerDescontoSelecionado(descontoId, identificador, tipo, valor, qtdMin, qtdMax) {
       const item = document.querySelector(`.desconto-item[data-desconto-id="${descontoId}"]`);
       const select = document.getElementById('selecionarDesconto');
@@ -3876,7 +3978,6 @@ document.addEventListener('DOMContentLoaded', function () {
       showFlashMessage('info', 'Desconto removido');
   }
 
-  // Adicionar função para lidar com erro de imagem (se necessário)
   function handleImageError(img) {
       img.style.display = 'none';
       const wrapper = img.closest('.foto-wrapper');
@@ -3891,7 +3992,6 @@ document.addEventListener('DOMContentLoaded', function () {
       }
   }
 
-  // Função para preview da foto (se necessário)
   function setupFotoPreview(inputId, previewContainerId, previewImgId) {
       const input = document.getElementById(inputId);
       const previewContainer = document.getElementById(previewContainerId);
@@ -3913,10 +4013,8 @@ document.addEventListener('DOMContentLoaded', function () {
       }
   }
 
-  // Event Listeners para Produtos
   document.getElementById('searchProduto')?.addEventListener('input', loadProdutosData);
   document.addEventListener('DOMContentLoaded', function () {
-    // Registrar eventos após o DOM estar totalmente carregado
     const refreshButton = document.getElementById('refreshProdutos');
     if (refreshButton) {
       refreshButton.addEventListener('click', function (e) {

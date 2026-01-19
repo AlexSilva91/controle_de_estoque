@@ -1483,12 +1483,61 @@ def relatorio_produtos_pdf():
 @admin_required
 def gerar_pdf_lotes():
     try:
-        lotes = (
-            db.session.query(LoteEstoque)
-            .join(Produto, LoteEstoque.produto_id == Produto.id)
-            .order_by(Produto.nome.asc(), LoteEstoque.data_entrada.asc())
-            .all()
-        )
+        produto_id = request.args.get("produto_id", type=int)
+        data_inicio_str = request.args.get("data_inicio")
+        data_fim_str = request.args.get("data_fim")
+        data_unica_str = request.args.get("data")
+        
+        query = db.session.query(LoteEstoque).join(Produto, LoteEstoque.produto_id == Produto.id)
+
+        if produto_id:
+            query = query.filter(LoteEstoque.produto_id == produto_id)
+
+        filtro_data_aplicado = False
+        data_inicio = None
+        data_fim = None
+        data_unica = None
+
+        if data_unica_str:
+            try:
+                data_unica = datetime.strptime(data_unica_str, "%Y-%m-%d").date()
+                data_inicio = datetime.combine(data_unica, time.min)
+                data_fim = datetime.combine(data_unica, time.max)
+                filtro_data_aplicado = True
+            except ValueError as e:
+                logger.warning(f"Formato de data inválido: {data_unica_str} - Erro: {e}")
+
+        elif data_inicio_str or data_fim_str:
+            if data_inicio_str:
+                try:
+                    data_inicio = datetime.strptime(data_inicio_str, "%Y-%m-%d").date()
+                    data_inicio = datetime.combine(data_inicio, time.min)
+                except ValueError as e:
+                    logger.warning(f"Formato de data início inválido: {data_inicio_str} - Erro: {e}")
+
+            if data_fim_str:
+                try:
+                    data_fim = datetime.strptime(data_fim_str, "%Y-%m-%d").date()
+                    data_fim = datetime.combine(data_fim, time.max)
+                except ValueError as e:
+                    logger.warning(f"Formato de data fim inválido: {data_fim_str} - Erro: {e}")
+
+            if data_inicio or data_fim:
+                filtro_data_aplicado = True
+                if data_inicio and data_fim:
+                    query = query.filter(LoteEstoque.data_entrada.between(data_inicio, data_fim))
+                elif data_inicio:
+                    query = query.filter(LoteEstoque.data_entrada >= data_inicio)
+                elif data_fim:
+                    query = query.filter(LoteEstoque.data_entrada <= data_fim)
+
+        if filtro_data_aplicado and data_unica_str:
+            query = query.filter(LoteEstoque.data_entrada.between(data_inicio, data_fim))
+
+        lotes = query.order_by(Produto.nome.asc(), LoteEstoque.data_entrada.asc()).all()
+        
+        for i, lote in enumerate(lotes[:3]):
+            logger.info(f"Lote {i+1}: Produto={lote.produto.nome if lote.produto else 'N/A'}, Data={lote.data_entrada}, Qtd={lote.quantidade_disponivel}")
 
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
@@ -1516,7 +1565,31 @@ def gerar_pdf_lotes():
             alignment=TA_CENTER,
             spaceAfter=10,
         )
-        elements.append(Paragraph("Entradas no Estoque", header_style))
+        
+        titulo = "Entradas no Estoque"
+        info_filtros = []
+        
+        if produto_id:
+            produto_filtrado = Produto.query.get(produto_id)
+            if produto_filtrado:
+                info_filtros.append(f"Produto: {produto_filtrado.nome}")
+        
+        if filtro_data_aplicado:
+            if data_unica_str:
+                info_filtros.append(f"Data: {data_unica_str}")
+            else:
+                periodo = []
+                if data_inicio_str:
+                    periodo.append(f"De: {data_inicio_str}")
+                if data_fim_str:
+                    periodo.append(f"Até: {data_fim_str}")
+                if periodo:
+                    info_filtros.append(" ".join(periodo))
+        
+        if info_filtros:
+            titulo = f"{titulo} - {' | '.join(info_filtros)}"
+        
+        elements.append(Paragraph(titulo, header_style))
         elements.append(Spacer(1, -20))
         elements.append(
             Table(
@@ -1526,6 +1599,19 @@ def gerar_pdf_lotes():
             )
         )
         elements.append(Spacer(1, 12))
+
+        # -------------------- Informações do Filtro --------------------
+        if info_filtros:
+            filtro_style = ParagraphStyle(
+                "Filtro",
+                parent=styles["Normal"],
+                fontSize=9,
+                alignment=TA_LEFT,
+                spaceAfter=6,
+                textColor=colors.grey,
+            )
+            elements.append(Paragraph(f"Filtros aplicados: {' | '.join(info_filtros)}", filtro_style))
+            elements.append(Spacer(1, 6))
 
         # -------------------- Tabela --------------------
         table_data = [
@@ -1587,6 +1673,16 @@ def gerar_pdf_lotes():
                 ]
             )
 
+        if len(table_data) == 1:
+            table_data.append([
+                Paragraph("Nenhum lote encontrado com os filtros aplicados", cell_left),
+                Paragraph("", cell_style),
+                Paragraph("", cell_style),
+                Paragraph("", cell_style),
+                Paragraph("", cell_style),
+                Paragraph("", cell_style),
+            ])
+
         col_widths = [55 * mm, 25 * mm, 25 * mm, 30 * mm, 25 * mm, 15 * mm]
         lotes_table = Table(table_data, colWidths=col_widths, repeatRows=1)
 
@@ -1608,6 +1704,24 @@ def gerar_pdf_lotes():
 
         lotes_table.setStyle(table_style)
         elements.append(lotes_table)
+
+        # -------------------- Resumo --------------------
+        if len(lotes) > 0:
+            total_lotes = len(lotes)
+            total_ativos = sum(1 for lote in lotes if float(lote.quantidade_disponivel) > 0)
+            
+            resumo_style = ParagraphStyle(
+                "Resumo",
+                parent=styles["Normal"],
+                fontSize=9,
+                alignment=TA_LEFT,
+                spaceBefore=12,
+                textColor=colors.darkgreen,
+            )
+            
+            resumo_text = f"Resumo: {total_lotes} lote(s) encontrado(s) | {total_ativos} ativo(s)"
+            elements.append(Paragraph(resumo_text, resumo_style))
+            logger.info(f"Resumo PDF: {resumo_text}")
 
         # -------------------- Marca d'água --------------------
         def marca_dagua(canvas, doc):
@@ -1632,7 +1746,6 @@ def gerar_pdf_lotes():
     except Exception as e:
         logger.error(f"Erro ao gerar PDF de lotes: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
-
 
 @admin_bp.route("/produtos", methods=["POST"])
 @login_required
@@ -1874,7 +1987,9 @@ def atualizar_produto(produto_id):
         # -----------------------------
         # Entrada de dados
         # -----------------------------
-        if request.content_type and request.content_type.startswith("multipart/form-data"):
+        if request.content_type and request.content_type.startswith(
+            "multipart/form-data"
+        ):
             form_data = request.form
             foto_file = request.files.get("foto")
             delete_foto = form_data.get("delete_foto") == "true"
@@ -1899,14 +2014,24 @@ def atualizar_produto(produto_id):
         # -----------------------------
         # Campos monetários
         # -----------------------------
-        for campo in ["valor_unitario", "valor_unitario_compra", "valor_total_compra", "imcs"]:
+        for campo in [
+            "valor_unitario",
+            "valor_unitario_compra",
+            "valor_total_compra",
+            "imcs",
+        ]:
             if campo in form_data:
                 valor = to_decimal_2(form_data[campo])
                 if valor is None:
-                    return jsonify({
-                        "success": False,
-                        "message": f"Valor inválido para {campo}"
-                    }), 400
+                    return (
+                        jsonify(
+                            {
+                                "success": False,
+                                "message": f"Valor inválido para {campo}",
+                            }
+                        ),
+                        400,
+                    )
                 update_fields[campo] = valor
 
         # -----------------------------
@@ -1928,10 +2053,15 @@ def atualizar_produto(produto_id):
                     )
                     update_fields[campo] = valor
                 except Exception:
-                    return jsonify({
-                        "success": False,
-                        "message": f"Valor inválido para {campo}"
-                    }), 400
+                    return (
+                        jsonify(
+                            {
+                                "success": False,
+                                "message": f"Valor inválido para {campo}",
+                            }
+                        ),
+                        400,
+                    )
 
         # -----------------------------
         # Conversões de unidade
@@ -1945,10 +2075,15 @@ def atualizar_produto(produto_id):
                         else int(form_data[campo])
                     )
                 except Exception:
-                    return jsonify({
-                        "success": False,
-                        "message": f"Valor inválido para {campo}"
-                    }), 400
+                    return (
+                        jsonify(
+                            {
+                                "success": False,
+                                "message": f"Valor inválido para {campo}",
+                            }
+                        ),
+                        400,
+                    )
 
         # -----------------------------
         # Atualizar dados do produto
@@ -1972,11 +2107,7 @@ def atualizar_produto(produto_id):
             if produto.foto:
                 delete_product_photo(produto.foto, current_app)
 
-            produto.foto = save_product_photo(
-                foto_file,
-                current_app,
-                produto.id
-            )
+            produto.foto = save_product_photo(foto_file, current_app, produto.id)
 
         # -----------------------------
         # DESCONTOS
@@ -1984,9 +2115,7 @@ def atualizar_produto(produto_id):
         descontos_ids = []
 
         if "descontos[]" in form_data:
-            descontos_ids = [
-                int(i) for i in form_data.getlist("descontos[]") if i
-            ]
+            descontos_ids = [int(i) for i in form_data.getlist("descontos[]") if i]
         elif isinstance(form_data.get("descontos"), list):
             descontos_ids = [int(i) for i in form_data["descontos"]]
 
@@ -1996,10 +2125,15 @@ def atualizar_produto(produto_id):
         for desconto_id in descontos_ids:
             desconto = buscar_desconto_by_id(db.session, desconto_id)
             if not desconto:
-                return jsonify({
-                    "success": False,
-                    "message": f"Desconto {desconto_id} não encontrado"
-                }), 400
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": f"Desconto {desconto_id} não encontrado",
+                        }
+                    ),
+                    400,
+                )
             produto.descontos.append(desconto)
 
         # -----------------------------
@@ -2007,27 +2141,27 @@ def atualizar_produto(produto_id):
         # -----------------------------
         db.session.commit()
 
-        return jsonify({
-            "success": True,
-            "message": "Produto atualizado com sucesso",
-            "produto": {
-                "id": produto.id,
-                "nome": produto.nome,
-                "foto": produto.foto,
-                "foto_url": (
-                    get_product_photo_url(produto.foto, current_app)
-                    if produto.foto else None
-                ),
+        return jsonify(
+            {
+                "success": True,
+                "message": "Produto atualizado com sucesso",
+                "produto": {
+                    "id": produto.id,
+                    "nome": produto.nome,
+                    "foto": produto.foto,
+                    "foto_url": (
+                        get_product_photo_url(produto.foto, current_app)
+                        if produto.foto
+                        else None
+                    ),
+                },
             }
-        })
+        )
 
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao atualizar produto: {e}")
-        return jsonify({
-            "success": False,
-            "message": str(e)
-        }), 400
+        return jsonify({"success": False, "message": str(e)}), 400
 
 
 @admin_bp.route("/produtos/<int:produto_id>/entrada-estoque", methods=["POST"])
@@ -8550,10 +8684,10 @@ def baixar_pdf_produtos():
 @admin_required
 def historico_financeiro():
     tipo = request.args.get("tipo")
-    data_str = request.args.get("data")  
-    start_str = request.args.get("start")  
-    end_str = request.args.get("end")  
-    operador_id = request.args.get("operador_id", type=int) 
+    data_str = request.args.get("data")
+    start_str = request.args.get("start")
+    end_str = request.args.get("end")
+    operador_id = request.args.get("operador_id", type=int)
     incluir_outros = request.args.get("incluir_outros", "false").lower() == "true"
 
     if not tipo:
@@ -8604,22 +8738,24 @@ def historico_financeiro():
         mes_ano_display = hoje.strftime("%m/%Y")
 
     from app.models.entities import Usuario, TipoUsuario
-    
-    operadores = Usuario.query.filter(
-        Usuario.tipo == TipoUsuario.operador
-    ).order_by(Usuario.nome).all()
-    
+
+    operadores = (
+        Usuario.query.filter(Usuario.tipo == TipoUsuario.operador)
+        .order_by(Usuario.nome)
+        .all()
+    )
+
     operador_selecionado = None
     if operador_id:
         operador_selecionado = Usuario.query.get(operador_id)
 
     historico_agrupado = buscar_historico_financeiro_agrupado(
         tipo_movimentacao,
-        data=None, 
+        data=None,
         incluir_outros=incluir_outros,
         start_date=start_date,
         end_date=end_date,
-        operador_id=operador_id  
+        operador_id=operador_id,
     )
 
     return render_template(
@@ -8630,9 +8766,10 @@ def historico_financeiro():
         start_date=start_date.strftime("%Y-%m-%d") if start_date else "",
         end_date=end_date.strftime("%Y-%m-%d") if end_date else "",
         operadores=operadores,
-        operador_id=operador_id, 
-        operador_selecionado=operador_selecionado 
+        operador_id=operador_id,
+        operador_selecionado=operador_selecionado,
     )
+
 
 @admin_bp.route("/financeiro/historico/json", methods=["GET"])
 @login_required

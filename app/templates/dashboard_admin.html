@@ -425,7 +425,7 @@
                             </button>
                             <button class="btn btn-warning" id="btnRelatorioEntradas">
                                 <i class="fas fa-file-pdf"></i>
-                                <span>PDF Entradas</span>
+                                <span>Relatório de Entradas</span>
                             </button>
                             <button class="btn btn-secondary" id="btnEntradaLotes">
                                 <i class="fas fa-boxes"></i>
@@ -1266,6 +1266,53 @@
             </form>
         </div>
     </div>
+    </div>
+
+    <!-- Modal para Relatório de Entradas -->
+    <div id="relatorioEntradasModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px; background: var(--card-bg); border: 1px solid var(--border-color); box-shadow: var(--shadow-lg);">
+            <div class="modal-header" style="padding: var(--space-lg); border-bottom: 1px solid var(--border-color); background: var(--gradient-primary); border-radius: var(--border-radius) var(--border-radius) 0 0;">
+                <h3 style="margin: 0; color: var(--text-light); font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold);">Filtrar Relatório de Entradas</h3>
+                <button type="button" class="close-modal" data-modal="relatorioEntradasModal" style="background: none; border: none; color: var(--text-light); font-size: 24px; cursor: pointer; padding: 0; line-height: 1;">&times;</button>
+            </div>
+            
+            <div class="modal-body" style="padding: var(--space-lg);">
+                <form id="formRelatorioEntradas">
+                    <div class="form-group">
+                        <label for="selectProduto" style="display: block; margin-bottom: var(--space-sm); color: var(--text-secondary); font-weight: var(--font-weight-medium); font-size: var(--font-size-sm);">Produto (opcional):</label>
+                        <select id="selectProduto" name="produto_id" class="form-control" style="width: 100%; padding: var(--space-md); background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); color: var(--text-primary); font-family: var(--font-family); font-size: var(--font-size-sm); transition: border-color 0.2s;">
+                            <option value="" style="background: var(--card-bg); color: var(--text-muted);">-- Todos os Produtos --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: block; margin-bottom: var(--space-sm); color: var(--text-secondary); font-weight: var(--font-weight-medium); font-size: var(--font-size-sm);">Período (opcional):</label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md);">
+                            <div>
+                                <input type="date" id="dataInicio" name="data_inicio" class="form-control" style="width: 100%; padding: var(--space-md); background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); color: var(--text-primary); font-family: var(--font-family); font-size: var(--font-size-sm);">
+                                <small style="color: var(--text-muted); font-size: var(--font-size-xs); display: block; margin-top: var(--space-xs);">Data inicial</small>
+                            </div>
+                            <div>
+                                <input type="date" id="dataFim" name="data_fim" class="form-control" style="width: 100%; padding: var(--space-md); background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); color: var(--text-primary); font-family: var(--font-family); font-size: var(--font-size-sm);">
+                                <small style="color: var(--text-muted); font-size: var(--font-size-xs); display: block; margin-top: var(--space-xs);">Data final</small>
+                            </div>
+                        </div>
+                        <small style="color: var(--text-muted); font-size: var(--font-size-xs); display: block; margin-top: var(--space-sm);">
+                            Preencha apenas a data inicial para relatório de um dia específico
+                        </small>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer" style="padding: var(--space-lg); border-top: 1px solid var(--border-color); background: var(--bg-tertiary); border-radius: 0 0 var(--border-radius) var(--border-radius); display: flex; justify-content: flex-end; gap: var(--space-md);">
+                <button type="button" class="btn btn-secondary close-modal" data-modal="relatorioEntradasModal" style="padding: var(--space-md) var(--space-lg); background: var(--card-bg); color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); cursor: pointer; font-weight: var(--font-weight-medium); transition: all 0.2s; font-size: var(--font-size-sm);">
+                    Cancelar
+                </button>
+                <button type="button" id="gerarRelatorioEntradasBtn" class="btn btn-primary" style="padding: var(--space-md) var(--space-lg); background: var(--gradient-primary); color: var(--text-light); border: none; border-radius: var(--border-radius-sm); cursor: pointer; font-weight: var(--font-weight-semibold); transition: background 0.2s; font-size: var(--font-size-sm);">
+                    Gerar PDF
+                </button>
+            </div>
+        </div>
     </div>
 
     <div id="entradaEstoqueModal" class="modal">
