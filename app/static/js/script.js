@@ -3174,598 +3174,743 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   async function openEditarProdutoModal(produtoId) {
-    try {
-      const produtoResponse = await fetchWithErrorHandling(
-        `/admin/produtos/${produtoId}`
-      );
-
-      if (produtoResponse.success) {
-        const produto = produtoResponse.produto;
-
-        const descontosResponse = await fetchWithErrorHandling('/admin/descontos');
-
-        if (descontosResponse.success) {
-          const formBody = document.querySelector('#editarProdutoModal .modal-body');
-
-          if (!formBody) return;
-
-          function formatarValorParaExibicao(valor) {
-            if (!valor || valor === '' || valor === 0) return '';
-
-            const numero =
-              typeof valor === 'string'
-                ? parseFloat(valor.replace(/[^\d,.-]/g, '').replace(',', '.'))
-                : parseFloat(valor);
-
-            if (isNaN(numero)) return '';
-
-            return numero.toLocaleString('pt-BR', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            });
-          }
-
-          const valorUnitarioFormatado = formatarValorParaExibicao(
-            produto.valor_unitario
-          );
-          const valorCompraFormatado = formatarValorParaExibicao(
-            produto.valor_unitario_compra
-          );
-          const valorTotalCompraFormatado = formatarValorParaExibicao(
-            produto.valor_total_compra
+      try {
+          const produtoResponse = await fetchWithErrorHandling(
+              `/admin/produtos/${produtoId}`
           );
 
-          // Obter URL da foto do produto
-          const fotoUrl = produto.foto || '';
+          if (produtoResponse.success) {
+              const produto = produtoResponse.produto;
 
-          // Verificar se a foto existe
-          const temFoto = fotoUrl && fotoUrl !== '';
+              const descontosResponse = await fetchWithErrorHandling('/admin/descontos');
 
-          const descontosAtuais = produto.descontos || [];
-          const descontosAtuaisIds = descontosAtuais.map((d) => d.id);
-          const todosDescontos = descontosResponse.descontos || [];
+              if (descontosResponse.success) {
+                  const formBody = document.querySelector('#editarProdutoModal .modal-body');
 
-          formBody.innerHTML = `
-          <!-- Cabeçalho da Seção -->
-          <div class="section-header mb-4">
-            <h4 class="section-title">
-              <i class="fas fa-box-open me-2"></i>Informações do Produto
-            </h4>
-            <div class="section-divider"></div>
-          </div>
+                  if (!formBody) return;
 
-          <!-- Informações Básicas -->
-          <div class="form-section mb-4">
-            <h5 class="form-section-title">
-              <i class="fas fa-info-circle me-2"></i>Informações Básicas
-            </h5>
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="editCodigo" class="form-label">
-                  <i class="fas fa-barcode me-1"></i>Código*
-                </label>
-                <input type="text" id="editCodigo" class="form-control form-control-dark" value="${
-                  produto.codigo || ''
-                }" required>
-              </div>
-              <div class="form-group">
-                <label for="editMarca" class="form-label">
-                  <i class="fas fa-tag me-1"></i>Marca*
-                </label>
-                <input type="text" id="editMarca" class="form-control form-control-dark" value="${
-                  produto.marca || ''
-                }" required>
-              </div>
-              <div class="form-group">
-                <label for="editNome" class="form-label">
-                  <i class="fas fa-font me-1"></i>Nome*
-                </label>
-                <input type="text" id="editNome" class="form-control form-control-dark" value="${
-                  produto.nome
-                }" required>
-              </div>
-              <div class="form-group">
-                <label for="editTipo" class="form-label">
-                  <i class="fas fa-cubes me-1"></i>Tipo*
-                </label>
-                <input type="text" id="editTipo" class="form-control form-control-dark" value="${
-                  produto.tipo
-                }" required>
-              </div>
-              <div class="form-group">
-                <label for="editUnidade" class="form-label">
-                  <i class="fas fa-balance-scale me-1"></i>Unidade
-                </label>
-                <div class="form-control-static">
-                  <span class="badge badge-unidade">${produto.unidade}</span>
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="editValor" class="form-label">
-                  <i class="fas fa-money-bill-wave me-1"></i>Valor Unitário*
-                </label>
-                <div class="input-with-icon">
-                  <i class="fas fa-dollar-sign input-icon"></i>
-                  <input type="text" id="editValor" class="form-control form-control-dark" value="${valorUnitarioFormatado}" placeholder="Ex: 2.100,30" required>
-                </div>
-              </div>
-            </div>
-          </div>
+                  function formatarValorParaExibicao(valor) {
+                      if (!valor || valor === '' || valor === 0) return '';
 
-          <!-- Valores de Compra -->
-          <div class="form-section mb-4">
-            <h5 class="form-section-title">
-              <i class="fas fa-shopping-cart me-2"></i>Valores de Compra
-            </h5>
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="editValorCompra" class="form-label">
-                  <i class="fas fa-tag me-1"></i>Valor de Compra
-                </label>
-                <div class="input-with-icon">
-                  <i class="fas fa-dollar-sign input-icon"></i>
-                  <input type="text" id="editValorCompra" class="form-control form-control-dark" value="${valorCompraFormatado}" placeholder="Ex: 10.200,40">
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="editValorTotalCompra" class="form-label">
-                  <i class="fas fa-calculator me-1"></i>Valor Total Compra
-                </label>
-                <div class="input-with-icon">
-                  <i class="fas fa-dollar-sign input-icon"></i>
-                  <input type="text" id="editValorTotalCompra" class="form-control form-control-dark" value="${valorTotalCompraFormatado}" placeholder="Ex: 25.500,75">
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="editICMS" class="form-label">
-                  <i class="fas fa-percentage me-1"></i>ICMS (%)
-                </label>
-                <div class="input-with-icon">
-                  <i class="fas fa-percent input-icon"></i>
-                  <input type="number" id="editICMS" class="form-control form-control-dark" value="${
-                    produto.imcs || ''
-                  }" step="0.01" min="0">
-                </div>
-              </div>
-            </div>
-          </div>
+                      const numero =
+                          typeof valor === 'string'
+                              ? parseFloat(valor.replace(/[^\d,.-]/g, '').replace(',', '.'))
+                              : parseFloat(valor);
 
-          <!-- Estoques -->
-          <div class="form-section mb-4">
-            <h5 class="form-section-title">
-              <i class="fas fa-warehouse me-2"></i>Controle de Estoque
-            </h5>
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="editEstoqueLoja" class="form-label">
-                  <i class="fas fa-store me-1"></i>Estoque Loja
-                </label>
-                <div class="input-with-icon">
-                  <i class="fas fa-box input-icon"></i>
-                  <input type="number" id="editEstoqueLoja" class="form-control form-control-dark" value="${
-                    produto.estoque_loja
-                  }" step="0.001" min="0">
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="editEstoqueDeposito" class="form-label">
-                  <i class="fas fa-building me-1"></i>Estoque Depósito
-                </label>
-                <div class="input-with-icon">
-                  <i class="fas fa-box input-icon"></i>
-                  <input type="number" id="editEstoqueDeposito" class="form-control form-control-dark" value="${
-                    produto.estoque_deposito
-                  }" step="0.001" min="0">
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="editEstoqueFabrica" class="form-label">
-                  <i class="fas fa-industry me-1"></i>Estoque Fábrica
-                </label>
-                <div class="input-with-icon">
-                  <i class="fas fa-box input-icon"></i>
-                  <input type="number" id="editEstoqueFabrica" class="form-control form-control-dark" value="${
-                    produto.estoque_fabrica
-                  }" step="0.001" min="0">
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="editEstoqueMinimo" class="form-label">
-                  <i class="fas fa-exclamation-triangle me-1"></i>Estoque Mínimo
-                </label>
-                <div class="input-with-icon">
-                  <i class="fas fa-arrow-down input-icon"></i>
-                  <input type="number" id="editEstoqueMinimo" class="form-control form-control-dark" value="${
-                    produto.estoque_minimo || 0
-                  }" step="0.001" min="0">
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="editEstoqueMaximo" class="form-label">
-                  <i class="fas fa-exclamation-circle me-1"></i>Estoque Máximo
-                </label>
-                <div class="input-with-icon">
-                  <i class="fas fa-arrow-up input-icon"></i>
-                  <input type="number" id="editEstoqueMaximo" class="form-control form-control-dark" value="${
-                    produto.estoque_maximo || ''
-                  }" step="0.001" min="0">
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="editAtivo" class="form-label">
-                  <i class="fas fa-power-off me-1"></i>Status
-                </label>
-                <select id="editAtivo" class="form-control form-control-dark">
-                  <option value="true" ${produto.ativo ? 'selected' : ''}>
-                    <i class="fas fa-check-circle text-success me-1"></i>Ativo
-                  </option>
-                  <option value="false" ${!produto.ativo ? 'selected' : ''}>
-                    <i class="fas fa-times-circle text-danger me-1"></i>Inativo
-                  </option>
-                </select>
-              </div>
-            </div>
-          </div>
+                      if (isNaN(numero)) return '';
 
-          <!-- Seção de Foto -->
-          <div class="form-section mb-4">
-            <h5 class="form-section-title">
-              <i class="fas fa-camera me-2"></i>Imagem do Produto
-            </h5>
-            
-            <!-- Foto Atual -->
-            <div class="foto-container">
-              ${
-                fotoUrl
-                  ? `
-                <div class="foto-atual-container mb-3">
-                  <div class="foto-atual-header">
-                    <h6 class="foto-atual-title">
-                      <i class="fas fa-image me-2"></i>Foto Atual
-                    </h6>
+                      return numero.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                      });
+                  }
+
+                  const valorUnitarioFormatado = formatarValorParaExibicao(
+                      produto.valor_unitario
+                  );
+                  const valorCompraFormatado = formatarValorParaExibicao(
+                      produto.valor_unitario_compra
+                  );
+                  const valorTotalCompraFormatado = formatarValorParaExibicao(
+                      produto.valor_total_compra
+                  );
+
+                  // Obter URL da foto do produto
+                  const fotoUrl = produto.foto || '';
+
+                  // Verificar se a foto existe
+                  const temFoto = fotoUrl && fotoUrl !== '';
+
+                  const descontosAtuais = produto.descontos || [];
+                  const descontosAtuaisIds = descontosAtuais.map((d) => d.id);
+                  const todosDescontos = descontosResponse.descontos || [];
+
+                  formBody.innerHTML = `
+                  <!-- Cabeçalho da Seção -->
+                  <div class="section-header">
+                      <h4 class="section-title">
+                          <i class="fas fa-box-open me-2"></i>Informações do Produto
+                      </h4>
+                      <div class="section-divider"></div>
                   </div>
-                  <div class="foto-atual-body">
-                    <div class="foto-wrapper">
-                      <a href="${fotoUrl}" target="_blank" rel="noopener noreferrer">
-                        <img
-                          src="${fotoUrl}"
-                          alt="Foto atual do produto"
-                          class="foto-atual-img"
-                          onerror="handleImageError(this)"
-                          style="cursor: zoom-in;"
-                        >
-                      </a>
-                      <div class="foto-error-message" style="display: none;">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <span>Erro ao carregar imagem</span>
-                      </div>
-                    </div>
-                    <div class="foto-actions mt-3">
-                      <div class="form-check form-check-danger">
-                        <input type="checkbox" id="deleteFoto" class="form-check-input">
-                        <label for="deleteFoto" class="form-check-label">
-                          <i class="fas fa-trash-alt me-2"></i>Remover foto atual
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              `
-                  : `
-                <div class="foto-empty-state">
-                  <div class="foto-empty-icon">
-                    <i class="fas fa-image"></i>
-                  </div>
-                  <p class="foto-empty-text">Nenhuma foto cadastrada</p>
-                </div>
-              `
-              }
-            </div>
-              
-              <!-- Upload de Nova Foto -->
-              <div class="foto-upload-card mt-4">
-                <div class="foto-upload-header">
-                  <h6 class="foto-upload-title">
-                    <i class="fas fa-upload me-2"></i>
-                    ${temFoto ? 'Substituir Foto' : 'Adicionar Foto'}
-                  </h6>
-                </div>
-                <div class="foto-upload-body">
-                  <div class="file-upload-area">
-                    <div class="file-upload-icon">
-                      <i class="fas fa-cloud-upload-alt"></i>
-                    </div>
-                    <p class="file-upload-text">Arraste ou clique para selecionar</p>
-                    <input type="file" id="editFoto" class="file-upload-input" accept="image/*">
-                    <small class="file-upload-hint">
-                      <i class="fas fa-info-circle me-1"></i>
-                      Formatos: JPG, PNG, GIF, WEBP. Tamanho máximo: 5MB.
-                    </small>
-                  </div>
-                  
-                  <!-- Preview da Nova Foto -->
-                  <div id="editFotoPreview" class="foto-preview mt-3" style="display: none;">
-                    <div class="foto-preview-header">
-                      <h6 class="foto-preview-title">
-                        <i class="fas fa-eye me-2"></i>Prévia
-                      </h6>
-                    </div>
-                    <div class="foto-preview-body">
-                      <img id="editFotoPreviewImg" src="#" alt="Preview da nova foto" class="foto-preview-img">
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <!-- Seção de Descontos -->
-          <div class="form-section mb-4">
-            <h5 class="form-section-title">
-              <i class="fas fa-percent me-2"></i>Descontos Aplicados
-            </h5>
-            
-            <!-- Descontos Atuais -->
-            <div class="descontos-container mb-3">
-              <div id="descontosContainer" class="descontos-list">
-                ${descontosAtuais
-                  .map(
-                    (desconto) => `
-                    <div class="desconto-item" data-id="${desconto.id}">
-                      <div class="desconto-icon">
-                        <i class="fas fa-tag"></i>
-                      </div>
-                      <div class="desconto-content">
-                        <div class="desconto-header">
-                          <span class="desconto-identificador">${
-                            desconto.identificador
-                          }</span>
-                          <span class="desconto-tipo-badge badge-${
-                            desconto.tipo === 'fixo' ? 'primary' : 'secondary'
-                          }">
-                            ${desconto.tipo === 'fixo' ? 'Fixo' : 'Percentual'}
-                          </span>
-                        </div>
-                        <div class="desconto-body">
-                          <div class="desconto-valor">
-                            ${
-                              desconto.tipo === 'fixo'
-                                ? `<i class="fas fa-dollar-sign me-1"></i>R$ ${formatarValorParaExibicao(
-                                    desconto.valor
-                                  )}`
-                                : `<i class="fas fa-percent me-1"></i>${desconto.valor}%`
-                            }
+                  <!-- Informações Básicas -->
+                  <div class="form-section">
+                      <h5 class="form-section-title">
+                          <i class="fas fa-info-circle me-2"></i>Informações Básicas
+                      </h5>
+                      <div class="form-grid">
+                          <div class="form-group">
+                              <label for="editCodigo" class="form-label">
+                                  <i class="fas fa-barcode me-1"></i>Código*
+                              </label>
+                              <input type="text" id="editCodigo" class="form-control form-control-dark" value="${
+                                  produto.codigo || ''
+                              }" required>
                           </div>
-                          <div class="desconto-quantidades">
-                            <span class="desconto-quantidade">
-                              <i class="fas fa-arrow-up me-1"></i>Mín: ${
-                                desconto.quantidade_minima
-                              }
-                            </span>
-                            ${
-                              desconto.quantidade_maxima
-                                ? `
-                              <span class="desconto-quantidade">
-                                <i class="fas fa-arrow-down me-1"></i>Máx: ${desconto.quantidade_maxima}
-                              </span>
-                            `
-                                : ''
-                            }
+                          <div class="form-group">
+                              <label for="editMarca" class="form-label">
+                                  <i class="fas fa-tag me-1"></i>Marca*
+                              </label>
+                              <input type="text" id="editMarca" class="form-control form-control-dark" value="${
+                                  produto.marca || ''
+                              }" required>
                           </div>
-                        </div>
+                          <div class="form-group">
+                              <label for="editNome" class="form-label">
+                                  <i class="fas fa-font me-1"></i>Nome*
+                              </label>
+                              <input type="text" id="editNome" class="form-control form-control-dark" value="${
+                                  produto.nome
+                              }" required>
+                          </div>
+                          <div class="form-group">
+                              <label for="editTipo" class="form-label">
+                                  <i class="fas fa-cubes me-1"></i>Tipo*
+                              </label>
+                              <input type="text" id="editTipo" class="form-control form-control-dark" value="${
+                                  produto.tipo
+                              }" required>
+                          </div>
+                          <div class="form-group">
+                              <label for="editUnidade" class="form-label">
+                                  <i class="fas fa-balance-scale me-1"></i>Unidade
+                              </label>
+                              <div class="form-control-static">
+                                  <span class="badge-unidade">${produto.unidade}</span>
+                              </div>
+                          </div>
+                          <div class="form-group">
+                              <label for="editValor" class="form-label">
+                                  <i class="fas fa-money-bill-wave me-1"></i>Valor Unitário*
+                              </label>
+                              <div class="input-with-icon">
+                                  <i class="fas fa-dollar-sign input-icon"></i>
+                                  <input type="text" id="editValor" class="form-control form-control-dark" value="${valorUnitarioFormatado}" placeholder="Ex: 2.100,30" required>
+                              </div>
+                          </div>
                       </div>
-                      <button type="button" class="btn-remover-desconto">
-                        <i class="fas fa-times"></i>
-                      </button>
-                    </div>
-                  `
-                  )
-                  .join('')}
-              </div>
-              
-              ${
-                descontosAtuais.length === 0
-                  ? `
-                <div class="descontos-empty-state">
-                  <div class="descontos-empty-icon">
-                    <i class="fas fa-percent"></i>
                   </div>
-                  <p class="descontos-empty-text">Nenhum desconto aplicado</p>
-                </div>
-              `
-                  : ''
-              }
-            </div>
 
-            <!-- Adicionar Novo Desconto -->
-            <div class="adicionar-desconto-card">
-              <div class="adicionar-desconto-header">
-                <h6 class="adicionar-desconto-title">
-                  <i class="fas fa-plus-circle me-2"></i>Adicionar Desconto
-                </h6>
-              </div>
-              <div class="adicionar-desconto-body">
-                <div class="desconto-select-container">
-                  <div class="input-with-icon mb-3">
-                    <i class="fas fa-search input-icon"></i>
-                    <select id="selecionarDesconto" class="form-control form-control-dark">
-                      <option value="">Selecione um desconto...</option>
-                      ${todosDescontos
-                        .filter((d) => !descontosAtuaisIds.includes(d.id))
-                        .map(
-                          (desconto) => `
-                            <option value="${desconto.id}" 
-                              data-quantidade-minima="${desconto.quantidade_minima}"
-                              data-quantidade-maxima="${
-                                desconto.quantidade_maxima || ''
-                              }"
-                              data-valor="${desconto.valor}"
-                              data-tipo="${desconto.tipo}"
-                              data-identificador="${desconto.identificador}">
-                              ${desconto.identificador} - 
-                              ${
-                                desconto.tipo === 'fixo'
-                                  ? `R$ ${formatarValorParaExibicao(desconto.valor)}`
-                                  : `${desconto.valor}%`
-                              } - Mín: ${desconto.quantidade_minima}${
-                            desconto.quantidade_maxima
-                              ? `, Máx: ${desconto.quantidade_maxima}`
-                              : ''
-                          }
-                            </option>
+                  <!-- Valores de Compra -->
+                  <div class="form-section">
+                      <h5 class="form-section-title">
+                          <i class="fas fa-shopping-cart me-2"></i>Valores de Compra
+                      </h5>
+                      <div class="form-grid">
+                          <div class="form-group">
+                              <label for="editValorCompra" class="form-label">
+                                  <i class="fas fa-tag me-1"></i>Valor de Compra
+                              </label>
+                              <div class="input-with-icon">
+                                  <i class="fas fa-dollar-sign input-icon"></i>
+                                  <input type="text" id="editValorCompra" class="form-control form-control-dark" value="${valorCompraFormatado}" placeholder="Ex: 10.200,40">
+                              </div>
+                          </div>
+                          <div class="form-group">
+                              <label for="editValorTotalCompra" class="form-label">
+                                  <i class="fas fa-calculator me-1"></i>Valor Total Compra
+                              </label>
+                              <div class="input-with-icon">
+                                  <i class="fas fa-dollar-sign input-icon"></i>
+                                  <input type="text" id="editValorTotalCompra" class="form-control form-control-dark" value="${valorTotalCompraFormatado}" placeholder="Ex: 25.500,75">
+                              </div>
+                          </div>
+                          <div class="form-group">
+                              <label for="editICMS" class="form-label">
+                                  <i class="fas fa-percentage me-1"></i>ICMS (%)
+                              </label>
+                              <div class="input-with-icon">
+                                  <i class="fas fa-percent input-icon"></i>
+                                  <input type="number" id="editICMS" class="form-control form-control-dark" value="${
+                                      produto.imcs || ''
+                                  }" step="0.01" min="0">
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+
+                  <!-- Estoques -->
+                  <div class="form-section">
+                      <h5 class="form-section-title">
+                          <i class="fas fa-warehouse me-2"></i>Controle de Estoque
+                      </h5>
+                      <div class="form-grid">
+                          <div class="form-group">
+                              <label for="editEstoqueLoja" class="form-label">
+                                  <i class="fas fa-store me-1"></i>Estoque Loja
+                              </label>
+                              <div class="input-with-icon">
+                                  <i class="fas fa-box input-icon"></i>
+                                  <input type="number" id="editEstoqueLoja" class="form-control form-control-dark" value="${
+                                      produto.estoque_loja
+                                  }" step="0.001" min="0">
+                              </div>
+                          </div>
+                          <div class="form-group">
+                              <label for="editEstoqueDeposito" class="form-label">
+                                  <i class="fas fa-building me-1"></i>Estoque Depósito
+                              </label>
+                              <div class="input-with-icon">
+                                  <i class="fas fa-box input-icon"></i>
+                                  <input type="number" id="editEstoqueDeposito" class="form-control form-control-dark" value="${
+                                      produto.estoque_deposito
+                                  }" step="0.001" min="0">
+                              </div>
+                          </div>
+                          <div class="form-group">
+                              <label for="editEstoqueFabrica" class="form-label">
+                                  <i class="fas fa-industry me-1"></i>Estoque Fábrica
+                              </label>
+                              <div class="input-with-icon">
+                                  <i class="fas fa-box input-icon"></i>
+                                  <input type="number" id="editEstoqueFabrica" class="form-control form-control-dark" value="${
+                                      produto.estoque_fabrica
+                                  }" step="0.001" min="0">
+                              </div>
+                          </div>
+                          <div class="form-group">
+                              <label for="editEstoqueMinimo" class="form-label">
+                                  <i class="fas fa-exclamation-triangle me-1"></i>Estoque Mínimo
+                              </label>
+                              <div class="input-with-icon">
+                                  <i class="fas fa-arrow-down input-icon"></i>
+                                  <input type="number" id="editEstoqueMinimo" class="form-control form-control-dark" value="${
+                                      produto.estoque_minimo || 0
+                                  }" step="0.001" min="0">
+                              </div>
+                          </div>
+                          <div class="form-group">
+                              <label for="editEstoqueMaximo" class="form-label">
+                                  <i class="fas fa-exclamation-circle me-1"></i>Estoque Máximo
+                              </label>
+                              <div class="input-with-icon">
+                                  <i class="fas fa-arrow-up input-icon"></i>
+                                  <input type="number" id="editEstoqueMaximo" class="form-control form-control-dark" value="${
+                                      produto.estoque_maximo || ''
+                                  }" step="0.001" min="0">
+                              </div>
+                          </div>
+                          <div class="form-group">
+                              <label for="editAtivo" class="form-label">
+                                  <i class="fas fa-power-off me-1"></i>Status
+                              </label>
+                              <select id="editAtivo" class="form-control form-control-dark">
+                                  <option value="true" ${produto.ativo ? 'selected' : ''}>
+                                      Ativo
+                                  </option>
+                                  <option value="false" ${!produto.ativo ? 'selected' : ''}>
+                                      Inativo
+                                  </option>
+                              </select>
+                          </div>
+                      </div>
+                  </div>
+
+                  <!-- Seção de Foto -->
+                  <div class="form-section">
+                      <h5 class="form-section-title">
+                          <i class="fas fa-camera me-2"></i>Imagem do Produto
+                      </h5>
+                      
+                      <!-- Foto Atual -->
+                      <div class="foto-container">
+                          ${
+                              fotoUrl
+                                  ? `
+                              <div class="foto-atual-card">
+                                  <div class="foto-atual-header">
+                                      <h6 class="foto-atual-title">
+                                          <i class="fas fa-image me-2"></i>Foto Atual
+                                      </h6>
+                                  </div>
+                                  <div class="foto-atual-body">
+                                      <div class="foto-wrapper">
+                                          <a href="${fotoUrl}" target="_blank" rel="noopener noreferrer">
+                                              <img
+                                                  src="${fotoUrl}"
+                                                  alt="Foto atual do produto"
+                                                  class="foto-atual-img"
+                                                  onerror="handleImageError(this)"
+                                                  style="cursor: zoom-in;"
+                                              >
+                                          </a>
+                                      </div>
+                                      <div class="foto-actions mt-3">
+                                          <div class="form-check form-check-danger">
+                                              <input type="checkbox" id="deleteFoto" class="form-check-input">
+                                              <label for="deleteFoto" class="form-check-label">
+                                                  <i class="fas fa-trash-alt me-2"></i>Remover foto atual
+                                              </label>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
                           `
-                        )
-                        .join('')}
-                    </select>
+                                  : `
+                              <div class="foto-empty-state">
+                                  <div class="foto-empty-icon">
+                                      <i class="fas fa-image"></i>
+                                  </div>
+                                  <p class="foto-empty-text">Nenhuma foto cadastrada</p>
+                              </div>
+                          `
+                          }
+                      </div>
+                      
+                      <!-- Upload de Nova Foto -->
+                      <div class="foto-upload-card mt-4">
+                          <div class="foto-upload-header">
+                              <h6 class="foto-upload-title">
+                                  <i class="fas fa-upload me-2"></i>
+                                  ${temFoto ? 'Substituir Foto' : 'Adicionar Foto'}
+                              </h6>
+                          </div>
+                          <div class="foto-upload-body">
+                              <div class="file-upload-area">
+                                  <div class="file-upload-icon">
+                                      <i class="fas fa-cloud-upload-alt"></i>
+                                  </div>
+                                  <p class="file-upload-text">Arraste ou clique para selecionar</p>
+                                  <input type="file" id="editFoto" class="file-upload-input" accept="image/*">
+                                  <small class="file-upload-hint">
+                                      <i class="fas fa-info-circle me-1"></i>
+                                      Formatos: JPG, PNG, GIF, WEBP. Tamanho máximo: 5MB.
+                                  </small>
+                              </div>
+                              
+                              <!-- Preview da Nova Foto -->
+                              <div id="editFotoPreview" class="foto-preview mt-3" style="display: none;">
+                                  <div class="foto-preview-header">
+                                      <h6 class="foto-preview-title">
+                                          <i class="fas fa-eye me-2"></i>Prévia
+                                      </h6>
+                                  </div>
+                                  <div class="foto-preview-body">
+                                      <img id="editFotoPreviewImg" src="#" alt="Preview da nova foto" class="foto-preview-img">
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
                   </div>
-                  <button type="button" id="btnAdicionarDesconto" class="btn btn-gradient-primary">
-                    <i class="fas fa-plus me-2"></i>Adicionar Desconto
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
 
-          const editarProdutoForm = document.getElementById('editarProdutoForm');
-          if (editarProdutoForm) {
-            editarProdutoForm.setAttribute('data-produto-id', produtoId);
-          }
+                  <!-- Seção de Descontos -->
+                  <div class="form-section">
+                      <h5 class="form-section-title">
+                          <i class="fas fa-percent me-2"></i>Descontos Aplicados
+                      </h5>
+                      
+                      <!-- Descontos Selecionados -->
+                      <div class="descontos-container">
+                          <div id="descontosSelecionadosLista" class="descontos-list">
+                              ${descontosAtuais
+                                  .map(
+                                      (desconto) => `
+                                          <div class="desconto-item" data-desconto-id="${desconto.id}">
+                                              <div class="desconto-icon">
+                                                  <i class="fas fa-tag"></i>
+                                              </div>
+                                              <div class="desconto-content">
+                                                  <div class="desconto-header">
+                                                      <span class="desconto-identificador">${desconto.identificador}</span>
+                                                      <span class="desconto-tipo-badge ${
+                                                          desconto.tipo === 'fixo' ? 'badge-primary' : 'badge-secondary'
+                                                      }">
+                                                          ${desconto.tipo === 'fixo' ? 'Fixo' : 'Percentual'}
+                                                      </span>
+                                                  </div>
+                                                  <div class="desconto-body">
+                                                      <div class="desconto-valor">
+                                                          ${
+                                                              desconto.tipo === 'fixo'
+                                                                  ? `<i class="fas fa-dollar-sign me-1"></i>R$ ${formatarValorParaExibicao(desconto.valor)}`
+                                                                  : `<i class="fas fa-percent me-1"></i>${desconto.valor}%`
+                                                          }
+                                                      </div>
+                                                      <div class="desconto-quantidades">
+                                                          <span class="desconto-quantidade">
+                                                              <i class="fas fa-arrow-up me-1"></i>Mín: ${desconto.quantidade_minima}
+                                                          </span>
+                                                          ${
+                                                              desconto.quantidade_maxima
+                                                                  ? `
+                                                              <span class="desconto-quantidade">
+                                                                  <i class="fas fa-arrow-down me-1"></i>Máx: ${desconto.quantidade_maxima}
+                                                              </span>
+                                                          `
+                                                                  : ''
+                                                          }
+                                                      </div>
+                                                  </div>
+                                              </div>
+                                              <button type="button" class="btn-remover-desconto" data-desconto-id="${desconto.id}" title="Remover desconto">
+                                                  <i class="fas fa-times"></i>
+                                              </button>
+                                          </div>
+                                      `
+                                  )
+                                  .join('')}
+                          </div>
+                          
+                          ${
+                              descontosAtuais.length === 0
+                                  ? `
+                              <div class="descontos-empty-state" id="descontosEmptyState">
+                                  <div class="descontos-empty-icon">
+                                      <i class="fas fa-percent"></i>
+                                  </div>
+                                  <p class="descontos-empty-text">Nenhum desconto aplicado</p>
+                              </div>
+                          `
+                                  : ''
+                          }
+                      </div>
 
-          // Configurar eventos
-          setupDescontoEvents();
-          setupFotoPreview('editFoto', 'editFotoPreview', 'editFotoPreviewImg');
+                      <!-- Adicionar Novo Desconto -->
+                      <div class="adicionar-desconto-card">
+                          <div class="adicionar-desconto-header">
+                              <h6 class="adicionar-desconto-title">
+                                  <i class="fas fa-plus-circle me-2"></i>Adicionar Desconto
+                              </h6>
+                          </div>
+                          <div class="adicionar-desconto-body">
+                              <div class="desconto-select-container">
+                                  <div class="input-with-icon">
+                                      <i class="fas fa-search input-icon"></i>
+                                      <select id="selecionarDesconto" class="form-control form-control-dark">
+                                          <option value="">Selecione um desconto...</option>
+                                          ${todosDescontos
+                                              .filter((d) => !descontosAtuaisIds.includes(d.id))
+                                              .map(
+                                                  (desconto) => `
+                                                      <option value="${desconto.id}" 
+                                                          data-quantidade-minima="${desconto.quantidade_minima}"
+                                                          data-quantidade-maxima="${desconto.quantidade_maxima || ''}"
+                                                          data-valor="${desconto.valor}"
+                                                          data-tipo="${desconto.tipo}"
+                                                          data-identificador="${desconto.identificador}">
+                                                          ${desconto.identificador} - 
+                                                          ${
+                                                              desconto.tipo === 'fixo'
+                                                                  ? `R$ ${formatarValorParaExibicao(desconto.valor)}`
+                                                                  : `${desconto.valor}%`
+                                                          } - Mín: ${desconto.quantidade_minima}${
+                                                      desconto.quantidade_maxima ? `, Máx: ${desconto.quantidade_maxima}` : ''
+                                                  }
+                                                      </option>
+                                                  `
+                                              )
+                                              .join('')}
+                                      </select>
+                                  </div>
+                                  <button type="button" id="btnAdicionarDesconto" class="btn-gradient-primary mt-3">
+                                      <i class="fas fa-plus me-2"></i>Adicionar Desconto
+                                  </button>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  `;
 
-          // Configurar evento para checkbox de deletar foto
-          const deleteFotoCheckbox = document.getElementById('deleteFoto');
-          const fotoInput = document.getElementById('editFoto');
+                  const editarProdutoForm = document.getElementById('editarProdutoForm');
+                  if (editarProdutoForm) {
+                      editarProdutoForm.setAttribute('data-produto-id', produtoId);
+                  }
 
-          if (deleteFotoCheckbox && fotoInput) {
-            deleteFotoCheckbox.addEventListener('change', function () {
-              if (this.checked) {
-                fotoInput.disabled = true;
-                fotoInput.value = '';
-                const preview = document.getElementById('editFotoPreview');
-                if (preview) preview.style.display = 'none';
+                  // Configurar eventos
+                  setupDescontoEvents();
+                  setupFotoPreview('editFoto', 'editFotoPreview', 'editFotoPreviewImg');
+
+                  // Configurar evento para checkbox de deletar foto
+                  const deleteFotoCheckbox = document.getElementById('deleteFoto');
+                  const fotoInput = document.getElementById('editFoto');
+
+                  if (deleteFotoCheckbox && fotoInput) {
+                      deleteFotoCheckbox.addEventListener('change', function () {
+                          if (this.checked) {
+                              fotoInput.disabled = true;
+                              fotoInput.value = '';
+                              const preview = document.getElementById('editFotoPreview');
+                              if (preview) preview.style.display = 'none';
+                          } else {
+                              fotoInput.disabled = false;
+                          }
+                      });
+                  }
+
+                  // Configurar drag and drop para upload de foto
+                  setupFileUpload('editFoto');
+
+                  openModal('editarProdutoModal');
               } else {
-                fotoInput.disabled = false;
+                  throw new Error('Erro ao carregar descontos');
               }
-            });
+          } else {
+              throw new Error('Erro ao carregar dados do produto');
           }
-
-          // Configurar drag and drop para upload de foto
-          setupFileUpload('editFoto');
-
-          openModal('editarProdutoModal');
-        } else {
-          throw new Error('Erro ao carregar descontos');
-        }
-      } else {
-        throw new Error('Erro ao carregar dados do produto');
+      } catch (error) {
+          console.error('Erro ao abrir modal de edição:', error);
+          showFlashMessage('error', 'Erro ao carregar dados do produto');
       }
-    } catch (error) {
-      console.error('Erro ao abrir modal de edição:', error);
-      showFlashMessage('error', 'Erro ao carregar dados do produto');
-    }
   }
 
   // Função para configurar drag and drop
   function setupFileUpload(inputId) {
-    const fileInput = document.getElementById(inputId);
-    const fileUploadArea = fileInput?.closest('.file-upload-area');
+      const fileInput = document.getElementById(inputId);
+      const fileUploadArea = fileInput?.closest('.file-upload-area');
 
-    if (!fileUploadArea) return;
+      if (!fileUploadArea) return;
 
-    // Highlight quando arrasta arquivo sobre a área
-    fileUploadArea.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      fileUploadArea.classList.add('dragover');
-    });
+      // Highlight quando arrasta arquivo sobre a área
+      fileUploadArea.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          fileUploadArea.classList.add('dragover');
+      });
 
-    fileUploadArea.addEventListener('dragleave', () => {
-      fileUploadArea.classList.remove('dragover');
-    });
+      fileUploadArea.addEventListener('dragleave', () => {
+          fileUploadArea.classList.remove('dragover');
+      });
 
-    fileUploadArea.addEventListener('drop', (e) => {
-      e.preventDefault();
-      fileUploadArea.classList.remove('dragover');
+      fileUploadArea.addEventListener('drop', (e) => {
+          e.preventDefault();
+          fileUploadArea.classList.remove('dragover');
 
-      if (e.dataTransfer.files.length) {
-        fileInput.files = e.dataTransfer.files;
-        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    });
+          if (e.dataTransfer.files.length) {
+              fileInput.files = e.dataTransfer.files;
+              fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+      });
 
-    // Clique na área para abrir o seletor de arquivos
-    fileUploadArea.addEventListener('click', () => {
-      fileInput.click();
-    });
+      // Clique na área para abrir o seletor de arquivos
+      fileUploadArea.addEventListener('click', () => {
+          fileInput.click();
+      });
   }
 
   function setupDescontoEvents() {
-    const btnAdicionarDesconto = document.getElementById('btnAdicionarDesconto');
-    if (btnAdicionarDesconto) {
-      btnAdicionarDesconto.addEventListener('click', function () {
-        const select = document.getElementById('selecionarDesconto');
-        if (!select) return;
+      const btnAdicionarDesconto = document.getElementById('btnAdicionarDesconto');
+      if (btnAdicionarDesconto) {
+          btnAdicionarDesconto.addEventListener('click', function () {
+              const select = document.getElementById('selecionarDesconto');
+              if (!select) return;
 
-        const selectedOption = select.options[select.selectedIndex];
+              const selectedOption = select.options[select.selectedIndex];
 
-        if (!selectedOption.value) {
-          showFlashMessage('warning', 'Selecione um desconto para adicionar');
-          return;
-        }
+              if (!selectedOption.value) {
+                  showFlashMessage('warning', 'Selecione um desconto para adicionar');
+                  return;
+              }
 
-        const descontoId = selectedOption.value;
-        const container = document.getElementById('descontosContainer');
-        if (!container) return;
+              const descontoId = selectedOption.value;
+              const lista = document.getElementById('descontosSelecionadosLista');
+              const emptyState = document.getElementById('descontosEmptyState');
+              
+              if (!lista) return;
 
-        if (document.querySelector(`.desconto-item[data-id="${descontoId}"]`)) {
-          showFlashMessage('warning', 'Este desconto já foi adicionado');
-          return;
-        }
+              // Verifica se o desconto já foi adicionado
+              if (document.querySelector(`.desconto-item[data-desconto-id="${descontoId}"]`)) {
+                  showFlashMessage('warning', 'Este desconto já foi adicionado');
+                  return;
+              }
 
-        const item = document.createElement('div');
-        item.className = 'desconto-item';
-        item.dataset.id = descontoId;
-        item.innerHTML = `
-          <span>${selectedOption.dataset.identificador} - 
-          ${
-            selectedOption.dataset.tipo === 'fixo'
-              ? `R$ ${selectedOption.dataset.valor}`
-              : `${selectedOption.dataset.valor}%`
-          } - 
-          Mín: ${selectedOption.dataset.quantidadeMinima}${
-          selectedOption.dataset.quantidadeMaxima
-            ? `, Máx: ${selectedOption.dataset.quantidadeMaxima}`
-            : ''
-        }</span>
-          <button type="button" class="btn-icon btn-danger btn-remover-desconto">
-            <i class="fas fa-times"></i>
-          </button>
-        `;
+              // Remove o estado vazio se existir
+              if (emptyState) {
+                  emptyState.remove();
+              }
 
-        container.appendChild(item);
+              // Cria o novo item de desconto selecionado
+              const item = document.createElement('div');
+              item.className = 'desconto-item';
+              item.setAttribute('data-desconto-id', descontoId);
+              
+              const tipo = selectedOption.dataset.tipo;
+              const valor = selectedOption.dataset.valor;
+              const identificador = selectedOption.dataset.identificador;
+              const qtdMin = selectedOption.dataset.quantidadeMinima;
+              const qtdMax = selectedOption.dataset.quantidadeMaxima;
 
-        select.value = '';
+              // Formatar valor para exibição
+              function formatarValorParaExibicao(valor) {
+                  if (!valor || valor === '' || valor === 0) return '0,00';
+                  
+                  const numero = parseFloat(valor);
+                  if (isNaN(numero)) return '0,00';
+                  
+                  return numero.toLocaleString('pt-BR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                  });
+              }
 
-        const removeBtn = item.querySelector('.btn-remover-desconto');
-        if (removeBtn) {
-          removeBtn.addEventListener('click', function () {
-            item.remove();
+              item.innerHTML = `
+                  <div class="desconto-icon">
+                      <i class="fas fa-tag"></i>
+                  </div>
+                  <div class="desconto-content">
+                      <div class="desconto-header">
+                          <span class="desconto-identificador">${identificador}</span>
+                          <span class="desconto-tipo-badge ${tipo === 'fixo' ? 'badge-primary' : 'badge-secondary'}">
+                              ${tipo === 'fixo' ? 'Fixo' : 'Percentual'}
+                          </span>
+                      </div>
+                      <div class="desconto-body">
+                          <div class="desconto-valor">
+                              ${
+                                  tipo === 'fixo'
+                                      ? `<i class="fas fa-dollar-sign me-1"></i>R$ ${formatarValorParaExibicao(valor)}`
+                                      : `<i class="fas fa-percent me-1"></i>${valor}%`
+                              }
+                          </div>
+                          <div class="desconto-quantidades">
+                              <span class="desconto-quantidade">
+                                  <i class="fas fa-arrow-up me-1"></i>Mín: ${qtdMin}
+                              </span>
+                              ${qtdMax ? `
+                                  <span class="desconto-quantidade">
+                                      <i class="fas fa-arrow-down me-1"></i>Máx: ${qtdMax}
+                                  </span>
+                              ` : ''}
+                          </div>
+                      </div>
+                  </div>
+                  <button type="button" class="btn-remover-desconto" data-desconto-id="${descontoId}" title="Remover desconto">
+                      <i class="fas fa-times"></i>
+                  </button>
+              `;
+
+              lista.appendChild(item);
+
+              // Remove a opção do select
+              selectedOption.remove();
+              select.value = '';
+
+              // Adiciona evento de remoção no novo item
+              const removeBtn = item.querySelector('.btn-remover-desconto');
+              if (removeBtn) {
+                  removeBtn.addEventListener('click', function () {
+                      removerDescontoSelecionado(descontoId, identificador, tipo, valor, qtdMin, qtdMax);
+                  });
+              }
+
+              showFlashMessage('success', 'Desconto adicionado com sucesso');
           });
-        }
-      });
-    }
+      }
 
-    document.querySelectorAll('.btn-remover-desconto').forEach((btn) => {
-      btn.addEventListener('click', function () {
-        const item = this.closest('.desconto-item');
-        if (item) {
-          item.remove();
-        }
+      // Adiciona eventos de remoção nos descontos já existentes
+      document.querySelectorAll('.btn-remover-desconto').forEach((btn) => {
+          btn.addEventListener('click', function () {
+              const descontoId = this.getAttribute('data-desconto-id');
+              const item = this.closest('.desconto-item');
+              
+              if (item) {
+                  // Extrai informações do desconto para readicionar ao select
+                  const identificador = item.querySelector('.desconto-identificador').textContent;
+                  const tipo = item.querySelector('.desconto-tipo-badge').classList.contains('badge-primary') ? 'fixo' : 'percentual';
+                  const valorElement = item.querySelector('.desconto-valor').textContent.trim();
+                  const valor = tipo === 'fixo' 
+                      ? valorElement.replace(/[^\d,]/g, '').replace(',', '.')
+                      : valorElement.replace(/[^\d]/g, '');
+                  
+                  const quantidades = item.querySelectorAll('.desconto-quantidade');
+                  const qtdMin = quantidades[0]?.textContent.replace(/[^\d]/g, '') || '';
+                  const qtdMax = quantidades[1]?.textContent.replace(/[^\d]/g, '') || '';
+                  
+                  removerDescontoSelecionado(descontoId, identificador, tipo, valor, qtdMin, qtdMax);
+              }
+          });
       });
-    });
+  }
+
+  // Função auxiliar para remover desconto selecionado
+  function removerDescontoSelecionado(descontoId, identificador, tipo, valor, qtdMin, qtdMax) {
+      const item = document.querySelector(`.desconto-item[data-desconto-id="${descontoId}"]`);
+      const select = document.getElementById('selecionarDesconto');
+      const lista = document.getElementById('descontosSelecionadosLista');
+      
+      if (!item || !select) return;
+
+      // Remove o item da lista
+      item.remove();
+
+      // Formatar valor para exibição no select
+      function formatarValorParaExibicao(valor) {
+          if (!valor || valor === '' || valor === 0) return '0,00';
+          
+          const numero = parseFloat(valor);
+          if (isNaN(numero)) return '0,00';
+          
+          return numero.toLocaleString('pt-BR', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+          });
+      }
+
+      // Readiciona a opção ao select
+      const option = document.createElement('option');
+      option.value = descontoId;
+      option.dataset.quantidadeMinima = qtdMin;
+      option.dataset.quantidadeMaxima = qtdMax;
+      option.dataset.valor = valor;
+      option.dataset.tipo = tipo;
+      option.dataset.identificador = identificador;
+      
+      const valorFormatado = tipo === 'fixo' ? `R$ ${formatarValorParaExibicao(valor)}` : `${valor}%`;
+      option.textContent = `${identificador} - ${valorFormatado} - Mín: ${qtdMin}${qtdMax ? `, Máx: ${qtdMax}` : ''}`;
+      
+      select.appendChild(option);
+
+      // Se não houver mais descontos, mostra o estado vazio
+      if (lista && lista.children.length === 0) {
+          const emptyState = document.createElement('div');
+          emptyState.className = 'descontos-empty-state';
+          emptyState.id = 'descontosEmptyState';
+          emptyState.innerHTML = `
+              <div class="descontos-empty-icon">
+                  <i class="fas fa-percent"></i>
+              </div>
+              <p class="descontos-empty-text">Nenhum desconto aplicado</p>
+          `;
+          lista.parentNode.appendChild(emptyState);
+      }
+
+      showFlashMessage('info', 'Desconto removido');
+  }
+
+  // Adicionar função para lidar com erro de imagem (se necessário)
+  function handleImageError(img) {
+      img.style.display = 'none';
+      const wrapper = img.closest('.foto-wrapper');
+      if (wrapper) {
+          const errorDiv = document.createElement('div');
+          errorDiv.className = 'foto-error';
+          errorDiv.innerHTML = `
+              <i class="fas fa-exclamation-triangle"></i>
+              <p>Erro ao carregar a imagem</p>
+          `;
+          wrapper.appendChild(errorDiv);
+      }
+  }
+
+  // Função para preview da foto (se necessário)
+  function setupFotoPreview(inputId, previewContainerId, previewImgId) {
+      const input = document.getElementById(inputId);
+      const previewContainer = document.getElementById(previewContainerId);
+      const previewImg = document.getElementById(previewImgId);
+      
+      if (input && previewContainer && previewImg) {
+          input.addEventListener('change', function() {
+              if (this.files && this.files[0]) {
+                  const reader = new FileReader();
+                  
+                  reader.onload = function(e) {
+                      previewImg.src = e.target.result;
+                      previewContainer.style.display = 'block';
+                  }
+                  
+                  reader.readAsDataURL(this.files[0]);
+              }
+          });
+      }
   }
 
   // Event Listeners para Produtos
@@ -3900,10 +4045,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
       const descontos = [];
       document
-        .querySelectorAll('#descontosContainer .desconto-item')
+        .querySelectorAll('#descontosSelecionadosLista .desconto-item')
         .forEach((item) => {
-          descontos.push(item.dataset.id);
-        });
+          descontos.push(item.getAttribute('data-desconto-id'));
+      });
+
 
       const fotoFile = document.getElementById('editFoto')?.files[0];
       const deleteFoto = document.getElementById('deleteFoto')?.checked || false;
