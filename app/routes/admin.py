@@ -5831,8 +5831,8 @@ def get_caixa_financeiro_pdf(caixa_id):
 def atualizar_forma_pagamentos(venda_id):
     """
     Atualiza TODOS os pagamentos associados à nota fiscal e registros relacionados
-    para a forma de pagamento recebida no JSON.
-    Recebe JSON com {"pagamentos": [{"forma_pagamento": "PIX"}]}.
+    para as formas de pagamento recebidas no JSON.
+    Recebe JSON com {"pagamentos": [{"forma_pagamento": "PIX", "valor": 100.00}, ...]}.
     """
     data = request.get_json()
     pagamentos_recebidos = data.get("pagamentos")
@@ -5844,16 +5844,19 @@ def atualizar_forma_pagamentos(venda_id):
             400,
         )
 
-    nova_forma = pagamentos_recebidos[0].get("forma_pagamento")
-    if not nova_forma:
-        logger.warning("Forma de pagamento inválida")
-        return jsonify({"success": False, "error": "Forma de pagamento inválida"}), 400
-
-    # Converte para Enum se existir
-    if nova_forma in FormaPagamento.__members__:
-        nova_forma_enum = FormaPagamento[nova_forma]
-    else:
-        nova_forma_enum = nova_forma  # fallback, caso seja string exata
+    for i, pagamento in enumerate(pagamentos_recebidos):
+        if not pagamento.get("forma_pagamento"):
+            logger.warning(f"Forma de pagamento inválida no item {i}")
+            return (
+                jsonify({"success": False, "error": f"Forma de pagamento inválida no item {i}"}),
+                400,
+            )
+        if "valor" not in pagamento:
+            logger.warning(f"Valor não informado no item {i}")
+            return (
+                jsonify({"success": False, "error": f"Valor não informado no item {i}"}),
+                400,
+            )
 
     session: Session = db.session
     try:
@@ -5865,58 +5868,153 @@ def atualizar_forma_pagamentos(venda_id):
                 404,
             )
 
-        # Atualiza todos os pagamentos da nota
-        pagamentos_nf = (
-            session.query(PagamentoNotaFiscal).filter_by(nota_fiscal_id=venda_id).all()
-        )
-        for pagamento in pagamentos_nf:
-            pagamento.forma_pagamento = nova_forma_enum
+        caixa_aberto = get_caixa_aberto(session, operador_id=nota_fiscal.operador_id)
+        if not caixa_aberto:
+            logger.warning(f"Caixa não encontrado para a nota fiscal {venda_id}")
+            return (
+                jsonify({"success": False, "error": "Caixa não encontrado"}),
+                404,
+            )
 
-        # Atualiza todos os lançamentos financeiros relacionados a esses pagamentos
-        financeiros = (
-            session.query(Financeiro)
-            .filter(Financeiro.pagamento_id.in_([p.id for p in pagamentos_nf]))
+        pagamentos_existentes = (
+            session.query(PagamentoNotaFiscal)
+            .filter_by(nota_fiscal_id=venda_id)
             .all()
         )
-        for fin in financeiros:
-            fin.forma_pagamento = nova_forma_enum
+        
+        pagamento_ids = [p.id for p in pagamentos_existentes]
+        
+        if pagamento_ids:
+            session.query(Financeiro).filter(
+                Financeiro.pagamento_id.in_(pagamento_ids)
+            ).delete(synchronize_session=False)
+        
+        session.query(PagamentoNotaFiscal).filter_by(
+            nota_fiscal_id=venda_id
+        ).delete(synchronize_session=False)
+        
+        conta_receber_existente = session.query(ContaReceber).filter_by(
+            nota_fiscal_id=venda_id
+        ).first()
+        
+        if conta_receber_existente:
+            session.delete(conta_receber_existente)
 
-        # Atualiza a forma de pagamento principal da nota fiscal
-        nota_fiscal.forma_pagamento = nova_forma_enum
+        pagamentos_ids = []
+        valor_a_prazo = Decimal(0)
+        valor_total_pagamentos = Decimal(0)
+        
+        for pagamento_data in pagamentos_recebidos:
+            forma = pagamento_data.get("forma_pagamento")
+            valor = Decimal(str(pagamento_data.get("valor")))
+            
+            try:
+                forma_enum = FormaPagamento(forma)
+            except ValueError:
+                forma_enum = forma
+            
+            pagamento_nf = PagamentoNotaFiscal(
+                nota_fiscal_id=nota_fiscal.id,
+                forma_pagamento=forma_enum,
+                valor=valor,
+                data=datetime.now(),
+                sincronizado=False,
+            )
+            session.add(pagamento_nf)
+            session.flush()  
 
-        # Atualiza todas as movimentações de estoque vinculadas a essa nota
+            pagamentos_ids.append(pagamento_nf.id)
+            valor_total_pagamentos += valor
+
+            if forma != "a_prazo":
+                financeiro = Financeiro(
+                    tipo=TipoMovimentacao.entrada,
+                    categoria=CategoriaFinanceira.venda,
+                    valor=valor,
+                    descricao=f"Pagamento venda NF #{nota_fiscal.id} (editado por {current_user.nome})",
+                    cliente_id=nota_fiscal.cliente_id,
+                    caixa_id=nota_fiscal.caixa_id,
+                    nota_fiscal_id=nota_fiscal.id,
+                    pagamento_id=pagamento_nf.id,
+                    sincronizado=False,
+                )
+                session.add(financeiro)
+            else:
+                valor_a_prazo += valor
+
+        diferenca = abs(valor_total_pagamentos - nota_fiscal.valor_total)
+        if diferenca > Decimal("0.01"): 
+            logger.warning(
+                f"Soma dos novos pagamentos ({valor_total_pagamentos}) não confere com valor total da nota ({nota_fiscal.valor_total})"
+            )
+            return (
+                jsonify({
+                    "success": False, 
+                    "error": f"Soma dos pagamentos ({valor_total_pagamentos}) não confere com valor total da venda ({nota_fiscal.valor_total})"
+                }),
+                400,
+            )
+
+        if valor_a_prazo > 0:
+            conta_receber = ContaReceber(
+                cliente_id=nota_fiscal.cliente_id,
+                nota_fiscal_id=nota_fiscal.id,
+                descricao=f"Venda a prazo NF #{nota_fiscal.id} (editado por {current_user.nome})",
+                valor_original=valor_a_prazo,
+                valor_aberto=valor_a_prazo,
+                data_vencimento=datetime.now() + timedelta(days=30),
+                status=StatusPagamento.pendente,
+                sincronizado=False,
+            )
+            session.add(conta_receber)
+
+        if len(pagamentos_recebidos) == 1:
+            nota_fiscal.forma_pagamento = FormaPagamento(pagamentos_recebidos[0]["forma_pagamento"])
+        else:
+            nota_fiscal.forma_pagamento = FormaPagamento.dinheiro
+        
+        nota_fiscal.a_prazo = valor_a_prazo > 0
+        
+        valor_recebido = valor_total_pagamentos - valor_a_prazo
+        nota_fiscal.valor_recebido = valor_recebido
+        nota_fiscal.troco = max(valor_recebido - nota_fiscal.valor_total, Decimal(0))
+
         movimentacoes = (
             session.query(MovimentacaoEstoque)
             .filter_by(caixa_id=nota_fiscal.caixa_id, tipo=TipoMovimentacao.saida)
             .all()
         )
-        for mov in movimentacoes:
-            mov.forma_pagamento = nova_forma_enum
+        
+        if len(pagamentos_recebidos) == 1:
+            nova_forma_enum = FormaPagamento(pagamentos_recebidos[0]["forma_pagamento"])
+            for mov in movimentacoes:
+                mov.forma_pagamento = nova_forma_enum
 
         session.commit()
 
         logger.info(
-            f"Formas de pagamento da venda {venda_id} atualizadas para {nova_forma_enum}"
+            f"Formas de pagamento da venda {venda_id} atualizadas. "
+            f"Total de {len(pagamentos_recebidos)} pagamentos registrados. "
+            f"Valor a prazo: {valor_a_prazo}"
         )
-        return jsonify(
-            {
-                "success": True,
-                "mensagem": "Formas de pagamento de toda a nota atualizadas com sucesso!",
-            }
-        )
+        
+        return jsonify({
+            "success": True,
+            "mensagem": "Formas de pagamento atualizadas com sucesso!",
+            "pagamentos_ids": pagamentos_ids,
+            "valor_a_prazo": float(valor_a_prazo) if valor_a_prazo > 0 else 0,
+            "valor_recebido": float(valor_recebido),
+            "troco": float(nota_fiscal.troco) if nota_fiscal.troco else 0,
+        })
 
     except Exception as e:
         session.rollback()
         import logging
-
         logging.exception(f"Erro ao atualizar pagamentos da venda {venda_id}: {str(e)}")
         return (
-            jsonify(
-                {"success": False, "error": "Erro interno ao atualizar pagamentos"}
-            ),
+            jsonify({"success": False, "error": f"Erro interno ao atualizar pagamentos: {str(e)}"}),
             500,
         )
-
 
 @admin_bp.route("/caixas/<int:caixa_id>/vendas-por-pagamento")
 @login_required
@@ -5934,7 +6032,6 @@ def get_vendas_por_pagamento(caixa_id):
                 400,
             )
 
-        # Busca vendas com a forma de pagamento específica
         vendas = (
             session.query(NotaFiscal)
             .join(PagamentoNotaFiscal)
@@ -5948,7 +6045,6 @@ def get_vendas_por_pagamento(caixa_id):
 
         vendas_data = []
         for venda in vendas:
-            # Calcula o valor pago com esta forma de pagamento
             valor_pago = (
                 session.query(func.sum(PagamentoNotaFiscal.valor))
                 .filter(
