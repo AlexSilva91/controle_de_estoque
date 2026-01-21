@@ -864,6 +864,154 @@ def calcular_fator_conversao(produto, unidade_origem, unidade_destino):
     
     return fatores.get((unidade_origem, unidade_destino), Decimal('1'))
 
+def transferir_produto(
+    *,
+    produto_origem: Produto,
+    usuario_id: int,
+    estoque_origem: TipoEstoque,
+    estoque_destino: TipoEstoque,
+    quantidade: Decimal,
+    unidade_destino: UnidadeMedida | None = None,
+    dar_entrada_destino: bool = True,
+    observacao: str | None = None,
+):
+    """
+    Transfere produto entre estoques, com ou sem conversão de unidade.
+    """
+
+    if quantidade <= 0:
+        raise ValueError("Quantidade deve ser maior que zero")
+
+    unidade_origem = produto_origem.unidade
+    unidade_destino = unidade_destino or unidade_origem
+
+    try:
+        # ==========================
+        # 1. VERIFICA ESTOQUE ORIGEM
+        # ==========================
+        campo_estoque_origem = Produto.get_estoque(estoque_origem)
+        estoque_atual = getattr(produto_origem, campo_estoque_origem.key)
+
+        if estoque_atual < quantidade:
+            raise ValueError("Estoque insuficiente no estoque de origem")
+
+        # ==========================
+        # 2. BAIXA ESTOQUE ORIGEM
+        # ==========================
+        setattr(
+            produto_origem,
+            campo_estoque_origem.key,
+            estoque_atual - quantidade
+        )
+
+        # ==========================
+        # 3. CONVERSÃO DE UNIDADE
+        # ==========================
+        fator = calcular_fator_conversao(
+            produto_origem,
+            unidade_origem.value,
+            unidade_destino.value
+        )
+
+        quantidade_convertida = (Decimal(quantidade) * fator).quantize(Decimal("0.001"))
+
+        # ==========================
+        # 4. PRODUTO DESTINO
+        # ==========================
+        produto_destino = produto_origem
+
+        if unidade_destino != unidade_origem:
+            produto_destino = (
+                Produto.query
+                .filter(
+                    Produto.nome == produto_origem.nome,
+                    Produto.unidade == unidade_destino,
+                    Produto.ativo == True
+                )
+                .first()
+            )
+
+            if not produto_destino:
+                produto_destino = Produto(
+                    codigo=Produto.gerar_codigo_sequencial(),
+                    nome=produto_origem.nome,
+                    tipo=produto_origem.tipo,
+                    marca=produto_origem.marca,
+                    unidade=unidade_destino,
+                    valor_unitario=produto_origem.valor_unitario,
+                    valor_unitario_compra=produto_origem.valor_unitario_compra,
+                    peso_kg_por_saco=produto_origem.peso_kg_por_saco,
+                    pacotes_por_saco=produto_origem.pacotes_por_saco,
+                    pacotes_por_fardo=produto_origem.pacotes_por_fardo,
+                )
+                db.session.add(produto_destino)
+                db.session.flush()
+
+        # ==========================
+        # 5. ENTRADA NO DESTINO
+        # ==========================
+        if dar_entrada_destino:
+            campo_estoque_destino = Produto.get_estoque(estoque_destino)
+            estoque_destino_atual = getattr(produto_destino, campo_estoque_destino.key)
+
+            setattr(
+                produto_destino,
+                campo_estoque_destino.key,
+                estoque_destino_atual + quantidade_convertida
+            )
+
+            lote = LoteEstoque(
+                produto_id=produto_destino.id,
+                quantidade_inicial=quantidade_convertida,
+                quantidade_disponivel=quantidade_convertida,
+                valor_unitario_compra=produto_origem.valor_unitario_compra or Decimal("0"),
+                observacao=f"Transferência do produto {produto_origem.id}",
+                ativo=True
+            )
+            db.session.add(lote)
+
+        # ==========================
+        # 6. REGISTRO DA TRANSFERÊNCIA
+        # ==========================
+        transferencia = TransferenciaEstoque(
+            produto_id=produto_origem.id,
+            produto_destino_id=produto_destino.id if produto_destino else None,
+            usuario_id=usuario_id,
+            estoque_origem=estoque_origem,
+            estoque_destino=estoque_destino,
+            quantidade=quantidade,
+            quantidade_destino=quantidade_convertida,
+            unidade_origem=unidade_origem.value,
+            unidade_destino=unidade_destino.value,
+            peso_kg_por_saco=produto_origem.peso_kg_por_saco,
+            pacotes_por_saco=produto_origem.pacotes_por_saco,
+            pacotes_por_fardo=produto_origem.pacotes_por_fardo,
+            observacao=observacao,
+        )
+        db.session.add(transferencia)
+
+        # ==========================
+        # 7. MOVIMENTAÇÃO DE ESTOQUE
+        # ==========================
+        mov = MovimentacaoEstoque(
+            produto_id=produto_origem.id,
+            usuario_id=usuario_id,
+            tipo=TipoMovimentacao.transferencia,
+            estoque_origem=estoque_origem,
+            estoque_destino=estoque_destino,
+            quantidade=quantidade,
+            valor_unitario=produto_origem.valor_unitario,
+            observacao=observacao,
+        )
+        db.session.add(mov)
+
+        db.session.commit()
+        return transferencia
+
+    except SQLAlchemyError:
+        db.session.rollback()
+        raise
+
 def obter_contas_receber(
     cliente_nome=None,
     cliente_documento=None,
