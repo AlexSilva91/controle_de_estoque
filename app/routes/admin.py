@@ -71,6 +71,7 @@ from app.utils.audit import calcular_diferencas
 from app.utils.format_data_moeda import (
     format_currency,
     format_number,
+    formatar_data_br2,
     to_decimal_or_none,
 )
 from app.models.entities import (
@@ -1576,13 +1577,13 @@ def gerar_pdf_lotes():
         
         if filtro_data_aplicado:
             if data_unica_str:
-                info_filtros.append(f"Data: {data_unica_str}")
+                info_filtros.append(f"Data: {formatar_data_br2(data_unica_str)}")
             else:
                 periodo = []
                 if data_inicio_str:
-                    periodo.append(f"De: {data_inicio_str}")
+                    periodo.append(f"De: {formatar_data_br2(data_inicio_str)}")
                 if data_fim_str:
-                    periodo.append(f"Até: {data_fim_str}")
+                    periodo.append(f"Até: {formatar_data_br2(data_fim_str)}")
                 if periodo:
                     info_filtros.append(" ".join(periodo))
         
@@ -1619,7 +1620,7 @@ def gerar_pdf_lotes():
                 Paragraph("Produto", styles["Normal"]),
                 Paragraph("Qtd Inicial", styles["Normal"]),
                 Paragraph("Qtd Disponível", styles["Normal"]),
-                Paragraph("Valor Unitário", styles["Normal"]),
+                Paragraph("Valor de Compra", styles["Normal"]),
                 Paragraph("Data Entrada", styles["Normal"]),
                 Paragraph("Ativo", styles["Normal"]),
             ]
