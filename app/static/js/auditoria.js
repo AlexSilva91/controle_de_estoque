@@ -219,14 +219,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function carregarLogsAuditoria() {
         mostrarLoading();
         
-        // Construir parâmetros da URL
         const params = new URLSearchParams({
             pagina: paginaAtual,
             por_pagina: porPagina,
             ...filtrosAtuais
         });
         
-        // Remover parâmetros vazios
         for (const [key, value] of [...params.entries()]) {
             if (!value || value === '') {
                 params.delete(key);
@@ -242,10 +240,17 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(data => {
                 logsCarregados = data.logs || [];
-                preencherTabela(logsCarregados);
+                
+                logsCarregados.forEach(log => {
+                    log.alteracoes_count = contarAlteracoes(log);
+                });
+                
+                window.auditoriaData = logsCarregados;
+                preencherTabela(window.auditoriaData);
                 atualizarPaginacao(data.total || 0, data.paginas || 1);
                 atualizarEstatisticas(data);
                 esconderLoading();
+                setupAuditoriaSorting();
             })
             .catch(error => {
                 console.error('Erro ao carregar logs:', error);
@@ -275,7 +280,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td><span class="badge badge-info">${obterNomeTabelaAmigavel(log.tabela)}</span></td>
                 <td>${log.registro_id || ''}</td>
                 <td><span class="badge ${obterClasseBadgeAcao(log.acao)}">${formatarAcao(log.acao)}</span></td>
-                <td><strong>${contarAlteracoes(log)}</strong> alteração(ões)</td>
+                <td><strong>${log.alteracoes_count || contarAlteracoes(log)}</strong> alteração(ões)</td>
                 <td>
                     <button class="btn btn-sm btn-outline btn-detalhes" data-log-id="${log.id}" title="Ver detalhes completos">
                         <i class="fas fa-eye"></i> Ver Detalhes
@@ -285,16 +290,98 @@ document.addEventListener('DOMContentLoaded', function() {
             tbodyAuditoria.appendChild(tr);
         });
         
-        // Adicionar event listeners aos botões de detalhes
         document.querySelectorAll('.btn-detalhes').forEach(btn => {
             btn.addEventListener('click', function() {
                 const logId = this.getAttribute('data-log-id');
-                const log = logsCarregados.find(l => l.id == logId);
+                const log = logs.find(l => l.id == logId);
                 if (log) {
                     mostrarDetalhesLog(log);
                 }
             });
         });
+    }
+
+    function setupAuditoriaSorting() {
+    const table = document.getElementById('tabelaAuditoria');
+    if (!table) return;
+
+    const headers = table.querySelectorAll('th.sortable');
+    let currentSort = { column: null, direction: 'asc' };
+
+    headers.forEach(header => {
+        header.addEventListener('click', function() {
+            const sortColumn = this.getAttribute('data-sort');
+            const isAscending = currentSort.column === sortColumn && currentSort.direction === 'asc';
+            
+            currentSort = {
+                column: sortColumn,
+                direction: isAscending ? 'desc' : 'asc'
+            };
+
+            headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+            this.classList.add(`sort-${currentSort.direction}`);
+
+            sortAuditoriaTable(sortColumn, currentSort.direction);
+        });
+
+        header.style.cursor = 'pointer';
+    });
+    }
+
+    function sortAuditoriaTable(column, direction) {
+        if (!window.auditoriaData) return;
+
+        const auditoriaOrdenada = [...window.auditoriaData].sort((a, b) => {
+            let aValue = getAuditoriaValue(a, column);
+            let bValue = getAuditoriaValue(b, column);
+
+            if (typeof aValue === 'number' && typeof bValue === 'number') {
+                return direction === 'asc' ? aValue - bValue : bValue - aValue;
+            }
+
+            if (column === 'criado_em') {
+                const aDate = new Date(a.criado_em || 0);
+                const bDate = new Date(b.criado_em || 0);
+                return direction === 'asc' ? aDate - bDate : bDate - aDate;
+            }
+
+            if (column === 'acao') {
+                const acaoOrder = { 'insert': 1, 'update': 2, 'delete': 3 };
+                const aOrder = acaoOrder[a.acao] || 99;
+                const bOrder = acaoOrder[b.acao] || 99;
+                return direction === 'asc' ? aOrder - bOrder : bOrder - aOrder;
+            }
+
+            aValue = String(aValue || '');
+            bValue = String(bValue || '');
+            
+            return direction === 'asc' 
+                ? aValue.localeCompare(bValue, 'pt-BR', { sensitivity: 'base' })
+                : bValue.localeCompare(aValue, 'pt-BR', { sensitivity: 'base' });
+        });
+
+        preencherTabela(auditoriaOrdenada);
+    }
+
+    function getAuditoriaValue(log, column) {
+        switch(column) {
+            case 'id':
+                return parseInt(log.id) || 0;
+            case 'criado_em':
+                return log.criado_em || '';
+            case 'usuario_nome':
+                return log.usuario_nome || '';
+            case 'tabela':
+                return obterNomeTabelaAmigavel(log.tabela);
+            case 'registro_id':
+                return parseInt(log.registro_id) || 0;
+            case 'acao':
+                return formatarAcao(log.acao);
+            case 'alteracoes_count':
+                return log.alteracoes_count || contarAlteracoes(log);
+            default:
+                return '';
+        }
     }
 
     function obterNomeTabelaAmigavel(tabela) {
