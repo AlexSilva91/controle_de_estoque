@@ -84,16 +84,28 @@ controle_de_estoque
 │  │  │  ├─ sales_icon.png
 │  │  │  └─ user_icon.png
 │  │  ├─ css
+│  │  │  ├─ formas_pagamento.css
+│  │  │  ├─ lotes.css
 │  │  │  ├─ style.css
 │  │  │  ├─ style_login.css
 │  │  │  └─ styles_operador.css
-│  │  └─ js
-│  │     ├─ auditoria.js
-│  │     ├─ script.js
-│  │     ├─ script_contas_usuario.js
-│  │     ├─ script_login.js
-│  │     ├─ script_lotes.js
-│  │     └─ script_operador.js
+│  │  ├─ js
+│  │  │  ├─ auditoria.js
+│  │  │  ├─ lotes.js
+│  │  │  ├─ script.js
+│  │  │  ├─ script_contas_usuario.js
+│  │  │  ├─ script_formas_pagamento.js
+│  │  │  ├─ script_login.js
+│  │  │  ├─ script_lotes.js
+│  │  │  └─ script_operador.js
+│  │  └─ uploads
+│  │     ├─ avatars
+│  │     ├─ docs
+│  │     ├─ produtos
+│  │     │  ├─ 2026
+│  │     │  │  └─ 01
+│  │     │  └─ temp
+│  │     └─ temp
 │  ├─ templates
 │  │  ├─ auditoria.html
 │  │  ├─ contas_usuario.html
@@ -106,21 +118,25 @@ controle_de_estoque
 │  │  │  ├─ 500.html
 │  │  │  └─ 503.html
 │  │  ├─ financeiro_historico.html
+│  │  ├─ formas_pagamento.html
 │  │  ├─ login.html
-│  │  └─ produtos_unidade.html
+│  │  ├─ lotes.html
+│  │  ├─ produtos_unidade.html
+│  │  └─ relatorio_contasReceber.html
 │  └─ utils
 │     ├─ audit.py
+│     ├─ calcularNOvoValor.py
 │     ├─ conversor_unidade.py
 │     ├─ converter_endereco.py
 │     ├─ format_data_moeda.py
 │     ├─ nfce.py
 │     ├─ preparar_notas.py
-│     └─ signature.py
+│     ├─ signature.py
+│     └─ upload.py
 ├─ backup_db.py
 ├─ config.py
 ├─ docs
-│  ├─ DOCUMENTACAO_TECNICA.md
-│  └─ DOCUMENTATION.md
+│  └─ DOCUMENTACAO_TECNICA.md
 ├─ requirements.txt
 ├─ run.py
 └─ wsgi.py
@@ -176,20 +192,6 @@ controle_de_estoque
 4. **Produtos:** Gerencie estoque e preços.  
 5. **Vendas:** Adicione produtos à venda, selecione o cliente e forma de pagamento.  
 6. **Caixa:** Monitore o saldo em tempo real e feche o caixa ao final do expediente.  
-
----
-
-## 🔗 Endpoints da API
-
-| Endpoint | Método | Descrição |
-|-----------|---------|------------|
-| `/operador/api/saldo` | `GET` | Retorna o saldo atual do caixa |
-| `/operador/api/clientes` | `GET` | Lista todos os clientes |
-| `/operador/api/clientes` | `POST` | Cria um novo cliente |
-| `/operador/api/clientes/<id>` | `PUT` | Atualiza cliente existente |
-| `/operador/api/produtos` | `GET` | Lista todos os produtos |
-| `/operador/api/vendas` | `POST` | Registra uma nova venda |
-| `/operador/api/fechar-caixa` | `POST` | Realiza o fechamento do caixa |
 
 ---
 

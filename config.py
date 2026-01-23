@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 basedir = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(basedir, ".env"))
 
-
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -19,11 +18,15 @@ class Config:
     # Subpastas organizadas por tipo
     UPLOAD_SUBFOLDERS = {
         "produtos": "produtos",
-        "avatars": "avatars",  # para fotos de perfil
-        "docs": "docs",  # para documentos
-        "temp": "temp",  # para arquivos temporários
+        "avatars": "avatars",
+        "docs": "docs",
+        "temp": "temp",
     }
 
+    # --- CONFIGURAÇÕES BRASIL NFe (API FISCAL) ---
+    API_FISCAL_BASE_URL = os.getenv("API_FISCAL_BASE_URL", "https://api.brasilnfe.com.br/services/fiscal")
+    API_FISCAL_TOKEN = os.getenv("API_FISCAL_TOKEN")
+    API_FISCAL_AMBIENTE = int(os.getenv("API_FISCAL_AMBIENTE", 2))
 
 class DevelopmentConfig(Config):
     DEBUG = True
@@ -32,7 +35,8 @@ class DevelopmentConfig(Config):
         or f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}@"
         f"{os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT', '3306')}/{os.getenv('MYSQL_DB')}"
     )
-
+    
+    API_FISCAL_AMBIENTE = 2
 
 class ProductionConfig(Config):
     SQLALCHEMY_DATABASE_URI = (
@@ -40,7 +44,8 @@ class ProductionConfig(Config):
         or f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}@"
         f"{os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT', '3306')}/{os.getenv('MYSQL_DB')}"
     )
-
+    
+    API_FISCAL_AMBIENTE = int(os.getenv("API_FISCAL_AMBIENTE", 1))
 
 config = {
     "development": DevelopmentConfig,
