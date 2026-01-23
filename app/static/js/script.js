@@ -3332,13 +3332,6 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
 
-    document.querySelectorAll('.movimentar-estoque').forEach((btn) => {
-      btn.addEventListener('click', function (e) {
-        const produtoId = this.getAttribute('data-id');
-        openTransferenciaModal(produtoId);
-      });
-    });
-
     document.getElementById('btnRelatorioProdutos').addEventListener('click', () => {
       const searchText = document.getElementById('searchProduto')?.value || '';
       const incluirInativos = document.getElementById('mostrarInativos')?.checked
