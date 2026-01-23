@@ -152,6 +152,7 @@ from app.crud import (
     create_user,
     get_venda_completa,
     obter_caixas_completo,
+    transferir_produto,
     transferir_todo_saldo,
     update_user,
     get_produto,
@@ -2479,6 +2480,104 @@ def registrar_movimentacao_produto(produto_id):
         logger.error(f"Erro ao registrar movimentação: {str(e)}")
         return jsonify({"success": False, "message": str(e)}), 400
 
+
+@admin_bp.route("/produtos/<int:produto_id>/transferir", methods=["POST"])
+@login_required
+@admin_required
+def transferir_produto_estoque(produto_id):
+    """
+    Rota para transferir produto entre estoques.
+    """
+    try:
+        data = request.get_json()
+
+        campos_obrigatorios = ['usuario_id', 'estoque_origem', 'estoque_destino', 'quantidade']
+        for campo in campos_obrigatorios:
+            if campo not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo obrigatório faltando: {campo}'
+                }), 400
+
+        produto_origem = Produto.query.get_or_404(produto_id)
+        
+        try:
+            estoque_origem = TipoEstoque(data['estoque_origem'])
+            estoque_destino = TipoEstoque(data['estoque_destino'])
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Tipo de estoque inválido. Valores válidos: {[e.value for e in TipoEstoque]}'
+            }), 400
+
+        try:
+            quantidade = Decimal(str(data['quantidade']))
+        except:
+            return jsonify({
+                'success': False,
+                'message': 'Quantidade deve ser um número válido'
+            }), 400
+        
+        unidade_destino = None
+        if 'unidade_destino' in data and data['unidade_destino'] is not None:
+            try:
+                unidade_destino = UnidadeMedida(data['unidade_destino'])
+            except ValueError as e:
+                return jsonify({
+                    'success': False,
+                    'message': f'Unidade de medida inválida. Valores válidos: {[e.value for e in UnidadeMedida]}'
+                }), 400
+        
+        dar_entrada_destino = data.get('dar_entrada_destino', True)
+        observacao = data.get('observacao')
+        
+        transferencia = transferir_produto(
+            produto_origem=produto_origem,
+            usuario_id=data['usuario_id'],
+            estoque_origem=estoque_origem,
+            estoque_destino=estoque_destino,
+            quantidade=quantidade,
+            unidade_destino=unidade_destino,
+            dar_entrada_destino=dar_entrada_destino,
+            observacao=observacao
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Transferência realizada com sucesso',
+            'transferencia': {
+                'id': transferencia.id,
+                'produto_origem_id': transferencia.produto_id,
+                'produto_destino_id': transferencia.produto_destino_id,
+                'quantidade_origem': str(transferencia.quantidade),
+                'quantidade_destino': str(transferencia.quantidade_destino),
+                'unidade_origem': transferencia.unidade_origem,
+                'unidade_destino': transferencia.unidade_destino,
+                'estoque_origem': transferencia.estoque_origem.value,
+                'estoque_destino': transferencia.estoque_destino.value,
+                'data': transferencia.data_criacao.isoformat() if transferencia.data_criacao else None
+            }
+        }), 200
+        
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 400
+        
+    except SQLAlchemyError as e:
+        return jsonify({
+            'success': False,
+            'message': 'Erro no banco de dados',
+            'error': str(e)
+        }), 500
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': 'Erro interno no servidor',
+            'error': str(e)
+        }), 500
 
 # ===== Venda com Data Retroativa ====
 @admin_bp.route("/api/vendas/retroativa", methods=["POST"])
