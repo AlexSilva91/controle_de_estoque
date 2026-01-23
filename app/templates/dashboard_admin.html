@@ -317,13 +317,13 @@
                                 <table id="clientesTable">
                                     <thead>
                                         <tr>
-                                            <th>ID</th>
-                                            <th>Nome</th>
-                                            <th>Documento</th>
-                                            <th>Telefone</th>
-                                            <th>Email</th>
-                                            <th>Status</th>
-                                            <th>Ações</th>
+                                            <th class="sortable" data-sort="id">ID</th>
+                                            <th class="sortable" data-sort="nome">Nome</th>
+                                            <th class="sortable" data-sort="documento">Documento</th>
+                                            <th class="sortable" data-sort="telefone">Telefone</th>
+                                            <th class="sortable" data-sort="email">Email</th>
+                                            <th class="sortable" data-sort="status">Status</th>
+                                            <th class="sortable" data-sort="acoes">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -389,13 +389,13 @@
                                 <table id="usuariosTable">
                                     <thead>
                                         <tr>
-                                            <th>ID</th>
-                                            <th>Nome</th>
-                                            <th>Perfil</th>
-                                            <th>Status</th>
-                                            <th>Conta</th>
-                                            <th>Último Acesso</th>
-                                            <th>Ações</th>
+                                            <th class="sortable" data-sort="id">ID</th>
+                                            <th class="sortable" data-sort="nome">Nome</th>
+                                            <th class="sortable" data-sort="tipo">Perfil</th>
+                                            <th class="sortable" data-sort="status">Status</th>
+                                            <th class="sortable" data-sort="conta">Conta</th>
+                                            <th class="sortable" data-sort="ultimo_acesso">Último Acesso</th>
+                                            <th class="sortable" data-sort="acoes">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -444,14 +444,14 @@
                                 <table id="produtosTable">
                                     <thead>
                                         <tr>
-                                            <th>Código</th>
-                                            <th>Nome</th>
-                                            <th>Unidade</th>
-                                            <th>Valor</th>
-                                            <th>Estoque Deposito</th>
-                                            <th>Estoque Loja</th>
-                                            <th>Estoque Fabrica</th>
-                                            <th>Ações</th>
+                                            <th class="sortable" data-sort="codigo">Código</th>
+                                            <th class="sortable" data-sort="nome">Nome</th>
+                                            <th class="sortable" data-sort="unidade">Unidade</th>
+                                            <th class="sortable" data-sort="valor">Valor</th>
+                                            <th class="sortable" data-sort="estoque_deposito">Estoque Deposito</th>
+                                            <th class="sortable" data-sort="estoque_loja">Estoque Loja</th>
+                                            <th class="sortable" data-sort="estoque_fabrica">Estoque Fabrica</th>
+                                            <th class="sortable" data-sort="acoes">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -543,20 +543,20 @@
 
                             <div class="table-responsive">
                                 <table id="tabelaRelatorio">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Produto</th>
-                                            <th>Unidade</th>
-                                            <th>Quantidade Vendida</th>
-                                            <th>Valor Total</th>
-                                            <th>Estoque Atual (Loja)</th>
-                                            <th>Estoque Mínimo</th>
-                                            <th>Status Estoque</th>
-                                            <th>Dias Restantes</th>
-                                            <th>Ações</th>
-                                        </tr>
-                                    </thead>
+                                <thead>
+                                    <tr>
+                                        <th class="sortable" data-sort="produto_id">ID</th>
+                                        <th class="sortable" data-sort="produto_nome">Produto</th>
+                                        <th class="sortable" data-sort="unidade">Unidade</th>
+                                        <th class="sortable" data-sort="quantidade_vendida">Quantidade Vendida</th>
+                                        <th class="sortable" data-sort="valor_total_vendido">Valor Total</th>
+                                        <th class="sortable" data-sort="estoque_atual_loja">Estoque Atual (Loja)</th>
+                                        <th class="sortable" data-sort="estoque_minimo">Estoque Mínimo</th>
+                                        <th class="sortable" data-sort="status_estoque">Status Estoque</th>
+                                        <th class="sortable" data-sort="dias_restantes">Dias Restantes</th>
+                                        <th class="sortable" data-sort="acoes">Ações</th>
+                                    </tr>
+                                </thead>
                                     <tbody>
                                         <!-- Dados serão preenchidos via JavaScript -->
                                     </tbody>
@@ -823,13 +823,13 @@
                                 <table id="movimentacoesEstoqueTable">
                                     <thead>
                                         <tr>
-                                            <th>Data</th>
-                                            <th>Observação</th>
-                                            <th>Produto</th>
-                                            <th>Quantidade</th>
-                                            <th>Origem</th>
-                                            <th>Destino</th>
-                                            <th>Usuário</th>
+                                            <th class="sortable" data-sort="data">Data</th>
+                                            <th class="sortable" data-sort="observacao">Observação</th>
+                                            <th class="sortable" data-sort="produto">Produto</th>
+                                            <th class="sortable" data-sort="quantidade">Quantidade</th>
+                                            <th class="sortable" data-sort="origem">Origem</th>
+                                            <th class="sortable" data-sort="destino">Destino</th>
+                                            <th class="sortable" data-sort="usuario">Usuário</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1002,14 +1002,14 @@
                         <table class="table table-hover-effect" id="caixasTable">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Operador</th>
-                                    <th>Abertura</th>
-                                    <th>Fechamento</th>
-                                    <th>Entradas</th>
-                                    <th>Saídas</th>
-                                    <th>Status</th>
-                                    <th>Ações</th>
+                                    <th class="sortable" data-sort="id">ID</th>
+                                    <th class="sortable" data-sort="operador">Operador</th>
+                                    <th class="sortable" data-sort="data_abertura">Abertura</th>
+                                    <th class="sortable" data-sort="data_fechamento">Fechamento</th>
+                                    <th class="sortable" data-sort="total_vendas">Entradas</th>
+                                    <th class="sortable" data-sort="total_despesas">Saídas</th>
+                                    <th class="sortable" data-sort="status">Status</th>
+                                    <th class="sortable" data-sort="acoes">Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1047,14 +1047,14 @@
                                 <table id="descontosTable">
                                     <thead>
                                         <tr>
-                                            <th>Identificador</th>
-                                            <th>Observação</th>
-                                            <th>Qtd. Mínima</th>
-                                            <th>Qtd. Máxima</th>
-                                            <th>Valor c/ Desc.</th>
-                                            <th>Validade</th>
-                                            <th>Status</th>
-                                            <th>Ações</th>
+                                            <th class="sortable" data-sort="identificador">Identificador</th>
+                                            <th class="sortable" data-sort="descricao">Observação</th>
+                                            <th class="sortable" data-sort="quantidade_minima">Qtd. Mínima</th>
+                                            <th class="sortable" data-sort="quantidade_maxima">Qtd. Máxima</th>
+                                            <th class="sortable" data-sort="valor_unitario_com_desconto">Valor c/ Desc.</th>
+                                            <th class="sortable" data-sort="valido_ate">Validade</th>
+                                            <th class="sortable" data-sort="ativo">Status</th>
+                                            <th class="sortable" data-sort="acoes">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>

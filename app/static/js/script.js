@@ -1607,76 +1607,216 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   setTimeout(inicializarBusca, 500);
+
   // ===== CLIENTES =====
+  function setupClienteSorting() {
+      const table = document.getElementById('clientesTable');
+      if (!table) return;
+
+      const headers = table.querySelectorAll('th.sortable');
+      let currentSort = { column: null, direction: 'asc' };
+
+      headers.forEach(header => {
+          header.addEventListener('click', function() {
+              const sortColumn = this.getAttribute('data-sort');
+              const isAscending = currentSort.column === sortColumn && currentSort.direction === 'asc';
+              
+              // Atualizar direção
+              currentSort = {
+                  column: sortColumn,
+                  direction: isAscending ? 'desc' : 'asc'
+              };
+
+              // Remover indicadores anteriores
+              headers.forEach(h => {
+                  h.classList.remove('sort-asc', 'sort-desc');
+              });
+
+              // Adicionar indicador atual
+              this.classList.add(`sort-${currentSort.direction}`);
+
+              // Ordenar os dados
+              sortClientesTable(sortColumn, currentSort.direction);
+          });
+
+          // Adicionar cursor pointer
+          header.style.cursor = 'pointer';
+      });
+  }
+
+  function sortClientesTable(column, direction) {
+      const table = document.getElementById('clientesTable');
+      const tbody = table.querySelector('tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+
+      // Função para extrair o valor de uma célula baseado na coluna
+      const getCellValue = (row, column) => {
+          const cellIndex = getColumnIndex(column);
+          const cell = row.cells[cellIndex];
+          
+          if (!cell) return '';
+          
+          let value = cell.textContent.trim();
+          
+          // Tratamento especial para diferentes tipos de dados
+          switch(column) {
+              case 'id':
+                  return parseInt(value) || 0;
+              case 'status':
+                  // Ordena por Ativo/Inativo
+                  const statusBadge = cell.querySelector('.badge');
+                  return statusBadge ? statusBadge.textContent.trim() : value;
+              default:
+                  return value.toLowerCase();
+          }
+      };
+
+      // Função para obter o índice da coluna baseado no data-sort
+      const getColumnIndex = (column) => {
+          const headers = table.querySelectorAll('th');
+          for (let i = 0; i < headers.length; i++) {
+              if (headers[i].getAttribute('data-sort') === column) {
+                  return i;
+              }
+          }
+          return 0;
+      };
+
+      // Ordenar as linhas
+      rows.sort((a, b) => {
+          let aValue = getCellValue(a, column);
+          let bValue = getCellValue(b, column);
+
+          // Se ambos são números, comparar numericamente
+          if (typeof aValue === 'number' && typeof bValue === 'number') {
+              return direction === 'asc' ? aValue - bValue : bValue - aValue;
+          }
+
+          // Caso contrário, comparar como strings
+          aValue = String(aValue);
+          bValue = String(bValue);
+          
+          if (direction === 'asc') {
+              return aValue.localeCompare(bValue, 'pt-BR', { sensitivity: 'base' });
+          } else {
+              return bValue.localeCompare(aValue, 'pt-BR', { sensitivity: 'base' });
+          }
+      });
+
+      // Remover todas as linhas existentes
+      rows.forEach(row => tbody.removeChild(row));
+
+      // Adicionar as linhas ordenadas
+      rows.forEach(row => tbody.appendChild(row));
+  }
+
+  // Atualize a função loadClientesData para incluir a ordenação:
   async function loadClientesData() {
-    try {
-      const searchText =
-        document.getElementById('searchCliente')?.value.toLowerCase() || '';
-      const data = await fetchWithErrorHandling('/admin/clientes');
+      try {
+          const searchText = document.getElementById('searchCliente')?.value.toLowerCase() || '';
+          const data = await fetchWithErrorHandling('/admin/clientes');
 
-      if (data.success) {
-        const clientesTable = document.querySelector('#clientesTable tbody');
-        if (clientesTable) {
-          clientesTable.innerHTML = '';
+          if (data.success) {
+              const clientesTable = document.querySelector('#clientesTable tbody');
+              if (clientesTable) {
+                  clientesTable.innerHTML = '';
 
-          data.clientes.forEach((cliente) => {
-            if (searchText && !cliente.nome.toLowerCase().includes(searchText)) return;
+                  // Armazenar os dados para ordenação posterior
+                  window.clientesData = data.clientes.filter(cliente => 
+                      !searchText || cliente.nome.toLowerCase().includes(searchText)
+                  );
 
-            const status =
-              cliente.ativo === 'Ativo' || cliente.ativo === true ? 'Ativo' : 'Inativo';
+                  // Renderizar os dados
+                  renderClientesTable(window.clientesData);
 
-            const row = document.createElement('tr');
-            row.innerHTML = `
+                  // Configurar ordenação
+                  setupClienteSorting();
+                  
+                  // Configurar ações dos botões
+                  setupClienteActions();
+              }
+          }
+      } catch (error) {
+          showFlashMessage('error', 'Erro ao carregar lista de clientes');
+      }
+  }
+
+  function renderClientesTable(clientes) {
+      const clientesTable = document.querySelector('#clientesTable tbody');
+      clientesTable.innerHTML = '';
+
+      clientes.forEach((cliente) => {
+          const status = cliente.ativo === 'Ativo' || cliente.ativo === true ? 'Ativo' : 'Inativo';
+
+          const row = document.createElement('tr');
+          row.innerHTML = `
               <td>${cliente.id}</td>
               <td>${cliente.nome}</td>
               <td>${cliente.documento || ''}</td>
               <td>${cliente.telefone || ''}</td>
               <td>${cliente.email || ''}</td>
-              <td><span class="badge ${
-                status === 'Ativo' ? 'badge-success' : 'badge-danger'
-              }">${status}</span></td>
+              <td><span class="badge ${status === 'Ativo' ? 'badge-success' : 'badge-danger'}">${status}</span></td>
               <td>
-                <div class="table-actions">
-                  <button class="btn-icon btn-info detalhes-cliente" data-id="${
-                    cliente.id
-                  }" title="Detalhes">
-                    <i class="fas fa-eye"></i>
-                  </button>
-                  <button class="btn-icon btn-warning editar-cliente" data-id="${
-                    cliente.id
-                  }" title="Editar">
-                    <i class="fas fa-edit"></i>
-                  </button>
-                  <button class="btn-icon btn-danger remover-cliente" data-id="${
-                    cliente.id
-                  }" title="Remover">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </div>
+                  <div class="table-actions">
+                      <button class="btn-icon btn-info detalhes-cliente" data-id="${cliente.id}" title="Detalhes">
+                          <i class="fas fa-eye"></i>
+                      </button>
+                      <button class="btn-icon btn-warning editar-cliente" data-id="${cliente.id}" title="Editar">
+                          <i class="fas fa-edit"></i>
+                      </button>
+                      <button class="btn-icon btn-danger remover-cliente" data-id="${cliente.id}" title="Remover">
+                          <i class="fas fa-trash"></i>
+                      </button>
+                  </div>
               </td>
-            `;
-            clientesTable.appendChild(row);
-          });
-
-          setupClienteActions();
-        }
-      }
-    } catch (error) {
-      showFlashMessage('error', 'Erro ao carregar lista de clientes');
-    }
+          `;
+          clientesTable.appendChild(row);
+      });
   }
+
   async function openDetalhesClienteModal(clienteId) {
     const content = document.getElementById('detalhesClienteContent');
-    if (content) content.innerHTML = '<p class="loading-text">Carregando dados...</p>';
+    const button = document.querySelector(`button.detalhes-cliente[data-id="${clienteId}"]`);
+    
+    // Desabilitar e animar o botão clicado
+    if (button) {
+        const originalHTML = button.innerHTML;
+        const originalTitle = button.title;
+        
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        button.title = 'Buscando informações...';
+        button.disabled = true;
+        button.classList.add('loading');
+    }
+    
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.className = 'modal-loading-overlay';
+    loadingOverlay.innerHTML = `
+        <i class="fas fa-spinner modal-loading-spinner"></i>
+        <div class="modal-loading-text">Buscando informações do cliente...</div>
+    `;
+    
+    content.innerHTML = '';
+    content.appendChild(loadingOverlay);
 
     try {
       const response = await fetchWithErrorHandling(
         `/admin/clientes/${clienteId}/detalhes`
       );
+      loadingOverlay.remove();
       if (!response.success) {
-        showFlashMessage('error', response.message || 'Erro ao carregar detalhes');
-        return;
-      }
+            content.innerHTML = `
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #dc3545; margin-bottom: 20px;"></i>
+                    <h3>Erro ao carregar detalhes</h3>
+                    <p>${response.message || 'Não foi possível carregar as informações do cliente.'}</p>
+                    <button class="btn btn-primary mt-3" onclick="openDetalhesClienteModal('${clienteId}')">
+                        <i class="fas fa-redo"></i> Tentar novamente
+                    </button>
+                </div>
+            `;
+            return;
+        }
 
       const c = response.cliente;
 
@@ -1929,29 +2069,44 @@ document.addEventListener('DOMContentLoaded', function () {
 
       openModal('detalhesClienteModal');
     } catch (err) {
-      showFlashMessage('error', 'Erro ao carregar detalhes do cliente');
+      loadingOverlay.remove();
+        content.innerHTML = `
+            <div class="error-message">
+                <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #dc3545; margin-bottom: 20px;"></i>
+                <h3>Erro de conexão</h3>
+                <p>Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.</p>
+                <button class="btn btn-primary mt-3" onclick="openDetalhesClienteModal('${clienteId}')">
+                    <i class="fas fa-redo"></i> Tentar novamente
+                </button>
+            </div>
+        `;
+    }finally{
+      setTimeout(() => {
+            if (button && button.classList.contains('loading')) {
+                button.innerHTML = '<i class="fas fa-eye"></i>';
+                button.title = 'Detalhes';
+                button.disabled = false;
+                button.classList.remove('loading');
+            }
+        }, 300);
     }
   }
 
-  // Função para adicionar listeners às linhas clicáveis
   function addClickableRowListeners(container) {
     const rows = container.querySelectorAll('.clickable-row');
     rows.forEach((row) => {
-      // Remover event listeners existentes para evitar duplicação
       const newRow = row.cloneNode(true);
       row.parentNode.replaceChild(newRow, row);
 
-      // Adicionar novos listeners
       newRow.style.cursor = 'pointer';
       newRow.addEventListener('click', function (e) {
-        e.stopPropagation(); // Prevenir que o clique propague para outros elementos
+        e.stopPropagation();
         const contaId = this.dataset.contaId;
         if (contaId) {
           openDetalhesContaModal(contaId);
         }
       });
 
-      // Efeitos de hover
       newRow.addEventListener('mouseenter', function () {
         this.style.backgroundColor = '#f0f8ff';
         this.style.transition = 'background-color 0.2s ease';
@@ -1961,14 +2116,11 @@ document.addEventListener('DOMContentLoaded', function () {
         this.style.backgroundColor = '';
       });
 
-      // Indicador visual de que é clicável
       newRow.title = newRow.title || 'Clique para ver detalhes da conta';
     });
   }
 
-  // Função para adicionar estilos CSS para as linhas clicáveis
   function addClickableRowStyles() {
-    // Verificar se os estilos já foram adicionados
     if (document.getElementById('clickable-rows-styles')) {
       return;
     }
@@ -2000,7 +2152,6 @@ document.addEventListener('DOMContentLoaded', function () {
     document.head.appendChild(style);
   }
 
-  // Nova função para abrir detalhes da conta (você precisará implementar esta rota também)
   async function openDetalhesContaModal(contaId) {
     try {
       const response = await fetchWithErrorHandling(
@@ -2018,10 +2169,8 @@ document.addEventListener('DOMContentLoaded', function () {
       const produtos = response.produtos || [];
       const pagamentos = response.pagamentos || [];
 
-      // Criar o overlay e o popup
       const popupId = 'contaDetalhesPopup';
 
-      // Remover popup anterior se existir
       const existingPopup = document.getElementById(popupId);
       if (existingPopup) {
         existingPopup.remove();
@@ -2045,7 +2194,6 @@ document.addEventListener('DOMContentLoaded', function () {
               animation: fadeIn 0.3s ease;
           `;
 
-      // Criar popup
       const popup = document.createElement('div');
       popup.id = popupId;
       popup.className = 'conta-detalhes-popup';
@@ -2062,7 +2210,6 @@ document.addEventListener('DOMContentLoaded', function () {
               border: 1px solid var(--border-color);
           `;
 
-      // Criar conteúdo do popup
       let html = `
               <style>
                   @keyframes fadeIn {
@@ -2480,7 +2627,6 @@ document.addEventListener('DOMContentLoaded', function () {
                   </div>
           `;
 
-      // Seção de Produtos (se houver)
       if (produtos.length > 0) {
         const totalProdutos = produtos.reduce(
           (sum, p) => sum + (p.valor_total || 0),
@@ -2557,8 +2703,6 @@ document.addEventListener('DOMContentLoaded', function () {
                   </div>
               `;
       }
-
-      // Seção de Pagamentos (se houver)
       if (pagamentos.length > 0) {
         const totalPago = pagamentos.reduce((sum, p) => sum + (p.valor_pago || 0), 0);
         html += `
@@ -2638,21 +2782,17 @@ document.addEventListener('DOMContentLoaded', function () {
       overlay.appendChild(popup);
       document.body.appendChild(overlay);
 
-      // Prevenir scroll do body
       document.body.style.overflow = 'hidden';
 
-      // Adicionar event listeners
       setupPopupEventListeners(popupId);
     } catch (err) {
       console.error('Erro ao carregar detalhes da conta:', err);
       showFlashMessage('error', 'Erro ao carregar detalhes da conta');
 
-      // Mostrar popup de erro com a paleta de cores
       showErrorPopup('Erro ao carregar detalhes da conta. Por favor, tente novamente.');
     }
   }
 
-  // Função auxiliar para formatar moeda
   function formatCurrency(value) {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -2660,15 +2800,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }).format(value);
   }
 
-  // Configurar event listeners do popup
   function setupPopupEventListeners(popupId) {
-    // Fechar ao clicar no botão de fechar
     const closeBtn = document.querySelector(`#${popupId} .popup-close-btn`);
     if (closeBtn) {
       closeBtn.addEventListener('click', closePopup);
     }
 
-    // Fechar ao clicar no overlay (fora do popup)
     const overlay = document.getElementById('contaDetalhesOverlay');
     if (overlay) {
       overlay.addEventListener('click', function (e) {
@@ -2678,7 +2815,6 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
 
-    // Fechar com tecla ESC
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         closePopup();
@@ -2707,7 +2843,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Fechar popup
   function closePopup() {
     const overlay = document.getElementById('contaDetalhesOverlay');
     const popup = document.getElementById('contaDetalhesPopup');
@@ -2721,13 +2856,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
       setTimeout(() => {
         overlay.remove();
-        // Restaurar scroll do body
         document.body.style.overflow = '';
       }, 300);
     }
   }
 
-  // Mostrar popup de erro com a paleta de cores
   function showErrorPopup(message) {
     const overlay = document.createElement('div');
     overlay.className = 'popup-overlay';
@@ -2994,71 +3127,136 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ===== PRODUTOS =====
   async function loadProdutosData() {
-    try {
-      const searchText =
-        document.getElementById('searchProduto')?.value.toLowerCase() || '';
-      const incluirInativos = document.getElementById('mostrarInativos')?.checked
-        ? 'true'
-        : 'false';
+      try {
+          const searchText = document.getElementById('searchProduto')?.value.toLowerCase() || '';
+          const incluirInativos = document.getElementById('mostrarInativos')?.checked ? 'true' : 'false';
 
-      const data = await fetchWithErrorHandling(
-        `/admin/produtos?incluir_inativos=${incluirInativos}`
-      );
+          const data = await fetchWithErrorHandling(`/admin/produtos?incluir_inativos=${incluirInativos}`);
 
-      if (data.success) {
-        const produtosTable = document.querySelector('#produtosTable tbody');
-        if (produtosTable) {
-          produtosTable.innerHTML = '';
-
-          data.produtos.forEach((produto) => {
-            if (searchText && !produto.nome.toLowerCase().includes(searchText)) return;
-
-            const row = document.createElement('tr');
-            // Adicione classe e atributo data-id para identificar a linha
-            row.className = 'produto-row clickable-row';
-            row.setAttribute('data-id', produto.id);
-            row.setAttribute('data-produto', JSON.stringify(produto));
-
-            row.innerHTML = `
-                <td>${produto.codigo}</td>
-                <td>${produto.nome} ${
-              !produto.ativo ? '<span class="badge badge-danger">Inativo</span>' : ''
-            }</td>
-                <td>${produto.unidade}</td>
-                <td>${produto.valor}</td>
-                <td>${produto.estoque_deposito}</td>
-                <td>${produto.estoque_loja}</td>
-                <td>${produto.estoque_fabrica}</td>
-                <td>
-                  <div class="table-actions">
-                    <button class="btn-icon btn-primary gerenciar-lotes" data-id="${
-                      produto.id
-                    }" data-nome="${produto.nome}" title="Gerenciar Lotes">
-                      <i class="fas fa-boxes"></i>
-                    </button>
-                    <button class="btn-icon btn-warning editar-produto" data-id="${
-                      produto.id
-                    }" title="Editar">
-                      <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn-icon btn-danger remover-produto" data-id="${
-                      produto.id
-                    }" title="Remover">
-                      <i class="fas fa-trash"></i>
-                    </button>
-                  </div>
-                </td>
-              `;
-            produtosTable.appendChild(row);
-          });
-
-          setupProdutoActions();
-          setupRowClickEvents(); // Nova função para configurar clicks nas linhas
-        }
+          if (data.success) {
+              window.produtosData = data.produtos.filter(produto => 
+                  !searchText || produto.nome.toLowerCase().includes(searchText)
+              );
+              
+              const produtosTable = document.querySelector('#produtosTable tbody');
+              if (produtosTable) {
+                  renderProdutosTable(window.produtosData);
+                  setupProdutoActions();
+                  setupRowClickEvents();
+                  setupProdutoSorting();
+              }
+          }
+      } catch (error) {
+          showFlashMessage('error', 'Erro ao carregar lista de produtos');
       }
-    } catch (error) {
-      showFlashMessage('error', 'Erro ao carregar lista de produtos');
-    }
+  }
+
+  function renderProdutosTable(produtos) {
+      const produtosTable = document.querySelector('#produtosTable tbody');
+      produtosTable.innerHTML = '';
+
+      produtos.forEach((produto) => {
+          const row = document.createElement('tr');
+          row.className = 'produto-row clickable-row';
+          row.setAttribute('data-id', produto.id);
+          row.setAttribute('data-produto', JSON.stringify(produto));
+
+          row.innerHTML = `
+              <td>${produto.codigo}</td>
+              <td>${produto.nome} ${!produto.ativo ? '<span class="badge badge-danger">Inativo</span>' : ''}</td>
+              <td>${produto.unidade}</td>
+              <td>${produto.valor}</td>
+              <td>${produto.estoque_deposito}</td>
+              <td>${produto.estoque_loja}</td>
+              <td>${produto.estoque_fabrica}</td>
+              <td>
+                  <div class="table-actions">
+                      <button class="btn-icon btn-primary gerenciar-lotes" data-id="${produto.id}" data-nome="${produto.nome}" title="Gerenciar Lotes">
+                          <i class="fas fa-boxes"></i>
+                      </button>
+                      <button class="btn-icon btn-warning editar-produto" data-id="${produto.id}" title="Editar">
+                          <i class="fas fa-edit"></i>
+                      </button>
+                      <button class="btn-icon btn-danger remover-produto" data-id="${produto.id}" title="Remover">
+                          <i class="fas fa-trash"></i>
+                      </button>
+                  </div>
+              </td>
+          `;
+          produtosTable.appendChild(row);
+      });
+  }
+
+  function setupProdutoSorting() {
+    const table = document.getElementById('produtosTable');
+    if (!table) return;
+
+    const headers = table.querySelectorAll('th.sortable');
+    let currentSort = { column: null, direction: 'asc' };
+
+    headers.forEach(header => {
+        header.addEventListener('click', function() {
+            const sortColumn = this.getAttribute('data-sort');
+            const isAscending = currentSort.column === sortColumn && currentSort.direction === 'asc';
+            
+            currentSort = {
+                column: sortColumn,
+                direction: isAscending ? 'desc' : 'asc'
+            };
+
+            headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+            this.classList.add(`sort-${currentSort.direction}`);
+
+            sortProdutosTable(sortColumn, currentSort.direction);
+        });
+
+        header.style.cursor = 'pointer';
+    });
+  }
+
+  function sortProdutosTable(column, direction) {
+      if (!window.produtosData) return;
+
+      const produtosOrdenados = [...window.produtosData].sort((a, b) => {
+          let aValue = getProdutoValue(a, column);
+          let bValue = getProdutoValue(b, column);
+
+          if (typeof aValue === 'number' && typeof bValue === 'number') {
+              return direction === 'asc' ? aValue - bValue : bValue - aValue;
+          }
+
+          aValue = String(aValue || '');
+          bValue = String(bValue || '');
+          
+          return direction === 'asc' 
+              ? aValue.localeCompare(bValue, 'pt-BR', { sensitivity: 'base' })
+              : bValue.localeCompare(aValue, 'pt-BR', { sensitivity: 'base' });
+      });
+
+      renderProdutosTable(produtosOrdenados);
+      setupProdutoActions();
+      setupRowClickEvents();
+  }
+
+  function getProdutoValue(produto, column) {
+      switch(column) {
+          case 'codigo':
+              return produto.codigo || '';
+          case 'nome':
+              return produto.nome || '';
+          case 'unidade':
+              return produto.unidade || '';
+          case 'valor':
+              return parseFloat((produto.valor || '0').replace(/[^\d,]/g, '').replace(',', '.')) || 0;
+          case 'estoque_deposito':
+              return parseFloat(produto.estoque_deposito) || 0;
+          case 'estoque_loja':
+              return parseFloat(produto.estoque_loja) || 0;
+          case 'estoque_fabrica':
+              return parseFloat(produto.estoque_fabrica) || 0;
+          default:
+              return '';
+      }
   }
 
   // recarregar lista ao clicar no refresh ou trocar checkbox
@@ -4911,47 +5109,39 @@ document.addEventListener('DOMContentLoaded', function () {
       console.error('Erro ao atualizar lista de pagamentos:', error);
     }
   }
+
   async function loadRelatorioSaidasData() {
-    try {
-      // Mostrar loading
-      const tbody = document.querySelector('#tabelaRelatorio tbody');
-      tbody.innerHTML =
-        '<tr><td colspan="9" class="text-center"><div class="spinner-border" role="status"><span class="sr-only">Carregando...</span></div></td></tr>';
+      try {
+          const tbody = document.querySelector('#tabelaRelatorio tbody');
+          tbody.innerHTML = '<tr><td colspan="10" class="text-center"><div class="spinner-border" role="status"><span class="sr-only">Carregando...</span></div></td></tr>';
 
-      // Obter valores dos filtros
-      const dataInicio = document.getElementById('relatorioDataInicio').value;
-      const dataFim = document.getElementById('relatorioDataFim').value;
-      const produtoNome = document.getElementById('relatorioProdutoNome').value;
-      const produtoCodigo = document.getElementById('relatorioProdutoCodigo').value;
+          const dataInicio = document.getElementById('relatorioDataInicio').value;
+          const dataFim = document.getElementById('relatorioDataFim').value;
+          const produtoNome = document.getElementById('relatorioProdutoNome').value;
+          const produtoCodigo = document.getElementById('relatorioProdutoCodigo').value;
 
-      // Construir parâmetros da URL
-      const params = new URLSearchParams();
-      if (dataInicio) params.append('data_inicio', dataInicio);
-      if (dataFim) params.append('data_fim', dataFim);
-      if (produtoNome) params.append('produto_nome', produtoNome);
-      if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
+          const params = new URLSearchParams();
+          if (dataInicio) params.append('data_inicio', dataInicio);
+          if (dataFim) params.append('data_fim', dataFim);
+          if (produtoNome) params.append('produto_nome', produtoNome);
+          if (produtoCodigo) params.append('produto_codigo', produtoCodigo);
+          params.append('limite', 50);
 
-      // Limite padrão de 50 itens
-      params.append('limite', 50);
+          const response = await fetchWithErrorHandling(
+              `/admin/relatorios/vendas-produtos?${params.toString()}`
+          );
 
-      // Fazer a requisição
-      const response = await fetchWithErrorHandling(
-        `/admin/relatorios/vendas-produtos?${params.toString()}`
-      );
-
-      if (response) {
-        // Atualizar metadados
-        atualizarMetadadosRelatorio(response.meta);
-
-        // Preencher tabela
-        preencherTabelaRelatorio(response.dados);
+          if (response) {
+              window.relatorioSaidasData = response.dados;
+              atualizarMetadadosRelatorio(response.meta);
+              preencherTabelaRelatorio(window.relatorioSaidasData);
+              setupRelatorioSaidasSorting();
+          }
+      } catch (error) {
+          const tbody = document.querySelector('#tabelaRelatorio tbody');
+          tbody.innerHTML = '<tr><td colspan="10" class="text-center text-danger">Erro ao carregar dados do relatório</td></tr>';
+          showFlashMessage('error', 'Erro ao carregar relatório de saídas');
       }
-    } catch (error) {
-      const tbody = document.querySelector('#tabelaRelatorio tbody');
-      tbody.innerHTML =
-        '<tr><td colspan="9" class="text-center text-danger">Erro ao carregar dados do relatório</td></tr>';
-      showFlashMessage('error', 'Erro ao carregar relatório de saídas');
-    }
   }
 
   function atualizarMetadadosRelatorio(meta) {
@@ -4992,30 +5182,27 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function preencherTabelaRelatorio(dados) {
-    const tbody = document.querySelector('#tabelaRelatorio tbody');
+      const tbody = document.querySelector('#tabelaRelatorio tbody');
 
-    if (!dados || dados.length === 0) {
-      tbody.innerHTML =
-        '<tr><td colspan="10" class="text-center">Nenhum dado encontrado para os filtros selecionados</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = '';
-
-    dados.forEach((item) => {
-      const tr = document.createElement('tr');
-
-      if (item.status_estoque === 'CRÍTICO') {
-        tr.classList.add('table-warning');
+      if (!dados || dados.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="10" class="text-center">Nenhum dado encontrado para os filtros selecionados</td></tr>';
+          return;
       }
 
-      tr.innerHTML = `
+      tbody.innerHTML = '';
+
+      dados.forEach((item) => {
+          const tr = document.createElement('tr');
+
+          if (item.status_estoque === 'CRÍTICO') {
+              tr.classList.add('table-warning');
+          }
+
+          tr.innerHTML = `
               <td>${item.produto_id}</td>
               <td>
                   <strong>${item.produto_nome}</strong><br>
-                  <small class="text-muted">${
-                    item.produto_codigo || 'Sem código'
-                  }</small>
+                  <small class="text-muted">${item.produto_codigo || 'Sem código'}</small>
               </td>
               <td>${item.unidade}</td>
               <td>${item.quantidade_vendida.toFixed(2)}</td>
@@ -5023,9 +5210,7 @@ document.addEventListener('DOMContentLoaded', function () {
               <td>
                   ${item.estoque_atual_loja.toFixed(2)}
                   <div class="progress mt-1" style="height: 5px;">
-                      <div class="progress-bar ${
-                        item.percentual_estoque < 100 ? 'bg-danger' : 'bg-success'
-                      }" 
+                      <div class="progress-bar ${item.percentual_estoque < 100 ? 'bg-danger' : 'bg-success'}" 
                           role="progressbar" 
                           style="width: ${Math.min(item.percentual_estoque, 100)}%" 
                           aria-valuenow="${item.percentual_estoque}" 
@@ -5036,9 +5221,7 @@ document.addEventListener('DOMContentLoaded', function () {
               </td>
               <td>${item.estoque_minimo.toFixed(2)}</td>
               <td>
-                  <span class="badge ${
-                    item.status_estoque === 'CRÍTICO' ? 'badge-danger' : 'badge-success'
-                  }">
+                  <span class="badge ${item.status_estoque === 'CRÍTICO' ? 'badge-danger' : 'badge-success'}">
                       ${item.status_estoque}
                   </span>
               </td>
@@ -5052,17 +5235,98 @@ document.addEventListener('DOMContentLoaded', function () {
               </td>
           `;
 
-      tbody.appendChild(tr);
-    });
-
-    // Evento do botão de detalhes
-    document.querySelectorAll('.btn-detalhes').forEach((btn) => {
-      btn.addEventListener('click', function () {
-        const produtoId = this.getAttribute('data-produto-id');
-        abrirModalDetalhesProduto(produtoId); // Chama a rota /detalhes
+          tbody.appendChild(tr);
       });
+
+      document.querySelectorAll('.btn-detalhes').forEach((btn) => {
+          btn.addEventListener('click', function () {
+              const produtoId = this.getAttribute('data-produto-id');
+              abrirModalDetalhesProduto(produtoId);
+          });
+      });
+  }
+
+  function setupRelatorioSaidasSorting() {
+    const table = document.getElementById('tabelaRelatorio');
+    if (!table) return;
+
+    const headers = table.querySelectorAll('th.sortable');
+    let currentSort = { column: null, direction: 'asc' };
+
+    headers.forEach(header => {
+        header.addEventListener('click', function() {
+            const sortColumn = this.getAttribute('data-sort');
+            const isAscending = currentSort.column === sortColumn && currentSort.direction === 'asc';
+            
+            currentSort = {
+                column: sortColumn,
+                direction: isAscending ? 'desc' : 'asc'
+            };
+
+            headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+            this.classList.add(`sort-${currentSort.direction}`);
+
+            sortRelatorioSaidasTable(sortColumn, currentSort.direction);
+        });
+
+        header.style.cursor = 'pointer';
     });
   }
+
+  function sortRelatorioSaidasTable(column, direction) {
+      if (!window.relatorioSaidasData) return;
+
+      const dadosOrdenados = [...window.relatorioSaidasData].sort((a, b) => {
+          let aValue = getRelatorioSaidasValue(a, column);
+          let bValue = getRelatorioSaidasValue(b, column);
+
+          if (typeof aValue === 'number' && typeof bValue === 'number') {
+              return direction === 'asc' ? aValue - bValue : bValue - aValue;
+          }
+
+          if (column === 'status_estoque') {
+              const statusOrder = { 'OK': 0, 'CRÍTICO': 1 };
+              const aOrder = statusOrder[aValue] || 2;
+              const bOrder = statusOrder[bValue] || 2;
+              return direction === 'asc' ? aOrder - bOrder : bOrder - aOrder;
+          }
+
+          aValue = String(aValue || '');
+          bValue = String(bValue || '');
+          
+          return direction === 'asc' 
+              ? aValue.localeCompare(bValue, 'pt-BR', { sensitivity: 'base' })
+              : bValue.localeCompare(aValue, 'pt-BR', { sensitivity: 'base' });
+      });
+
+      preencherTabelaRelatorio(dadosOrdenados);
+  }
+
+  function getRelatorioSaidasValue(item, column) {
+      switch(column) {
+          case 'produto_id':
+              return parseInt(item.produto_id) || 0;
+          case 'produto_nome':
+              return item.produto_nome || '';
+          case 'unidade':
+              return item.unidade || '';
+          case 'quantidade_vendida':
+              return parseFloat(item.quantidade_vendida) || 0;
+          case 'valor_total_vendido':
+              return parseFloat(item.valor_total_vendido) || 0;
+          case 'estoque_atual_loja':
+              return parseFloat(item.estoque_atual_loja) || 0;
+          case 'estoque_minimo':
+              return parseFloat(item.estoque_minimo) || 0;
+          case 'status_estoque':
+              return item.status_estoque || '';
+          case 'dias_restantes':
+              return parseFloat(item.dias_restantes) || 9999;
+          default:
+              return '';
+      }
+  }
+
   // Adicione esta função no seu arquivo JavaScript existente
   async function exportarRelatorioPDF() {
     try {
@@ -5093,6 +5357,7 @@ document.addEventListener('DOMContentLoaded', function () {
   document
     .getElementById('btnExportarPDF')
     ?.addEventListener('click', exportarRelatorioPDF);
+
   async function abrirModalDetalhesProduto(produtoId) {
     try {
       // Obter valores dos filtros atuais
@@ -5320,90 +5585,94 @@ document.addEventListener('DOMContentLoaded', function () {
   const caixasPerPage = 30;
 
   async function loadCaixasData(page = 1) {
-    try {
-      const status = document.getElementById('caixaStatus')?.value || '';
-      const operadorId = document.getElementById('caixaOperador')?.value || '';
-      const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
-      const dataFim = document.getElementById('caixaDataFim')?.value || '';
+      try {
+          const status = document.getElementById('caixaStatus')?.value || '';
+          const operadorId = document.getElementById('caixaOperador')?.value || '';
+          const dataInicio = document.getElementById('caixaDataInicio')?.value || '';
+          const dataFim = document.getElementById('caixaDataFim')?.value || '';
 
-      // Monta query string dinamicamente
-      const params = new URLSearchParams();
-      if (status) params.append('status', status);
-      if (operadorId) params.append('operador_id', operadorId);
-      if (dataInicio) params.append('data_inicio', dataInicio);
-      if (dataFim) params.append('data_fim', dataFim);
+          const params = new URLSearchParams();
+          if (status) params.append('status', status);
+          if (operadorId) params.append('operador_id', operadorId);
+          if (dataInicio) params.append('data_inicio', dataInicio);
+          if (dataFim) params.append('data_fim', dataFim);
+          params.append('page', page.toString());
+          params.append('per_page', caixasPerPage.toString());
 
-      // Paginação
-      params.append('page', page.toString());
-      params.append('per_page', caixasPerPage.toString());
+          let url = '/admin/caixas';
+          if ([...params].length > 0) {
+              url += `?${params.toString()}`;
+          }
 
-      let url = '/admin/caixas';
-      if ([...params].length > 0) {
-        url += `?${params.toString()}`;
+          const data = await fetchWithErrorHandling(url);
+
+          if (data.success) {
+              window.caixasData = data.data;
+              const caixasTable = document.querySelector('#caixasTable tbody');
+              if (caixasTable) {
+                  renderCaixasTable(window.caixasData);
+                  setupCaixaActions();
+                  setupCaixaSorting();
+                  updatePaginationControls(data.pagination);
+              }
+          }
+      } catch (error) {
+          showFlashMessage('error', 'Erro ao carregar lista de caixas');
       }
+  }
 
-      const data = await fetchWithErrorHandling(url);
+  function renderCaixasTable(caixas) {
+      const caixasTable = document.querySelector('#caixasTable tbody');
+      caixasTable.innerHTML = '';
 
-      if (data.success) {
-        const caixasTable = document.querySelector('#caixasTable tbody');
-        if (caixasTable) {
-          caixasTable.innerHTML = '';
+      caixas.forEach((caixa) => {
+          const row = document.createElement('tr');
 
-          data.data.forEach((caixa) => {
-            const row = document.createElement('tr');
+          const dataAbertura = formatDateTime(caixa.data_abertura);
+          const dataFechamento = caixa.data_fechamento ? formatDateTime(caixa.data_fechamento) : '-';
+          const valorEntradas = formatarMoeda(caixa.total_vendas);
+          const valorSaidas = formatarMoeda(caixa.total_despesas);
 
-            const dataAbertura = formatDateTime(caixa.data_abertura);
-            const dataFechamento = caixa.data_fechamento
-              ? formatDateTime(caixa.data_fechamento)
-              : '-';
-            const valorEntradas = formatarMoeda(caixa.total_vendas);
-            const valorSaidas = formatarMoeda(caixa.total_despesas);
-            const valorConfirmado = caixa.valor_confirmado
-              ? formatarMoeda(caixa.valor_confirmado)
-              : '-';
-
-            // Determina classe e texto do status
-            let statusClass = '';
-            let statusText = '';
-            switch (caixa.status) {
+          let statusClass = '';
+          let statusText = '';
+          switch (caixa.status) {
               case 'aberto':
-                statusClass = 'badge-success';
-                statusText = 'Aberto';
-                break;
+                  statusClass = 'badge-success';
+                  statusText = 'Aberto';
+                  break;
               case 'fechado':
-                statusClass = 'badge-primary';
-                statusText = 'Fechado';
-                break;
+                  statusClass = 'badge-primary';
+                  statusText = 'Fechado';
+                  break;
               case 'analise':
               case 'em_analise':
-                statusClass = 'badge-warning';
-                statusText = 'Em Análise';
-                break;
+                  statusClass = 'badge-warning';
+                  statusText = 'Em Análise';
+                  break;
               case 'rejeitado':
               case 'recusado':
-                statusClass = 'badge-danger';
-                statusText = 'Rejeitado';
-                break;
+                  statusClass = 'badge-danger';
+                  statusText = 'Rejeitado';
+                  break;
               case 'aprovado':
-                statusClass = 'badge-success';
-                statusText = 'Aprovado';
-                break;
+                  statusClass = 'badge-success';
+                  statusText = 'Aprovado';
+                  break;
               default:
-                statusClass = 'badge-secondary';
-                statusText = caixa.status || '-';
-            }
+                  statusClass = 'badge-secondary';
+                  statusText = caixa.status || '-';
+          }
 
-            // Botão "Aprovar" só aparece se não estiver aprovado
-            let aprovarButton = '';
-            if (caixa.status !== 'aprovado') {
+          let aprovarButton = '';
+          if (caixa.status !== 'aprovado') {
               aprovarButton = `
-                <button class="btn-icon btn-success aprovar-caixa" data-id="${caixa.id}" title="Transferir Saldo">
-                  <i class="fas fa-check"></i>
-                </button>
+                  <button class="btn-icon btn-success aprovar-caixa" data-id="${caixa.id}" title="Transferir Saldo">
+                      <i class="fas fa-check"></i>
+                  </button>
               `;
-            }
+          }
 
-            row.innerHTML = `
+          row.innerHTML = `
               <td>${caixa.id}</td>
               <td>${caixa.operador?.nome || '-'}</td>
               <td>${dataAbertura}</td>
@@ -5412,45 +5681,146 @@ document.addEventListener('DOMContentLoaded', function () {
               <td>${valorSaidas}</td>
               <td><span class="badge ${statusClass}">${statusText}</span></td>
               <td>
-                <div class="table-actions">
-                  <button class="btn-icon btn-info visualizar-caixa" data-id="${
-                    caixa.id
-                  }" title="Visualizar">
-                    <i class="fas fa-eye"></i>
-                  </button>
-                  <button class="btn-icon btn-warning reabrir-caixa" data-id="${
-                    caixa.id
-                  }" title="Reabrir Caixa">
-                    <i class="fas fa-unlock"></i>
-                  </button>
-                  <button class="btn-icon btn-danger fechar-caixa" data-id="${
-                    caixa.id
-                  }" title="Fechar Caixa">
-                    <i class="fas fa-lock"></i>
-                  </button>
-                  <button class="btn-icon btn-primary venda-retroativa-caixa" data-id="${
-                    caixa.id
-                  }" title="Venda Retroativa">
-                    <i class="fas fa-history"></i>
-                  </button>
-                  ${aprovarButton}
-                </div>
+                  <div class="table-actions">
+                      <button class="btn-icon btn-info visualizar-caixa" data-id="${caixa.id}" title="Visualizar">
+                          <i class="fas fa-eye"></i>
+                      </button>
+                      <button class="btn-icon btn-warning reabrir-caixa" data-id="${caixa.id}" title="Reabrir Caixa">
+                          <i class="fas fa-unlock"></i>
+                      </button>
+                      <button class="btn-icon btn-danger fechar-caixa" data-id="${caixa.id}" title="Fechar Caixa">
+                          <i class="fas fa-lock"></i>
+                      </button>
+                      <button class="btn-icon btn-primary venda-retroativa-caixa" data-id="${caixa.id}" title="Venda Retroativa">
+                          <i class="fas fa-history"></i>
+                      </button>
+                      ${aprovarButton}
+                  </div>
               </td>
-            `;
+          `;
 
-            caixasTable.appendChild(row);
-          });
-
-          setupCaixaActions();
-          updatePaginationControls(data.pagination);
-        }
-      }
-    } catch (error) {
-      showFlashMessage('error', 'Erro ao carregar lista de caixas');
-    }
+          caixasTable.appendChild(row);
+      });
   }
 
-  // NOVO: Função para atualizar controles de paginação
+  function setupCaixaSorting() {
+    const table = document.getElementById('caixasTable');
+    if (!table) return;
+
+    const headers = table.querySelectorAll('th.sortable');
+    let currentSort = { column: null, direction: 'asc' };
+
+    headers.forEach(header => {
+        header.addEventListener('click', function() {
+            const sortColumn = this.getAttribute('data-sort');
+            const isAscending = currentSort.column === sortColumn && currentSort.direction === 'asc';
+            
+            currentSort = {
+                column: sortColumn,
+                direction: isAscending ? 'desc' : 'asc'
+            };
+
+            headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+            this.classList.add(`sort-${currentSort.direction}`);
+
+            sortCaixasTable(sortColumn, currentSort.direction);
+        });
+
+        header.style.cursor = 'pointer';
+    });
+  }
+
+  function converterValorMonetarioParaNumero(valorMonetario) {
+    if (!valorMonetario || valorMonetario === '-') return 0;
+    
+    const valorLimpo = valorMonetario.toString()
+        .replace('R$', '')
+        .replace(/\./g, '')
+        .replace(',', '.')
+        .trim();
+    
+    const valorNumerico = parseFloat(valorLimpo);
+    return isNaN(valorNumerico) ? 0 : valorNumerico;
+  }
+
+  function sortCaixasTable(column, direction) {
+      if (!window.caixasData) return;
+
+      const caixasOrdenados = [...window.caixasData].sort((a, b) => {
+          let aValue = getCaixaValue(a, column);
+          let bValue = getCaixaValue(b, column);
+
+          if (typeof aValue === 'number' && typeof bValue === 'number') {
+              return direction === 'asc' ? aValue - bValue : bValue - aValue;
+          }
+
+          if (column === 'data_abertura' || column === 'data_fechamento') {
+              const aDate = new Date(aValue || 0);
+              const bDate = new Date(bValue || 0);
+              return direction === 'asc' ? aDate - bDate : bDate - aDate;
+          }
+
+          if (column === 'status') {
+              const statusOrder = { 
+                  'Aberto': 1, 
+                  'Fechado': 2, 
+                  'Em Análise': 3, 
+                  'Rejeitado': 4, 
+                  'Aprovado': 5 
+              };
+              const aOrder = statusOrder[aValue] || 99;
+              const bOrder = statusOrder[bValue] || 99;
+              return direction === 'asc' ? aOrder - bOrder : bOrder - aOrder;
+          }
+
+          aValue = String(aValue || '');
+          bValue = String(bValue || '');
+          
+          return direction === 'asc' 
+              ? aValue.localeCompare(bValue, 'pt-BR', { sensitivity: 'base' })
+              : bValue.localeCompare(aValue, 'pt-BR', { sensitivity: 'base' });
+      });
+
+      renderCaixasTable(caixasOrdenados);
+      setupCaixaActions();
+  }
+
+  function getCaixaValue(caixa, column) {
+      switch(column) {
+          case 'id':
+              return parseInt(caixa.id) || 0;
+          case 'operador':
+              return caixa.operador?.nome || '';
+          case 'data_abertura':
+              return caixa.data_abertura || '';
+          case 'data_fechamento':
+              return caixa.data_fechamento || '';
+          case 'total_vendas':
+              if (caixa.total_vendas && typeof caixa.total_vendas === 'string') {
+                  return converterValorMonetarioParaNumero(caixa.total_vendas);
+              }
+              return parseFloat(caixa.total_vendas) || 0;
+          case 'total_despesas':
+              if (caixa.total_despesas && typeof caixa.total_despesas === 'string') {
+                  return converterValorMonetarioParaNumero(caixa.total_despesas);
+              }
+              return parseFloat(caixa.total_despesas) || 0;
+          case 'status':
+              switch (caixa.status) {
+                  case 'aberto': return 'Aberto';
+                  case 'fechado': return 'Fechado';
+                  case 'analise':
+                  case 'em_analise': return 'Em Análise';
+                  case 'rejeitado':
+                  case 'recusado': return 'Rejeitado';
+                  case 'aprovado': return 'Aprovado';
+                  default: return caixa.status || '';
+              }
+          default:
+              return '';
+      }
+  }
+
   function updatePaginationControls(pagination) {
     let paginationContainer = document.getElementById('caixasPagination');
 
@@ -5529,7 +5899,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Atualize a função de refresh para resetar para página 1
   document.getElementById('refreshCaixas')?.addEventListener('click', () => {
     document.getElementById('caixaStatus').value = '';
     document.getElementById('caixaOperador').value = '';
@@ -5539,13 +5908,12 @@ document.addEventListener('DOMContentLoaded', function () {
     loadCaixasData(1);
   });
 
-  // Atualize o evento de filtro para resetar para página 1
+
   document.getElementById('filterCaixas')?.addEventListener('click', () => {
     currentCaixaPage = 1;
     loadCaixasData(1);
   });
 
-  // Função para inicializar tudo quando a página carregar
   function initializeCaixasPage() {
     currentCaixaPage = 1;
     loadOperadores().then(() => {
@@ -5553,13 +5921,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Aguarda o DOM estar completamente carregado
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeCaixasPage);
   } else {
     initializeCaixasPage();
   }
-  // Eventos de filtro
+
   document.getElementById('filterCaixas')?.addEventListener('click', () => {
     loadCaixasData();
   });
@@ -7725,32 +8092,44 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ===== MOVIMENTAÇÕES =====
   async function loadMovimentacoesData() {
-    try {
-      const dateInicio = document.getElementById('movimentacaoDateInicio')?.value;
-      const dateFim = document.getElementById('movimentacaoDateFim')?.value;
-      const tipo = document.getElementById('movimentacaoTipo')?.value;
+      try {
+          const dateInicio = document.getElementById('movimentacaoDateInicio')?.value;
+          const dateFim = document.getElementById('movimentacaoDateFim')?.value;
+          const tipo = document.getElementById('movimentacaoTipo')?.value;
 
-      let url = '/admin/transferencias';
-      const params = new URLSearchParams();
+          let url = '/admin/transferencias';
+          const params = new URLSearchParams();
 
-      if (dateInicio) params.append('data_inicio', dateInicio);
-      if (dateFim) params.append('data_fim', dateFim);
-      if (tipo) params.append('tipo', tipo);
+          if (dateInicio) params.append('data_inicio', dateInicio);
+          if (dateFim) params.append('data_fim', dateFim);
+          if (tipo) params.append('tipo', tipo);
 
-      if (params.toString()) {
-        url += `?${params.toString()}`;
+          if (params.toString()) {
+              url += `?${params.toString()}`;
+          }
+
+          const data = await fetchWithErrorHandling(url);
+
+          if (data.success) {
+              window.movimentacoesData = data.transferencias;
+              const table = document.querySelector('#movimentacoesEstoqueTable tbody');
+              if (table) {
+                  renderMovimentacoesTable(window.movimentacoesData);
+                  setupMovimentacoesSorting();
+              }
+          }
+      } catch (error) {
+          showFlashMessage('error', 'Erro ao carregar histórico de movimentações');
       }
+  }
 
-      const data = await fetchWithErrorHandling(url);
+  function renderMovimentacoesTable(movimentacoes) {
+      const table = document.querySelector('#movimentacoesEstoqueTable tbody');
+      table.innerHTML = '';
 
-      if (data.success) {
-        const table = document.querySelector('#movimentacoesEstoqueTable tbody');
-        if (table) {
-          table.innerHTML = '';
-
-          data.transferencias.forEach((transf) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
+      movimentacoes.forEach((transf) => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
               <td>${transf.data}</td>
               <td>${transf.observacao || '-'}</td>
               <td>${transf.produto}</td>
@@ -7758,16 +8137,86 @@ document.addEventListener('DOMContentLoaded', function () {
               <td>${transf.origem || '-'}</td>
               <td>${transf.destino || '-'}</td>
               <td>${transf.usuario}</td>
-            `;
-            table.appendChild(row);
-          });
-        }
-      }
-    } catch (error) {
-      showFlashMessage('error', 'Erro ao carregar histórico de movimentações');
-    }
+          `;
+          table.appendChild(row);
+      });
   }
 
+  function setupMovimentacoesSorting() {
+    const table = document.getElementById('movimentacoesEstoqueTable');
+    if (!table) return;
+
+    const headers = table.querySelectorAll('th.sortable');
+    let currentSort = { column: null, direction: 'asc' };
+
+    headers.forEach(header => {
+        header.addEventListener('click', function() {
+            const sortColumn = this.getAttribute('data-sort');
+            const isAscending = currentSort.column === sortColumn && currentSort.direction === 'asc';
+            
+            currentSort = {
+                column: sortColumn,
+                direction: isAscending ? 'desc' : 'asc'
+            };
+
+            headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+            this.classList.add(`sort-${currentSort.direction}`);
+
+            sortMovimentacoesTable(sortColumn, currentSort.direction);
+        });
+
+        header.style.cursor = 'pointer';
+    });
+  }
+
+  function sortMovimentacoesTable(column, direction) {
+      if (!window.movimentacoesData) return;
+
+      const movimentacoesOrdenadas = [...window.movimentacoesData].sort((a, b) => {
+          let aValue = getMovimentacaoValue(a, column);
+          let bValue = getMovimentacaoValue(b, column);
+
+          if (typeof aValue === 'number' && typeof bValue === 'number') {
+              return direction === 'asc' ? aValue - bValue : bValue - aValue;
+          }
+
+          if (column === 'data') {
+              const aDate = new Date(a.data || 0);
+              const bDate = new Date(b.data || 0);
+              return direction === 'asc' ? aDate - bDate : bDate - aDate;
+          }
+
+          aValue = String(aValue || '');
+          bValue = String(bValue || '');
+          
+          return direction === 'asc' 
+              ? aValue.localeCompare(bValue, 'pt-BR', { sensitivity: 'base' })
+              : bValue.localeCompare(aValue, 'pt-BR', { sensitivity: 'base' });
+      });
+
+      renderMovimentacoesTable(movimentacoesOrdenadas);
+  }
+
+  function getMovimentacaoValue(movimentacao, column) {
+      switch(column) {
+          case 'data':
+              return movimentacao.data || '';
+          case 'observacao':
+              return movimentacao.observacao || '';
+          case 'produto':
+              return movimentacao.produto || '';
+          case 'quantidade':
+              return parseFloat(movimentacao.quantidade) || 0;
+          case 'origem':
+              return movimentacao.origem || '';
+          case 'destino':
+              return movimentacao.destino || '';
+          case 'usuario':
+              return movimentacao.usuario || '';
+          default:
+              return '';
+      }
+  }
   // Event Listeners para Movimentações
   document
     .getElementById('filterMovimentacoes')
@@ -7775,96 +8224,158 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ===== USUÁRIOS =====
   async function loadUsuariosData() {
-    try {
-      const searchText =
-        document.getElementById('searchUsuario')?.value.toLowerCase() || '';
-      const data = await fetchWithErrorHandling('/admin/usuarios');
+      try {
+          const searchText = document.getElementById('searchUsuario')?.value.toLowerCase() || '';
+          const data = await fetchWithErrorHandling('/admin/usuarios');
 
-      if (data.success) {
-        const usuariosTable = document.querySelector('#usuariosTable tbody');
-        if (usuariosTable) {
-          usuariosTable.innerHTML = '';
-
-          data.usuarios.forEach((usuario) => {
-            if (searchText && !usuario.nome.toLowerCase().includes(searchText)) {
-              return;
-            }
-
-            const statusBool =
-              usuario.status === true ||
-              usuario.status === 'true' ||
-              usuario.status === 'Ativo';
-            const status = statusBool ? 'Ativo' : 'Inativo';
-
-            // Verificar se o usuário tem conta
-            const temConta = usuario.conta !== null && usuario.conta !== undefined;
-
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                        <td>${usuario.id}</td>
-                        <td>${usuario.nome}</td>
-                        <td><span class="badge badge-${usuario.tipo.toLowerCase()}">${formatPerfil(
-              usuario.tipo
-            )}</span></td>
-                        <td><span class="badge ${
-                          statusBool ? 'badge-success' : 'badge-danger'
-                        }">${status}</span></td>
-                        <td>
-                            <span class="badge ${
-                              temConta ? 'badge-success' : 'badge-warning'
-                            }">
-                                ${temConta ? 'Com conta' : 'Sem conta'}
-                            </span>
-                        </td>
-                        <td>${usuario.ultimo_acesso || 'Nunca'}</td>
-                        <td>
-                            <div class="table-actions">
-                                ${
-                                  !temConta
-                                    ? `
-                                    <button class="btn-icon btn-info criar-conta-usuario" data-id="${usuario.id}" title="Criar Conta">
-                                        <i class="fa-solid fa-landmark">‌</i>
-                                    </button>
-                                `
-                                    : ''
-                                }
-                                <button class="btn-icon btn-primary visualizar-usuario" data-id="${
-                                  usuario.id
-                                }" title="Visualizar">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button class="btn-icon btn-warning editar-usuario" data-id="${
-                                  usuario.id
-                                }" title="Editar">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-icon ${
-                                  statusBool ? 'btn-danger' : 'btn-success'
-                                } alterar-status-usuario" 
-                                        data-id="${usuario.id}" 
-                                        data-status="${status}"
-                                        title="${statusBool ? 'Desativar' : 'Ativar'}">
-                                    <i class="fas ${
-                                      statusBool ? 'fa-user-slash' : 'fa-user-check'
-                                    }"></i>
-                                </button>
-                                <button class="btn-icon btn-danger remover-usuario" data-id="${
-                                  usuario.id
-                                }" title="Remover">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    `;
-            usuariosTable.appendChild(row);
-          });
-
-          setupUsuarioActions();
-        }
+          if (data.success) {
+              window.usuariosData = data.usuarios.filter(usuario => 
+                  !searchText || usuario.nome.toLowerCase().includes(searchText)
+              );
+              
+              const usuariosTable = document.querySelector('#usuariosTable tbody');
+              if (usuariosTable) {
+                  renderUsuariosTable(window.usuariosData);
+                  setupUsuarioActions();
+                  setupUsuarioSorting();
+              }
+          }
+      } catch (error) {
+          showFlashMessage('error', 'Erro ao carregar lista de usuários');
       }
-    } catch (error) {
-      showFlashMessage('error', 'Erro ao carregar lista de usuários');
-    }
+  }
+
+  function renderUsuariosTable(usuarios) {
+      const usuariosTable = document.querySelector('#usuariosTable tbody');
+      usuariosTable.innerHTML = '';
+
+      usuarios.forEach((usuario) => {
+          const statusBool = usuario.status === true || usuario.status === 'true' || usuario.status === 'Ativo';
+          const status = statusBool ? 'Ativo' : 'Inativo';
+          const temConta = usuario.conta !== null && usuario.conta !== undefined;
+
+          const row = document.createElement('tr');
+          row.innerHTML = `
+              <td>${usuario.id}</td>
+              <td>${usuario.nome}</td>
+              <td><span class="badge badge-${usuario.tipo.toLowerCase()}">${formatPerfil(usuario.tipo)}</span></td>
+              <td><span class="badge ${statusBool ? 'badge-success' : 'badge-danger'}">${status}</span></td>
+              <td>
+                  <span class="badge ${temConta ? 'badge-success' : 'badge-warning'}">
+                      ${temConta ? 'Com conta' : 'Sem conta'}
+                  </span>
+              </td>
+              <td>${usuario.ultimo_acesso || 'Nunca'}</td>
+              <td>
+                  <div class="table-actions">
+                      ${!temConta ? `
+                          <button class="btn-icon btn-info criar-conta-usuario" data-id="${usuario.id}" title="Criar Conta">
+                              <i class="fa-solid fa-landmark">‌</i>
+                          </button>
+                      ` : ''}
+                      <button class="btn-icon btn-primary visualizar-usuario" data-id="${usuario.id}" title="Visualizar">
+                          <i class="fas fa-eye"></i>
+                      </button>
+                      <button class="btn-icon btn-warning editar-usuario" data-id="${usuario.id}" title="Editar">
+                          <i class="fas fa-edit"></i>
+                      </button>
+                      <button class="btn-icon ${statusBool ? 'btn-danger' : 'btn-success'} alterar-status-usuario" 
+                              data-id="${usuario.id}" 
+                              data-status="${status}"
+                              title="${statusBool ? 'Desativar' : 'Ativar'}">
+                          <i class="fas ${statusBool ? 'fa-user-slash' : 'fa-user-check'}"></i>
+                      </button>
+                      <button class="btn-icon btn-danger remover-usuario" data-id="${usuario.id}" title="Remover">
+                          <i class="fas fa-trash"></i>
+                      </button>
+                  </div>
+              </td>
+          `;
+          usuariosTable.appendChild(row);
+      });
+  }
+
+  function setupUsuarioSorting() {
+    const table = document.getElementById('usuariosTable');
+    if (!table) return;
+
+    const headers = table.querySelectorAll('th.sortable');
+    let currentSort = { column: null, direction: 'asc' };
+
+    headers.forEach(header => {
+        header.addEventListener('click', function() {
+            const sortColumn = this.getAttribute('data-sort');
+            const isAscending = currentSort.column === sortColumn && currentSort.direction === 'asc';
+            
+            currentSort = {
+                column: sortColumn,
+                direction: isAscending ? 'desc' : 'asc'
+            };
+
+            headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+            this.classList.add(`sort-${currentSort.direction}`);
+
+            sortUsuariosTable(sortColumn, currentSort.direction);
+        });
+
+        header.style.cursor = 'pointer';
+    });
+  }
+
+  function sortUsuariosTable(column, direction) {
+      if (!window.usuariosData) return;
+
+      const usuariosOrdenados = [...window.usuariosData].sort((a, b) => {
+          let aValue = getUsuarioValue(a, column);
+          let bValue = getUsuarioValue(b, column);
+
+          if (typeof aValue === 'number' && typeof bValue === 'number') {
+              return direction === 'asc' ? aValue - bValue : bValue - aValue;
+          }
+
+          if (typeof aValue === 'boolean' && typeof bValue === 'boolean') {
+              return direction === 'asc' ? (aValue === bValue ? 0 : aValue ? 1 : -1) : (aValue === bValue ? 0 : aValue ? -1 : 1);
+          }
+
+          if (column === 'ultimo_acesso') {
+              if (aValue === 'Nunca' && bValue === 'Nunca') return 0;
+              if (aValue === 'Nunca') return direction === 'asc' ? 1 : -1;
+              if (bValue === 'Nunca') return direction === 'asc' ? -1 : 1;
+              
+              const aDate = new Date(aValue || 0);
+              const bDate = new Date(bValue || 0);
+              return direction === 'asc' ? aDate - bDate : bDate - aDate;
+          }
+
+          aValue = String(aValue || '');
+          bValue = String(bValue || '');
+          
+          return direction === 'asc' 
+              ? aValue.localeCompare(bValue, 'pt-BR', { sensitivity: 'base' })
+              : bValue.localeCompare(aValue, 'pt-BR', { sensitivity: 'base' });
+      });
+
+      renderUsuariosTable(usuariosOrdenados);
+      setupUsuarioActions();
+  }
+
+  function getUsuarioValue(usuario, column) {
+      switch(column) {
+          case 'id':
+              return parseInt(usuario.id) || 0;
+          case 'nome':
+              return usuario.nome || '';
+          case 'tipo':
+              return usuario.tipo || '';
+          case 'status':
+              return usuario.status === true || usuario.status === 'true' || usuario.status === 'Ativo';
+          case 'conta':
+              return usuario.conta !== null && usuario.conta !== undefined;
+          case 'ultimo_acesso':
+              return usuario.ultimo_acesso || 'Nunca';
+          default:
+              return '';
+      }
   }
 
   async function criarContaUsuario(usuarioId) {
@@ -8666,72 +9177,145 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   // ===== DESCONTOS =====
   async function loadDescontosData() {
-    try {
-      const searchText =
-        document.getElementById('searchDesconto')?.value.toLowerCase() || '';
-      const data = await fetchWithErrorHandling('/admin/descontos');
+      try {
+          const searchText = document.getElementById('searchDesconto')?.value.toLowerCase() || '';
+          const data = await fetchWithErrorHandling('/admin/descontos');
 
-      if (data.success) {
-        const descontosTable = document.querySelector('#descontosTable tbody');
-        if (descontosTable) {
-          descontosTable.innerHTML = '';
+          if (data.success) {
+              window.descontosData = data.descontos.filter(desconto => 
+                  !searchText || (desconto.identificador || '').toLowerCase().includes(searchText)
+              );
+              
+              const descontosTable = document.querySelector('#descontosTable tbody');
+              if (descontosTable) {
+                  renderDescontosTable(window.descontosData);
+                  setupDescontoActions();
+                  setupDescontoRowClickEvents();
+                  setupDescontoSorting();
+              }
+          }
+      } catch (error) {
+          showFlashMessage('error', 'Erro ao carregar lista de descontos');
+      }
+  }
 
-          data.descontos.forEach((desconto) => {
-            if (
-              searchText &&
-              !(desconto.identificador || '').toLowerCase().includes(searchText)
-            ) {
-              return;
-            }
+  function renderDescontosTable(descontos) {
+      const descontosTable = document.querySelector('#descontosTable tbody');
+      descontosTable.innerHTML = '';
 
-            const row = document.createElement('tr');
-            row.classList.add('desconto-row');
-            row.setAttribute('data-id', desconto.id);
-            row.innerHTML = `
+      descontos.forEach((desconto) => {
+          const row = document.createElement('tr');
+          row.classList.add('desconto-row');
+          row.setAttribute('data-id', desconto.id);
+          
+          row.innerHTML = `
               <td>${desconto.identificador || '-'}</td>
               <td>${desconto.descricao || '-'}</td>
               <td>${desconto.quantidade_minima}</td>
               <td>${desconto.quantidade_maxima}</td>
               <td>${desconto.valor_unitario_com_desconto || '0,00'}</td>
               <td>${desconto.valido_ate || '-'}</td>
-              <td><span class="badge ${
-                desconto.ativo ? 'badge-success' : 'badge-danger'
-              }">${desconto.ativo ? 'Ativo' : 'Inativo'}</span></td>
+              <td><span class="badge ${desconto.ativo ? 'badge-success' : 'badge-danger'}">${desconto.ativo ? 'Ativo' : 'Inativo'}</span></td>
               <td>
-                <div class="table-actions">
-                  <button class="btn-icon btn-warning editar-desconto" data-id="${
-                    desconto.id
-                  }" title="Editar">
-                    <i class="fas fa-edit"></i>
-                  </button>
-                  <button class="btn-icon btn-danger remover-desconto" data-id="${
-                    desconto.id
-                  }" title="Remover">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </div>
+                  <div class="table-actions">
+                      <button class="btn-icon btn-warning editar-desconto" data-id="${desconto.id}" title="Editar">
+                          <i class="fas fa-edit"></i>
+                      </button>
+                      <button class="btn-icon btn-danger remover-desconto" data-id="${desconto.id}" title="Remover">
+                          <i class="fas fa-trash"></i>
+                      </button>
+                  </div>
               </td>
-            `;
-            descontosTable.appendChild(row);
-          });
+          `;
+          descontosTable.appendChild(row);
+      });
+  }
 
-          setupDescontoActions();
-
-          // Adiciona evento de clique nas linhas da tabela
-          document.querySelectorAll('.desconto-row').forEach((row) => {
-            row.addEventListener('click', function (e) {
-              // Evita abrir o modal se o clique foi em um botão de ação
+  function setupDescontoRowClickEvents() {
+      document.querySelectorAll('.desconto-row').forEach((row) => {
+          row.addEventListener('click', function (e) {
               if (!e.target.closest('.table-actions')) {
-                const descontoId = this.getAttribute('data-id');
-                openProdutosDescontoModal(descontoId);
+                  const descontoId = this.getAttribute('data-id');
+                  openProdutosDescontoModal(descontoId);
               }
-            });
           });
-        }
+      });
+  }
+
+  function setupDescontoSorting() {
+      const table = document.getElementById('descontosTable');
+      if (!table) return;
+
+      const headers = table.querySelectorAll('th.sortable');
+      let currentSort = { column: null, direction: 'asc' };
+
+      headers.forEach(header => {
+          header.addEventListener('click', function() {
+              const sortColumn = this.getAttribute('data-sort');
+              const isAscending = currentSort.column === sortColumn && currentSort.direction === 'asc';
+              
+              currentSort = {
+                  column: sortColumn,
+                  direction: isAscending ? 'desc' : 'asc'
+              };
+
+              headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+              this.classList.add(`sort-${currentSort.direction}`);
+
+              sortDescontosTable(sortColumn, currentSort.direction);
+          });
+
+          header.style.cursor = 'pointer';
+      });
+  }
+
+  function sortDescontosTable(column, direction) {
+      if (!window.descontosData) return;
+
+      const descontosOrdenados = [...window.descontosData].sort((a, b) => {
+          let aValue = getDescontoValue(a, column);
+          let bValue = getDescontoValue(b, column);
+
+          if (typeof aValue === 'number' && typeof bValue === 'number') {
+              return direction === 'asc' ? aValue - bValue : bValue - aValue;
+          }
+
+          if (typeof aValue === 'boolean' && typeof bValue === 'boolean') {
+              return direction === 'asc' ? (aValue === bValue ? 0 : aValue ? 1 : -1) : (aValue === bValue ? 0 : aValue ? -1 : 1);
+          }
+
+          aValue = String(aValue || '');
+          bValue = String(bValue || '');
+          
+          return direction === 'asc' 
+              ? aValue.localeCompare(bValue, 'pt-BR', { sensitivity: 'base' })
+              : bValue.localeCompare(aValue, 'pt-BR', { sensitivity: 'base' });
+      });
+
+      renderDescontosTable(descontosOrdenados);
+      setupDescontoActions();
+      setupDescontoRowClickEvents();
+  }
+
+  function getDescontoValue(desconto, column) {
+      switch(column) {
+          case 'identificador':
+              return desconto.identificador || '';
+          case 'descricao':
+              return desconto.descricao || '';
+          case 'quantidade_minima':
+              return parseInt(desconto.quantidade_minima) || 0;
+          case 'quantidade_maxima':
+              return parseInt(desconto.quantidade_maxima) || 0;
+          case 'valor_unitario_com_desconto':
+              return parseFloat((desconto.valor_unitario_com_desconto || '0').replace(/[^\d,]/g, '').replace(',', '.')) || 0;
+          case 'valido_ate':
+              return desconto.valido_ate || '';
+          case 'ativo':
+              return desconto.ativo === true || desconto.ativo === 'true';
+          default:
+              return '';
       }
-    } catch (error) {
-      showFlashMessage('error', 'Erro ao carregar lista de descontos');
-    }
   }
 
   async function openProdutosDescontoModal(descontoId) {
