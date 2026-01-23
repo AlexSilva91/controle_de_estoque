@@ -6708,6 +6708,7 @@ document.addEventListener('DOMContentLoaded', function () {
       'totalDinheiro',
       'totalCartaoCredito',
       'totalCartaoDebito',
+      'totalAPrazoRecebido',
       'totalAPrazo',
     ];
 
@@ -6723,23 +6724,85 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     formasPagamentoIds.forEach((id) => {
-      const element = document.getElementById(id);
-      if (element) {
-        // Encontra o elemento pai (total-item) para tornar clicável
-        const card = element.closest('.total-item');
-        if (card) {
-          card.style.cursor = 'pointer';
-          card.classList.add('clickable-card');
-          card.addEventListener('click', () => {
-            const formaPagamento = formaPagamentoMap[id];
-            openVendasFormaPagamentoModal(caixaId, formaPagamento);
-          });
+        const element = document.getElementById(id);
+        if (element) {
+            const card = element.closest('.total-item');
+            if (card) {
+                card.style.cursor = 'pointer';
+                card.classList.add('clickable-card');
+                
+                const newCard = card.cloneNode(true);
+                card.parentNode.replaceChild(newCard, card);
+
+                newCard.addEventListener('click', () => {
+                    if (id === 'totalAPrazoRecebido') {
+                        openContasPrazoRecebidasModal(caixaId);
+                    } else {
+                        const formaPagamento = formaPagamentoMap[id];
+                        openVendasFormaPagamentoModal(caixaId, formaPagamento);
+                    }
+                });
+            }
         }
-      }
     });
   }
 
-  // Função para abrir modal de vendas por forma de pagamento
+  async function openContasPrazoRecebidasModal(caixaId) {
+    try {
+      showLoading(true);
+      const response = await fetchWithErrorHandling(
+        `/admin/caixas/${caixaId}/contas-prazo-recebidas`
+      );
+
+      if (response.success) {
+        const modal = document.getElementById('vendasFormaPagamentoModal');
+        const tableBody = document.querySelector('#vendasFormaPagamentoTable tbody');
+        const titulo = document.getElementById('vendasFormaPagamentoTitulo');
+
+        titulo.textContent = 'Contas a Prazo Recebidas no Caixa';
+
+        tableBody.innerHTML = '';
+
+        response.pagamentos.forEach((p) => {
+          const row = document.createElement('tr');
+          
+          row.innerHTML = `
+                    <td>${formatDateTime(p.data_pagamento)}</td>
+                    <td>${p.conta_id}</td>
+                    <td>${p.cliente_nome}</td>
+                    <td>${p.descricao || '-'}</td>
+                    <td>${formatarMoeda(p.valor_pago)}</td>
+                    <td>
+                        ${p.nota_fiscal_id ? `
+                        <button class="btn-view-venda" data-venda-id="${p.nota_fiscal_id}">
+                            <i class="fas fa-eye"></i> Ver Detalhes
+                        </button>
+                        ` : '-'}
+                    </td>
+                `;
+          tableBody.appendChild(row);
+        });
+
+        tableBody.querySelectorAll('.btn-view-venda').forEach((btn) => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const vendaId = btn.getAttribute('data-venda-id');
+            openDetalhesVendaModal(vendaId);
+          });
+        });
+
+        openModal(modal);
+      } else {
+        showFlashMessage('error', response.error || 'Erro ao carregar recebimentos');
+      }
+    } catch (error) {
+      console.error(error);
+      showFlashMessage('error', 'Erro ao carregar recebimentos');
+    } finally {
+      showLoading(false);
+    }
+  }
+
   async function openVendasFormaPagamentoModal(caixaId, formaPagamento) {
     try {
       const response = await fetchWithErrorHandling(

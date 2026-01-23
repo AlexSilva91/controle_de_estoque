@@ -1489,8 +1489,10 @@ def gerar_pdf_lotes():
         data_inicio_str = request.args.get("data_inicio")
         data_fim_str = request.args.get("data_fim")
         data_unica_str = request.args.get("data")
-        
-        query = db.session.query(LoteEstoque).join(Produto, LoteEstoque.produto_id == Produto.id)
+
+        query = db.session.query(LoteEstoque).join(
+            Produto, LoteEstoque.produto_id == Produto.id
+        )
 
         if produto_id:
             query = query.filter(LoteEstoque.produto_id == produto_id)
@@ -1507,7 +1509,9 @@ def gerar_pdf_lotes():
                 data_fim = datetime.combine(data_unica, time.max)
                 filtro_data_aplicado = True
             except ValueError as e:
-                logger.warning(f"Formato de data inválido: {data_unica_str} - Erro: {e}")
+                logger.warning(
+                    f"Formato de data inválido: {data_unica_str} - Erro: {e}"
+                )
 
         elif data_inicio_str or data_fim_str:
             if data_inicio_str:
@@ -1515,31 +1519,41 @@ def gerar_pdf_lotes():
                     data_inicio = datetime.strptime(data_inicio_str, "%Y-%m-%d").date()
                     data_inicio = datetime.combine(data_inicio, time.min)
                 except ValueError as e:
-                    logger.warning(f"Formato de data início inválido: {data_inicio_str} - Erro: {e}")
+                    logger.warning(
+                        f"Formato de data início inválido: {data_inicio_str} - Erro: {e}"
+                    )
 
             if data_fim_str:
                 try:
                     data_fim = datetime.strptime(data_fim_str, "%Y-%m-%d").date()
                     data_fim = datetime.combine(data_fim, time.max)
                 except ValueError as e:
-                    logger.warning(f"Formato de data fim inválido: {data_fim_str} - Erro: {e}")
+                    logger.warning(
+                        f"Formato de data fim inválido: {data_fim_str} - Erro: {e}"
+                    )
 
             if data_inicio or data_fim:
                 filtro_data_aplicado = True
                 if data_inicio and data_fim:
-                    query = query.filter(LoteEstoque.data_entrada.between(data_inicio, data_fim))
+                    query = query.filter(
+                        LoteEstoque.data_entrada.between(data_inicio, data_fim)
+                    )
                 elif data_inicio:
                     query = query.filter(LoteEstoque.data_entrada >= data_inicio)
                 elif data_fim:
                     query = query.filter(LoteEstoque.data_entrada <= data_fim)
 
         if filtro_data_aplicado and data_unica_str:
-            query = query.filter(LoteEstoque.data_entrada.between(data_inicio, data_fim))
+            query = query.filter(
+                LoteEstoque.data_entrada.between(data_inicio, data_fim)
+            )
 
         lotes = query.order_by(Produto.nome.asc(), LoteEstoque.data_entrada.asc()).all()
-        
+
         for i, lote in enumerate(lotes[:3]):
-            logger.info(f"Lote {i+1}: Produto={lote.produto.nome if lote.produto else 'N/A'}, Data={lote.data_entrada}, Qtd={lote.quantidade_disponivel}")
+            logger.info(
+                f"Lote {i+1}: Produto={lote.produto.nome if lote.produto else 'N/A'}, Data={lote.data_entrada}, Qtd={lote.quantidade_disponivel}"
+            )
 
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
@@ -1567,15 +1581,15 @@ def gerar_pdf_lotes():
             alignment=TA_CENTER,
             spaceAfter=10,
         )
-        
+
         titulo = "Entradas no Estoque"
         info_filtros = []
-        
+
         if produto_id:
             produto_filtrado = Produto.query.get(produto_id)
             if produto_filtrado:
                 info_filtros.append(f"Produto: {produto_filtrado.nome}")
-        
+
         if filtro_data_aplicado:
             if data_unica_str:
                 info_filtros.append(f"Data: {formatar_data_br2(data_unica_str)}")
@@ -1587,10 +1601,10 @@ def gerar_pdf_lotes():
                     periodo.append(f"Até: {formatar_data_br2(data_fim_str)}")
                 if periodo:
                     info_filtros.append(" ".join(periodo))
-        
+
         if info_filtros:
             titulo = f"{titulo} - {' | '.join(info_filtros)}"
-        
+
         elements.append(Paragraph(titulo, header_style))
         elements.append(Spacer(1, -20))
         elements.append(
@@ -1612,7 +1626,11 @@ def gerar_pdf_lotes():
                 spaceAfter=6,
                 textColor=colors.grey,
             )
-            elements.append(Paragraph(f"Filtros aplicados: {' | '.join(info_filtros)}", filtro_style))
+            elements.append(
+                Paragraph(
+                    f"Filtros aplicados: {' | '.join(info_filtros)}", filtro_style
+                )
+            )
             elements.append(Spacer(1, 6))
 
         # -------------------- Tabela --------------------
@@ -1676,14 +1694,18 @@ def gerar_pdf_lotes():
             )
 
         if len(table_data) == 1:
-            table_data.append([
-                Paragraph("Nenhum lote encontrado com os filtros aplicados", cell_left),
-                Paragraph("", cell_style),
-                Paragraph("", cell_style),
-                Paragraph("", cell_style),
-                Paragraph("", cell_style),
-                Paragraph("", cell_style),
-            ])
+            table_data.append(
+                [
+                    Paragraph(
+                        "Nenhum lote encontrado com os filtros aplicados", cell_left
+                    ),
+                    Paragraph("", cell_style),
+                    Paragraph("", cell_style),
+                    Paragraph("", cell_style),
+                    Paragraph("", cell_style),
+                    Paragraph("", cell_style),
+                ]
+            )
 
         col_widths = [55 * mm, 25 * mm, 25 * mm, 30 * mm, 25 * mm, 15 * mm]
         lotes_table = Table(table_data, colWidths=col_widths, repeatRows=1)
@@ -1710,8 +1732,10 @@ def gerar_pdf_lotes():
         # -------------------- Resumo --------------------
         if len(lotes) > 0:
             total_lotes = len(lotes)
-            total_ativos = sum(1 for lote in lotes if float(lote.quantidade_disponivel) > 0)
-            
+            total_ativos = sum(
+                1 for lote in lotes if float(lote.quantidade_disponivel) > 0
+            )
+
             resumo_style = ParagraphStyle(
                 "Resumo",
                 parent=styles["Normal"],
@@ -1720,8 +1744,10 @@ def gerar_pdf_lotes():
                 spaceBefore=12,
                 textColor=colors.darkgreen,
             )
-            
-            resumo_text = f"Resumo: {total_lotes} lote(s) encontrado(s) | {total_ativos} ativo(s)"
+
+            resumo_text = (
+                f"Resumo: {total_lotes} lote(s) encontrado(s) | {total_ativos} ativo(s)"
+            )
             elements.append(Paragraph(resumo_text, resumo_style))
             logger.info(f"Resumo PDF: {resumo_text}")
 
@@ -1748,6 +1774,7 @@ def gerar_pdf_lotes():
     except Exception as e:
         logger.error(f"Erro ao gerar PDF de lotes: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
+
 
 @admin_bp.route("/produtos", methods=["POST"])
 @login_required
@@ -2491,93 +2518,131 @@ def transferir_produto_estoque(produto_id):
     try:
         data = request.get_json()
 
-        campos_obrigatorios = ['usuario_id', 'estoque_origem', 'estoque_destino', 'quantidade']
+        campos_obrigatorios = [
+            "usuario_id",
+            "estoque_origem",
+            "estoque_destino",
+            "quantidade",
+        ]
         for campo in campos_obrigatorios:
             if campo not in data:
-                return jsonify({
-                    'success': False,
-                    'message': f'Campo obrigatório faltando: {campo}'
-                }), 400
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": f"Campo obrigatório faltando: {campo}",
+                        }
+                    ),
+                    400,
+                )
 
         produto_origem = Produto.query.get_or_404(produto_id)
-        
-        try:
-            estoque_origem = TipoEstoque(data['estoque_origem'])
-            estoque_destino = TipoEstoque(data['estoque_destino'])
-        except ValueError as e:
-            return jsonify({
-                'success': False,
-                'message': f'Tipo de estoque inválido. Valores válidos: {[e.value for e in TipoEstoque]}'
-            }), 400
 
         try:
-            quantidade = Decimal(str(data['quantidade']))
+            estoque_origem = TipoEstoque(data["estoque_origem"])
+            estoque_destino = TipoEstoque(data["estoque_destino"])
+        except ValueError as e:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": f"Tipo de estoque inválido. Valores válidos: {[e.value for e in TipoEstoque]}",
+                    }
+                ),
+                400,
+            )
+
+        try:
+            quantidade = Decimal(str(data["quantidade"]))
         except:
-            return jsonify({
-                'success': False,
-                'message': 'Quantidade deve ser um número válido'
-            }), 400
-        
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Quantidade deve ser um número válido",
+                    }
+                ),
+                400,
+            )
+
         unidade_destino = None
-        if 'unidade_destino' in data and data['unidade_destino'] is not None:
+        if "unidade_destino" in data and data["unidade_destino"] is not None:
             try:
-                unidade_destino = UnidadeMedida(data['unidade_destino'])
+                unidade_destino = UnidadeMedida(data["unidade_destino"])
             except ValueError as e:
-                return jsonify({
-                    'success': False,
-                    'message': f'Unidade de medida inválida. Valores válidos: {[e.value for e in UnidadeMedida]}'
-                }), 400
-        
-        dar_entrada_destino = data.get('dar_entrada_destino', True)
-        observacao = data.get('observacao')
-        
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": f"Unidade de medida inválida. Valores válidos: {[e.value for e in UnidadeMedida]}",
+                        }
+                    ),
+                    400,
+                )
+
+        dar_entrada_destino = data.get("dar_entrada_destino", True)
+        observacao = data.get("observacao")
+
         transferencia = transferir_produto(
             produto_origem=produto_origem,
-            usuario_id=data['usuario_id'],
+            usuario_id=data["usuario_id"],
             estoque_origem=estoque_origem,
             estoque_destino=estoque_destino,
             quantidade=quantidade,
             unidade_destino=unidade_destino,
             dar_entrada_destino=dar_entrada_destino,
-            observacao=observacao
+            observacao=observacao,
         )
-        
-        return jsonify({
-            'success': True,
-            'message': 'Transferência realizada com sucesso',
-            'transferencia': {
-                'id': transferencia.id,
-                'produto_origem_id': transferencia.produto_id,
-                'produto_destino_id': transferencia.produto_destino_id,
-                'quantidade_origem': str(transferencia.quantidade),
-                'quantidade_destino': str(transferencia.quantidade_destino),
-                'unidade_origem': transferencia.unidade_origem,
-                'unidade_destino': transferencia.unidade_destino,
-                'estoque_origem': transferencia.estoque_origem.value,
-                'estoque_destino': transferencia.estoque_destino.value,
-                'data': transferencia.data_criacao.isoformat() if transferencia.data_criacao else None
-            }
-        }), 200
-        
+
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "message": "Transferência realizada com sucesso",
+                    "transferencia": {
+                        "id": transferencia.id,
+                        "produto_origem_id": transferencia.produto_id,
+                        "produto_destino_id": transferencia.produto_destino_id,
+                        "quantidade_origem": str(transferencia.quantidade),
+                        "quantidade_destino": str(transferencia.quantidade_destino),
+                        "unidade_origem": transferencia.unidade_origem,
+                        "unidade_destino": transferencia.unidade_destino,
+                        "estoque_origem": transferencia.estoque_origem.value,
+                        "estoque_destino": transferencia.estoque_destino.value,
+                        "data": (
+                            transferencia.data_criacao.isoformat()
+                            if transferencia.data_criacao
+                            else None
+                        ),
+                    },
+                }
+            ),
+            200,
+        )
+
     except ValueError as e:
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 400
-        
+        return jsonify({"success": False, "message": str(e)}), 400
+
     except SQLAlchemyError as e:
-        return jsonify({
-            'success': False,
-            'message': 'Erro no banco de dados',
-            'error': str(e)
-        }), 500
-        
+        return (
+            jsonify(
+                {"success": False, "message": "Erro no banco de dados", "error": str(e)}
+            ),
+            500,
+        )
+
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': 'Erro interno no servidor',
-            'error': str(e)
-        }), 500
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": "Erro interno no servidor",
+                    "error": str(e),
+                }
+            ),
+            500,
+        )
+
 
 # ===== Venda com Data Retroativa ====
 @admin_bp.route("/api/vendas/retroativa", methods=["POST"])
@@ -5948,13 +6013,20 @@ def atualizar_forma_pagamentos(venda_id):
         if not pagamento.get("forma_pagamento"):
             logger.warning(f"Forma de pagamento inválida no item {i}")
             return (
-                jsonify({"success": False, "error": f"Forma de pagamento inválida no item {i}"}),
+                jsonify(
+                    {
+                        "success": False,
+                        "error": f"Forma de pagamento inválida no item {i}",
+                    }
+                ),
                 400,
             )
         if "valor" not in pagamento:
             logger.warning(f"Valor não informado no item {i}")
             return (
-                jsonify({"success": False, "error": f"Valor não informado no item {i}"}),
+                jsonify(
+                    {"success": False, "error": f"Valor não informado no item {i}"}
+                ),
                 400,
             )
 
@@ -5977,42 +6049,40 @@ def atualizar_forma_pagamentos(venda_id):
             )
 
         pagamentos_existentes = (
-            session.query(PagamentoNotaFiscal)
-            .filter_by(nota_fiscal_id=venda_id)
-            .all()
+            session.query(PagamentoNotaFiscal).filter_by(nota_fiscal_id=venda_id).all()
         )
-        
+
         pagamento_ids = [p.id for p in pagamentos_existentes]
-        
+
         if pagamento_ids:
             session.query(Financeiro).filter(
                 Financeiro.pagamento_id.in_(pagamento_ids)
             ).delete(synchronize_session=False)
-        
-        session.query(PagamentoNotaFiscal).filter_by(
-            nota_fiscal_id=venda_id
-        ).delete(synchronize_session=False)
-        
-        conta_receber_existente = session.query(ContaReceber).filter_by(
-            nota_fiscal_id=venda_id
-        ).first()
-        
+
+        session.query(PagamentoNotaFiscal).filter_by(nota_fiscal_id=venda_id).delete(
+            synchronize_session=False
+        )
+
+        conta_receber_existente = (
+            session.query(ContaReceber).filter_by(nota_fiscal_id=venda_id).first()
+        )
+
         if conta_receber_existente:
             session.delete(conta_receber_existente)
 
         pagamentos_ids = []
         valor_a_prazo = Decimal(0)
         valor_total_pagamentos = Decimal(0)
-        
+
         for pagamento_data in pagamentos_recebidos:
             forma = pagamento_data.get("forma_pagamento")
             valor = Decimal(str(pagamento_data.get("valor")))
-            
+
             try:
                 forma_enum = FormaPagamento(forma)
             except ValueError:
                 forma_enum = forma
-            
+
             pagamento_nf = PagamentoNotaFiscal(
                 nota_fiscal_id=nota_fiscal.id,
                 forma_pagamento=forma_enum,
@@ -6021,7 +6091,7 @@ def atualizar_forma_pagamentos(venda_id):
                 sincronizado=False,
             )
             session.add(pagamento_nf)
-            session.flush()  
+            session.flush()
 
             pagamentos_ids.append(pagamento_nf.id)
             valor_total_pagamentos += valor
@@ -6043,15 +6113,17 @@ def atualizar_forma_pagamentos(venda_id):
                 valor_a_prazo += valor
 
         diferenca = abs(valor_total_pagamentos - nota_fiscal.valor_total)
-        if diferenca > Decimal("0.01"): 
+        if diferenca > Decimal("0.01"):
             logger.warning(
                 f"Soma dos novos pagamentos ({valor_total_pagamentos}) não confere com valor total da nota ({nota_fiscal.valor_total})"
             )
             return (
-                jsonify({
-                    "success": False, 
-                    "error": f"Soma dos pagamentos ({valor_total_pagamentos}) não confere com valor total da venda ({nota_fiscal.valor_total})"
-                }),
+                jsonify(
+                    {
+                        "success": False,
+                        "error": f"Soma dos pagamentos ({valor_total_pagamentos}) não confere com valor total da venda ({nota_fiscal.valor_total})",
+                    }
+                ),
                 400,
             )
 
@@ -6069,12 +6141,14 @@ def atualizar_forma_pagamentos(venda_id):
             session.add(conta_receber)
 
         if len(pagamentos_recebidos) == 1:
-            nota_fiscal.forma_pagamento = FormaPagamento(pagamentos_recebidos[0]["forma_pagamento"])
+            nota_fiscal.forma_pagamento = FormaPagamento(
+                pagamentos_recebidos[0]["forma_pagamento"]
+            )
         else:
             nota_fiscal.forma_pagamento = FormaPagamento.dinheiro
-        
+
         nota_fiscal.a_prazo = valor_a_prazo > 0
-        
+
         valor_recebido = valor_total_pagamentos - valor_a_prazo
         nota_fiscal.valor_recebido = valor_recebido
         nota_fiscal.troco = max(valor_recebido - nota_fiscal.valor_total, Decimal(0))
@@ -6084,7 +6158,7 @@ def atualizar_forma_pagamentos(venda_id):
             .filter_by(caixa_id=nota_fiscal.caixa_id, tipo=TipoMovimentacao.saida)
             .all()
         )
-        
+
         if len(pagamentos_recebidos) == 1:
             nova_forma_enum = FormaPagamento(pagamentos_recebidos[0]["forma_pagamento"])
             for mov in movimentacoes:
@@ -6097,24 +6171,33 @@ def atualizar_forma_pagamentos(venda_id):
             f"Total de {len(pagamentos_recebidos)} pagamentos registrados. "
             f"Valor a prazo: {valor_a_prazo}"
         )
-        
-        return jsonify({
-            "success": True,
-            "mensagem": "Formas de pagamento atualizadas com sucesso!",
-            "pagamentos_ids": pagamentos_ids,
-            "valor_a_prazo": float(valor_a_prazo) if valor_a_prazo > 0 else 0,
-            "valor_recebido": float(valor_recebido),
-            "troco": float(nota_fiscal.troco) if nota_fiscal.troco else 0,
-        })
+
+        return jsonify(
+            {
+                "success": True,
+                "mensagem": "Formas de pagamento atualizadas com sucesso!",
+                "pagamentos_ids": pagamentos_ids,
+                "valor_a_prazo": float(valor_a_prazo) if valor_a_prazo > 0 else 0,
+                "valor_recebido": float(valor_recebido),
+                "troco": float(nota_fiscal.troco) if nota_fiscal.troco else 0,
+            }
+        )
 
     except Exception as e:
         session.rollback()
         import logging
+
         logging.exception(f"Erro ao atualizar pagamentos da venda {venda_id}: {str(e)}")
         return (
-            jsonify({"success": False, "error": f"Erro interno ao atualizar pagamentos: {str(e)}"}),
+            jsonify(
+                {
+                    "success": False,
+                    "error": f"Erro interno ao atualizar pagamentos: {str(e)}",
+                }
+            ),
             500,
         )
+
 
 @admin_bp.route("/caixas/<int:caixa_id>/vendas-por-pagamento")
 @login_required
@@ -6178,6 +6261,39 @@ def get_vendas_por_pagamento(caixa_id):
     finally:
         session.close()
 
+
+@admin_bp.route("/caixas/<int:caixa_id>/contas-prazo-recebidas")
+@login_required
+@admin_required
+def get_contas_prazo_recebidas(caixa_id):
+    session = Session(db.engine)
+    try:
+        pagamentos = (
+            session.query(PagamentoContaReceber)
+            .join(ContaReceber)
+            .filter(PagamentoContaReceber.caixa_id == caixa_id)
+            .all()
+        )
+
+        pagamentos_data = []
+        for p in pagamentos:
+            pagamentos_data.append({
+                "id": p.id,
+                "conta_id": p.conta_id,
+                "nota_fiscal_id": p.conta.nota_fiscal_id,
+                "data_pagamento": p.data_pagamento.isoformat(),
+                "cliente_nome": p.conta.cliente.nome if p.conta.cliente else "N/A",
+                "valor_pago": float(p.valor_pago),
+                "forma_pagamento": p.forma_pagamento.value,
+                "descricao": p.conta.descricao
+            })
+
+        return jsonify({"success": True, "pagamentos": pagamentos_data})
+    except Exception as e:
+        logger.error(f"Erro ao buscar pagamentos de contas a prazo: {str(e)}", exc_info=True)
+        return jsonify({"success": False, "error": "Erro interno"}), 500
+    finally:
+        session.close()
 
 @admin_bp.route("/caixas/<int:caixa_id>/vendas-por-pagamento/pdf")
 @login_required
