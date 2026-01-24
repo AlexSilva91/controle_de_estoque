@@ -72,6 +72,7 @@ from app.utils.format_data_moeda import (
     format_currency,
     format_number,
     formatar_data_br2,
+    formatarMoeda,
     to_decimal_or_none,
 )
 from app.models.entities import (
@@ -8103,14 +8104,6 @@ def relatorio_vendas_produtos_pdf():
             exc_info=True,
         )
         return jsonify({"error": str(e)}), 500
-
-
-def formatarMoeda(valor):
-    """Função auxiliar para formatar valores monetários"""
-    return (
-        f"R$ {float(valor):,.2f}".replace(",", "v").replace(".", ",").replace("v", ".")
-    )
-
 
 # ================= CONTAS A RECEBER =====================
 from app.crud import obter_contas_receber

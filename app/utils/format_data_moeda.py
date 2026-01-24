@@ -31,6 +31,12 @@ def formatar_data_br2(data) -> str:
 
     return str(data)
 
+def formatarMoeda(valor):
+    """Função auxiliar para formatar valores monetários"""
+    return (
+        f"R$ {float(valor):,.2f}".replace(",", "v").replace(".", ",").replace("v", ".")
+    )
+
 def format_currency(value):
     """Formata valores monetários no padrão brasileiro (R$ XX.XXX,XX)"""
     if value is None:
