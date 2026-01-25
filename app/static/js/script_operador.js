@@ -2609,7 +2609,7 @@ function showDiscountInstructions() {
   const instructions = document.createElement('div');
   instructions.className = 'discount-instructions';
   instructions.style.cssText = `
-        font-size: 0.8rem;
+        font-size: 0.7rem;
         color: #6c757d;
         margin-top: 5px;
         padding: 5px;
@@ -2623,15 +2623,17 @@ function showDiscountInstructions() {
   if (hasSelectedProduct) {
     instructions.innerHTML = `
             <i class="fas fa-info-circle" style="color: #28a745; margin-right: 5px;"></i>
-            <strong>Desconto específico:</strong> Será aplicado apenas no produto selecionado.
-            <small style="display: block; margin-top: 2px;">Clique fora da tabela para aplicar em todos os produtos.</small>
+            <strong>Desconto específico:</strong><br>
+            Será aplicado apenas no produto selecionado.<br>
+            <small>Clique fora da tabela para aplicar em todos.</small>
         `;
     instructions.style.borderLeftColor = '#28a745';
   } else {
     instructions.innerHTML = `
             <i class="fas fa-info-circle" style="color: #6c757d; margin-right: 5px;"></i>
-            <strong>Desconto geral:</strong> Será aplicado em todos os produtos.
-            <small style="display: block; margin-top: 2px;">Clique em um produto na tabela para aplicar apenas nele.</small>
+            <strong>Desconto geral:</strong><br>
+            Será aplicado em todos os produtos.<br>
+            <small>Clique em um produto para aplicar apenas nele.</small>
         `;
     instructions.style.borderLeftColor = '#007bff';
   }

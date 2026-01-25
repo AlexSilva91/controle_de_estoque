@@ -549,6 +549,11 @@ def update_user(db: Session, user_id: int, user_data: schemas.UsuarioUpdate):
             raise ValueError("Senha deve ter pelo menos 6 caracteres.")
         update_data["senha_hash"] = hash_password(update_data.pop("senha"))
     
+    if "status" in update_data:
+        if user.conta:
+            user.conta.status = update_data["status"]
+            user.conta.sincronizado = False
+    
     for field, value in update_data.items():
         setattr(user, field, value)
     

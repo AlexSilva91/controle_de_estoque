@@ -119,6 +119,7 @@ class Conta(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, unique=True)
     saldo_total = Column(DECIMAL(12, 2), nullable=False, default=0.00)
+    status = Column(Boolean, default=True, nullable=False)
     atualizado_em = Column(
         DateTime, default=datetime.now, onupdate=datetime.now, nullable=False
     )

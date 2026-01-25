@@ -369,7 +369,6 @@ body {
 .btn-primary,
 .btn-secondary {
   padding: 16px 28px;
-  font-size: 16px;
   font-weight: bold;
   border: none;
   border-radius: 8px;
@@ -1675,7 +1674,6 @@ body {
 
 /* Estilos para o campo de desconto manual */
 .discount-control {
-  display: flex;
   align-items: center;
   margin-bottom: 15px;
 }
@@ -3450,7 +3448,7 @@ body {
   color: white;
   font-family: 'Segoe UI', Arial, sans-serif;
   font-weight: bold;
-  font-size: 16px;
+  font-size: 10px;
   border: none;
   padding: 16px 28px;
   border-radius: 8px;
