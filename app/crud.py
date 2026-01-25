@@ -1,3 +1,4 @@
+import re
 from zoneinfo import ZoneInfo
 from flask import json
 from flask_login import current_user
@@ -8,7 +9,7 @@ from app.models import entities
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import func
 from datetime import datetime, time, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import Enum
 from typing import List, Optional, Dict
 from sqlalchemy.orm import Session
@@ -21,7 +22,7 @@ from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy import func,  extract
 from typing import Dict, Any, List, Union, Tuple
 from . import db
-
+import xml.etree.ElementTree as ET
 from app.models.entities import (
     Caixa,
     Cliente,
@@ -31,6 +32,17 @@ from app.models.entities import (
     Financeiro,
     LoteEstoque,
     MovimentacaoConta,
+    NFeDestinatarioXML,
+    NFeDetalheXML,
+    NFeDuplicataXML,
+    NFeEmitenteXML,
+    NFeIdeXML,
+    NFeImpostoItemXML,
+    NFeImpostoXML,
+    NFePagamentoXML,
+    NFeProtocoloXML,
+    NFeTransporteXML,
+    NFeXML,
     NotaFiscal,
     NotaFiscalItem,
     MovimentacaoEstoque,
@@ -3839,3 +3851,635 @@ def atualizar_venda(session, nota_id, novos_dados):
         session.commit()
 
     return get_venda_completa(session, nota_id)
+
+def extrair_chave_acesso(xml_content):
+    """Extrai a chave de acesso do XML da NFe"""
+    try:
+        # Tentar extrair do atributo Id do infNFe
+        match = re.search(r'Id="NFe(\d+)"', xml_content)
+        if match:
+            return match.group(1)
+        
+        # Tentar extrair da tag chNFe
+        match = re.search(r'<chNFe>(\d+)</chNFe>', xml_content)
+        if match:
+            return match.group(1)
+        
+        # Tentar parsear XML
+        root = ET.fromstring(xml_content)
+        inf_nfe = root.find('.//{http://www.portalfiscal.inf.br/nfe}infNFe')
+        if inf_nfe is not None and 'Id' in inf_nfe.attrib:
+            chave = inf_nfe.attrib['Id'].replace('NFe', '')
+            if len(chave) == 44:
+                return chave
+        
+        # Procurar em protNFe
+        prot_nfe = root.find('.//{http://www.portalfiscal.inf.br/nfe}protNFe')
+        if prot_nfe is not None:
+            inf_prot = prot_nfe.find('{http://www.portalfiscal.inf.br/nfe}infProt')
+            if inf_prot is not None:
+                ch_nfe = inf_prot.find('{http://www.portalfiscal.inf.br/nfe}chNFe')
+                if ch_nfe is not None and ch_nfe.text:
+                    return ch_nfe.text
+        
+    except Exception as e:
+        logger.error(f"Erro ao extrair chave de acesso: {e}")
+    
+    return None
+
+
+def extrair_dados_nfe_completo(root, namespaces, chave_acesso):
+    """Extrai todos os dados da NFe do XML"""
+    dados = {
+        "chave_acesso": chave_acesso,
+        "produtos": [],
+        "ide": {},
+        "emitente": {},
+        "destinatario": {},
+        "totais": {},
+        "transporte": {},
+        "pagamentos": [],
+        "duplicatas": [],
+        "protocolo": {}
+    }
+    
+    try:
+        # Extrair dados de identificação (ide)
+        ide = root.find('.//{http://www.portalfiscal.inf.br/nfe}ide')
+        if ide is not None:
+            dados["ide"] = {
+                "cUF": get_text(ide, 'cUF'),
+                "cNF": get_text(ide, 'cNF'),
+                "natOp": get_text(ide, 'natOp'),
+                "mod": get_text(ide, 'mod'),
+                "serie": get_text(ide, 'serie'),
+                "nNF": get_text(ide, 'nNF'),
+                "dhEmi": get_datetime(ide, 'dhEmi'),
+                "dhSaiEnt": get_datetime(ide, 'dhSaiEnt'),
+                "tpNF": get_text(ide, 'tpNF'),
+                "idDest": get_text(ide, 'idDest'),
+                "cMunFG": get_text(ide, 'cMunFG'),
+                "tpImp": get_text(ide, 'tpImp'),
+                "tpEmis": get_text(ide, 'tpEmis'),
+                "cDV": get_text(ide, 'cDV'),
+                "tpAmb": get_text(ide, 'tpAmb'),
+                "finNFe": get_text(ide, 'finNFe'),
+                "indFinal": get_text(ide, 'indFinal'),
+                "indPres": get_text(ide, 'indPres'),
+                "procEmi": get_text(ide, 'procEmi'),
+                "verProc": get_text(ide, 'verProc')
+            }
+        
+        # Extrair emitente
+        emit = root.find('.//{http://www.portalfiscal.inf.br/nfe}emit')
+        if emit is not None:
+            dados["emitente"] = {
+                "CNPJ": get_text(emit, 'CNPJ'),
+                "xNome": get_text(emit, 'xNome'),
+                "xFant": get_text(emit, 'xFant'),
+                "IE": get_text(emit, 'IE'),
+                "CRT": get_text(emit, 'CRT'),
+                "enderEmit": extrair_endereco(emit.find('{http://www.portalfiscal.inf.br/nfe}enderEmit'))
+            }
+        
+        # Extrair destinatário
+        dest = root.find('.//{http://www.portalfiscal.inf.br/nfe}dest')
+        if dest is not None:
+            dados["destinatario"] = {
+                "CNPJ": get_text(dest, 'CNPJ'),
+                "CPF": get_text(dest, 'CPF'),
+                "xNome": get_text(dest, 'xNome'),
+                "indIEDest": get_text(dest, 'indIEDest'),
+                "IE": get_text(dest, 'IE'),
+                "email": get_text(dest, 'email'),
+                "enderDest": extrair_endereco(dest.find('{http://www.portalfiscal.inf.br/nfe}enderDest'))
+            }
+        
+        # Extrair produtos
+        for det in root.findall('.//{http://www.portalfiscal.inf.br/nfe}det'):
+            n_item = det.get('nItem')
+            prod = det.find('{http://www.portalfiscal.inf.br/nfe}prod')
+            
+            if prod is not None:
+                produto = {
+                    "numero_item": int(n_item) if n_item and n_item.isdigit() else 0,
+                    "codigo_produto": get_text(prod, 'cProd'),
+                    "codigo_ean": get_text(prod, 'cEAN'),
+                    "nome_produto": get_text(prod, 'xProd'),
+                    "ncm": get_text(prod, 'NCM'),
+                    "cest": get_text(prod, 'CEST'),
+                    "cfop": get_text(prod, 'CFOP'),
+                    "unidade_comercial": get_text(prod, 'uCom'),
+                    "unidade_tributaria": get_text(prod, 'uTrib'),
+                    "quantidade": float(get_text(prod, 'qCom', '0')),
+                    "quantidade_tributaria": float(get_text(prod, 'qTrib', '0')),
+                    "valor_unitario_compra": float(get_text(prod, 'vUnCom', '0')),
+                    "valor_unitario_tributario": float(get_text(prod, 'vUnTrib', '0')),
+                    "valor_total": float(get_text(prod, 'vProd', '0')),
+                    "infAdProd": get_text(det, 'infAdProd')
+                }
+                
+                # Extrair impostos do produto
+                imposto = det.find('{http://www.portalfiscal.inf.br/nfe}imposto')
+                if imposto is not None:
+                    produto["vTotTrib"] = float(get_text(imposto, 'vTotTrib', '0'))
+                    
+                    # ICMS
+                    icms = imposto.find('{http://www.portalfiscal.inf.br/nfe}ICMS')
+                    if icms is not None:
+                        icms_tags = icms.find('{http://www.portalfiscal.inf.br/nfe}ICMS00') or \
+                                   icms.find('{http://www.portalfiscal.inf.br/nfe}ICMS10') or \
+                                   icms.find('{http://www.portalfiscal.inf.br/nfe}ICMS20') or \
+                                   icms.find('{http://www.portalfiscal.inf.br/nfe}ICMS30')
+                        
+                        if icms_tags is not None:
+                            produto["icms"] = {
+                                "orig": get_text(icms_tags, 'orig'),
+                                "CST": get_text(icms_tags, 'CST'),
+                                "vBC": float(get_text(icms_tags, 'vBC', '0')),
+                                "pICMS": float(get_text(icms_tags, 'pICMS', '0')),
+                                "vICMS": float(get_text(icms_tags, 'vICMS', '0'))
+                            }
+                
+                dados["produtos"].append(produto)
+        
+        # Extrair totais
+        total = root.find('.//{http://www.portalfiscal.inf.br/nfe}total')
+        if total is not None:
+            icms_tot = total.find('{http://www.portalfiscal.inf.br/nfe}ICMSTot')
+            if icms_tot is not None:
+                dados["totais"] = {
+                    "vBC": float(get_text(icms_tot, 'vBC', '0')),
+                    "vICMS": float(get_text(icms_tot, 'vICMS', '0')),
+                    "vICMSDeson": float(get_text(icms_tot, 'vICMSDeson', '0')),
+                    "vBCST": float(get_text(icms_tot, 'vBCST', '0')),
+                    "vST": float(get_text(icms_tot, 'vST', '0')),
+                    "vProd": float(get_text(icms_tot, 'vProd', '0')),
+                    "vFrete": float(get_text(icms_tot, 'vFrete', '0')),
+                    "vSeg": float(get_text(icms_tot, 'vSeg', '0')),
+                    "vDesc": float(get_text(icms_tot, 'vDesc', '0')),
+                    "vNF": float(get_text(icms_tot, 'vNF', '0')),
+                    "vPIS": float(get_text(icms_tot, 'vPIS', '0')),
+                    "vCOFINS": float(get_text(icms_tot, 'vCOFINS', '0')),
+                    "vTotTrib": float(get_text(icms_tot, 'vTotTrib', '0'))
+                }
+        
+        # Extrair transporte
+        transp = root.find('.//{http://www.portalfiscal.inf.br/nfe}transp')
+        if transp is not None:
+            dados["transporte"] = {
+                "modFrete": get_text(transp, 'modFrete'),
+                "transporta": extrair_transporta(transp.find('{http://www.portalfiscal.inf.br/nfe}transporta')),
+                "veicTransp": extrair_veiculo(transp.find('{http://www.portalfiscal.inf.br/nfe}veicTransp')),
+                "vol": extrair_volume(transp.find('{http://www.portalfiscal.inf.br/nfe}vol'))
+            }
+        
+        # Extrair pagamentos
+        pag = root.find('.//{http://www.portalfiscal.inf.br/nfe}pag')
+        if pag is not None:
+            for det_pag in pag.findall('{http://www.portalfiscal.inf.br/nfe}detPag'):
+                pagamento = {
+                    "indPag": get_text(det_pag, 'indPag'),
+                    "tPag": get_text(det_pag, 'tPag'),
+                    "vPag": float(get_text(det_pag, 'vPag', '0'))
+                }
+                dados["pagamentos"].append(pagamento)
+        
+        # Extrair duplicatas
+        cobr = root.find('.//{http://www.portalfiscal.inf.br/nfe}cobr')
+        if cobr is not None:
+            for dup in cobr.findall('.//{http://www.portalfiscal.inf.br/nfe}dup'):
+                duplicata = {
+                    "nDup": get_text(dup, 'nDup'),
+                    "dVenc": get_datetime(dup, 'dVenc', date_only=True),
+                    "vDup": float(get_text(dup, 'vDup', '0'))
+                }
+                dados["duplicatas"].append(duplicata)
+        
+        # Extrair protocolo
+        prot_nfe = root.find('.//{http://www.portalfiscal.inf.br/nfe}protNFe')
+        if prot_nfe is not None:
+            inf_prot = prot_nfe.find('{http://www.portalfiscal.inf.br/nfe}infProt')
+            if inf_prot is not None:
+                dados["protocolo"] = {
+                    "tpAmb": get_text(inf_prot, 'tpAmb'),
+                    "verAplic": get_text(inf_prot, 'verAplic'),
+                    "chNFe": get_text(inf_prot, 'chNFe'),
+                    "dhRecbto": get_datetime(inf_prot, 'dhRecbto'),
+                    "nProt": get_text(inf_prot, 'nProt'),
+                    "digVal": get_text(inf_prot, 'digVal'),
+                    "cStat": get_text(inf_prot, 'cStat'),
+                    "xMotivo": get_text(inf_prot, 'xMotivo')
+                }
+        
+        # Extrair informações adicionais
+        inf_adic = root.find('.//{http://www.portalfiscal.inf.br/nfe}infAdic')
+        if inf_adic is not None:
+            dados["infCpl"] = get_text(inf_adic, 'infCpl')
+        
+    except Exception as e:
+        logger.error(f"Erro ao extrair dados da NFe: {e}")
+    
+    return dados
+
+
+def get_text(element, tag, default=''):
+    """Extrai texto de elementos XML, tratando namespaces"""
+    if element is None:
+        return default
+    
+    # Tentar com namespace
+    child = element.find(f'{{http://www.portalfiscal.inf.br/nfe}}{tag}')
+    if child is not None and child.text is not None:
+        return child.text.strip()
+    
+    # Tentar sem namespace
+    child = element.find(tag)
+    if child is not None and child.text is not None:
+        return child.text.strip()
+    
+    return default
+
+
+def get_datetime(element, tag, date_only=False):
+    """Extrai e converte datetime de elementos XML"""
+    text = get_text(element, tag)
+    if not text:
+        return None
+    
+    try:
+        if date_only:
+            # Formato apenas data: YYYY-MM-DD
+            return datetime.strptime(text[:10], '%Y-%m-%d')
+        else:
+            # Formato completo: YYYY-MM-DDThh:mm:ss-TZ
+            if 'T' in text:
+                # Remover timezone para simplificar
+                text = text.split('-')[0] if '-' in text and text.count('-') > 2 else text
+                return datetime.strptime(text[:19], '%Y-%m-%dT%H:%M:%S')
+            else:
+                return datetime.strptime(text[:10], '%Y-%m-%d')
+    except Exception:
+        return None
+
+
+def extrair_endereco(ender_element):
+    """Extrai dados de endereço"""
+    if ender_element is None:
+        return {}
+    
+    return {
+        "xLgr": get_text(ender_element, 'xLgr'),
+        "nro": get_text(ender_element, 'nro'),
+        "xBairro": get_text(ender_element, 'xBairro'),
+        "cMun": get_text(ender_element, 'cMun'),
+        "xMun": get_text(ender_element, 'xMun'),
+        "UF": get_text(ender_element, 'UF'),
+        "CEP": get_text(ender_element, 'CEP'),
+        "cPais": get_text(ender_element, 'cPais'),
+        "xPais": get_text(ender_element, 'xPais'),
+        "fone": get_text(ender_element, 'fone')
+    }
+
+
+def extrair_transporta(transporta_element):
+    """Extrai dados do transportador"""
+    if transporta_element is None:
+        return {}
+    
+    return {
+        "CPF": get_text(transporta_element, 'CPF'),
+        "CNPJ": get_text(transporta_element, 'CNPJ'),
+        "xNome": get_text(transporta_element, 'xNome'),
+        "xEnder": get_text(transporta_element, 'xEnder'),
+        "xMun": get_text(transporta_element, 'xMun'),
+        "UF": get_text(transporta_element, 'UF')
+    }
+
+
+def extrair_veiculo(veiculo_element):
+    """Extrai dados do veículo"""
+    if veiculo_element is None:
+        return {}
+    
+    return {
+        "placa": get_text(veiculo_element, 'placa'),
+        "UF": get_text(veiculo_element, 'UF')
+    }
+
+
+def extrair_volume(volume_element):
+    """Extrai dados dos volumes"""
+    if volume_element is None:
+        return {}
+    
+    return {
+        "qVol": int(get_text(volume_element, 'qVol', '0')),
+        "esp": get_text(volume_element, 'esp'),
+        "marca": get_text(volume_element, 'marca'),
+        "pesoL": float(get_text(volume_element, 'pesoL', '0')),
+        "pesoB": float(get_text(volume_element, 'pesoB', '0'))
+    }
+
+
+def determinar_unidade_produto(unidade_xml, nome_produto):
+    """Determina a unidade do produto baseado no XML e nome"""
+    # Mapeamento de unidades do XML para o sistema
+    unidades_map = {
+        'SC': UnidadeMedida.saco,    # Saco
+        'UN': UnidadeMedida.unidade, # Unidade
+        'KG': UnidadeMedida.kg,      # Quilograma
+        'FD': UnidadeMedida.fardo,   # Fardo
+        'PC': UnidadeMedida.pacote,  # Pacote
+        'CX': UnidadeMedida.pacote,  # Caixa (mapeado para pacote)
+        'PT': UnidadeMedida.pacote   # Pacote
+    }
+    
+    # Verificar no mapeamento
+    unidade_norm = unidade_xml.upper().strip()
+    if unidade_norm in unidades_map:
+        return unidades_map[unidade_norm]
+    
+    # Tentar inferir pelo nome do produto
+    nome_upper = nome_produto.upper()
+    if 'SACO' in nome_upper or 'SC' in nome_upper:
+        return UnidadeMedida.saco
+    elif 'PACOTE' in nome_upper or 'PC' in nome_upper:
+        return UnidadeMedida.pacote
+    elif 'FARDO' in nome_upper or 'FD' in nome_upper:
+        return UnidadeMedida.fardo
+    elif 'KG' in nome_upper or 'KILO' in nome_upper or 'QUILO' in nome_upper:
+        return UnidadeMedida.kg
+    elif 'UNID' in nome_upper or 'UN' in nome_upper:
+        return UnidadeMedida.unidade
+    
+    # Padrão: unidade
+    return UnidadeMedida.unidade
+
+
+def extrair_marca_produto(nome_produto):
+    """Extrai marca do nome do produto"""
+    marcas_conhecidas = [
+        'NUTRANE', 'PURINA', 'ROYAL CANIN', 'GRAN PLUS', 
+        'PEDIGREE', 'WHISKAS', 'FRIBOI', 'SADIA', 'PERDIGÃO',
+        'DOG', 'CAT', 'MY CAT', 'DOGS'
+    ]
+    
+    nome_upper = nome_produto.upper()
+    for marca in marcas_conhecidas:
+        if marca in nome_upper:
+            # Extrair apenas a marca, não todo o texto
+            parts = nome_upper.split()
+            for part in parts:
+                if marca.startswith(part) or part in marca:
+                    return marca
+    
+    # Se não encontrar marca conhecida, tentar extrair primeira palavra
+    parts = nome_upper.split()
+    if len(parts) > 0:
+        # Verificar se a primeira palavra parece ser uma marca
+        first_word = parts[0]
+        if len(first_word) > 2 and first_word.isalpha():
+            # Verificar se contém números (provavelmente não é marca)
+            if not any(char.isdigit() for char in first_word):
+                return first_word.title()
+    
+    return ''
+
+
+def salvar_nfe_xml_completo(session, chave_acesso, xml_content, dados_nfe):
+    """Salva todos os dados do XML no banco"""
+    # Criar registro principal
+    nfe_xml = NFeXML(
+        chave_acesso=chave_acesso,
+        xml_original=xml_content,
+        xml_processado=xml_content,
+        versao='4.00',
+        status_processamento='processando',
+        data_recebimento=datetime.now(),
+        sincronizado=False
+    )
+    session.add(nfe_xml)
+    session.flush()
+    
+    # Salvar dados de identificação (ide)
+    if dados_nfe.get('ide'):
+        ide = NFeIdeXML(
+            nfe_xml_id=nfe_xml.id,
+            **{k: v for k, v in dados_nfe['ide'].items() if v is not None}
+        )
+        session.add(ide)
+    
+    # Salvar emitente
+    if dados_nfe.get('emitente'):
+        emit = dados_nfe['emitente']
+        ender = emit.pop('enderEmit', {}) if 'enderEmit' in emit else {}
+        
+        emitente = NFeEmitenteXML(
+            nfe_xml_id=nfe_xml.id,
+            CNPJ=emit.get('CNPJ'),
+            xNome=emit.get('xNome'),
+            xFant=emit.get('xFant'),
+            IE=emit.get('IE'),
+            CRT=emit.get('CRT'),
+            **ender
+        )
+        session.add(emitente)
+    
+    # Salvar destinatário
+    if dados_nfe.get('destinatario'):
+        dest = dados_nfe['destinatario']
+        ender = dest.pop('enderDest', {}) if 'enderDest' in dest else {}
+        
+        destinatario = NFeDestinatarioXML(
+            nfe_xml_id=nfe_xml.id,
+            CNPJ=dest.get('CNPJ'),
+            CPF=dest.get('CPF'),
+            xNome=dest.get('xNome'),
+            indIEDest=dest.get('indIEDest'),
+            IE=dest.get('IE'),
+            email=dest.get('email'),
+            **ender
+        )
+        session.add(destinatario)
+    
+    # Salvar produtos (detalhes)
+    for produto in dados_nfe.get('produtos', []):
+        detalhe = NFeDetalheXML(
+            nfe_xml_id=nfe_xml.id,
+            numero_item=produto.get('numero_item', 0),
+            codigo_produto=produto.get('codigo_produto'),
+            codigo_ean=produto.get('codigo_ean'),
+            nome_produto=produto.get('nome_produto'),
+            ncm=produto.get('ncm'),
+            cest=produto.get('cest'),
+            cfop=produto.get('cfop'),
+            unidade_comercial=produto.get('unidade_comercial'),
+            unidade_tributaria=produto.get('unidade_tributaria'),
+            quantidade_comercial=Decimal(str(produto.get('quantidade', 0))),
+            quantidade_tributaria=Decimal(str(produto.get('quantidade_tributaria', 0))),
+            valor_unitario_comercial=Decimal(str(produto.get('valor_unitario_compra', 0))),
+            valor_unitario_tributario=Decimal(str(produto.get('valor_unitario_tributario', 0))),
+            valor_total=Decimal(str(produto.get('valor_total', 0))),
+            informacoes_adicionais=produto.get('infAdProd')
+        )
+        session.add(detalhe)
+        session.flush()
+        
+        # Salvar impostos do item
+        if 'icms' in produto:
+            impostos_item = NFeImpostoItemXML(
+                detalhe_id=detalhe.id,
+                origem_icms=produto['icms'].get('orig'),
+                cst_icms=produto['icms'].get('CST'),
+                valor_base_calculo_icms=Decimal(str(produto['icms'].get('vBC', 0))),
+                aliquota_icms=Decimal(str(produto['icms'].get('pICMS', 0))),
+                valor_icms=Decimal(str(produto['icms'].get('vICMS', 0))),
+                valor_total_tributos=Decimal(str(produto.get('vTotTrib', 0)))
+            )
+            session.add(impostos_item)
+    
+    # Salvar totais
+    if dados_nfe.get('totais'):
+        impostos = NFeImpostoXML(
+            nfe_xml_id=nfe_xml.id,
+            valor_base_calculo_icms=Decimal(str(dados_nfe['totais'].get('vBC', 0))),
+            valor_icms=Decimal(str(dados_nfe['totais'].get('vICMS', 0))),
+            valor_base_calculo_st=Decimal(str(dados_nfe['totais'].get('vBCST', 0))),
+            valor_st=Decimal(str(dados_nfe['totais'].get('vST', 0))),
+            valor_total_produtos=Decimal(str(dados_nfe['totais'].get('vProd', 0))),
+            valor_frete=Decimal(str(dados_nfe['totais'].get('vFrete', 0))),
+            valor_seguro=Decimal(str(dados_nfe['totais'].get('vSeg', 0))),
+            valor_desconto=Decimal(str(dados_nfe['totais'].get('vDesc', 0))),
+            valor_total_nota=Decimal(str(dados_nfe['totais'].get('vNF', 0))),
+            valor_pis=Decimal(str(dados_nfe['totais'].get('vPIS', 0))),
+            valor_cofins=Decimal(str(dados_nfe['totais'].get('vCOFINS', 0))),
+            valor_total_tributos=Decimal(str(dados_nfe['totais'].get('vTotTrib', 0)))
+        )
+        session.add(impostos)
+    
+    # Salvar transporte
+    if dados_nfe.get('transporte'):
+        transp = dados_nfe['transporte']
+        transporta = transp.get('transporta', {})
+        veiculo = transp.get('veicTransp', {})
+        volume = transp.get('vol', {})
+        
+        transporte = NFeTransporteXML(
+            nfe_xml_id=nfe_xml.id,
+            modalidade_frete=transp.get('modFrete'),
+            cpf_cnpj_transportador=transporta.get('CNPJ') or transporta.get('CPF'),
+            nome_transportador=transporta.get('xNome'),
+            endereco_transportador=transporta.get('xEnder'),
+            municipio_transportador=transporta.get('xMun'),
+            uf_transportador=transporta.get('UF'),
+            placa_veiculo=veiculo.get('placa'),
+            uf_veiculo=veiculo.get('UF'),
+            quantidade_volumes=volume.get('qVol'),
+            especie_volumes=volume.get('esp'),
+            peso_liquido=Decimal(str(volume.get('pesoL', 0))),
+            peso_bruto=Decimal(str(volume.get('pesoB', 0)))
+        )
+        session.add(transporte)
+    
+    # Salvar pagamentos
+    for i, pagamento in enumerate(dados_nfe.get('pagamentos', [])):
+        pag = NFePagamentoXML(
+            nfe_xml_id=nfe_xml.id,
+            forma_pagamento=pagamento.get('tPag'),
+            valor_pagamento=Decimal(str(pagamento.get('vPag', 0))),
+            indicador_pagamento=pagamento.get('indPag'),
+            numero_parcela=i + 1
+        )
+        session.add(pag)
+    
+    # Salvar duplicatas
+    for duplicata in dados_nfe.get('duplicatas', []):
+        dup = NFeDuplicataXML(
+            nfe_xml_id=nfe_xml.id,
+            numero_duplicata=duplicata.get('nDup'),
+            data_vencimento=duplicata.get('dVenc'),
+            valor_duplicata=Decimal(str(duplicata.get('vDup', 0)))
+        )
+        session.add(dup)
+    
+    # Salvar protocolo
+    if dados_nfe.get('protocolo'):
+        protocolo = NFeProtocoloXML(
+            nfe_xml_id=nfe_xml.id,
+            numero_protocolo=dados_nfe['protocolo'].get('nProt'),
+            data_recebimento=dados_nfe['protocolo'].get('dhRecbto'),
+            digito_validador=dados_nfe['protocolo'].get('digVal'),
+            codigo_status=dados_nfe['protocolo'].get('cStat'),
+            motivo_status=dados_nfe['protocolo'].get('xMotivo')
+        )
+        session.add(protocolo)
+    
+    return nfe_xml
+
+
+def to_decimal(value, default=None, places=2):
+    """
+    Converte valor para Decimal normalizado ou retorna default.
+    - Aceita int, float, str
+    - Remove símbolos monetários
+    - Normaliza para N casas decimais (padrão: 2)
+    """
+    if value is None:
+        return default
+
+    try:
+        if isinstance(value, Decimal):
+            decimal_value = value
+
+        elif isinstance(value, (int, float)):
+            decimal_value = Decimal(str(value))
+
+        elif isinstance(value, str):
+            value = value.strip()
+            if value == '':
+                return default
+
+            value = (
+                value
+                .replace('R$', '')
+                .replace(' ', '')
+                .replace(',', '.')
+            )
+
+            parts = value.split('.')
+            if len(parts) > 2:
+                value = parts[0] + '.' + ''.join(parts[1:])
+
+            decimal_value = Decimal(value)
+
+        else:
+            decimal_value = Decimal(str(value))
+
+        if places is not None:
+            decimal_value = decimal_value.quantize(
+                Decimal(f'1.{"0" * places}'),
+                rounding=ROUND_HALF_UP
+            )
+
+        return decimal_value
+
+    except (InvalidOperation, ValueError, TypeError):
+        return default
+
+def arredondar_preco_venda(valor: Decimal) -> Decimal:
+    """
+    Arredonda o preço para múltiplos de 0.10
+    Ex:
+    156.38 -> 156.40
+    143.27 -> 143.30
+    62.02  -> 62.00
+    """
+    if valor is None:
+        return None
+
+    return (
+        (valor / Decimal("0.10"))
+        .quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        * Decimal("0.10")
+    ).quantize(Decimal("0.00"))

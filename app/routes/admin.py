@@ -5,6 +5,7 @@ import locale
 import math
 from math import ceil
 from weasyprint import HTML
+import xml.etree.ElementTree as ET
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 import os
 from zoneinfo import ZoneInfo
@@ -82,6 +83,7 @@ from app.models.entities import (
     Conta,
     LoteEstoque,
     MovimentacaoConta,
+    NFeXML,
     Produto,
     NotaFiscal,
     SaldoFormaPagamento,
@@ -108,6 +110,7 @@ from app.models.entities import (
 )
 from app.crud import (
     TipoEstoque,
+    arredondar_preco_venda,
     atualizar_desconto,
     atualizar_estoque_produto,
     atualizar_venda,
@@ -121,7 +124,11 @@ from app.crud import (
     calcular_formas_pagamento,
     criar_desconto,
     deletar_desconto,
+    determinar_unidade_produto,
     estornar_venda,
+    extrair_chave_acesso,
+    extrair_dados_nfe_completo,
+    extrair_marca_produto,
     get_caixa_aberto,
     abrir_caixa,
     fechar_caixa,
@@ -153,6 +160,8 @@ from app.crud import (
     create_user,
     get_venda_completa,
     obter_caixas_completo,
+    salvar_nfe_xml_completo,
+    to_decimal,
     transferir_produto,
     transferir_todo_saldo,
     update_user,
@@ -1553,7 +1562,10 @@ def gerar_pdf_lotes():
 
         for i, lote in enumerate(lotes[:3]):
             logger.info(
-                f"Lote {i+1}: Produto={lote.produto.nome if lote.produto else 'N/A'}, Data={lote.data_entrada}, Qtd={lote.quantidade_disponivel}"
+                f"Lote {i+1}: Produto={lote.produto.nome if lote.produto else 'N/A'}, "
+                f"Data={lote.data_entrada}, "
+                f"Qtd={lote.quantidade_disponivel}, "
+                f"Valor Venda={lote.produto.valor_unitario if lote.produto else 'N/A'}"
             )
 
         buffer = io.BytesIO()
@@ -1641,6 +1653,7 @@ def gerar_pdf_lotes():
                 Paragraph("Qtd Inicial", styles["Normal"]),
                 Paragraph("Qtd Disponível", styles["Normal"]),
                 Paragraph("Valor de Compra", styles["Normal"]),
+                Paragraph("Valor de Venda", styles["Normal"]),
                 Paragraph("Data Entrada", styles["Normal"]),
                 Paragraph("Ativo", styles["Normal"]),
             ]
@@ -1678,6 +1691,14 @@ def gerar_pdf_lotes():
             )
 
             valor_unitario = formatar_moeda_br(lote.valor_unitario_compra)
+            
+            # VALOR DE VENDA
+            valor_venda = ""
+            if lote.produto and lote.produto.valor_unitario:
+                valor_venda = formatar_moeda_br(lote.produto.valor_unitario)
+            else:
+                valor_venda = "N/A"
+            
             data_entrada = lote.data_entrada.strftime("%d/%m/%Y")
 
             # regra solicitada: ativo depende da quantidade disponível
@@ -1689,6 +1710,7 @@ def gerar_pdf_lotes():
                     Paragraph(qtd_inicial, cell_style),
                     qtd_disp_paragraph,
                     Paragraph(valor_unitario, cell_style),
+                    Paragraph(valor_venda, cell_style),  # NOVA COLUNA
                     Paragraph(data_entrada, cell_style),
                     Paragraph(ativo_str, cell_style),
                 ]
@@ -1703,12 +1725,13 @@ def gerar_pdf_lotes():
                     Paragraph("", cell_style),
                     Paragraph("", cell_style),
                     Paragraph("", cell_style),
+                    Paragraph("", cell_style),  # NOVA COLUNA VAZIA
                     Paragraph("", cell_style),
                     Paragraph("", cell_style),
                 ]
             )
 
-        col_widths = [55 * mm, 25 * mm, 25 * mm, 30 * mm, 25 * mm, 15 * mm]
+        col_widths = [55 * mm, 25 * mm, 25 * mm, 30 * mm, 30 * mm, 25 * mm, 15 * mm]
         lotes_table = Table(table_data, colWidths=col_widths, repeatRows=1)
 
         table_style = TableStyle(
@@ -1775,7 +1798,6 @@ def gerar_pdf_lotes():
     except Exception as e:
         logger.error(f"Erro ao gerar PDF de lotes: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
-
 
 @admin_bp.route("/produtos", methods=["POST"])
 @login_required
@@ -2007,6 +2029,243 @@ def criar_produto():
         db.session.rollback()
         logger.error(f"Erro ao criar produto: {e}")
         return jsonify({"success": False, "message": str(e)}), 400
+
+@admin_bp.route("/dashboard/upload-xml", methods=["GET"])
+@login_required
+@admin_required
+def entrada_produtos_xml():
+    logger.info(f"Import de notas - Usuário: {current_user.nome}")
+    return render_template("upload_xml.html")
+
+@admin_bp.route("/nfe/processar-xml", methods=["POST"])
+@login_required
+@admin_required
+def processar_xml():
+    """
+    Processa um XML de NFe, extrai produtos e salva todos os dados
+    """
+    try:
+        # =========================
+        # Validação do upload
+        # =========================
+        if 'xml_file' not in request.files:
+            return jsonify({"success": False, "message": "Nenhum arquivo XML enviado"}), 400
+
+        xml_file = request.files['xml_file']
+
+        if not xml_file.filename:
+            return jsonify({"success": False, "message": "Nenhum arquivo selecionado"}), 400
+
+        if not xml_file.filename.lower().endswith('.xml'):
+            return jsonify({"success": False, "message": "O arquivo deve ser um XML"}), 400
+
+        # =========================
+        # Parâmetros
+        # =========================
+        profit_percentage = to_decimal(
+            request.form.get("profit_percentage", "30"),
+            default=None,
+            places=2
+        )
+
+        if profit_percentage is None or profit_percentage < 0:
+            return jsonify({"success": False, "message": "Porcentagem de lucro inválida"}), 400
+
+        stock_type = request.form.get("stock_type", "loja")
+        product_category = request.form.get("product_category", "Ração")
+
+        # =========================
+        # Leitura do XML
+        # =========================
+        xml_content = xml_file.read().decode("utf-8")
+
+        chave_acesso = extrair_chave_acesso(xml_content)
+        if not chave_acesso:
+            return jsonify({"success": False, "message": "Chave de acesso não encontrada no XML"}), 400
+
+        nfe_existente = NFeXML.query.filter_by(chave_acesso=chave_acesso).first()
+        if nfe_existente and nfe_existente.status_processamento == "processado":
+            return jsonify({
+                "success": False,
+                "message": f"XML já processado (Chave: {chave_acesso})"
+            }), 400
+
+        try:
+            root = ET.fromstring(xml_content)
+        except ET.ParseError as e:
+            return jsonify({"success": False, "message": f"XML malformado: {e}"}), 400
+
+        namespaces = {"nfe": "http://www.portalfiscal.inf.br/nfe"}
+
+        dados_nfe = extrair_dados_nfe_completo(root, namespaces, chave_acesso)
+
+        # =========================
+        # Processamento dos produtos
+        # =========================
+        produtos_processados = []
+        produtos_atualizados = 0
+        novos_produtos = 0
+        produtos_com_erro = 0
+
+        usuario_id = current_user.id
+        data_atual = datetime.now(ZoneInfo("America/Sao_Paulo"))
+
+        for produto_xml in dados_nfe["produtos"]:
+            try:
+                # ---------- Valores ----------
+                valor_compra = to_decimal(
+                    produto_xml.get("valor_unitario_compra"),
+                    default=None
+                )
+
+                if not valor_compra or valor_compra <= 0:
+                    logger.warning(f"Valor de compra inválido: {produto_xml.get('nome_produto')}")
+                    continue
+
+                margem = profit_percentage / Decimal("100")
+                valor_venda_calculado = valor_compra * (Decimal("1") + margem)
+                valor_venda = arredondar_preco_venda(valor_venda_calculado)
+
+                quantidade = to_decimal(
+                    produto_xml.get("quantidade"),
+                    default=Decimal("0"),
+                    places=3
+                )
+
+                # ---------- Unidade ----------
+                unidade_xml = produto_xml.get("unidade_comercial", "")
+                unidade = determinar_unidade_produto(
+                    unidade_xml,
+                    produto_xml.get("nome_produto", "")
+                )
+
+                # ---------- Estoque ----------
+                estoque_loja = quantidade if stock_type == "loja" else Decimal("0")
+                estoque_deposito = quantidade if stock_type == "deposito" else Decimal("0")
+                estoque_fabrica = quantidade if stock_type == "fabrica" else Decimal("0")
+
+                nome_produto = produto_xml.get("nome_produto", "").strip()
+                if not nome_produto:
+                    continue
+
+                # ---------- Produto existente ----------
+                produto_existente = (
+                    db.session.query(Produto)
+                    .filter(
+                        func.lower(Produto.nome) == func.lower(nome_produto),
+                        Produto.unidade == unidade,
+                        Produto.ativo.is_(True)
+                    )
+                    .first()
+                )
+
+                if produto_existente:
+                    produto_existente.estoque_loja += estoque_loja
+                    produto_existente.estoque_deposito += estoque_deposito
+                    produto_existente.estoque_fabrica += estoque_fabrica
+                    produto_existente.valor_unitario = valor_venda
+                    produto_existente.valor_unitario_compra = valor_compra
+                    produto_existente.atualizado_em = data_atual
+
+                    produtos_atualizados += 1
+                    status = "atualizado"
+                    produto_ref = produto_existente
+
+                else:
+                    produto_ref = create_produto(
+                        db.session,
+                        ProdutoCreate(
+                            codigo=produto_xml.get("codigo_produto", "").strip(),
+                            nome=nome_produto,
+                            tipo=product_category,
+                            marca=extrair_marca_produto(nome_produto),
+                            unidade=unidade,
+                            valor_unitario=valor_venda,
+                            valor_unitario_compra=valor_compra,
+                            estoque_loja=estoque_loja,
+                            estoque_deposito=estoque_deposito,
+                            estoque_fabrica=estoque_fabrica,
+                            estoque_minimo=Decimal("0"),
+                            ativo=True,
+                            foto=None
+                        )
+                    )
+                    db.session.flush()
+
+                    novos_produtos += 1
+                    status = "criado"
+
+                # ---------- Lote e movimentação ----------
+                if quantidade > 0:
+                    criar_ou_atualizar_lote(
+                        db.session,
+                        produto_id=produto_ref.id,
+                        quantidade=quantidade,
+                        valor_unitario_compra=valor_compra,
+                        data_entrada=data_atual,
+                        observacao=f"Entrada via XML NFe {chave_acesso}"
+                    )
+
+                    movimentacao = MovimentacaoEstoque(
+                        produto_id=produto_ref.id,
+                        usuario_id=usuario_id,
+                        tipo=TipoMovimentacao.entrada,
+                        estoque_destino=TipoEstoque[stock_type],
+                        quantidade=quantidade,
+                        valor_unitario=valor_venda,
+                        valor_unitario_compra=valor_compra,
+                        data=data_atual,
+                        observacao=f"XML NFe {chave_acesso[:10]}..."
+                    )
+                    db.session.add(movimentacao)
+
+                produtos_processados.append({
+                    "nome": nome_produto,
+                    "codigo": produto_ref.codigo,
+                    "quantidade": float(quantidade),
+                    "valor_compra": float(valor_compra),
+                    "valor_venda": float(valor_venda),
+                    "unidade": unidade.value,
+                    "status": status
+                })
+
+            except Exception as e:
+                produtos_com_erro += 1
+                logger.error(f"Erro no produto {produto_xml.get('nome_produto')}: {e}", exc_info=True)
+
+        # =========================
+        # Salvar XML
+        # =========================
+        nfe_xml = salvar_nfe_xml_completo(
+            db.session,
+            chave_acesso,
+            xml_content,
+            dados_nfe
+        )
+
+        nfe_xml.status_processamento = "processado"
+        nfe_xml.data_processamento = data_atual
+        nfe_xml.sincronizado = False
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "chave_acesso": chave_acesso,
+            "total_produtos": len(produtos_processados),
+            "produtos_atualizados": produtos_atualizados,
+            "novos_produtos": novos_produtos,
+            "produtos_com_erro": produtos_com_erro,
+            "produtos": produtos_processados
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro geral ao processar XML: {e}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "message": "Erro interno ao processar XML"
+        }), 500
 
 
 @admin_bp.route("/produtos/<int:produto_id>", methods=["PUT"])

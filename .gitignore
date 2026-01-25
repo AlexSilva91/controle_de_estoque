@@ -14,3 +14,4 @@ backups
 app/static/uploads
 logs
 enviar_nfe_final.py
+xmls/

@@ -750,7 +750,361 @@ class TransferenciaEstoque(Base):
 
 
 # --------------------
-# Nota Fiscal
+# Armazenamento de XML de Nota Fiscal
+# --------------------
+class NFeXML(Base):
+    __tablename__ = "nfe_xml"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    chave_acesso = Column(String(44), unique=True, nullable=False)
+    xml_original = Column(Text, nullable=False)
+    xml_processado = Column(Text, nullable=True)
+    versao = Column(String(10), nullable=True)
+    
+    status_processamento = Column(String(20), default='pendente')
+    data_recebimento = Column(DateTime, default=datetime.now, nullable=False)
+    data_processamento = Column(DateTime, nullable=True)
+    erro_processamento = Column(Text, nullable=True)
+    
+    nota_fiscal_id = Column(Integer, ForeignKey('notas_fiscais.id'), nullable=True)
+    sincronizado = Column(Boolean, default=False, nullable=False)
+    
+    # Relacionamentos
+    nota_fiscal = db.relationship(
+        "NotaFiscal",
+        back_populates="xmls"
+    )
+    detalhes = relationship("NFeDetalheXML", back_populates="nfe_xml", cascade="all, delete-orphan")
+    impostos = relationship("NFeImpostoXML", back_populates="nfe_xml", cascade="all, delete-orphan")
+    transportes = relationship("NFeTransporteXML", back_populates="nfe_xml", cascade="all, delete-orphan")
+    pagamentos = relationship("NFePagamentoXML", back_populates="nfe_xml", cascade="all, delete-orphan")
+    duplicatas = relationship("NFeDuplicataXML", back_populates="nfe_xml", cascade="all, delete-orphan")
+    protocolo = relationship("NFeProtocoloXML", back_populates="nfe_xml", cascade="all, delete-orphan", uselist=False)
+    emitente = relationship("NFeEmitenteXML", back_populates="nfe_xml", cascade="all, delete-orphan", uselist=False)
+    destinatario = relationship("NFeDestinatarioXML", back_populates="nfe_xml", cascade="all, delete-orphan", uselist=False)
+    ide = relationship("NFeIdeXML", back_populates="nfe_xml", cascade="all, delete-orphan", uselist=False)
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "chave_acesso": self.chave_acesso,
+            "nota_fiscal_id": self.nota_fiscal_id,
+            "status_processamento": self.status_processamento,
+            "data_recebimento": self.data_recebimento.isoformat() if self.data_recebimento else None,
+            "data_processamento": self.data_processamento.isoformat() if self.data_processamento else None,
+            "versao": self.versao,
+            "sincronizado": self.sincronizado
+        }
+
+
+# --------------------
+# Identificação da NFe (ide)
+# --------------------
+class NFeIdeXML(Base):
+    __tablename__ = "nfe_ide_xml"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nfe_xml_id = Column(Integer, ForeignKey('nfe_xml.id'), nullable=False, unique=True)
+    
+    cUF = Column(String(2), nullable=True)
+    cNF = Column(String(8), nullable=True)
+    natOp = Column(String(60), nullable=True)
+    mod = Column(String(2), nullable=True)
+    serie = Column(String(3), nullable=True)
+    nNF = Column(String(9), nullable=True)
+    dhEmi = Column(DateTime, nullable=True)
+    dhSaiEnt = Column(DateTime, nullable=True)
+    tpNF = Column(String(1), nullable=True)
+    idDest = Column(String(1), nullable=True)
+    cMunFG = Column(String(7), nullable=True)
+    tpImp = Column(String(1), nullable=True)
+    tpEmis = Column(String(1), nullable=True)
+    cDV = Column(String(1), nullable=True)
+    tpAmb = Column(String(1), nullable=True)
+    finNFe = Column(String(1), nullable=True)
+    indFinal = Column(String(1), nullable=True)
+    indPres = Column(String(1), nullable=True)
+    procEmi = Column(String(1), nullable=True)
+    verProc = Column(String(20), nullable=True)
+    
+    nfe_xml = relationship("NFeXML", back_populates="ide")
+
+
+# --------------------
+# Emitente da NFe
+# --------------------
+class NFeEmitenteXML(Base):
+    __tablename__ = "nfe_emitente_xml"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nfe_xml_id = Column(Integer, ForeignKey('nfe_xml.id'), nullable=False, unique=True)
+    
+    CNPJ = Column(String(14), nullable=True)
+    CPF = Column(String(11), nullable=True)
+    xNome = Column(String(60), nullable=True)
+    xFant = Column(String(60), nullable=True)
+    IE = Column(String(14), nullable=True)
+    IEST = Column(String(14), nullable=True)
+    IM = Column(String(15), nullable=True)
+    CNAE = Column(String(7), nullable=True)
+    CRT = Column(String(1), nullable=True)
+    
+    # Endereço
+    xLgr = Column(String(60), nullable=True)
+    nro = Column(String(60), nullable=True)
+    xCpl = Column(String(60), nullable=True)
+    xBairro = Column(String(60), nullable=True)
+    cMun = Column(String(7), nullable=True)
+    xMun = Column(String(60), nullable=True)
+    UF = Column(String(2), nullable=True)
+    CEP = Column(String(8), nullable=True)
+    cPais = Column(String(4), nullable=True)
+    xPais = Column(String(60), nullable=True)
+    fone = Column(String(14), nullable=True)
+    
+    nfe_xml = relationship("NFeXML", back_populates="emitente")
+
+
+# --------------------
+# Destinatário da NFe
+# --------------------
+class NFeDestinatarioXML(Base):
+    __tablename__ = "nfe_destinatario_xml"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nfe_xml_id = Column(Integer, ForeignKey('nfe_xml.id'), nullable=False, unique=True)
+    
+    CNPJ = Column(String(14), nullable=True)
+    CPF = Column(String(11), nullable=True)
+    xNome = Column(String(60), nullable=True)
+    indIEDest = Column(String(1), nullable=True)
+    IE = Column(String(14), nullable=True)
+    ISUF = Column(String(9), nullable=True)
+    IM = Column(String(15), nullable=True)
+    email = Column(String(60), nullable=True)
+    
+    # Endereço
+    xLgr = Column(String(60), nullable=True)
+    nro = Column(String(60), nullable=True)
+    xCpl = Column(String(60), nullable=True)
+    xBairro = Column(String(60), nullable=True)
+    cMun = Column(String(7), nullable=True)
+    xMun = Column(String(60), nullable=True)
+    UF = Column(String(2), nullable=True)
+    CEP = Column(String(8), nullable=True)
+    cPais = Column(String(4), nullable=True)
+    xPais = Column(String(60), nullable=True)
+    fone = Column(String(14), nullable=True)
+    
+    nfe_xml = relationship("NFeXML", back_populates="destinatario")
+
+
+# --------------------
+# Detalhes de Produtos do XML
+# --------------------
+class NFeDetalheXML(Base):
+    __tablename__ = "nfe_detalhe_xml"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nfe_xml_id = Column(Integer, ForeignKey('nfe_xml.id'), nullable=False)
+    numero_item = Column(Integer, nullable=False)
+    
+    # Dados do produto
+    codigo_produto = Column(String(60), nullable=True)
+    codigo_ean = Column(String(14), nullable=True)
+    nome_produto = Column(String(120), nullable=True)
+    ncm = Column(String(8), nullable=True)
+    cest = Column(String(7), nullable=True)
+    cfop = Column(String(4), nullable=True)
+    unidade_comercial = Column(String(6), nullable=True)
+    unidade_tributaria = Column(String(6), nullable=True)
+    
+    # Quantidades
+    quantidade_comercial = Column(DECIMAL(16, 4), nullable=True)
+    quantidade_tributaria = Column(DECIMAL(16, 4), nullable=True)
+    valor_unitario_comercial = Column(DECIMAL(16, 10), nullable=True)
+    valor_unitario_tributario = Column(DECIMAL(16, 10), nullable=True)
+    valor_total = Column(DECIMAL(16, 2), nullable=True)
+    
+    # Informações adicionais
+    informacoes_adicionais = Column(Text, nullable=True)
+    peso_bruto = Column(DECIMAL(16, 3), nullable=True)
+    
+    produto_id = Column(Integer, ForeignKey('produtos.id'), nullable=True)
+    
+    # Relacionamentos
+    nfe_xml = relationship("NFeXML", back_populates="detalhes")
+    produto = relationship("Produto")
+    impostos_item = relationship("NFeImpostoItemXML", back_populates="detalhe", cascade="all, delete-orphan")
+    
+    __table_args__ = (
+        UniqueConstraint('nfe_xml_id', 'numero_item', name='uq_nfe_xml_item'),
+    )
+
+
+# --------------------
+# Impostos por Item
+# --------------------
+class NFeImpostoItemXML(Base):
+    __tablename__ = "nfe_imposto_item_xml"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    detalhe_id = Column(Integer, ForeignKey('nfe_detalhe_xml.id'), nullable=False)
+    
+    # ICMS
+    origem_icms = Column(String(1), nullable=True)
+    cst_icms = Column(String(3), nullable=True)
+    valor_base_calculo_icms = Column(DECIMAL(16, 2), nullable=True)
+    aliquota_icms = Column(DECIMAL(5, 2), nullable=True)
+    valor_icms = Column(DECIMAL(16, 2), nullable=True)
+    
+    # ICMS ST
+    valor_base_calculo_st = Column(DECIMAL(16, 2), nullable=True)
+    aliquota_st = Column(DECIMAL(5, 2), nullable=True)
+    valor_st = Column(DECIMAL(16, 2), nullable=True)
+    
+    # PIS
+    cst_pis = Column(String(2), nullable=True)
+    valor_base_calculo_pis = Column(DECIMAL(16, 2), nullable=True)
+    aliquota_pis = Column(DECIMAL(5, 2), nullable=True)
+    valor_pis = Column(DECIMAL(16, 2), nullable=True)
+    
+    # COFINS
+    cst_cofins = Column(String(2), nullable=True)
+    valor_base_calculo_cofins = Column(DECIMAL(16, 2), nullable=True)
+    aliquota_cofins = Column(DECIMAL(5, 2), nullable=True)
+    valor_cofins = Column(DECIMAL(16, 2), nullable=True)
+    
+    valor_total_tributos = Column(DECIMAL(16, 2), nullable=True)
+    
+    # Relacionamento
+    detalhe = relationship("NFeDetalheXML", back_populates="impostos_item")
+
+
+# --------------------
+# Totais da NFe
+# --------------------
+class NFeImpostoXML(Base):
+    __tablename__ = "nfe_imposto_xml"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nfe_xml_id = Column(Integer, ForeignKey('nfe_xml.id'), nullable=False, unique=True)
+    
+    # Totais ICMS
+    valor_base_calculo_icms = Column(DECIMAL(16, 2), nullable=True)
+    valor_icms = Column(DECIMAL(16, 2), nullable=True)
+    valor_base_calculo_st = Column(DECIMAL(16, 2), nullable=True)
+    valor_st = Column(DECIMAL(16, 2), nullable=True)
+    
+    # Totais outros
+    valor_total_produtos = Column(DECIMAL(16, 2), nullable=True)
+    valor_frete = Column(DECIMAL(16, 2), nullable=True)
+    valor_seguro = Column(DECIMAL(16, 2), nullable=True)
+    valor_desconto = Column(DECIMAL(16, 2), nullable=True)
+    valor_total_nota = Column(DECIMAL(16, 2), nullable=True)
+    
+    # Tributos federais
+    valor_pis = Column(DECIMAL(16, 2), nullable=True)
+    valor_cofins = Column(DECIMAL(16, 2), nullable=True)
+    valor_total_tributos = Column(DECIMAL(16, 2), nullable=True)
+    
+    # Relacionamento
+    nfe_xml = relationship("NFeXML", back_populates="impostos")
+
+
+# --------------------
+# Transporte
+# --------------------
+class NFeTransporteXML(Base):
+    __tablename__ = "nfe_transporte_xml"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nfe_xml_id = Column(Integer, ForeignKey('nfe_xml.id'), nullable=False, unique=True)
+    
+    modalidade_frete = Column(String(1), nullable=True)
+    
+    # Transportador
+    cpf_cnpj_transportador = Column(String(14), nullable=True)
+    nome_transportador = Column(String(60), nullable=True)
+    endereco_transportador = Column(String(60), nullable=True)
+    municipio_transportador = Column(String(60), nullable=True)
+    uf_transportador = Column(String(2), nullable=True)
+    
+    # Veículo
+    placa_veiculo = Column(String(7), nullable=True)
+    uf_veiculo = Column(String(2), nullable=True)
+    
+    # Volumes
+    quantidade_volumes = Column(Integer, nullable=True)
+    especie_volumes = Column(String(60), nullable=True)
+    peso_liquido = Column(DECIMAL(16, 3), nullable=True)
+    peso_bruto = Column(DECIMAL(16, 3), nullable=True)
+    
+    # Relacionamento
+    nfe_xml = relationship("NFeXML", back_populates="transportes")
+
+
+# --------------------
+# Pagamentos
+# --------------------
+class NFePagamentoXML(Base):
+    __tablename__ = "nfe_pagamento_xml"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nfe_xml_id = Column(Integer, ForeignKey('nfe_xml.id'), nullable=False)
+    
+    forma_pagamento = Column(String(2), nullable=True)
+    valor_pagamento = Column(DECIMAL(16, 2), nullable=True)
+    indicador_pagamento = Column(String(1), nullable=True)
+    numero_parcela = Column(Integer, nullable=True)
+    
+    __table_args__ = (
+        UniqueConstraint('nfe_xml_id', 'forma_pagamento', 'numero_parcela', name='uq_nfe_pagamento'),
+    )
+    
+    nfe_xml = relationship("NFeXML", back_populates="pagamentos")
+
+
+# --------------------
+# Duplicatas
+# --------------------
+class NFeDuplicataXML(Base):
+    __tablename__ = "nfe_duplicata_xml"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nfe_xml_id = Column(Integer, ForeignKey('nfe_xml.id'), nullable=False)
+    
+    numero_duplicata = Column(String(60), nullable=True)
+    data_vencimento = Column(DateTime, nullable=True)
+    valor_duplicata = Column(DECIMAL(16, 2), nullable=True)
+    
+    __table_args__ = (
+        UniqueConstraint('nfe_xml_id', 'numero_duplicata', name='uq_nfe_duplicata'),
+    )
+    
+    nfe_xml = relationship("NFeXML", back_populates="duplicatas")
+
+
+# --------------------
+# ProtNFe (Autorização)
+# --------------------
+class NFeProtocoloXML(Base):
+    __tablename__ = "nfe_protocolo_xml"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nfe_xml_id = Column(Integer, ForeignKey('nfe_xml.id'), nullable=False, unique=True)
+    
+    numero_protocolo = Column(String(15), nullable=True)
+    data_recebimento = Column(DateTime, nullable=True)
+    digito_validador = Column(String(28), nullable=True)
+    codigo_status = Column(String(3), nullable=True)
+    motivo_status = Column(String(255), nullable=True)
+    
+    nfe_xml = relationship("NFeXML", back_populates="protocolo")
+
+
+# --------------------
+# Nota Fiscal (ATUALIZADO com campos do XML)
 # --------------------
 class NotaFiscal(Base):
     __tablename__ = "notas_fiscais"
@@ -765,7 +1119,7 @@ class NotaFiscal(Base):
     valor_desconto = Column(DECIMAL(12, 2), nullable=False, default=0.00)
     tipo_desconto = Column(Enum(TipoDesconto), nullable=True)
     status = Column(Enum(StatusNota), nullable=False, default=StatusNota.emitida)
-    chave_acesso = Column(String(60), unique=True, nullable=True)
+    chave_acesso = Column(String(44), unique=True, nullable=True)  # Alterado para 44 caracteres
     observacao = Column(Text, nullable=True)
     forma_pagamento = Column(Enum(FormaPagamento), nullable=True)
     valor_recebido = Column(DECIMAL(12, 2), nullable=True)
@@ -773,6 +1127,12 @@ class NotaFiscal(Base):
     a_prazo = Column(Boolean, default=False, nullable=False)
     sincronizado = Column(Boolean, default=False, nullable=False)
 
+    # Campos adicionais do XML
+    numero_nf = Column(String(9), nullable=True)  # nNF
+    serie_nf = Column(String(3), nullable=True)  # série
+    natureza_operacao = Column(String(60), nullable=True)  # natOp
+    modelo_nf = Column(String(2), nullable=True)  # mod
+    
     cliente = relationship("Cliente", back_populates="notas_fiscais")
     operador = relationship("Usuario", back_populates="notas_fiscais")
     caixa = relationship("Caixa", back_populates="notas_fiscais")
@@ -791,7 +1151,13 @@ class NotaFiscal(Base):
         back_populates="nota_fiscal",
         cascade="all, delete-orphan",
     )
-
+    # Novo relacionamento com XMLs
+    xmls = db.relationship(
+        "NFeXML",
+        back_populates="nota_fiscal",
+        cascade="all, delete-orphan"
+    )
+    
     @classmethod
     def obter_vendas_do_dia(cls, data=None, caixa_id=None, operador_id=None):
         """
@@ -819,7 +1185,7 @@ class NotaFiscal(Base):
             cls.data_emissao >= inicio_dia,
             cls.data_emissao <= fim_dia,
             cls.status == StatusNota.emitida,
-            Caixa.status == StatusCaixa.aberto,  # Filtra apenas caixas abertos
+            Caixa.status == StatusCaixa.aberto,
         )
 
         # Aplica filtros adicionais se fornecidos
@@ -830,6 +1196,21 @@ class NotaFiscal(Base):
             query = query.filter(cls.operador_id == operador_id)
 
         return query.order_by(cls.data_emissao.desc()).all()
+
+    def vincular_xml(self, nfe_xml):
+        """Vincula um XML importado a esta nota fiscal"""
+        if not self.chave_acesso and nfe_xml.chave_acesso:
+            self.chave_acesso = nfe_xml.chave_acesso
+        
+        nfe_xml.nota_fiscal_id = self.id
+        nfe_xml.status_processamento = 'vinculado'
+        
+        # Atualiza campos da nota com dados do XML se necessário
+        if nfe_xml.ide:
+            self.numero_nf = nfe_xml.ide.nNF
+            self.serie_nf = nfe_xml.ide.serie
+            self.natureza_operacao = nfe_xml.ide.natOp
+            self.modelo_nf = nfe_xml.ide.mod
 
 
 # --------------------
