@@ -11743,4 +11743,7 @@ def listar_lotes():
 @admin_required
 def entrada_lotes():
     logger.info(f"Acessando dashboard admin - Usuário: {current_user.nome}")
-    return render_template("lotes.html")
+    
+    produtos = Produto.query.filter_by(ativo=True).order_by(Produto.nome).all()
+    
+    return render_template("lotes.html", produtos=produtos)
