@@ -108,13 +108,6 @@ controle_de_estoque
 │  │     ├─ avatars
 │  │     ├─ docs
 │  │     ├─ produtos
-│  │     │  ├─ 2026
-│  │     │  │  └─ 01
-│  │     │  │     ├─ produto_175_Captura_de_tela_de_2_20260116_144246_cc2eab7f.webp
-│  │     │  │     ├─ produto_176_Ourinet_Solar_20260119_093207_595e4e7e.webp
-│  │     │  │     ├─ produto_88_Captura_de_tela_de_2_20260116_135112_0c65c9ea.webp
-│  │     │  │     └─ produto_98_Captura_de_tela_de_2_20260116_143227_0f481f9a.webp
-│  │     │  └─ temp
 │  │     └─ temp
 │  ├─ templates
 │  │  ├─ auditoria.html
@@ -139,6 +132,10 @@ controle_de_estoque
 │     ├─ calcularNOvoValor.py
 │     ├─ conversor_unidade.py
 │     ├─ converter_endereco.py
+│     ├─ fiscal
+│     │  ├─ __init__.py
+│     │  ├─ helpers.py
+│     │  └─ nfe_template.py
 │     ├─ format_data_moeda.py
 │     ├─ nfce.py
 │     ├─ preparar_notas.py

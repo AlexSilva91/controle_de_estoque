@@ -2,7 +2,8 @@
 
 import requests
 import logging
-from config import API_FISCAL_BASE_URL, API_FISCAL_TOKEN
+from config import Config
+
 
 logger = logging.getLogger(__name__)
 
@@ -11,15 +12,16 @@ class BrasilNFeClient:
     Cliente de baixo nível para a API Brasil NFe.
     Lida com a autenticação via Header 'Token' e comunicação HTTP para todos os serviços fiscais.
     """
-
     def __init__(self):
-        self.base_url = API_FISCAL_BASE_URL.rstrip('/')
-        self.token = API_FISCAL_TOKEN
+        self.base_url = Config.API_FISCAL_BASE_URL.rstrip("/")
+        self.token = Config.API_FISCAL_TOKEN
+
         self.headers = {
             "Token": self.token,
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
+
 
     def _request(self, method, endpoint, payload=None):
         """Método genérico para realizar as chamadas HTTP com tratamento de erro padronizado."""
