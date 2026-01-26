@@ -5,39 +5,43 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Lotes de Estoque</title>
   <link rel="icon" href="{{ url_for('static', filename='assets/logo1.ico') }}" type="image/x-icon">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/lotes.css') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/lotes.css') }}">
 </head>
 <body>
   <main class="container">
     <h1>Lotes de Estoque</h1>
 
     <div class="filters">
-      <select id="produto">
-        <option value="">Todos os produtos</option>
-        {% for produto in produtos %}
-        <option value="{{ produto.id }}">{{ produto.nome }}</option>
-        {% endfor %}
-      </select>
+      <div class="search-container">
+        <input type="text" id="search-input" placeholder="Buscar e adicionar produtos..." autocomplete="off">
+        <div id="search-results" class="search-results"></div>
+        <div id="selected-products-container"></div>
+      </div>
 
-      <input type="date" id="data_inicio">
-      <input type="date" id="data_fim">
+      <div class="date-filters">
+        <input type="date" id="data_inicio">
+        <input type="date" id="data_fim">
+      </div>
 
-      <button id="btnAplicar" class="btn primary">Aplicar</button>
-      <button id="btnLimpar" class="btn">Limpar</button>
+      <div class="action-buttons">
+        <button id="btnAplicar" class="btn primary">Aplicar</button>
+        <button id="btnLimpar" class="btn">Limpar</button>
+      </div>
     </div>
 
     <div class="table-wrapper">
+      <div id="loading" class="loading-overlay"><div class="spinner"></div></div>
       <table id="tabela">
         <thead>
           <tr>
             <th>Data Entrada</th>
             <th>Produto</th>
-            <th>Quantidade Inicial</th>
+            <th>Qtd Inicial</th>
             <th>Disponível</th>
             <th>Valor Unit.</th>
-            <th>Ativo</th>
+            <th>Status</th>
             <th>Observação</th>
           </tr>
         </thead>
