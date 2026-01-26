@@ -175,7 +175,6 @@
     function atualizarPaginacao(pag) {
         document.getElementById('paginaAtual').textContent = pag.pagina_atual;
         document.getElementById('totalPaginas').textContent = pag.total_paginas;
-        document.getElementById('total').textContent = pag.total_lotes;
         document.getElementById('prevPage').disabled = !pag.tem_anterior;
         document.getElementById('nextPage').disabled = !pag.tem_proxima;
     }
