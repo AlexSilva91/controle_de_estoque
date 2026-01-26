@@ -55,6 +55,12 @@ controle_de_estoque
 │  ├─ crud.py
 │  ├─ database.py
 │  ├─ init_db.py
+│  ├─ integrations
+│  │  ├─ __init__.py
+│  │  └─ fiscal_api
+│  │     ├─ __init__.py
+│  │     ├─ client.py
+│  │     └─ service.py
 │  ├─ models
 │  │  ├─ __init__.py
 │  │  ├─ audit_events.py
@@ -104,6 +110,10 @@ controle_de_estoque
 │  │     ├─ produtos
 │  │     │  ├─ 2026
 │  │     │  │  └─ 01
+│  │     │  │     ├─ produto_175_Captura_de_tela_de_2_20260116_144246_cc2eab7f.webp
+│  │     │  │     ├─ produto_176_Ourinet_Solar_20260119_093207_595e4e7e.webp
+│  │     │  │     ├─ produto_88_Captura_de_tela_de_2_20260116_135112_0c65c9ea.webp
+│  │     │  │     └─ produto_98_Captura_de_tela_de_2_20260116_143227_0f481f9a.webp
 │  │     │  └─ temp
 │  │     └─ temp
 │  ├─ templates
@@ -122,7 +132,8 @@ controle_de_estoque
 │  │  ├─ login.html
 │  │  ├─ lotes.html
 │  │  ├─ produtos_unidade.html
-│  │  └─ relatorio_contasReceber.html
+│  │  ├─ relatorio_contasReceber.html
+│  │  └─ upload_xml.html
 │  └─ utils
 │     ├─ audit.py
 │     ├─ calcularNOvoValor.py
