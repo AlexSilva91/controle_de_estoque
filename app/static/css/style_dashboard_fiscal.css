@@ -831,3 +831,276 @@ td {
     color: var(--primary-color);
     border-bottom-color: var(--primary-color);
 }
+/* CSS específico para exibição do nome do produto no formulário de edição */
+.produto-info-display {
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-md);
+    box-shadow: var(--shadow-md);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.produto-info-display::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 5px;
+    height: 100%;
+    background: var(--gradient-primary);
+}
+
+.produto-info-display:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 6px 12px rgba(108, 92, 231, 0.2);
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+}
+
+.produto-id-badge {
+    display: inline-block;
+    background: var(--gradient-primary);
+    color: var(--text-light);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: 20px;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    margin-bottom: var(--space-sm);
+    letter-spacing: 0.5px;
+    box-shadow: var(--shadow-sm);
+    text-transform: uppercase;
+}
+
+.produto-nome-text {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    line-height: 1.4;
+    margin-bottom: var(--space-sm);
+    padding: var(--space-md);
+    background: var(--card-bg);
+    border-radius: var(--border-radius-sm);
+    border-left: 4px solid var(--success-color);
+    box-shadow: var(--shadow-inset);
+    word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: var(--font-family);
+    transition: all 0.3s ease;
+}
+
+.produto-nome-text:hover {
+    background: var(--card-hover);
+    border-left-color: var(--primary-light);
+}
+
+.produto-detalhes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: center;
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    background: rgba(108, 92, 231, 0.05);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid rgba(108, 92, 231, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.produto-detalhes span {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    transition: color 0.3s ease;
+}
+
+.produto-detalhes span:hover {
+    color: var(--text-secondary);
+}
+
+.produto-detalhes span:nth-child(2n) {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+.produto-detalhes span:nth-child(2n):hover {
+    color: var(--secondary-color);
+    opacity: 1;
+}
+
+/* Efeito de brilho suave no hover do container */
+.produto-info-display::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.05),
+        transparent
+    );
+    transition: left 0.8s ease;
+}
+
+.produto-info-display:hover::after {
+    left: 100%;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .produto-info-display {
+        padding: var(--space-md);
+        margin-bottom: var(--space-sm);
+    }
+    
+    .produto-nome-text {
+        font-size: var(--font-size-sm);
+        padding: var(--space-sm);
+        max-height: 150px;
+    }
+    
+    .produto-detalhes {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-xs);
+        padding: var(--space-sm);
+    }
+    
+    .produto-detalhes span {
+        width: 100%;
+        justify-content: space-between;
+        padding: 2px 0;
+    }
+    
+    .produto-detalhes span:nth-child(2n) {
+        display: none;
+    }
+    
+    .produto-info-display::before {
+        width: 3px;
+    }
+}
+
+@media (max-width: 480px) {
+    .produto-info-display {
+        padding: var(--space-sm);
+    }
+    
+    .produto-id-badge {
+        font-size: 10px;
+        padding: 4px 8px;
+    }
+    
+    .produto-nome-text {
+        font-size: var(--font-size-xs);
+        padding: var(--space-xs);
+        max-height: 120px;
+    }
+    
+    .produto-detalhes {
+        font-size: 10px;
+        padding: var(--space-xs);
+    }
+}
+
+/* Animações */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+.produto-info-display {
+    animation: fadeIn 0.5s ease-out;
+}
+
+.produto-id-badge {
+    animation: slideInLeft 0.6s ease-out 0.2s both;
+}
+
+.produto-nome-text {
+    animation: slideInLeft 0.6s ease-out 0.3s both;
+}
+
+.produto-detalhes {
+    animation: slideInLeft 0.6s ease-out 0.4s both;
+}
+
+/* Efeitos de foco para acessibilidade */
+.produto-info-display:focus-within {
+    outline: 2px solid var(--primary-light);
+    outline-offset: 2px;
+}
+
+/* Estilo para scrollbar personalizada no texto do produto */
+.produto-nome-text::-webkit-scrollbar {
+    width: 6px;
+}
+
+.produto-nome-text::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius-sm);
+}
+
+.produto-nome-text::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: var(--border-radius-sm);
+}
+
+.produto-nome-text::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-dark);
+}
+
+/* Modo impressão */
+@media print {
+    .produto-info-display {
+        background: none;
+        border: 1px solid #000;
+        box-shadow: none;
+        page-break-inside: avoid;
+    }
+    
+    .produto-info-display::before,
+    .produto-info-display::after {
+        display: none;
+    }
+    
+    .produto-nome-text {
+        background: none;
+        box-shadow: none;
+        border-left: 2px solid #000;
+    }
+}

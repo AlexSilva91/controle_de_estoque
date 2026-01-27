@@ -792,7 +792,17 @@ function getProdutoFiscalForm(produto = {}) {
                 <div class="form-group">
                     <label class="form-label" for="produto_id">Produto *</label>
                     ${isEdit ? 
-                        `<p class="form-input-static">Produto ID: ${produto.produto_id || 'N/A'} - Nome: ${produto.produto_nome || 'Não encontrado'}</p>
+                        `<div class="produto-info-display">
+                            <div class="produto-id-badge">ID: ${produto.produto_id || 'N/A'}</div>
+                            <div class="produto-nome-text">${produto.produto_nome || 'Não encontrado'}</div>
+                            <div class="produto-detalhes">
+                                <span>Código: ${produto.produto_codigo || 'N/A'}</span>
+                                <span>•</span>
+                                <span>Unidade: ${produto.produto_unidade || 'N/A'}</span>
+                                <span>•</span>
+                                <span>Valor: R$ ${(produto.produto_valor_unitario || 0).toFixed(2)}</span>
+                            </div>
+                         </div>
                          <input type="hidden" id="produto_id" name="produto_id" value="${produto.produto_id || ''}">` :
                         `<select id="produto_id" name="produto_id" class="form-input form-select" required>
                             <option value="">Selecione um produto...</option>
@@ -820,6 +830,13 @@ function getProdutoFiscalForm(produto = {}) {
                     <input type="text" id="codigo_ean" name="codigo_ean" class="form-input" 
                            value="${produto.codigo_ean || ''}"
                            placeholder="Ex: 7891234567890" maxlength="14">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="codigo_gtin_trib">Código GTIN Tributário</label>
+                    <input type="text" id="codigo_gtin_trib" name="codigo_gtin_trib" class="form-input" 
+                           value="${produto.codigo_gtin_trib || ''}"
+                           placeholder="Código GTIN para unidade tributável" maxlength="14">
                 </div>
                 
                 <div class="form-group">
@@ -1223,14 +1240,12 @@ async function editProdutoFiscal(id) {
         
         const response = await fetchData(`${API_BASE}/produtos-fiscais/${id}`);
         const produto = response.data;
-        
         const modal = document.getElementById('createProdutoFiscalModal');
         modal.querySelector('.modal-title').textContent = 'Editar Produto Fiscal';
         modal.querySelector('.modal-body').innerHTML = getProdutoFiscalForm(produto);
         
         modal.classList.add('active');
         
-        // Aguardar um pouco para garantir que o DOM foi atualizado
         setTimeout(async () => {
             await carregarProdutosParaSelect();
         }, 100);

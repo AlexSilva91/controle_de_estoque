@@ -331,20 +331,33 @@ def listar_produtos_fiscais():
 @fiscal_bp.route('/produtos-fiscais/<int:id>', methods=['GET'])
 @admin_required
 def obter_produto_fiscal_por_id(id):
-    """Obtém dados fiscais do produto por ID"""
+    """Obtém dados fiscais do produto por ID com todos os campos"""
     try:
         produto_fiscal = ProdutoFiscalCRUD.obter_por_id(db.session, id)
         if not produto_fiscal:
             return jsonify({"success": False, "message": "Dados fiscais não encontrados"}), 404
+        
+        # Obter dados do produto relacionado
+        produto = produto_fiscal.produto
+        produto_codigo = produto.codigo if produto else None
+        produto_unidade = produto.unidade if produto else None
+        produto_valor_unitario = float(produto.valor_unitario) if produto and produto.valor_unitario else None
         
         return jsonify({
             "success": True,
             "data": {
                 "id": produto_fiscal.id,
                 "produto_id": produto_fiscal.produto_id,
-                "produto_nome": produto_fiscal.produto.nome if produto_fiscal.produto else None,
+                "produto_nome": produto.nome if produto else None,
+                "produto_codigo": produto_codigo,
+                "produto_unidade": produto_unidade,
+                "produto_valor_unitario": produto_valor_unitario,
                 "codigo_ncm": produto_fiscal.codigo_ncm,
                 "codigo_cest": produto_fiscal.codigo_cest,
+                "codigo_ean": produto_fiscal.codigo_ean,
+                "codigo_gtin_trib": produto_fiscal.codigo_gtin_trib,
+                "unidade_tributaria": produto_fiscal.unidade_tributaria,
+                "valor_unitario_trib": float(produto_fiscal.valor_unitario_trib) if produto_fiscal.valor_unitario_trib else None,
                 "origem": produto_fiscal.origem,
                 "tipo_item": produto_fiscal.tipo_item,
                 "cst_icms": produto_fiscal.cst_icms,
@@ -354,10 +367,14 @@ def obter_produto_fiscal_por_id(id):
                 "aliquota_pis": float(produto_fiscal.aliquota_pis) if produto_fiscal.aliquota_pis else None,
                 "cst_cofins": produto_fiscal.cst_cofins,
                 "aliquota_cofins": float(produto_fiscal.aliquota_cofins) if produto_fiscal.aliquota_cofins else None,
+                "informacoes_fisco": produto_fiscal.informacoes_fisco,
+                "informacoes_complementares": produto_fiscal.informacoes_complementares,
                 "homologado": produto_fiscal.homologado,
                 "data_homologacao": produto_fiscal.data_homologacao.isoformat() if produto_fiscal.data_homologacao else None,
+                "justificativa_homologacao": produto_fiscal.justificativa_homologacao,
                 "criado_em": produto_fiscal.criado_em.isoformat() if produto_fiscal.criado_em else None,
-                "atualizado_em": produto_fiscal.atualizado_em.isoformat() if produto_fiscal.atualizado_em else None
+                "atualizado_em": produto_fiscal.atualizado_em.isoformat() if produto_fiscal.atualizado_em else None,
+                "sincronizado": produto_fiscal.sincronizado
             }
         }), 200
         
