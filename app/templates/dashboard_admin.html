@@ -46,12 +46,6 @@
                             <span class="nav-text">Clientes</span>
                         </a>
                     </li>
-                    <li data-tab="XML-IMPORT">
-                        <a href="{{ url_for('admin.entrada_produtos_xml') }}" class="nav-link">
-                            <i class="fas fa-file-code"></i>
-                            <span class="nav-text">Importar XML</span>
-                        </a>
-                    </li>
                     <li data-tab="produtos">
                         <a href="#produtos" class="nav-link">
                             <i class="fas fa-boxes"></i>
@@ -86,6 +80,18 @@
                         <a href="#caixas" class="nav-link">
                             <i class="fas fa-cash-register"></i>
                             <span class="nav-text">Caixas</span>
+                        </a>
+                    </li>
+                    <li data-tab="XML-IMPORT">
+                        <a href="{{ url_for('admin.entrada_produtos_xml') }}" class="nav-link">
+                            <i class="fas fa-file-code"></i>
+                            <span class="nav-text">Importar XML</span>
+                        </a>
+                    </li>
+                    <li data-tab="fiscal">
+                        <a href="{{ url_for('admin.dashboard_fiscal') }}" class="nav-link">
+                            <i class="fa-solid fa-dollar-sign"></i>
+                            <span class="nav-text">Painel Fiscal</span>
                         </a>
                     </li>
                     <li data-tab="vendas">

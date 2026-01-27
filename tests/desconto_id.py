@@ -1,5 +1,5 @@
 from app import create_app, db  # ou de onde você importa seu app e o db
-from app.crud import buscar_descontos_por_produto_id
+from app.services.crud import buscar_descontos_por_produto_id
 
 app = create_app()  # ou como você cria seu app Flask
 

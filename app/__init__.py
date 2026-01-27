@@ -3,30 +3,38 @@ import time
 import logging
 from logging.handlers import RotatingFileHandler
 from flask import Flask, abort, request, g, send_from_directory, render_template
-from app.utils.format_data_moeda import (
-    format_currency,
-    formatar_data_br,
-    formatar_data_br2,
-)
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from werkzeug.exceptions import HTTPException
 from config import config
 from app.models.entities import Usuario
-from app.models import db
+from app.models import db, audit_events
+from app.utils.format_data_moeda import (
+    format_currency,
+    formatar_data_br,
+    formatar_data_br2,
+)
 from .routes import init_app
+import json
+
+BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
 
-basedir = os.path.abspath(os.path.dirname(__file__))
+# ==========================
+# LOGGING
+# ==========================
+def configure_logging(app: Flask):
+    os.makedirs(os.path.join(BASEDIR, "logs"), exist_ok=True)
 
-
-def configure_logging(app):
     formatter = logging.Formatter(
         "[%(asctime)s] [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
 
     file_handler = RotatingFileHandler(
-        "logs/app.log", maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8"
+        os.path.join(BASEDIR, "logs/app.log"),
+        maxBytes=5 * 1024 * 1024,
+        backupCount=5,
+        encoding="utf-8",
     )
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.INFO)
@@ -42,6 +50,9 @@ def configure_logging(app):
     app.logger.addHandler(file_handler)
     app.logger.addHandler(console_handler)
 
+    # ==========================
+    # REQUEST LOGGING
+    # ==========================
     @app.before_request
     def start_timer():
         g.start_time = time.time()
@@ -83,32 +94,29 @@ def configure_logging(app):
         return response
 
 
-def create_upload_folders(app):
+# ==========================
+# UPLOADS
+# ==========================
+def create_upload_folders(app: Flask):
     """
     Cria automaticamente todas as pastas necessárias para upload de arquivos.
-    Esta função é chamada dentro do contexto da aplicação.
     """
     try:
-        # Pasta base de uploads
         upload_base = os.path.join(app.static_folder, "uploads")
 
-        # Criar pastas principais
         folders_to_create = [
             upload_base,
             os.path.join(upload_base, "produtos"),
             os.path.join(upload_base, "avatars"),
             os.path.join(upload_base, "docs"),
             os.path.join(upload_base, "temp"),
-            # Pastas organizadas por ano/mês para melhor organização
             os.path.join(upload_base, "produtos", "temp"),
-            # Pasta para logs de upload
-            os.path.join(basedir, "logs", "uploads"),
+            os.path.join(BASEDIR, "logs", "uploads"),
         ]
 
         for folder in folders_to_create:
             try:
                 os.makedirs(folder, exist_ok=True)
-                app.logger.info(f"Pasta criada/verificada: {folder}")
             except Exception as e:
                 app.logger.error(f"Erro ao criar pasta {folder}: {e}")
 
@@ -118,9 +126,6 @@ def create_upload_folders(app):
             with open(test_file, "w") as f:
                 f.write("test")
             os.remove(test_file)
-            app.logger.info(
-                "Permissões de escrita verificadas com sucesso nas pastas de upload."
-            )
         except Exception as e:
             app.logger.warning(
                 f"Aviso: Problema com permissões de escrita nas pastas de upload: {e}"
@@ -130,15 +135,13 @@ def create_upload_folders(app):
 
     except Exception as e:
         app.logger.error(f"Erro crítico ao criar pastas de upload: {e}")
-        # Não interrompe a aplicação, apenas loga o erro
         return False
 
 
-def create_app(config_name="development"):
-    # Criar pasta de logs se não existir
-    logs_dir = os.path.join(basedir, "logs")
-    os.makedirs(logs_dir, exist_ok=True)
-
+# ==========================
+# APPLICATION FACTORY
+# ==========================
+def create_app(config_name="development") -> Flask:
     app = Flask(__name__)
     app.config.from_object(config[config_name])
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
@@ -147,18 +150,19 @@ def create_app(config_name="development"):
     app.jinja_env.filters["data_br"] = formatar_data_br
     app.jinja_env.filters["data_br2"] = formatar_data_br2
 
-    # Configurar logging
+    # Logging
     configure_logging(app)
 
-    # Inicializar banco de dados
+    # Banco de dados
     db.init_app(app)
     Migrate(app, db)
 
-    # Criar pastas de upload dentro do contexto da aplicação
+    # Pastas de upload
     with app.app_context():
         create_upload_folders(app)
+        audit_events.setup_audit_events()
 
-    # Configurar login manager
+    # Login
     login_manager = LoginManager()
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
@@ -167,15 +171,10 @@ def create_app(config_name="development"):
     def load_user(user_id):
         return Usuario.query.get(int(user_id))
 
-    # Inicializar rotas
+    # Rotas principais
     init_app(app)
 
-    from app.models import audit_events
-
-    with app.app_context():
-        audit_events.setup_audit_events()
-
-    # Rota para favicon
+    # Favicon
     @app.route("/favicon.ico")
     def favicon():
         return send_from_directory(
@@ -184,7 +183,7 @@ def create_app(config_name="development"):
             mimetype="image/vnd.microsoft.icon",
         )
 
-    # Headers de cache
+    # Cache headers
     @app.after_request
     def add_no_cache_headers(response):
         response.headers["Cache-Control"] = (
@@ -194,12 +193,67 @@ def create_app(config_name="development"):
         response.headers["Expires"] = "0"
         return response
 
-    # Rota para servir arquivos de upload
+    # Uploads públicos
     @app.route("/uploads/<path:filename>")
     def uploaded_file(filename):
         return send_from_directory(os.path.join(app.static_folder, "uploads"), filename)
 
-    # Handlers de erro
+    # Rotas de teste
+    @app.route("/test-400")
+    def test_400():
+        abort(400, description="Teste de Bad Request")
+
+    @app.route("/test-403")
+    def test_403():
+        abort(403, description="Teste de Forbidden")
+
+    @app.route("/test-404")
+    def test_404():
+        abort(404, description="Teste de Not Found")
+
+    @app.route("/test-500")
+    def test_500():
+        raise Exception("Teste de Internal Server Error")
+
+    @app.route("/test-503")
+    def test_503():
+        raise ConnectionError("Teste de Serviço Indisponível")
+
+    # Status uploads
+    @app.route("/api/upload-status")
+    def upload_status():
+        upload_base = os.path.join(app.static_folder, "uploads")
+        status = {
+            "upload_base": {
+                "path": upload_base,
+                "exists": os.path.exists(upload_base),
+                "writable": (
+                    os.access(upload_base, os.W_OK)
+                    if os.path.exists(upload_base)
+                    else False
+                ),
+            },
+            "subfolders": {},
+        }
+
+        subfolders = ["produtos", "avatars", "docs", "temp"]
+        for folder in subfolders:
+            folder_path = os.path.join(upload_base, folder)
+            status["subfolders"][folder] = {
+                "path": folder_path,
+                "exists": os.path.exists(folder_path),
+                "writable": (
+                    os.access(folder_path, os.W_OK)
+                    if os.path.exists(folder_path)
+                    else False
+                ),
+            }
+
+        return json.dumps(status, indent=2)
+
+    # ==========================
+    # ERROR HANDLERS
+    # ==========================
     @app.errorhandler(400)
     def bad_request_error(e):
         app.logger.warning(f"400 Bad Request em {request.path}: {e}")
@@ -237,61 +291,5 @@ def create_app(config_name="development"):
 
         app.logger.exception("Erro não tratado:")
         return render_template("errors/500.html"), 500
-
-    # Rotas de teste
-    @app.route("/test-400")
-    def test_400():
-        abort(400, description="Teste de Bad Request")
-
-    @app.route("/test-403")
-    def test_403():
-        abort(403, description="Teste de Forbidden")
-
-    @app.route("/test-404")
-    def test_404():
-        abort(404, description="Teste de Not Found")
-
-    @app.route("/test-500")
-    def test_500():
-        raise Exception("Teste de Internal Server Error")
-
-    @app.route("/test-503")
-    def test_503():
-        raise ConnectionError("Teste de Serviço Indisponível")
-
-    # Rota para verificar status das pastas
-    @app.route("/api/upload-status")
-    def upload_status():
-        """Rota para verificar o status das pastas de upload"""
-        import json
-
-        upload_base = os.path.join(app.static_folder, "uploads")
-        status = {
-            "upload_base": {
-                "path": upload_base,
-                "exists": os.path.exists(upload_base),
-                "writable": (
-                    os.access(upload_base, os.W_OK)
-                    if os.path.exists(upload_base)
-                    else False
-                ),
-            },
-            "subfolders": {},
-        }
-
-        subfolders = ["produtos", "avatars", "docs", "temp"]
-        for folder in subfolders:
-            folder_path = os.path.join(upload_base, folder)
-            status["subfolders"][folder] = {
-                "path": folder_path,
-                "exists": os.path.exists(folder_path),
-                "writable": (
-                    os.access(folder_path, os.W_OK)
-                    if os.path.exists(folder_path)
-                    else False
-                ),
-            }
-
-        return json.dumps(status, indent=2)
 
     return app

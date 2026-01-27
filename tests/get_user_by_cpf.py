@@ -1,5 +1,5 @@
 from app.database import SessionLocal
-from app.crud import get_usuarios,  get_user_by_cpf
+from app.services.crud import get_usuarios,  get_user_by_cpf
 
 # Cria uma instância da sessão
 db = SessionLocal()

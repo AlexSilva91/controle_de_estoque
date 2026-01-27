@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão Fiscal - Sistema Administrativo</title>
+    <link rel="icon" href="{{ url_for('static', filename='assets/logo1.ico') }}" type="image/x-icon">
+    
+    <!-- Fontes -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_dashboard_fiscal.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h1>Gestão Fiscal</h1>
+                <div class="subtitle">Sistema Administrativo</div>
+            </div>
+
+            <div class="nav-section">
+                <h3 class="nav-section-title">Principal</h3>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="#dashboard" class="nav-link active" data-section="dashboard">
+                            <i class="fas fa-chart-line"></i>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#configuracoes" class="nav-link" data-section="configuracoes">
+                            <i class="fas fa-cogs"></i>
+                            Configurações
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="nav-section">
+                <h3 class="nav-section-title">Cadastros</h3>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="#produtos-fiscais" class="nav-link" data-section="produtos-fiscais">
+                            <i class="fas fa-box"></i>
+                            Produtos Fiscais
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#transportadoras" class="nav-link" data-section="transportadoras">
+                            <i class="fas fa-truck"></i>
+                            Transportadoras
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#veiculos" class="nav-link" data-section="veiculos">
+                            <i class="fas fa-bus"></i>
+                            Veículos
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="nav-section">
+                <h3 class="nav-section-title">Notas Fiscais</h3>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="#historico" class="nav-link" data-section="historico">
+                            <i class="fas fa-history"></i>
+                            Histórico
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#eventos" class="nav-link" data-section="eventos">
+                            <i class="fas fa-calendar-alt"></i>
+                            Eventos
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#volumes" class="nav-link" data-section="volumes">
+                            <i class="fas fa-cubes"></i>
+                            Volumes
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="nav-section">
+                <h3 class="nav-section-title">Sistema</h3>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="#configuracao" class="nav-link">
+                            <i class="fas fa-user-cog"></i>
+                            Minha Conta
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ url_for('admin.dashboard') }}" class="nav-link">
+                            <i class="fas fa-sign-out-alt"></i>
+                            Sair
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <button class="mobile-toggle" id="mobileToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                
+                <h2 class="page-title" id="pageTitle">Dashboard Fiscal</h2>
+                
+                <div class="user-menu">
+                    <div class="user-info">
+                        <div class="user-name">Administrador</div>
+                        <div class="user-role">admin@empresa.com</div>
+                    </div>
+                    <div class="user-avatar">A</div>
+                </div>
+            </div>
+
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="section active">
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Configurações Ativas</h3>
+                            <div class="card-icon config">
+                                <i class="fas fa-cog"></i>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <div class="card-stat" id="configCount">0</div>
+                            <p>Configurações fiscais ativas no sistema</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Produtos Homologados</h3>
+                            <div class="card-icon produtos">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <div class="card-stat" id="produtosCount">0</div>
+                            <p>Produtos com dados fiscais homologados</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Transportadoras</h3>
+                            <div class="card-icon transporte">
+                                <i class="fas fa-truck-moving"></i>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <div class="card-stat" id="transportadorasCount">0</div>
+                            <p>Transportadoras cadastradas no sistema</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Eventos Hoje</h3>
+                            <div class="card-icon historico">
+                                <i class="fas fa-chart-bar"></i>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <div class="card-stat" id="eventosCount">0</div>
+                            <p>Eventos registrados nas últimas 24 horas</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabela de Configurações Recentes -->
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3 class="table-title">Configurações Fiscais</h3>
+                        <div class="table-actions">
+                            <button class="btn btn-primary" onclick="openModal('createConfigModal')">
+                                <i class="fas fa-plus"></i> Nova Configuração
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Razão Social</th>
+                                    <th>CNPJ</th>
+                                    <th>Ambiente</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="configTableBody">
+                                <!-- Dados carregados via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Configurações Section -->
+            <section id="configuracoes" class="section" style="display: none;">
+                <div class="tabs">
+                    <button class="tab active" data-tab="config-list">Listar</button>
+                    <button class="tab" data-tab="config-create">Criar</button>
+                    <button class="tab" data-tab="config-edit">Editar</button>
+                </div>
+
+                <div class="tab-content" id="config-list" style="display: block;">
+                    <!-- Conteúdo carregado via JavaScript -->
+                </div>
+
+                <div class="tab-content" id="config-create" style="display: none;">
+                    <!-- Conteúdo carregado via JavaScript -->
+                </div>
+
+                <div class="tab-content" id="config-edit" style="display: none;">
+                    <!-- Conteúdo carregado via JavaScript -->
+                </div>
+            </section>
+
+            <!-- Outras seções serão carregadas dinamicamente -->
+            <div id="contentSections"></div>
+
+            <!-- Modal para Nova Configuração -->
+            <div class="modal-overlay" id="createConfigModal">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Nova Configuração Fiscal</h3>
+                        <button class="modal-close" onclick="closeModal('createConfigModal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Formulário será inserido aqui via JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard_fiscal.js') }}"></script>
+</body>
+</html>

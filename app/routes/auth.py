@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_user, logout_user, login_required, current_user
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import desc
-from app.crud import (
+from app.services.crud import (
     abrir_caixa, 
     get_caixa_aberto, 
     get_user_by_cpf, 

@@ -4,7 +4,7 @@ from datetime import datetime
 import requests
 from dotenv import load_dotenv
 
-from app.crud import calcular_formas_pagamento
+from app.services.crud import calcular_formas_pagamento
 from app.database import SessionLocal
 from app.models.entities import MovimentacaoEstoque, Produto, Usuario, Caixa
 from app.models.entities import TipoMovimentacao

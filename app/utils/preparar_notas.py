@@ -2,7 +2,7 @@ from decimal import Decimal
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from app.models.entities import Produto
-from app.crud import buscar_descontos_por_produto_id 
+from app.services.crud import buscar_descontos_por_produto_id 
 
 def preparar_dados_nota(dados_venda: dict, session) -> dict:
     """

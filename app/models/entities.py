@@ -773,7 +773,7 @@ class NFeXML(Base):
     sincronizado = Column(Boolean, default=False, nullable=False)
     
     # Relacionamentos
-    nota_fiscal = db.relationship(
+    nota_fiscal = relationship(
         "NotaFiscal",
         back_populates="xmls"
     )
@@ -1155,7 +1155,7 @@ class NotaFiscal(Base):
         cascade="all, delete-orphan",
     )
     # Novo relacionamento com XMLs
-    xmls = db.relationship(
+    xmls = relationship(
         "NFeXML",
         back_populates="nota_fiscal",
         cascade="all, delete-orphan"

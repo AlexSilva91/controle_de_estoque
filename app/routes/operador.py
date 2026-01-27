@@ -39,6 +39,7 @@ from app.bot.bot_movimentacao import (
     enviar_resumo_movimentacao_diaria,
 )
 from flask import send_file
+from app.decorators.decorators import operador_required
 from app.utils.preparar_notas import preparar_dados_nota
 from app.utils.calcularNOvoValor import novoValor
 from app.utils.converter_endereco import parse_endereco_string
@@ -69,7 +70,7 @@ from app.schemas import (
     ClienteBase,
     MovimentacaoEstoqueCreate,
 )
-from app.crud import (
+from app.services.crud import (
     CategoriaFinanceira,
     FormaPagamento,
     StatusCaixa,
@@ -101,23 +102,6 @@ from app.utils.upload import get_product_photo_url
 
 operador_bp = Blueprint("operador", __name__, url_prefix="/operador")
 logger = logging.getLogger(__name__)
-
-
-def operador_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated:
-            return jsonify({"success": False, "message": "Acesso não autorizado"}), 401
-        if (
-            current_user.tipo != "operador"
-        ):  # Supondo que 'tipo' seja o campo que define o tipo de usuário
-            return (
-                jsonify({"success": False, "message": "Acesso restrito a operadores"}),
-                403,
-            )
-        return f(*args, **kwargs)
-
-    return decorated_function
 
 
 @operador_bp.route("/dashboard")

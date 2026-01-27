@@ -1,5 +1,4 @@
 import csv
-from functools import wraps
 import io
 import locale
 import math
@@ -67,6 +66,7 @@ from io import BytesIO
 from datetime import datetime, date, time
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
+from app.decorators.decorators import admin_required
 from app.models import db
 from app.utils.audit import calcular_diferencas
 from app.utils.format_data_moeda import (
@@ -108,7 +108,7 @@ from app.models.entities import (
     Usuario,
     produto_desconto_association,
 )
-from app.crud import (
+from app.services.crud import (
     TipoEstoque,
     arredondar_preco_venda,
     atualizar_desconto,
@@ -211,25 +211,6 @@ locale.setlocale(locale.LC_ALL, "pt_BR.UTF-8")
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 logger = logging.getLogger(__name__)
-
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated:
-            return jsonify({"success": False, "message": "Acesso não autorizado"}), 401
-        if (
-            current_user.tipo != "admin"
-        ):  # Supondo que 'tipo' seja o campo que define o tipo de usuário
-            return (
-                jsonify(
-                    {"success": False, "message": "Acesso restrito a administradores"}
-                ),
-                403,
-            )
-        return f(*args, **kwargs)
-
-    return decorated_function
 
 
 def to_decimal_2(value):
@@ -8361,7 +8342,7 @@ def relatorio_vendas_produtos_pdf():
         return jsonify({"error": str(e)}), 500
 
 # ================= CONTAS A RECEBER =====================
-from app.crud import obter_contas_receber
+from app.services.crud import obter_contas_receber
 
 
 @admin_bp.route("/contas-receber", methods=["GET"])
@@ -11747,3 +11728,11 @@ def entrada_lotes():
     produtos = Produto.query.filter_by(ativo=True).order_by(Produto.nome).all()
     
     return render_template("lotes.html", produtos=produtos)
+
+@admin_bp.route("/dashboard/fiscal")
+@login_required
+@admin_required
+def dashboard_fiscal():
+    logger.info(f"Acessando dashboard fiscal - Usuário: {current_user.nome}")
+    
+    return render_template("dashboard_fiscal.html")

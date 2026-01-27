@@ -21,7 +21,7 @@ from decimal import Decimal
 from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy import func,  extract
 from typing import Dict, Any, List, Union, Tuple
-from . import db
+from .. import db
 import xml.etree.ElementTree as ET
 from app.models.entities import (
     Caixa,
