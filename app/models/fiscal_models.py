@@ -6,6 +6,7 @@ NÃO modifica os modelos principais - apenas adiciona novas tabelas
 """
 
 from datetime import datetime
+from decimal import Decimal
 from sqlalchemy import (
     Column, Integer, String, DateTime, ForeignKey, 
     Text, DECIMAL, Boolean, UniqueConstraint
@@ -108,9 +109,61 @@ class ProdutoFiscal(Base):
     # Relacionamento (opcional, se quiser acessar o produto)
     produto = relationship("Produto", backref="dados_fiscais")
     
+    def to_dict(self):
+        """Converte todos os campos do ProdutoFiscal para um dicionário"""
+        return {
+            # IDs
+            "id": self.id,
+            "produto_id": self.produto_id,
+            
+            # Dados do produto relacionado (se carregado)
+            "produto_nome": self.produto.nome if self.produto else None,
+            "produto_codigo": self.produto.codigo if self.produto else None,
+            "produto_unidade": self.produto.unidade.value if self.produto and hasattr(self.produto.unidade, 'value') else str(self.produto.unidade) if self.produto and self.produto.unidade else None,
+            "produto_valor_unitario": float(self.produto.valor_unitario) if self.produto and self.produto.valor_unitario else None,
+            
+            # Dados Fiscais
+            "codigo_ncm": self.codigo_ncm,
+            "codigo_cest": self.codigo_cest,
+            "codigo_ean": self.codigo_ean,
+            "codigo_gtin_trib": self.codigo_gtin_trib,
+            "unidade_tributaria": self.unidade_tributaria,
+            "valor_unitario_trib": float(self.valor_unitario_trib) if self.valor_unitario_trib else None,
+            
+            # Classificação
+            "origem": self.origem,
+            "tipo_item": self.tipo_item,
+            
+            # Tributação ICMS
+            "cst_icms": self.cst_icms,
+            "cfop": self.cfop,
+            "aliquota_icms": float(self.aliquota_icms) if self.aliquota_icms else None,
+            
+            # Tributação PIS
+            "cst_pis": self.cst_pis,
+            "aliquota_pis": float(self.aliquota_pis) if self.aliquota_pis else None,
+            
+            # Tributação COFINS
+            "cst_cofins": self.cst_cofins,
+            "aliquota_cofins": float(self.aliquota_cofins) if self.aliquota_cofins else None,
+            
+            # Informações
+            "informacoes_fisco": self.informacoes_fisco,
+            "informacoes_complementares": self.informacoes_complementares,
+            
+            # Status
+            "homologado": self.homologado,
+            "data_homologacao": self.data_homologacao.isoformat() if self.data_homologacao else None,
+            "justificativa_homologacao": self.justificativa_homologacao,
+            
+            # Controle
+            "criado_em": self.criado_em.isoformat() if self.criado_em else None,
+            "atualizado_em": self.atualizado_em.isoformat() if self.atualizado_em else None,
+            "sincronizado": self.sincronizado
+        }
+    
     def __repr__(self):
         return f"<ProdutoFiscal(id={self.id}, produto_id={self.produto_id}, ncm={self.codigo_ncm})>"
-
 
 # --------------------
 # 3. TRANSPORTADORAS

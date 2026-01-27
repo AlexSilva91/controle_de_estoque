@@ -224,16 +224,33 @@
             <!-- Produtos Fiscais Section -->
             <section id="produtos-fiscais" class="section" style="display: none;">
                 <div class="tabs">
-                    <button class="tab active" data-tab="produtos-list">Listar</button>
+                    <button class="tab active" data-tab="produtos-list">Listar Produtos Fiscais</button>
+                    <button class="tab" data-tab="produtos-buscar">Buscar Produtos</button>
                     <button class="tab" data-tab="produtos-nao-homologados">Não Homologados</button>
                 </div>
 
+                <!-- Lista de Produtos Fiscais -->
                 <div class="tab-content" id="produtos-list" style="display: block;">
-                    <!-- Conteúdo carregado via JavaScript -->
+                    <!-- Conteúdo carregado dinamicamente via JavaScript -->
                 </div>
 
+                <!-- Buscar Produtos -->
+                <div class="tab-content" id="produtos-buscar" style="display: none;">
+                    <div class="search-container">
+                        <div class="form-group">
+                            <input type="text" id="buscar-produto-fiscal" class="form-input" 
+                                placeholder="Buscar por ID do produto, NCM ou nome...">
+                            <button class="btn btn-primary" onclick="buscarProdutosFiscais()">
+                                <i class="fas fa-search"></i> Buscar
+                            </button>
+                        </div>
+                        <div id="resultados-busca-produtos-fiscais" class="mt-3"></div>
+                    </div>
+                </div>
+
+                <!-- Produtos Não Homologados -->
                 <div class="tab-content" id="produtos-nao-homologados" style="display: none;">
-                    <!-- Conteúdo carregado via JavaScript -->
+                    <!-- Conteúdo carregado dinamicamente via JavaScript -->
                 </div>
             </section>
 
@@ -465,7 +482,7 @@
 
             <!-- Modal para Novo Produto Fiscal -->
             <div class="modal-overlay" id="createProdutoFiscalModal">
-                <div class="modal">
+                <div class="modal modal-lg">
                     <div class="modal-header">
                         <h3 class="modal-title">Novo Produto Fiscal</h3>
                         <button class="modal-close" onclick="closeModal('createProdutoFiscalModal')">
@@ -474,6 +491,36 @@
                     </div>
                     <div class="modal-body">
                         <!-- Formulário será inserido aqui via JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal para Homologar Produto -->
+            <div class="modal-overlay" id="homologarProdutoModal">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Homologar Produto Fiscal</h3>
+                        <button class="modal-close" onclick="closeModal('homologarProdutoModal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="homologarForm" onsubmit="homologarProdutoSubmit(event)">
+                            <input type="hidden" id="homologar_produto_id">
+                            <div class="form-group">
+                                <label class="form-label">Justificativa da Homologação *</label>
+                                <textarea id="homologar_justificativa" class="form-input" rows="4" 
+                                        placeholder="Descreva os motivos da homologação..." required></textarea>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-secondary" onclick="closeModal('homologarProdutoModal')">
+                                    Cancelar
+                                </button>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-check-circle"></i> Homologar Produto
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>

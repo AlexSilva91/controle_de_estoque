@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
 from sqlalchemy import and_, or_
 from app.models.fiscal_models import (
     ConfiguracaoFiscal,
@@ -255,10 +256,13 @@ class ProdutoFiscalCRUD:
     @staticmethod
     def obter_por_id(db: Session, id: int) -> Optional[ProdutoFiscal]:
         """
-        Obtém dados fiscais por ID
+        Obtém dados fiscais por ID com produto carregado
         """
-        return db.query(ProdutoFiscal).filter(ProdutoFiscal.id == id).first()
-    
+        return db.query(ProdutoFiscal)\
+            .options(joinedload(ProdutoFiscal.produto))\
+            .filter(ProdutoFiscal.id == id)\
+            .first()
+        
     @staticmethod
     def obter_por_produto_id(db: Session, produto_id: int) -> Optional[ProdutoFiscal]:
         """
@@ -291,7 +295,11 @@ class ProdutoFiscalCRUD:
         """
         Lista todos os produtos fiscais
         """
-        return db.query(ProdutoFiscal).offset(skip).limit(limit).all()
+        return db.query(ProdutoFiscal)\
+            .options(joinedload(ProdutoFiscal.produto))\
+            .offset(skip)\
+            .limit(limit)\
+            .all()
     
     @staticmethod
     def listar_nao_homologados(db: Session, skip: int = 0, limit: int = 100) -> List[ProdutoFiscal]:

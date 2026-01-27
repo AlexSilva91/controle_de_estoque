@@ -157,6 +157,7 @@ async function loadSectionData(section) {
             case 'produtos-fiscais':
                 data = await fetchData(`${API_BASE}/produtos-fiscais`);
                 renderProdutosFiscais(data.data || []);
+                setupProdutosFiscaisTabs();
                 break;
             case 'transportadoras':
                 data = await fetchData(`${API_BASE}/transportadoras`);
@@ -565,11 +566,897 @@ function formatDateTime(dateString) {
     return date.toLocaleString('pt-BR');
 }
 
-// Renderizar produtos fiscais
-function renderProdutosFiscais(produtos) {
-    // Implementar renderização de produtos fiscais
-    console.log('Renderizando produtos fiscais:', produtos);
+// ============================================
+// FUNÇÕES PARA PRODUTOS FISCAIS
+// ============================================
+function setupProdutosFiscaisTabs() {
+    const tabs = document.querySelectorAll('#produtos-fiscais .tab');
+    
+    tabs.forEach(tab => {
+        tab.addEventListener('click', async () => {
+            const tabId = tab.getAttribute('data-tab');
+            
+            // Atualizar tabs ativas
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Mostrar conteúdo da tab
+            document.querySelectorAll('#produtos-fiscais .tab-content').forEach(content => {
+                content.style.display = 'none';
+            });
+            document.getElementById(tabId).style.display = 'block';
+            
+            // Carregar dados específicos da tab
+            if (tabId === 'produtos-nao-homologados') {
+                await carregarProdutosNaoHomologados();
+            }
+            // Para 'produtos-buscar', o formulário já está disponível
+        });
+    });
 }
+// Renderizar lista de produtos fiscais
+function renderProdutosFiscais(produtos) {
+    const container = document.getElementById('produtos-list');
+    
+    if (!produtos || produtos.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-box"></i>
+                <h3>Nenhum produto fiscal encontrado</h3>
+                <p>Clique em "Novo Produto Fiscal" para começar</p>
+                <button class="btn btn-primary mt-2" onclick="showCreateProdutoFiscalForm()">
+                    <i class="fas fa-plus"></i> Novo Produto Fiscal
+                </button>
+            </div>
+        `;
+        return;
+    }
+
+    let html = `
+        <div class="table-container">
+            <div class="table-header">
+                <h3 class="table-title">Produtos Fiscais</h3>
+                <div class="table-actions">
+                    <button class="btn btn-primary" onclick="showCreateProdutoFiscalForm()">
+                        <i class="fas fa-plus"></i> Novo Produto Fiscal
+                    </button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Produto</th>
+                            <th>NCM</th>
+                            <th>CEST</th>
+                            <th>Origem</th>
+                            <th>CST ICMS</th>
+                            <th>Homologado</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    produtos.forEach(produto => {
+        // Formatar origem
+        let origem = '';
+        switch(produto.origem) {
+            case '0': origem = 'Nacional'; break;
+            case '1': origem = 'Estrangeira'; break;
+            default: origem = produto.origem || 'N/A';
+        }
+
+        html += `
+            <tr>
+                <td>${produto.id}</td>
+                <td>${produto.produto_nome || '-'}</td>
+                <td>${produto.codigo_ncm || '-'}</td>
+                <td>${produto.codigo_cest || '-'}</td>
+                <td>${origem}</td>
+                <td>${produto.cst_icms || '-'}</td>
+                <td>
+                    <span class="status-badge ${produto.homologado ? 'status-ativo' : 'status-inativo'}">
+                        ${produto.homologado ? 'Sim' : 'Não'}
+                    </span>
+                </td>
+                <td>
+                    <div class="btn-group">
+                        <button class="btn btn-secondary btn-sm" onclick="editProdutoFiscal(${produto.id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        ${!produto.homologado ? `
+                            <button class="btn btn-success btn-sm" onclick="showHomologarForm(${produto.id})">
+                                <i class="fas fa-check"></i>
+                            </button>
+                        ` : ''}
+                        <button class="btn btn-danger btn-sm" onclick="deleteProdutoFiscal(${produto.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+// Carregar produtos não homologados
+async function carregarProdutosNaoHomologados() {
+    try {
+        const response = await fetchData(`${API_BASE}/produtos-fiscais/listar-nao-homologados`);
+        const produtos = response.data || [];
+        
+        const container = document.getElementById('produtos-nao-homologados');
+        
+        if (!produtos.length) {
+            container.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i>
+                    Todos os produtos estão homologados!
+                </div>
+            `;
+            return;
+        }
+
+        let html = `
+            <div class="table-container">
+                <h3 class="table-title">Produtos Não Homologados</h3>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Produto ID</th>
+                                <th>NCM</th>
+                                <th>CEST</th>
+                                <th>Origem</th>
+                                <th>CFOP</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        produtos.forEach(produto => {
+            // Formatar origem
+            let origem = '';
+            switch(produto.origem) {
+                case '0': origem = 'Nacional'; break;
+                case '1': origem = 'Estrangeira'; break;
+                default: origem = produto.origem || 'N/A';
+            }
+
+            html += `
+                <tr>
+                    <td>${produto.id}</td>
+                    <td>${produto.produto_id || '-'}</td>
+                    <td>${produto.codigo_ncm || '-'}</td>
+                    <td>${produto.codigo_cest || '-'}</td>
+                    <td>${origem}</td>
+                    <td>${produto.cfop || '-'}</td>
+                    <td>
+                        <div class="btn-group">
+                            <button class="btn btn-secondary btn-sm" onclick="editProdutoFiscal(${produto.id})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-success btn-sm" onclick="showHomologarForm(${produto.id})">
+                                <i class="fas fa-check"></i> Homologar
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteProdutoFiscal(${produto.id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = html;
+        
+    } catch (error) {
+        showAlert('Erro ao carregar produtos não homologados', 'danger');
+    }
+}
+
+// Mostrar formulário de criação de produto fiscal
+async function showCreateProdutoFiscalForm() {
+    const modal = document.getElementById('createProdutoFiscalModal');
+    modal.querySelector('.modal-body').innerHTML = getProdutoFiscalForm();
+    modal.classList.add('active');
+    
+    await carregarProdutosParaSelectParaCadastro();
+}
+// Obter formulário de produto fiscal
+function getProdutoFiscalForm(produto = {}) {
+    const isEdit = !!produto.id;
+    return `
+        <form id="produtoFiscalForm" onsubmit="handleProdutoFiscalSubmit(event, ${produto.id || ''})">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label" for="produto_id">Produto *</label>
+                    ${isEdit ? 
+                        `<p class="form-input-static">Produto ID: ${produto.produto_id || 'N/A'} - Nome: ${produto.produto_nome || 'Não encontrado'}</p>
+                         <input type="hidden" id="produto_id" name="produto_id" value="${produto.produto_id || ''}">` :
+                        `<select id="produto_id" name="produto_id" class="form-input form-select" required>
+                            <option value="">Selecione um produto...</option>
+                         </select>`
+                    }
+                    <small class="form-text">${isEdit ? 'Produto não pode ser alterado após criação' : 'Escolha um produto do sistema (apenas produtos sem dados fiscais aparecerão)'}</small>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="codigo_ncm">Código NCM *</label>
+                    <input type="text" id="codigo_ncm" name="codigo_ncm" class="form-input" 
+                           value="${produto.codigo_ncm || ''}" required
+                           placeholder="Ex: 22030000" maxlength="8">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="codigo_cest">Código CEST</label>
+                    <input type="text" id="codigo_cest" name="codigo_cest" class="form-input" 
+                           value="${produto.codigo_cest || ''}"
+                           placeholder="Ex: 0100100" maxlength="7">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="codigo_ean">Código EAN (GTIN)</label>
+                    <input type="text" id="codigo_ean" name="codigo_ean" class="form-input" 
+                           value="${produto.codigo_ean || ''}"
+                           placeholder="Ex: 7891234567890" maxlength="14">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="origem">Origem *</label>
+                    <select id="origem" name="origem" class="form-input form-select" required>
+                        <option value="0" ${produto.origem === '0' ? 'selected' : ''}>Nacional</option>
+                        <option value="1" ${produto.origem === '1' ? 'selected' : ''}>Estrangeira - Importação Direta</option>
+                        <option value="2" ${produto.origem === '2' ? 'selected' : ''}>Estrangeira - Adquirida no Mercado Interno</option>
+                        <option value="3" ${produto.origem === '3' ? 'selected' : ''}>Nacional - Conteúdo Importado 40%</option>
+                        <option value="4" ${produto.origem === '4' ? 'selected' : ''}>Nacional - Produção Conforme Processos Produtivos</option>
+                        <option value="5" ${produto.origem === '5' ? 'selected' : ''}>Nacional - Conteúdo Importado 70%</option>
+                        <option value="6" ${produto.origem === '6' ? 'selected' : ''}>Estrangeira - Importação Direta sem Similar Nacional</option>
+                        <option value="7" ${produto.origem === '7' ? 'selected' : ''}>Estrangeira - Adquirida Mercado Interno sem Similar Nacional</option>
+                        <option value="8" ${produto.origem === '8' ? 'selected' : ''}>Nacional - Conteúdo Importado Superior a 70%</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="tipo_item">Tipo do Item</label>
+                    <select id="tipo_item" name="tipo_item" class="form-input form-select">
+                        <option value="">Selecione</option>
+                        <option value="00" ${produto.tipo_item === '00' ? 'selected' : ''}>Mercadoria para Revenda</option>
+                        <option value="01" ${produto.tipo_item === '01' ? 'selected' : ''}>Matéria-Prima</option>
+                        <option value="02" ${produto.tipo_item === '02' ? 'selected' : ''}>Embalagem</option>
+                        <option value="03" ${produto.tipo_item === '03' ? 'selected' : ''}>Produto em Processo</option>
+                        <option value="04" ${produto.tipo_item === '04' ? 'selected' : ''}>Produto Acabado</option>
+                        <option value="05" ${produto.tipo_item === '05' ? 'selected' : ''}>Subproduto</option>
+                        <option value="06" ${produto.tipo_item === '06' ? 'selected' : ''}>Produto Intermediário</option>
+                        <option value="07" ${produto.tipo_item === '07' ? 'selected' : ''}>Material de Uso e Consumo</option>
+                        <option value="08" ${produto.tipo_item === '08' ? 'selected' : ''}>Ativo Imobilizado</option>
+                        <option value="09" ${produto.tipo_item === '09' ? 'selected' : ''}>Serviços</option>
+                        <option value="10" ${produto.tipo_item === '10' ? 'selected' : ''}>Outros Insumos</option>
+                        <option value="99" ${produto.tipo_item === '99' ? 'selected' : ''}>Outros</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="unidade_tributaria">Unidade Tributária</label>
+                    <input type="text" id="unidade_tributaria" name="unidade_tributaria" class="form-input" 
+                           value="${produto.unidade_tributaria || ''}"
+                           placeholder="Ex: UN, KG, M2">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="valor_unitario_trib">Valor Unitário Tributário</label>
+                    <input type="number" id="valor_unitario_trib" name="valor_unitario_trib" class="form-input" 
+                           value="${produto.valor_unitario_trib || ''}" step="0.0001"
+                           placeholder="Ex: 10.5000">
+                </div>
+                
+                <div class="form-group full-width">
+                    <h4>Tributação ICMS</h4>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="cst_icms">CST ICMS *</label>
+                    <select id="cst_icms" name="cst_icms" class="form-input form-select" required>
+                        <option value="">Selecione</option>
+                        <option value="00" ${produto.cst_icms === '00' ? 'selected' : ''}>00 - Tributada integralmente</option>
+                        <option value="10" ${produto.cst_icms === '10' ? 'selected' : ''}>10 - Tributada com cobrança do ICMS por ST</option>
+                        <option value="20" ${produto.cst_icms === '20' ? 'selected' : ''}>20 - Com redução da BC</option>
+                        <option value="30" ${produto.cst_icms === '30' ? 'selected' : ''}>30 - Isenta / não tributada</option>
+                        <option value="40" ${produto.cst_icms === '40' ? 'selected' : ''}>40 - Isenta</option>
+                        <option value="41" ${produto.cst_icms === '41' ? 'selected' : ''}>41 - Não tributada</option>
+                        <option value="50" ${produto.cst_icms === '50' ? 'selected' : ''}>50 - Suspensão</option>
+                        <option value="51" ${produto.cst_icms === '51' ? 'selected' : ''}>51 - Diferimento</option>
+                        <option value="60" ${produto.cst_icms === '60' ? 'selected' : ''}>60 - ICMS cobrado anteriormente por ST</option>
+                        <option value="70" ${produto.cst_icms === '70' ? 'selected' : ''}>70 - Com redução da BC e cobrança do ICMS por ST</option>
+                        <option value="90" ${produto.cst_icms === '90' ? 'selected' : ''}>90 - Outras</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="cfop">CFOP *</label>
+                    <input type="text" id="cfop" name="cfop" class="form-input" 
+                           value="${produto.cfop || ''}" required
+                           placeholder="Ex: 5102" maxlength="4">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="aliquota_icms">Alíquota ICMS (%)</label>
+                    <input type="number" id="aliquota_icms" name="aliquota_icms" class="form-input" 
+                           value="${produto.aliquota_icms || ''}" step="0.01" min="0" max="100"
+                           placeholder="Ex: 18.00">
+                </div>
+                
+                <div class="form-group full-width">
+                    <h4>Tributação PIS/COFINS</h4>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="cst_pis">CST PIS</label>
+                    <select id="cst_pis" name="cst_pis" class="form-input form-select">
+                        <option value="">Selecione</option>
+                        <option value="01" ${produto.cst_pis === '01' ? 'selected' : ''}>01 - Operação Tributável com Alíquota Básica</option>
+                        <option value="02" ${produto.cst_pis === '02' ? 'selected' : ''}>02 - Operação Tributável com Alíquota Diferenciada</option>
+                        <option value="03" ${produto.cst_pis === '03' ? 'selected' : ''}>03 - Operação Tributável com Alíquota por Unidade de Medida</option>
+                        <option value="04" ${produto.cst_pis === '04' ? 'selected' : ''}>04 - Operação Tributável Monofásica - Revenda a Alíquota Zero</option>
+                        <option value="05" ${produto.cst_pis === '05' ? 'selected' : ''}>05 - Operação Tributável por Substituição Tributária</option>
+                        <option value="06" ${produto.cst_pis === '06' ? 'selected' : ''}>06 - Operação Tributável a Alíquota Zero</option>
+                        <option value="07" ${produto.cst_pis === '07' ? 'selected' : ''}>07 - Operação Isenta da Contribuição</option>
+                        <option value="08" ${produto.cst_pis === '08' ? 'selected' : ''}>08 - Operação sem Incidência da Contribuição</option>
+                        <option value="09" ${produto.cst_pis === '09' ? 'selected' : ''}>09 - Operação com Suspensão da Contribuição</option>
+                        <option value="49" ${produto.cst_pis === '49' ? 'selected' : ''}>49 - Outras Operações de Saída</option>
+                        <option value="50" ${produto.cst_pis === '50' ? 'selected' : ''}>50 - Operação com Direito a Crédito - Vinculada</option>
+                        <option value="51" ${produto.cst_pis === '51' ? 'selected' : ''}>51 - Operação com Direito a Crédito - Vinculada</option>
+                        <option value="52" ${produto.cst_pis === '52' ? 'selected' : ''}>52 - Operação com Direito a Crédito - Vinculada</option>
+                        <option value="53" ${produto.cst_pis === '53' ? 'selected' : ''}>53 - Operação com Direito a Crédito - Vinculada</option>
+                        <option value="54" ${produto.cst_pis === '54' ? 'selected' : ''}>54 - Operação com Direito a Crédito - Vinculada</option>
+                        <option value="55" ${produto.cst_pis === '55' ? 'selected' : ''}>55 - Operação com Direito a Crédito - Vinculada</option>
+                        <option value="56" ${produto.cst_pis === '56' ? 'selected' : ''}>56 - Operação com Direito a Crédito - Vinculada</option>
+                        <option value="60" ${produto.cst_pis === '60' ? 'selected' : ''}>60 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="61" ${produto.cst_pis === '61' ? 'selected' : ''}>61 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="62" ${produto.cst_pis === '62' ? 'selected' : ''}>62 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="63" ${produto.cst_pis === '63' ? 'selected' : ''}>63 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="64" ${produto.cst_pis === '64' ? 'selected' : ''}>64 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="65" ${produto.cst_pis === '65' ? 'selected' : ''}>65 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="66" ${produto.cst_pis === '66' ? 'selected' : ''}>66 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="67" ${produto.cst_pis === '67' ? 'selected' : ''}>67 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="70" ${produto.cst_pis === '70' ? 'selected' : ''}>70 - Operação de Aquisição sem Direito a Crédito</option>
+                        <option value="71" ${produto.cst_pis === '71' ? 'selected' : ''}>71 - Operação de Aquisição com Isenção</option>
+                        <option value="72" ${produto.cst_pis === '72' ? 'selected' : ''}>72 - Operação de Aquisição com Suspensão</option>
+                        <option value="73" ${produto.cst_pis === '73' ? 'selected' : ''}>73 - Operação de Aquisição a Alíquota Zero</option>
+                        <option value="74" ${produto.cst_pis === '74' ? 'selected' : ''}>74 - Operação de Aquisição sem Incidência da Contribuição</option>
+                        <option value="75" ${produto.cst_pis === '75' ? 'selected' : ''}>75 - Operação de Aquisição por Substituição Tributária</option>
+                        <option value="98" ${produto.cst_pis === '98' ? 'selected' : ''}>98 - Outras Operações de Entrada</option>
+                        <option value="99" ${produto.cst_pis === '99' ? 'selected' : ''}>99 - Outras Operações</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="aliquota_pis">Alíquota PIS (%)</label>
+                    <input type="number" id="aliquota_pis" name="aliquota_pis" class="form-input" 
+                           value="${produto.aliquota_pis || ''}" step="0.01" min="0" max="100"
+                           placeholder="Ex: 1.65">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="cst_cofins">CST COFINS</label>
+                    <select id="cst_cofins" name="cst_cofins" class="form-input form-select">
+                        <option value="">Selecione</option>
+                        <option value="01" ${produto.cst_cofins === '01' ? 'selected' : ''}>01 - Operação Tributável com Alíquota Básica</option>
+                        <option value="02" ${produto.cst_cofins === '02' ? 'selected' : ''}>02 - Operação Tributável com Alíquota Diferenciada</option>
+                        <option value="03" ${produto.cst_cofins === '03' ? 'selected' : ''}>03 - Operação Tributável com Alíquota por Unidade de Medida</option>
+                        <option value="04" ${produto.cst_cofins === '04' ? 'selected' : ''}>04 - Operação Tributável Monofásica - Revenda a Alíquota Zero</option>
+                        <option value="05" ${produto.cst_cofins === '05' ? 'selected' : ''}>05 - Operação Tributável por Substituição Tributária</option>
+                        <option value="06" ${produto.cst_cofins === '06' ? 'selected' : ''}>06 - Operação Tributável a Alíquota Zero</option>
+                        <option value="07" ${produto.cst_cofins === '07' ? 'selected' : ''}>07 - Operação Isenta da Contribuição</option>
+                        <option value="08" ${produto.cst_cofins === '08' ? 'selected' : ''}>08 - Operação sem Incidência da Contribuição</option>
+                        <option value="09" ${produto.cst_cofins === '09' ? 'selected' : ''}>09 - Operação com Suspensão da Contribuição</option>
+                        <option value="49" ${produto.cst_cofins === '49' ? 'selected' : ''}>49 - Outras Operações de Saída</option>
+                        <option value="50" ${produto.cst_cofins === '50' ? 'selected' : ''}>50 - Operação com Direito a Crédito - Vinculada</option>
+                        <option value="51" ${produto.cst_cofins === '51' ? 'selected' : ''}>51 - Operação com Direito a Crédito - Vinculada</option>
+                        <option value="52" ${produto.cst_cofins === '52' ? 'selected' : ''}>52 - Operação com Direito a Crédito - Vinculada</option>
+                        <option value="53" ${produto.cst_cofins === '53' ? 'selected' : ''}>53 - Operação com Direito a Crédito - Vinculada</option>
+                        <option value="54" ${produto.cst_cofins === '54' ? 'selected' : ''}>54 - Operação com Direito a Crédito - Vinculada</option>
+                        <option value="55" ${produto.cst_cofins === '55' ? 'selected' : ''}>55 - Operação com Direito a Crédito - Vinculada</option>
+                        <option value="56" ${produto.cst_cofins === '56' ? 'selected' : ''}>56 - Operação com Direito a Crédito - Vinculada</option>
+                        <option value="60" ${produto.cst_cofins === '60' ? 'selected' : ''}>60 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="61" ${produto.cst_cofins === '61' ? 'selected' : ''}>61 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="62" ${produto.cst_cofins === '62' ? 'selected' : ''}>62 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="63" ${produto.cst_cofins === '63' ? 'selected' : ''}>63 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="64" ${produto.cst_cofins === '64' ? 'selected' : ''}>64 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="65" ${produto.cst_cofins === '65' ? 'selected' : ''}>65 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="66" ${produto.cst_cofins === '66' ? 'selected' : ''}>66 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="67" ${produto.cst_cofins === '67' ? 'selected' : ''}>67 - Crédito Presumido - Operação de Aquisição Vinculada</option>
+                        <option value="70" ${produto.cst_cofins === '70' ? 'selected' : ''}>70 - Operação de Aquisição sem Direito a Crédito</option>
+                        <option value="71" ${produto.cst_cofins === '71' ? 'selected' : ''}>71 - Operação de Aquisição com Isenção</option>
+                        <option value="72" ${produto.cst_cofins === '72' ? 'selected' : ''}>72 - Operação de Aquisição com Suspensão</option>
+                        <option value="73" ${produto.cst_cofins === '73' ? 'selected' : ''}>73 - Operação de Aquisição a Alíquota Zero</option>
+                        <option value="74" ${produto.cst_cofins === '74' ? 'selected' : ''}>74 - Operação de Aquisição sem Incidência da Contribuição</option>
+                        <option value="75" ${produto.cst_cofins === '75' ? 'selected' : ''}>75 - Operação de Aquisição por Substituição Tributária</option>
+                        <option value="98" ${produto.cst_cofins === '98' ? 'selected' : ''}>98 - Outras Operações de Entrada</option>
+                        <option value="99" ${produto.cst_cofins === '99' ? 'selected' : ''}>99 - Outras Operações</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="aliquota_cofins">Alíquota COFINS (%)</label>
+                    <input type="number" id="aliquota_cofins" name="aliquota_cofins" class="form-input" 
+                           value="${produto.aliquota_cofins || ''}" step="0.01" min="0" max="100"
+                           placeholder="Ex: 7.60">
+                </div>
+                
+                <div class="form-group full-width">
+                    <h4>Informações Adicionais</h4>
+                </div>
+                
+                <div class="form-group full-width">
+                    <label class="form-label" for="informacoes_fisco">Informações ao Fisco</label>
+                    <textarea id="informacoes_fisco" name="informacoes_fisco" class="form-input" rows="3"
+                              placeholder="Informações relevantes para o fisco...">${produto.informacoes_fisco || ''}</textarea>
+                </div>
+                
+                <div class="form-group full-width">
+                    <label class="form-label" for="informacoes_complementares">Informações Complementares</label>
+                    <textarea id="informacoes_complementares" name="informacoes_complementares" class="form-input" rows="3"
+                              placeholder="Informações complementares para o cliente...">${produto.informacoes_complementares || ''}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="homologado">Status de Homologação</label>
+                    <select id="homologado" name="homologado" class="form-input form-select">
+                        <option value="false" ${!produto.homologado ? 'selected' : ''}>Não Homologado</option>
+                        <option value="true" ${produto.homologado ? 'selected' : ''}>Homologado</option>
+                    </select>
+                </div>
+                
+                <div class="form-group full-width">
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('createProdutoFiscalModal')">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> ${produto.id ? 'Atualizar' : 'Salvar'} Produto Fiscal
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    `;
+}
+
+// Nova função específica para cadastro
+async function carregarProdutosParaSelectParaCadastro() {
+    try {
+        const select = document.getElementById('produto_id');
+        if (!select) {
+            console.warn('Select produto_id não encontrado');
+            return;
+        }
+        
+        // Para cadastro, sempre carregar produtos
+        const response = await fetchData(`${API_BASE}/produtos`);
+        const produtos = response.data || [];
+        
+        if (!produtos.length) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Nenhum produto disponível';
+            select.appendChild(option);
+            return;
+        }
+        
+        // Limpar opções existentes (mantendo a primeira)
+        while (select.options.length > 1) {
+            select.remove(1);
+        }
+        
+        produtos.forEach(produto => {
+            // Não mostrar produtos que já têm dados fiscais
+            if (produto.tem_dados_fiscais) {
+                return; // Pula este produto
+            }
+            
+            const option = document.createElement('option');
+            option.value = produto.id;
+            option.textContent = `${produto.nome} (ID: ${produto.id}, Código: ${produto.codigo || 'N/A'})`;
+            select.appendChild(option);
+        });
+        
+    } catch (error) {
+        console.error('Erro ao carregar produtos para select (cadastro):', error);
+        const select = document.getElementById('produto_id');
+        if (select) {
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Erro ao carregar produtos';
+            select.appendChild(option);
+        }
+    }
+}
+
+async function carregarProdutosParaSelect() {
+    try {
+        const select = document.getElementById('produto_id');
+        if (!select) {
+            console.warn('Select produto_id não encontrado - elemento não existe no DOM');
+            return;
+        }
+        
+        // Se já tem produtos carregados (mais de 1 opção), não carregar novamente
+        if (select.options && select.options.length > 1) {
+            return;
+        }
+        
+        // Para edição, carregar todos os produtos
+        const response = await fetchData(`${API_BASE}/produtos`);
+        const produtos = response.data || [];
+        
+        if (!produtos.length) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Nenhum produto disponível';
+            select.appendChild(option);
+            return;
+        }
+        
+        produtos.forEach(produto => {
+            const option = document.createElement('option');
+            option.value = produto.id;
+            option.textContent = `${produto.nome} (ID: ${produto.id}, Código: ${produto.codigo || 'N/A'})`;
+            
+            // Se for edição e este for o produto correto, marcar como selecionado
+            if (window.currentEditingProdutoId && produto.tem_dados_fiscais && 
+                produto.produto_fiscal_id == window.currentEditingProdutoId) {
+                option.selected = true;
+            }
+            
+            select.appendChild(option);
+        });
+        
+    } catch (error) {
+        console.error('Erro ao carregar produtos para select (edição):', error);
+        const select = document.getElementById('produto_id');
+        if (select && select.options) {
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Erro ao carregar produtos';
+            select.appendChild(option);
+        }
+    }
+}
+
+// Manipular envio do formulário de produto fiscal
+async function handleProdutoFiscalSubmit(event, id = null) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+    
+    // Converter valores booleanos
+    data.homologado = data.homologado === 'true';
+    
+    // Converter string vazia para null
+    Object.keys(data).forEach(key => {
+        if (data[key] === '') {
+            data[key] = null;
+        }
+    });
+    
+    // Converter números
+    const numericFields = ['produto_id', 'valor_unitario_trib', 'aliquota_icms', 'aliquota_pis', 'aliquota_cofins'];
+    numericFields.forEach(field => {
+        if (data[field] !== null) {
+            data[field] = parseFloat(data[field]);
+        }
+    });
+    
+    try {
+        let response;
+        if (id) {
+            // Atualização
+            response = await fetchData(`${API_BASE}/produtos-fiscais/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+            showAlert('Produto fiscal atualizado com sucesso!', 'success');
+        } else {
+            // Criação
+            response = await fetchData(`${API_BASE}/produtos-fiscais`, {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            showAlert('Produto fiscal criado com sucesso!', 'success');
+        }
+        
+        closeModal('createProdutoFiscalModal');
+        
+        // Recarregar dados baseado na aba atual
+        const section = currentSection;
+        if (section === 'produtos-fiscais') {
+            // Recarregar lista principal
+            const produtosResponse = await fetchData(`${API_BASE}/produtos-fiscais`);
+            renderProdutosFiscais(produtosResponse.data || []);
+            
+            // Recarregar não homologados se estiver naquela aba
+            const tabAtiva = document.querySelector('#produtos-fiscais .tab.active');
+            if (tabAtiva && tabAtiva.getAttribute('data-tab') === 'produtos-nao-homologados') {
+                await carregarProdutosNaoHomologados();
+            }
+        }
+        
+    } catch (error) {
+        showAlert(id ? 'Erro ao atualizar produto fiscal' : 'Erro ao criar produto fiscal', 'danger');
+        console.error('Erro detalhado:', error);
+    }
+}
+
+// Editar produto fiscal
+async function editProdutoFiscal(id) {
+    try {
+        window.currentEditingProdutoId = id;
+        
+        const response = await fetchData(`${API_BASE}/produtos-fiscais/${id}`);
+        const produto = response.data;
+        
+        const modal = document.getElementById('createProdutoFiscalModal');
+        modal.querySelector('.modal-title').textContent = 'Editar Produto Fiscal';
+        modal.querySelector('.modal-body').innerHTML = getProdutoFiscalForm(produto);
+        
+        modal.classList.add('active');
+        
+        // Aguardar um pouco para garantir que o DOM foi atualizado
+        setTimeout(async () => {
+            await carregarProdutosParaSelect();
+        }, 100);
+        
+    } catch (error) {
+        showAlert('Erro ao carregar produto fiscal', 'danger');
+    }
+}
+
+// Excluir produto fiscal
+async function deleteProdutoFiscal(id) {
+    if (!confirm('Tem certeza que deseja excluir este produto fiscal?\nEsta ação não pode ser desfeita.')) {
+        return;
+    }
+    
+    try {
+        await fetchData(`${API_BASE}/produtos-fiscais/${id}`, {
+            method: 'DELETE'
+        });
+        
+        showAlert('Produto fiscal excluído com sucesso!', 'success');
+        
+        // Recarregar dados
+        const produtosResponse = await fetchData(`${API_BASE}/produtos-fiscais`);
+        renderProdutosFiscais(produtosResponse.data || []);
+        
+        // Recarregar não homologados se estiver visível
+        if (document.querySelector('#produtos-fiscais .tab.active').getAttribute('data-tab') === 'produtos-nao-homologados') {
+            await carregarProdutosNaoHomologados();
+        }
+        
+    } catch (error) {
+        showAlert('Erro ao excluir produto fiscal', 'danger');
+    }
+}
+
+// Buscar produtos fiscais
+async function buscarProdutosFiscais() {
+    try {
+        const termo = document.getElementById('buscar-produto-fiscal').value.trim();
+        
+        if (!termo) {
+            showAlert('Digite um termo para buscar', 'warning');
+            return;
+        }
+        
+        // Primeiro, tentar buscar por produto_id se for número
+        if (!isNaN(termo)) {
+            try {
+                const response = await fetchData(`${API_BASE}/produtos-fiscais/${termo}`);
+                if (response.success && response.data) {
+                    exibirResultadoBusca([response.data]);
+                    return;
+                }
+            } catch (error) {
+                // Continua para buscar por outros critérios
+            }
+        }
+        
+        // Buscar por produto_id
+        try {
+            const response = await fetchData(`${API_BASE}/produtos-fiscais/produto/${termo}`);
+            if (response.success && response.data) {
+                exibirResultadoBusca([response.data]);
+                return;
+            }
+        } catch (error) {
+            // Continua para buscar por NCM
+        }
+        
+        // Se não encontrou, buscar por NCM
+        try {
+            const response = await fetchData(`${API_BASE}/produtos-fiscais/ncm/${termo}`);
+            if (response.success && response.data && response.data.length > 0) {
+                exibirResultadoBusca(response.data);
+                return;
+            }
+        } catch (error) {
+            // Continua
+        }
+        
+        // Se não encontrou, mostrar mensagem
+        document.getElementById('resultados-busca-produtos-fiscais').innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                Nenhum produto fiscal encontrado para "${termo}"
+            </div>
+        `;
+        
+    } catch (error) {
+        showAlert('Erro ao buscar produtos fiscais', 'danger');
+    }
+}
+
+// Exibir resultado da busca
+function exibirResultadoBusca(produtos) {
+    const container = document.getElementById('resultados-busca-produtos-fiscais');
+    
+    if (!produtos || produtos.length === 0) {
+        container.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                Nenhum produto fiscal encontrado
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `
+        <div class="table-container">
+            <h4>Resultados da Busca (${produtos.length} encontrados)</h4>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Produto ID</th>
+                            <th>NCM</th>
+                            <th>CEST</th>
+                            <th>Origem</th>
+                            <th>CST ICMS</th>
+                            <th>Homologado</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+    
+    produtos.forEach(produto => {
+        let origem = '';
+        switch(produto.origem) {
+            case '0': origem = 'Nacional'; break;
+            case '1': origem = 'Estrangeira'; break;
+            default: origem = produto.origem || 'N/A';
+        }
+        
+        html += `
+            <tr>
+                <td>${produto.id}</td>
+                <td>${produto.produto_id || '-'}</td>
+                <td>${produto.codigo_ncm || '-'}</td>
+                <td>${produto.codigo_cest || '-'}</td>
+                <td>${origem}</td>
+                <td>${produto.cst_icms || '-'}</td>
+                <td>
+                    <span class="status-badge ${produto.homologado ? 'status-ativo' : 'status-inativo'}">
+                        ${produto.homologado ? 'Sim' : 'Não'}
+                    </span>
+                </td>
+                <td>
+                    <div class="btn-group">
+                        <button class="btn btn-secondary btn-sm" onclick="editProdutoFiscal(${produto.id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        ${!produto.homologado ? `
+                            <button class="btn btn-success btn-sm" onclick="showHomologarForm(${produto.id})">
+                                <i class="fas fa-check"></i>
+                            </button>
+                        ` : ''}
+                        <button class="btn btn-danger btn-sm" onclick="deleteProdutoFiscal(${produto.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+// Mostrar formulário de homologação
+function showHomologarForm(produtoId) {
+    document.getElementById('homologar_produto_id').value = produtoId;
+    document.getElementById('homologar_justificativa').value = '';
+    
+    const modal = document.getElementById('homologarProdutoModal');
+    modal.classList.add('active');
+}
+
+// Submeter homologação
+async function homologarProdutoSubmit(event) {
+    event.preventDefault();
+    
+    const produtoId = document.getElementById('homologar_produto_id').value;
+    const justificativa = document.getElementById('homologar_justificativa').value;
+    
+    if (!produtoId || !justificativa.trim()) {
+        showAlert('Preencha a justificativa da homologação', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetchData(`${API_BASE}/produtos-fiscais/${produtoId}/homologar`, {
+            method: 'POST',
+            body: JSON.stringify({ justificativa: justificativa.trim() })
+        });
+        
+        if (response.success) {
+            showAlert('Produto homologado com sucesso!', 'success');
+            closeModal('homologarProdutoModal');
+            
+            // Recarregar dados
+            if (currentSection === 'produtos-fiscais') {
+                const produtosResponse = await fetchData(`${API_BASE}/produtos-fiscais`);
+                renderProdutosFiscais(produtosResponse.data || []);
+                
+                // Atualizar lista de não homologados
+                await carregarProdutosNaoHomologados();
+            }
+        } else {
+            showAlert(response.message || 'Erro ao homologar produto', 'danger');
+        }
+        
+    } catch (error) {
+        showAlert('Erro ao homologar produto', 'danger');
+    }
+}
+
 
 // ============================================
 // FUNÇÕES PARA TRANSPORTADORAS
