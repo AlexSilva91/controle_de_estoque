@@ -6016,39 +6016,77 @@ def rota_estornar_venda(venda_id):
 def get_caixa_financeiro(caixa_id):
     session = Session(db.engine)
     try:
-        # Busca informações do caixa
         caixa = session.query(Caixa).filter_by(id=caixa_id).first()
         if not caixa:
             logger.warning(f"Caixa não encontrado: ID {caixa_id}")
             return jsonify({"success": False, "error": "Caixa não encontrado"}), 404
 
-        # Busca todas as movimentações financeiras do caixa
-        movimentacoes = (
+        notas_fiscais = (
+            session.query(NotaFiscal)
+            .filter_by(caixa_id=caixa_id)
+            .order_by(NotaFiscal.data_emissao.desc())
+            .all()
+        )
+        
+        movimentacoes_diretas = (
             session.query(Financeiro)
             .filter_by(caixa_id=caixa_id)
+            .filter(Financeiro.nota_fiscal_id.is_(None))  
+            .filter(Financeiro.categoria != CategoriaFinanceira.estorno)  
             .order_by(Financeiro.data.desc())
             .all()
         )
 
-        # Inicializa estrutura de dados das movimentações
         dados = []
-        for mov in movimentacoes:
-            # Busca informações do cliente
+        
+        notas_processadas = set()
+        
+        for nota in notas_fiscais:
+            notas_processadas.add(nota.id)
+            
+            cliente_nome = None
+            if nota.cliente_id:
+                cliente = session.query(Cliente).get(nota.cliente_id)
+                cliente_nome = cliente.nome if cliente else None
+            
+            formas_pagamento = []
+            if nota.pagamentos:
+                formas_pagamento = [p.forma_pagamento.value for p in nota.pagamentos]
+            
+            financeiros_nota = (
+                session.query(Financeiro)
+                .filter_by(nota_fiscal_id=nota.id)
+                .filter(Financeiro.categoria != CategoriaFinanceira.estorno)
+                .order_by(Financeiro.data.desc())
+                .all()
+            )
+            
+            if financeiros_nota:
+                for fin in financeiros_nota:
+                    dados.append(
+                        {
+                            "id": fin.id,
+                            "data": fin.data.isoformat(),
+                            "tipo": fin.tipo.value,
+                            "categoria": fin.categoria.value if fin.categoria else None,
+                            "valor": float(fin.valor),
+                            "descricao": fin.descricao or f"Venda NF #{nota.id}",
+                            "nota_fiscal_id": nota.id,
+                            "cliente_id": nota.cliente_id,
+                            "conta_receber_id": fin.conta_receber_id,
+                            "cliente_nome": cliente_nome,
+                            "formas_pagamento": formas_pagamento,
+                            "nota_fiscal_status": nota.status.value if nota.status else None,
+                        }
+                    )
+        
+        for mov in movimentacoes_diretas:
             cliente_nome = None
             if mov.cliente_id:
                 cliente = session.query(Cliente).get(mov.cliente_id)
                 cliente_nome = cliente.nome if cliente else None
 
-            # Busca formas de pagamento
             formas_pagamento = []
-            if mov.nota_fiscal_id:
-                pagamentos = (
-                    session.query(PagamentoNotaFiscal)
-                    .filter_by(nota_fiscal_id=mov.nota_fiscal_id)
-                    .all()
-                )
-                formas_pagamento = [p.forma_pagamento.value for p in pagamentos]
-
             if mov.conta_receber_id:
                 pagamentos = (
                     session.query(PagamentoContaReceber)
@@ -6070,10 +6108,12 @@ def get_caixa_financeiro(caixa_id):
                     "conta_receber_id": mov.conta_receber_id,
                     "cliente_nome": cliente_nome,
                     "formas_pagamento": formas_pagamento,
+                    "nota_fiscal_status": None,  
                 }
             )
-
-        # ---- Usa a função nova para calcular os totais ----
+        
+        dados.sort(key=lambda x: x["data"], reverse=True)
+        
         totais = calcular_formas_pagamento(caixa_id, session)
 
         logger.info(f"Dados financeiros do caixa ID {caixa_id} recuperados com sucesso")
@@ -6108,8 +6148,7 @@ def get_caixa_financeiro(caixa_id):
         )
     finally:
         session.close()
-
-
+        
 @admin_bp.route("/caixas/<int:caixa_id>/financeiro/movimentacoes/pdf")
 @login_required
 @admin_required

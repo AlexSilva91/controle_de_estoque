@@ -6506,19 +6506,25 @@ document.addEventListener('DOMContentLoaded', function () {
         `/admin/caixas/${caixaId}/financeiro`
       );
       caixaIdAtual = caixaId;
-
+  
       if (response.success) {
         const tableBody = document.querySelector('#caixaFinanceiroTable tbody');
         if (tableBody) {
           tableBody.innerHTML = '';
-
+  
           response.data.forEach((item) => {
             const row = document.createElement('tr');
             const valor = parseFloat(item.valor);
-
+  
+            // Verificar se a nota fiscal está cancelada
+            const isNotaCancelada = item.nota_fiscal_status === 'cancelada';
+            
             // Verificar se é uma venda que pode ser estornada
-            const isVendaEstornavel = item.tipo === 'entrada' && item.nota_fiscal_id;
-
+            // Apenas notas emitidas (não canceladas) podem ser estornadas
+            const isVendaEstornavel = item.tipo === 'entrada' && 
+                                     item.nota_fiscal_id && 
+                                     !isNotaCancelada;
+  
             // Format payment methods as tags
             const paymentTags =
               item.formas_pagamento && item.formas_pagamento.length > 0
@@ -6526,12 +6532,21 @@ document.addEventListener('DOMContentLoaded', function () {
                     .map((p) => `<span class="badge badge-info">${p}</span>`)
                     .join(' ')
                 : '-';
-
+  
+            // Estilização especial para notas canceladas
+            const canceladaClass = isNotaCancelada ? 'cancelada-row' : '';
+            const canceladaBadge = isNotaCancelada 
+              ? '<span class="badge badge-secondary ml-2">Cancelada</span>' 
+              : '';
+  
             row.innerHTML = `
                         <td>${formatDateTime(item.data)}</td>
-                        <td><span class="badge ${
-                          item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'
-                        }">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
+                        <td>
+                          <span class="badge ${
+                            item.tipo === 'entrada' ? 'badge-success' : 'badge-danger'
+                          }">${item.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span>
+                          ${canceladaBadge}
+                        </td>
                         <td>${item.categoria || '-'}</td>
                         <td>${formatarMoeda(valor)}</td>
                         <td>
@@ -6550,48 +6565,62 @@ document.addEventListener('DOMContentLoaded', function () {
                               item.nota_fiscal_id
                                 ? `
                                 <br>
-                                <button class="btn btn-sm btn-info btn-editar-pagamento" data-venda-id="${
-                                  item.nota_fiscal_id
-                                }">
-                                    <i class="fas fa-edit"></i> Editar Pagamentos
-                                </button>
-                                <button class="btn btn-sm btn-danger btn-estornar-venda" 
-                                        data-venda-id="${item.nota_fiscal_id}"
-                                        data-valor="${valor}"
-                                        data-data="${item.data}"
-                                        data-cliente="${item.cliente_nome || ''}"
-                                        data-descricao="${item.descricao || ''}">
-                                    <i class="fas fa-undo"></i> Estornar
-                                </button>
+                                ${
+                                  !isNotaCancelada
+                                    ? `
+                                    <button class="btn btn-sm btn-info btn-editar-pagamento" data-venda-id="${
+                                      item.nota_fiscal_id
+                                    }">
+                                        <i class="fas fa-edit"></i> Editar Pagamentos
+                                    </button>
+                                    <button class="btn btn-sm btn-danger btn-estornar-venda" 
+                                            data-venda-id="${item.nota_fiscal_id}"
+                                            data-valor="${valor}"
+                                            data-data="${item.data}"
+                                            data-cliente="${item.cliente_nome || ''}"
+                                            data-descricao="${item.descricao || ''}">
+                                        <i class="fas fa-undo"></i> Estornar
+                                    </button>
+                                    `
+                                    : '<span class="badge badge-secondary">Venda Cancelada</span>'
+                                }
                             `
                                 : ''
                             }
                         </td>
                     `;
-
-            // Adicionar eventos aos botões de editar pagamento
-            row.querySelectorAll('.btn-editar-pagamento').forEach((btn) => {
-              btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const vendaId = btn.getAttribute('data-venda-id');
-                openEditarFormasPagamentoModal(vendaId);
+  
+            // Adicionar classe especial para linhas canceladas
+            if (isNotaCancelada) {
+              row.classList.add('cancelada-row');
+            }
+  
+            // Adicionar eventos aos botões de editar pagamento (apenas para notas não canceladas)
+            if (!isNotaCancelada) {
+              row.querySelectorAll('.btn-editar-pagamento').forEach((btn) => {
+                btn.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  const vendaId = btn.getAttribute('data-venda-id');
+                  openEditarFormasPagamentoModal(vendaId);
+                });
               });
-            });
-
-            // Adicionar eventos aos botões de estornar
-            row.querySelectorAll('.btn-estornar-venda').forEach((btn) => {
-              btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const vendaId = btn.getAttribute('data-venda-id');
-                const valor = btn.getAttribute('data-valor');
-                const data = btn.getAttribute('data-data');
-                const cliente = btn.getAttribute('data-cliente');
-                const descricao = btn.getAttribute('data-descricao');
-                openEstornarVendaModal(vendaId, valor, data, cliente, descricao);
+  
+              // Adicionar eventos aos botões de estornar (apenas para notas não canceladas)
+              row.querySelectorAll('.btn-estornar-venda').forEach((btn) => {
+                btn.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  const vendaId = btn.getAttribute('data-venda-id');
+                  const valor = btn.getAttribute('data-valor');
+                  const data = btn.getAttribute('data-data');
+                  const cliente = btn.getAttribute('data-cliente');
+                  const descricao = btn.getAttribute('data-descricao');
+                  openEstornarVendaModal(vendaId, valor, data, cliente, descricao);
+                });
               });
-            });
-
+            }
+  
             // Adiciona evento de clique para abrir detalhes da venda
+            // Mesmo notas canceladas podem ser clicadas para ver os produtos
             if (item.nota_fiscal_id) {
               row.style.cursor = 'pointer';
               row.classList.add('clickable-row');
@@ -6599,10 +6628,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 openDetalhesVendaModal(item.nota_fiscal_id);
               });
             }
-
+  
             tableBody.appendChild(row);
           });
-
+  
           // USE OS TOTAIS DO BACKEND (response.totais) EM VEZ DE CALCULAR NOVAMENTE
           if (document.getElementById('caixaTotalEntradas')) {
             document.getElementById('caixaTotalEntradas').textContent = formatarMoeda(
@@ -6639,9 +6668,9 @@ document.addEventListener('DOMContentLoaded', function () {
               response.totais.contas_prazo_recebidas || 0
             );
           }
-
+  
           const formasPagamento = response.vendas_por_forma_pagamento || {};
-
+  
           document.getElementById('totalPixFabiano').textContent = formatarMoeda(
             formasPagamento.pix_fabiano || 0
           );
@@ -6666,7 +6695,7 @@ document.addEventListener('DOMContentLoaded', function () {
           document.getElementById('totalAPrazo').textContent = formatarMoeda(
             formasPagamento.a_prazo || 0
           );
-
+  
           // Adiciona eventos de clique para os cards de formas de pagamento
           addFormaPagamentoClickEvents(caixaId);
         }

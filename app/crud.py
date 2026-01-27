@@ -2140,7 +2140,6 @@ def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
     - Para outras vendas: mantém o comportamento original com nota fiscal de estorno
     """
     try:
-        # Busca a nota fiscal original
         nota_original = NotaFiscal.query.get(nota_fiscal_id)
         if not nota_original:
             return {'success': False, 'message': 'Nota fiscal não encontrada'}
@@ -2148,36 +2147,49 @@ def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
         if nota_original.status == StatusNota.cancelada:
             return {'success': False, 'message': 'Esta nota já foi cancelada anteriormente'}
         
-        # Verifica se é uma venda a prazo
         is_venda_a_prazo = nota_original.a_prazo
         
-        # TRATAMENTO ESPECÍFICO PARA VENDAS A PRAZO - DESFAZER EXATAMENTE O QUE FOI FEITO NA VENDA
         if is_venda_a_prazo:
-            # 1. REMOVER CONTA A RECEBER (se existir)
             for conta in nota_original.contas_receber:
-                # Remove registros financeiros relacionados aos pagamentos das contas
                 financeiros_pagamentos = Financeiro.query.filter_by(
                     conta_receber_id=conta.id
                 ).all()
                 for financeiro in financeiros_pagamentos:
                     db.session.delete(financeiro)
                 
-                # Remove pagamentos da conta
                 for pagamento in conta.pagamentos:
                     db.session.delete(pagamento)
                 
-                # Remove a conta a receber
                 db.session.delete(conta)
             
-            # 2. DEVOLVER PRODUTOS AO ESTOQUE (reverte a baixa de estoque)
             for item in nota_original.itens:
                 produto = Produto.query.get(item.produto_id)
                 if produto:
-                    # Devolve a quantidade ao estoque de origem (reverte o -= da venda)
-                    produto.estoque_loja += item.quantidade
+                    if item.estoque_origem == TipoEstoque.loja:
+                        produto.estoque_loja += item.quantidade
+                    elif item.estoque_origem == TipoEstoque.deposito:
+                        produto.estoque_deposito += item.quantidade
+                    elif item.estoque_origem == TipoEstoque.fabrica:
+                        produto.estoque_fabrica += item.quantidade
+                    
                     produto.sincronizado = False
+                    
+                    lotes_ativos = LoteEstoque.query.filter_by(
+                        produto_id=produto.id,
+                        ativo=True
+                    ).order_by(LoteEstoque.data_entrada.asc()).all()
+                    
+                    quantidade_restante = item.quantidade
+                    for lote in lotes_ativos:
+                        if quantidade_restante <= 0:
+                            break
+                            
+                        capacidade_lote = lote.quantidade_inicial - lote.quantidade_disponivel
+                        if capacidade_lote > 0:
+                            quantidade_adicionar = min(quantidade_restante, capacidade_lote)
+                            lote.quantidade_disponivel += quantidade_adicionar
+                            quantidade_restante -= quantidade_adicionar
                 
-                # Cria movimentação de estoque de devolução
                 movimentacao = MovimentacaoEstoque(
                     produto_id=item.produto_id,
                     usuario_id=usuario_id,
@@ -2195,7 +2207,6 @@ def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
                 )
                 db.session.add(movimentacao)
             
-            # 3. REMOVER PAGAMENTOS A PRAZO DA NOTA FISCAL (se existirem)
             pagamentos_a_prazo = PagamentoNotaFiscal.query.filter_by(
                 nota_fiscal_id=nota_original.id,
                 forma_pagamento=FormaPagamento.a_prazo
@@ -2204,7 +2215,6 @@ def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
             for pagamento in pagamentos_a_prazo:
                 db.session.delete(pagamento)
             
-            # 4. ATUALIZAR STATUS DA NOTA ORIGINAL PARA CANCELADA
             nota_original.status = StatusNota.cancelada
             nota_original.observacao = f"Cancelada - Estorno venda a prazo: {motivo_estorno}"
             nota_original.sincronizado = False
@@ -2218,12 +2228,9 @@ def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
                 'venda_a_prazo': True
             }
         
-        # COMPORTAMENTO ORIGINAL PARA OUTRAS VENDAS (NÃO A PRAZO)
         else:
-            # Usa o mesmo caixa da nota original
             caixa_id = nota_original.caixa_id
             
-            # Cria uma nova nota fiscal de estorno (com valores negativos)
             nota_estorno = NotaFiscal(
                 cliente_id=nota_original.cliente_id,
                 operador_id=usuario_id,
@@ -2242,7 +2249,6 @@ def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
             db.session.add(nota_estorno)
             db.session.flush()
             
-            # Cria os itens de estorno (com quantidades negativas)
             for item in nota_original.itens:
                 item_estorno = NotaFiscalItem(
                     nota_id=nota_estorno.id,
@@ -2257,10 +2263,8 @@ def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
                 )
                 db.session.add(item_estorno)
                 
-                # Atualiza o estoque do produto
                 produto = Produto.query.get(item.produto_id)
                 if produto:
-                    # Devolve a quantidade ao estoque de origem
                     if item.estoque_origem == TipoEstoque.loja:
                         produto.estoque_loja += item.quantidade
                     elif item.estoque_origem == TipoEstoque.deposito:
@@ -2269,8 +2273,23 @@ def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
                         produto.estoque_fabrica += item.quantidade
                     
                     produto.sincronizado = False
+                    
+                    lotes_ativos = LoteEstoque.query.filter_by(
+                        produto_id=produto.id,
+                        ativo=True
+                    ).order_by(LoteEstoque.data_entrada.asc()).all()
+                    
+                    quantidade_restante = item.quantidade
+                    for lote in lotes_ativos:
+                        if quantidade_restante <= 0:
+                            break
+                            
+                        capacidade_lote = lote.quantidade_inicial - lote.quantidade_disponivel
+                        if capacidade_lote > 0:
+                            quantidade_adicionar = min(quantidade_restante, capacidade_lote)
+                            lote.quantidade_disponivel += quantidade_adicionar
+                            quantidade_restante -= quantidade_adicionar
                 
-                # Cria movimentação de estoque reversa
                 movimentacao = MovimentacaoEstoque(
                     produto_id=item.produto_id,
                     usuario_id=usuario_id,
@@ -2288,12 +2307,10 @@ def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
                 )
                 db.session.add(movimentacao)
             
-            # Atualiza status da nota original para cancelada
             nota_original.status = StatusNota.cancelada
             nota_original.observacao = f"Cancelada por estorno. Motivo: {motivo_estorno}"
             nota_original.sincronizado = False
             
-            # Registra no financeiro
             financeiro_estorno = Financeiro(
                 tipo=TipoMovimentacao.saida_estorno,
                 categoria=CategoriaFinanceira.estorno,
@@ -2307,7 +2324,6 @@ def estornar_venda(db, nota_fiscal_id, motivo_estorno, usuario_id):
             )
             db.session.add(financeiro_estorno)
             
-            # Cancela contas a receber associadas (se houver)
             for conta in nota_original.contas_receber:
                 if conta.status != StatusPagamento.quitado:
                     conta.status = StatusPagamento.cancelado
