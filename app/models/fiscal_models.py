@@ -168,7 +168,7 @@ class VeiculoTransporte(Base):
     placa = Column(String(7), nullable=False)
     uf = Column(String(2), nullable=False)
     rntc = Column(String(20), nullable=True)
-    tipo_veiculo = Column(String(2), nullable=True)
+    tipo_veiculo = Column(String(50), nullable=True) 
     capacidade_carga = Column(DECIMAL(10, 3), nullable=True)
     proprietario = Column(String(150), nullable=True)
     

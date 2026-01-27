@@ -1,3 +1,4 @@
+from datetime import datetime
 from flask import Blueprint, request, jsonify
 from app.models import db
 from app.decorators.decorators import admin_required
@@ -12,6 +13,7 @@ from app.services.fiscal_crud import (
     NotaFiscalVolumeCRUD,
     FiscalManager
 )
+from app.utils.fiscal.helpers import NFeHelpers
 
 
 fiscal_bp = Blueprint('fiscal', __name__, url_prefix='/admin/fiscal')
@@ -135,12 +137,16 @@ def obter_configuracao_por_id(id):
             "atualizado_em": config.atualizado_em.isoformat() if config.atualizado_em else None
         }
         
+        config_dict_formatado = NFeHelpers.formatar_dados_para_frontend(config_dict, tipo='configuracao')
+        
         return jsonify({
             "success": True,
-            "data": config_dict
+            "data": config_dict_formatado
         }), 200
         
     except Exception as e:
+        import traceback
+        print(f"Erro detalhado: {traceback.format_exc()}")
         return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
 
 @fiscal_bp.route('/configuracoes/<int:id>', methods=['PUT'])
@@ -168,6 +174,50 @@ def atualizar_configuracao(id):
         
     except Exception as e:
         return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+
+@fiscal_bp.route('/configuracoes/<int:id>', methods=['DELETE'])
+@admin_required
+def excluir_configuracao(id):
+    """Desativa (soft delete) uma configuração fiscal"""
+    try:
+        sucesso = ConfiguracaoFiscalCRUD.excluir(db.session, id)
+        
+        if not sucesso:
+            return jsonify({"success": False, "message": "Configuração não encontrada"}), 404
+        
+        return jsonify({
+            "success": True,
+            "message": "Configuração fiscal desativada com sucesso"
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+
+@fiscal_bp.route('/configuracoes/<int:id>/reativar', methods=['POST'])
+@admin_required
+def reativar_configuracao(id):
+    """Reativa uma configuração fiscal desativada"""
+    try:
+        config = ConfiguracaoFiscalCRUD.reativar(db.session, id)
+        
+        if not config:
+            return jsonify({"success": False, "message": "Configuração não encontrada"}), 404
+        
+        return jsonify({
+            "success": True,
+            "message": "Configuração fiscal reativada com sucesso",
+            "data": {
+                "id": config.id,
+                "razao_social": config.razao_social,
+                "ativo": config.ativo
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
 
 @fiscal_bp.route('/configuracoes/<int:id>/incrementar-nfe', methods=['POST'])
 @admin_required
@@ -399,7 +449,6 @@ def listar_transportadoras():
         skip = request.args.get('skip', 0, type=int)
         limit = request.args.get('limit', 100, type=int)
         
-         
         transportadoras = TransportadoraCRUD.listar_ativas(db.session, skip, limit)
         
         return jsonify({
@@ -407,10 +456,15 @@ def listar_transportadoras():
             "data": [{
                 "id": t.id,
                 "razao_social": t.razao_social,
+                "nome_fantasia": t.nome_fantasia,
                 "cnpj": t.cnpj,
                 "cpf": t.cpf,
                 "municipio": t.municipio,
-                "uf": t.uf
+                "uf": t.uf,
+                "ativo": t.ativo, 
+                "placa_veiculo": t.placa_veiculo,
+                "uf_veiculo": t.uf_veiculo,
+                "rntc": t.rntc
             } for t in transportadoras]
         }), 200
         
@@ -422,18 +476,45 @@ def listar_transportadoras():
 def obter_transportadora(id):
     """Obtém transportadora por ID"""
     try:
-         
         transportadora = TransportadoraCRUD.obter_por_id(db.session, id)
         
         if not transportadora:
             return jsonify({"success": False, "message": "Transportadora não encontrada"}), 404
         
+        transportadora_dict = {
+            "id": transportadora.id,
+            "razao_social": transportadora.razao_social,
+            "nome_fantasia": transportadora.nome_fantasia,
+            "cnpj": transportadora.cnpj,
+            "cpf": transportadora.cpf,
+            "inscricao_estadual": transportadora.inscricao_estadual,
+            "logradouro": transportadora.logradouro,
+            "numero": transportadora.numero,
+            "complemento": transportadora.complemento,
+            "bairro": transportadora.bairro,
+            "municipio": transportadora.municipio,
+            "uf": transportadora.uf,
+            "cep": transportadora.cep,
+            "telefone": transportadora.telefone,
+            "email": transportadora.email,
+            "modalidade_frete": transportadora.modalidade_frete,
+            "placa_veiculo": transportadora.placa_veiculo,
+            "uf_veiculo": transportadora.uf_veiculo,
+            "rntc": transportadora.rntc,
+            "ativo": transportadora.ativo,
+            "criado_em": transportadora.criado_em.isoformat() if transportadora.criado_em else None,
+            "atualizado_em": transportadora.atualizado_em.isoformat() if transportadora.atualizado_em else None,
+            "sincronizado": transportadora.sincronizado
+        }
+        
         return jsonify({
             "success": True,
-            "data": transportadora.__dict__
+            "data": transportadora_dict
         }), 200
         
     except Exception as e:
+        import traceback
+        print(f"Erro detalhado: {traceback.format_exc()}")
         return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
 
 @fiscal_bp.route('/transportadoras/buscar', methods=['GET'])
@@ -493,6 +574,52 @@ def atualizar_transportadora(id):
     except Exception as e:
         return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
 
+@fiscal_bp.route('/transportadoras/<int:id>', methods=['DELETE'])
+@admin_required
+def excluir_transportadora(id):
+    """Desativa (soft delete) uma transportadora"""
+    try:
+        sucesso = TransportadoraCRUD.excluir(db.session, id)
+        
+        if not sucesso:
+            return jsonify({"success": False, "message": "Transportadora não encontrada"}), 404
+        
+        return jsonify({
+            "success": True,
+            "message": "Transportadora desativada com sucesso"
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+
+@fiscal_bp.route('/transportadoras/<int:id>/reativar', methods=['POST'])
+@admin_required
+def reativar_transportadora(id):
+    """Reativa uma transportadora desativada"""
+    try:
+        transportadora = TransportadoraCRUD.obter_por_id(db.session, id)
+        if not transportadora:
+            return jsonify({"success": False, "message": "Transportadora não encontrada"}), 404
+        
+        transportadora.ativo = True
+        transportadora.atualizado_em = datetime.now()
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Transportadora reativada com sucesso",
+            "data": {
+                "id": transportadora.id,
+                "razao_social": transportadora.razao_social,
+                "ativo": transportadora.ativo
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
 # ============================================
 # 4. ROTAS VEÍCULO DE TRANSPORTE
 # ============================================
@@ -536,7 +663,6 @@ def listar_veiculos():
         skip = request.args.get('skip', 0, type=int)
         limit = request.args.get('limit', 100, type=int)
         
-         
         veiculos = VeiculoTransporteCRUD.listar_ativos(db.session, skip, limit)
         
         return jsonify({
@@ -546,7 +672,10 @@ def listar_veiculos():
                 "placa": v.placa,
                 "uf": v.uf,
                 "rntc": v.rntc,
-                "transportadora_id": v.transportadora_id
+                "transportadora_id": v.transportadora_id,
+                "transportadora_nome": v.transportadora.razao_social if v.transportadora else None,
+                "ativo": v.ativo,
+                "proprietario": v.proprietario
             } for v in veiculos]
         }), 200
         
@@ -558,15 +687,33 @@ def listar_veiculos():
 def obter_veiculo(id):
     """Obtém veículo por ID"""
     try:
-         
         veiculo = VeiculoTransporteCRUD.obter_por_id(db.session, id)
         
         if not veiculo:
             return jsonify({"success": False, "message": "Veículo não encontrado"}), 404
         
+        capacidade_carga = None
+        if veiculo.capacidade_carga:
+            capacidade_carga = str(veiculo.capacidade_carga)
+        
+        veiculo_dict = {
+            "id": veiculo.id,
+            "transportadora_id": veiculo.transportadora_id,
+            "transportadora_nome": veiculo.transportadora.razao_social if veiculo.transportadora else None,
+            "placa": veiculo.placa,
+            "uf": veiculo.uf,
+            "rntc": veiculo.rntc,
+            "tipo_veiculo": veiculo.tipo_veiculo.capitalize(),
+            "capacidade_carga": capacidade_carga,
+            "proprietario": veiculo.proprietario,
+            "ativo": veiculo.ativo,
+            "criado_em": veiculo.criado_em.isoformat() if veiculo.criado_em else None,
+            "atualizado_em": veiculo.atualizado_em.isoformat() if veiculo.atualizado_em else None,
+            "sincronizado": veiculo.sincronizado
+        }
         return jsonify({
             "success": True,
-            "data": veiculo.__dict__
+            "data": veiculo_dict
         }), 200
         
     except Exception as e:
@@ -639,6 +786,48 @@ def atualizar_veiculo(id):
     except Exception as e:
         return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
 
+@fiscal_bp.route('/veiculos/<int:id>', methods=['DELETE'])
+@admin_required
+def excluir_veiculo(id):
+    """Desativa (soft delete) um veículo"""
+    try:
+        sucesso = VeiculoTransporteCRUD.excluir(db.session, id)
+        
+        if not sucesso:
+            return jsonify({"success": False, "message": "Veículo não encontrado"}), 404
+        
+        return jsonify({
+            "success": True,
+            "message": "Veículo desativado com sucesso"
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+
+@fiscal_bp.route('/veiculos/<int:id>/reativar', methods=['POST'])
+@admin_required
+def reativar_veiculo(id):
+    """Reativa um veículo desativado"""
+    try:
+        veiculo = VeiculoTransporteCRUD.reativar(db.session, id)
+        
+        if not veiculo:
+            return jsonify({"success": False, "message": "Veículo não encontrado"}), 404
+        
+        return jsonify({
+            "success": True,
+            "message": "Veículo reativado com sucesso",
+            "data": {
+                "id": veiculo.id,
+                "placa": veiculo.placa,
+                "ativo": veiculo.ativo
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+    
 # ============================================
 # 5. ROTAS HISTÓRICO DA NOTA FISCAL
 # ============================================

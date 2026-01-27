@@ -5,6 +5,7 @@ CRUD completo para os modelos fiscais - COMPATÍVEL com sistema existente
 """
 
 from datetime import datetime
+from decimal import Decimal
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -113,12 +114,13 @@ class ConfiguracaoFiscalCRUD:
         """
         Atualiza configuração fiscal
         """
+        dados_tratados = NFeHelpers.tratar_dados_configuracao(dados)
         config = ConfiguracaoFiscalCRUD.obter_por_id(db, id)
         if not config:
             return None
         
         try:
-            for key, value in dados.items():
+            for key, value in dados_tratados.items():
                 if hasattr(config, key) and value is not None:
                     setattr(config, key, value)
             
@@ -134,7 +136,7 @@ class ConfiguracaoFiscalCRUD:
     @staticmethod
     def excluir(db: Session, id: int) -> bool:
         """
-        Exclui configuração fiscal (soft delete - desativa)
+        Desativa uma configuração fiscal (soft delete)
         """
         config = ConfiguracaoFiscalCRUD.obter_por_id(db, id)
         if not config:
@@ -148,8 +150,28 @@ class ConfiguracaoFiscalCRUD:
             
         except Exception as e:
             db.rollback()
-            raise Exception(f"Erro ao excluir configuração: {str(e)}")
+            raise Exception(f"Erro ao desativar configuração: {str(e)}")
     
+    @staticmethod
+    def reativar(db: Session, id: int) -> Optional[ConfiguracaoFiscal]:
+        """
+        Reativa uma configuração fiscal (inverso do soft delete)
+        """
+        config = ConfiguracaoFiscalCRUD.obter_por_id(db, id)
+        if not config:
+            return None
+        
+        try:
+            config.ativo = True
+            config.atualizado_em = datetime.now()
+            db.commit()
+            db.refresh(config)
+            return config
+            
+        except Exception as e:
+            db.rollback()
+            raise Exception(f"Erro ao reativar configuração: {str(e)}")
+        
     @staticmethod
     def incrementar_numero_nfe(db: Session, id: int) -> int:
         """
@@ -463,7 +485,6 @@ class TransportadoraCRUD:
         Lista transportadoras ativas
         """
         return db.query(Transportadora).filter(
-            Transportadora.ativo == True
         ).offset(skip).limit(limit).all()
     
     @staticmethod
@@ -523,15 +544,37 @@ class VeiculoTransporteCRUD:
         Cria um novo veículo de transporte
         """
         try:
+            # Trata os dados antes de criar
+            dados_tratados = NFeHelpers.tratar_dados_veiculo(dados)
+            
+            # Converte campos específicos
+            capacidade_carga = dados_tratados.get('capacidade_carga')
+            if capacidade_carga is not None:
+                try:
+                    capacidade_carga = Decimal(str(capacidade_carga))
+                except:
+                    capacidade_carga = None
+            
+            transportadora_id = dados_tratados.get('transportadora_id')
+            if transportadora_id is not None:
+                try:
+                    transportadora_id = int(transportadora_id)
+                except:
+                    transportadora_id = None
+            
+            ativo = dados_tratados.get('ativo', True)
+            if isinstance(ativo, str):
+                ativo = ativo.lower() in ('true', '1', 'yes', 'sim')
+            
             veiculo = VeiculoTransporte(
-                transportadora_id=dados.get('transportadora_id'),
-                placa=dados['placa'].upper().replace('-', '').replace(' ', ''),
-                uf=dados['uf'].upper(),
-                rntc=dados.get('rntc'),
-                tipo_veiculo=dados.get('tipo_veiculo'),
-                capacidade_carga=dados.get('capacidade_carga'),
-                proprietario=dados.get('proprietario'),
-                ativo=dados.get('ativo', True)
+                transportadora_id=transportadora_id,
+                placa=dados_tratados['placa'],
+                uf=dados_tratados['uf'],
+                rntc=dados_tratados.get('rntc'),
+                tipo_veiculo=dados_tratados.get('tipo_veiculo'),
+                capacidade_carga=capacidade_carga,
+                proprietario=dados_tratados.get('proprietario'),
+                ativo=ativo
             )
             
             db.add(veiculo)
@@ -542,6 +585,9 @@ class VeiculoTransporteCRUD:
         except IntegrityError as e:
             db.rollback()
             raise ValueError(f"Erro ao criar veículo: {str(e)}")
+        except Exception as e:
+            db.rollback()
+            raise Exception(f"Erro inesperado ao criar veículo: {str(e)}")
     
     @staticmethod
     def obter_por_id(db: Session, id: int) -> Optional[VeiculoTransporte]:
@@ -576,9 +622,7 @@ class VeiculoTransporteCRUD:
         """
         Lista veículos ativos
         """
-        return db.query(VeiculoTransporte).filter(
-            VeiculoTransporte.ativo == True
-        ).offset(skip).limit(limit).all()
+        return db.query(VeiculoTransporte).offset(skip).limit(limit).all()
     
     @staticmethod
     def atualizar(db: Session, id: int, dados: Dict[str, Any]) -> Optional[VeiculoTransporte]:
@@ -625,7 +669,26 @@ class VeiculoTransporteCRUD:
             db.rollback()
             raise Exception(f"Erro ao excluir veículo: {str(e)}")
 
-
+    @staticmethod
+    def reativar(db: Session, id: int) -> Optional[VeiculoTransporte]:
+        """
+        Reativa um veículo de transporte
+        """
+        veiculo = VeiculoTransporteCRUD.obter_por_id(db, id)
+        if not veiculo:
+            return None
+        
+        try:
+            veiculo.ativo = True
+            veiculo.atualizado_em = datetime.now()
+            db.commit()
+            db.refresh(veiculo)
+            return veiculo
+            
+        except Exception as e:
+            db.rollback()
+            raise Exception(f"Erro ao reativar veículo: {str(e)}")
+        
 # ============================================
 # 5. CRUD HISTÓRICO DA NOTA FISCAL
 # ============================================

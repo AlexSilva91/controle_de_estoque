@@ -404,6 +404,21 @@ class NFeHelpers:
             if campo in dados_tratados and dados_tratados[campo]:
                 dados_tratados[campo] = NFeHelpers.normalizar_texto(dados_tratados[campo])
         
+        # Converte capacidade_carga para string (será convertido para Decimal depois)
+        if 'capacidade_carga' in dados_tratados and dados_tratados['capacidade_carga'] is not None:
+            try:
+                # Garante que seja string para conversão posterior
+                dados_tratados['capacidade_carga'] = str(dados_tratados['capacidade_carga'])
+            except:
+                dados_tratados['capacidade_carga'] = None
+        
+        # Converte transportadora_id para string (será convertido para int depois)
+        if 'transportadora_id' in dados_tratados:
+            if dados_tratados['transportadora_id'] == '' or dados_tratados['transportadora_id'] is None:
+                dados_tratados['transportadora_id'] = None
+            else:
+                dados_tratados['transportadora_id'] = str(dados_tratados['transportadora_id'])
+        
         return dados_tratados
     
     @staticmethod

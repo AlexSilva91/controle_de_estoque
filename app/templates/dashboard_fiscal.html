@@ -18,7 +18,7 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
+        <!-- Sidebar (mantenha igual) -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h1>Gestão Fiscal</h1>
@@ -110,7 +110,7 @@
             </div>
         </aside>
 
-        <!-- Main Content -->
+        <!-- Main Content COMPLETO -->
         <main class="main-content">
             <!-- Top Bar -->
             <div class="top-bar">
@@ -189,11 +189,6 @@
                 <div class="table-container">
                     <div class="table-header">
                         <h3 class="table-title">Configurações Fiscais</h3>
-                        <div class="table-actions">
-                            <button class="btn btn-primary" onclick="openModal('createConfigModal')">
-                                <i class="fas fa-plus"></i> Nova Configuração
-                            </button>
-                        </div>
                     </div>
                     <div class="table-responsive">
                         <table>
@@ -226,15 +221,269 @@
                 </div>
             </section>
 
-            <!-- Outras seções serão carregadas dinamicamente -->
-            <div id="contentSections"></div>
+            <!-- Produtos Fiscais Section -->
+            <section id="produtos-fiscais" class="section" style="display: none;">
+                <div class="tabs">
+                    <button class="tab active" data-tab="produtos-list">Listar</button>
+                    <button class="tab" data-tab="produtos-nao-homologados">Não Homologados</button>
+                </div>
 
+                <div class="tab-content" id="produtos-list" style="display: block;">
+                    <!-- Conteúdo carregado via JavaScript -->
+                </div>
+
+                <div class="tab-content" id="produtos-nao-homologados" style="display: none;">
+                    <!-- Conteúdo carregado via JavaScript -->
+                </div>
+            </section>
+
+            <!-- Transportadoras Section -->
+            <section id="transportadoras" class="section" style="display: none;">
+                <div class="tabs">
+                    <button class="tab active" data-tab="transp-list">Listar</button>
+                    <button class="tab" data-tab="transp-buscar">Buscar</button>
+                </div>
+
+                <div class="tab-content" id="transp-list" style="display: block;">
+                    <!-- Conteúdo carregado via JavaScript -->
+                </div>
+
+                <div class="tab-content" id="transp-buscar" style="display: none;">
+                    <div class="search-container">
+                        <div class="form-group">
+                            <input type="text" id="buscar-transportadora" class="form-input" placeholder="Digite o nome da transportadora...">
+                            <button class="btn btn-primary" onclick="buscarTransportadoras()">
+                                <i class="fas fa-search"></i> Buscar
+                            </button>
+                        </div>
+                        <div id="resultados-busca-transp"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Veículos Section -->
+            <section id="veiculos" class="section" style="display: none;">
+                <div class="tabs">
+                    <button class="tab active" data-tab="veiculos-list">Listar Veículos</button>
+                    <button class="tab" data-tab="veiculos-por-transp">Por Transportadora</button>
+                </div>
+
+                <div class="tab-content" id="veiculos-list" style="display: block;">
+                    <!-- Conteúdo carregado via JavaScript -->
+                </div>
+
+                <div class="tab-content" id="veiculos-por-transp" style="display: none;">
+                    <div class="form-group">
+                        <label class="form-label">Selecione uma transportadora:</label>
+                        <select id="select-transportadora-veiculos" class="form-input form-select" onchange="carregarVeiculosPorTransportadora()">
+                            <option value="">Selecione...</option>
+                            <!-- Carregado via JavaScript -->
+                        </select>
+                    </div>
+                    <div id="lista-veiculos-transp" class="mt-3"></div>
+                </div>
+            </section>
+
+            <!-- Histórico Section -->
+            <section id="historico" class="section" style="display: none;">
+                <div class="tabs">
+                    <button class="tab active" data-tab="historico-notas">Por Nota Fiscal</button>
+                    <button class="tab" data-tab="historico-usuario">Por Usuário</button>
+                </div>
+
+                <div class="tab-content" id="historico-notas" style="display: block;">
+                    <div class="form-group">
+                        <label class="form-label">ID da Nota Fiscal:</label>
+                        <input type="number" id="nota-fiscal-id" class="form-input" placeholder="Digite o ID da nota fiscal">
+                        <button class="btn btn-primary mt-2" onclick="carregarHistoricoNota()">
+                            <i class="fas fa-search"></i> Buscar Histórico
+                        </button>
+                    </div>
+                    <div id="resultado-historico-nota" class="mt-3"></div>
+                </div>
+
+                <div class="tab-content" id="historico-usuario" style="display: none;">
+                    <div class="form-group">
+                        <label class="form-label">ID do Usuário:</label>
+                        <input type="number" id="usuario-id" class="form-input" placeholder="Digite o ID do usuário">
+                        <button class="btn btn-primary mt-2" onclick="carregarHistoricoUsuario()">
+                            <i class="fas fa-search"></i> Buscar Histórico
+                        </button>
+                    </div>
+                    <div id="resultado-historico-usuario" class="mt-3"></div>
+                </div>
+            </section>
+
+            <!-- Eventos Section -->
+            <section id="eventos" class="section" style="display: none;">
+                <div class="tabs">
+                    <button class="tab active" data-tab="eventos-list">Listar Eventos</button>
+                    <button class="tab" data-tab="eventos-filtrar">Filtrar</button>
+                </div>
+
+                <div class="tab-content" id="eventos-list" style="display: block;">
+                    <!-- Conteúdo carregado via JavaScript -->
+                </div>
+
+                <div class="tab-content" id="eventos-filtrar" style="display: none;">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Tipo de Evento:</label>
+                            <select id="filtro-tipo-evento" class="form-input form-select">
+                                <option value="">Todos</option>
+                                <option value="110111">Cancelamento</option>
+                                <option value="110110">Carta de Correção</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Status:</label>
+                            <select id="filtro-status-evento" class="form-input form-select">
+                                <option value="">Todos</option>
+                                <option value="true">Processado</option>
+                                <option value="false">Não Processado</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="filtrarEventos()">
+                        <i class="fas fa-filter"></i> Aplicar Filtros
+                    </button>
+                    <div id="resultados-filtro-eventos" class="mt-3"></div>
+                </div>
+            </section>
+
+            <!-- Volumes Section -->
+            <section id="volumes" class="section" style="display: none;">
+                <div class="tabs">
+                    <button class="tab active" data-tab="volumes-nota">Por Nota Fiscal</button>
+                    <button class="tab" data-tab="volumes-criar">Criar Volumes</button>
+                </div>
+
+                <div class="tab-content" id="volumes-nota" style="display: block;">
+                    <div class="form-group">
+                        <label class="form-label">ID da Nota Fiscal:</label>
+                        <input type="number" id="nota-fiscal-volumes" class="form-input" placeholder="Digite o ID da nota fiscal">
+                        <button class="btn btn-primary mt-2" onclick="carregarVolumesNota()">
+                            <i class="fas fa-search"></i> Buscar Volumes
+                        </button>
+                    </div>
+                    <div id="resultado-volumes-nota" class="mt-3"></div>
+                </div>
+
+                <div class="tab-content" id="volumes-criar" style="display: none;">
+                    <form id="form-criar-volumes" onsubmit="criarVolumes(event)">
+                        <div class="form-group">
+                            <label class="form-label">ID da Nota Fiscal:</label>
+                            <input type="number" id="nota-criar-volumes" name="nota_fiscal_id" class="form-input" required>
+                        </div>
+                        
+                        <div id="campos-volumes">
+                            <!-- Campos dinâmicos para volumes -->
+                            <div class="volume-item">
+                                <h5>Volume 1</h5>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label class="form-label">Quantidade:</label>
+                                        <input type="number" name="quantidade[]" class="form-input" value="1" min="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Espécie:</label>
+                                        <input type="text" name="especie[]" class="form-input" placeholder="Caixas, Paletes...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Marca:</label>
+                                        <input type="text" name="marca[]" class="form-input">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Peso Líquido (kg):</label>
+                                        <input type="number" name="peso_liquido[]" class="form-input" step="0.01">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Peso Bruto (kg):</label>
+                                        <input type="number" name="peso_bruto[]" class="form-input" step="0.01">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary" onclick="adicionarVolume()">
+                                <i class="fas fa-plus"></i> Adicionar Volume
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Salvar Volumes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Modais -->
             <!-- Modal para Nova Configuração -->
             <div class="modal-overlay" id="createConfigModal">
                 <div class="modal">
                     <div class="modal-header">
                         <h3 class="modal-title">Nova Configuração Fiscal</h3>
                         <button class="modal-close" onclick="closeModal('createConfigModal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Formulário será inserido aqui via JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal para Novo Veículo -->
+            <div class="modal-overlay" id="createVeiculoModal">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Novo Veículo</h3>
+                        <button class="modal-close" onclick="closeModal('createVeiculoModal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Formulário será inserido aqui via JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal para Nova Transportadora -->
+            <div class="modal-overlay" id="createTransportadoraModal">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Nova Transportadora</h3>
+                        <button class="modal-close" onclick="closeModal('createTransportadoraModal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Formulário será inserido aqui via JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal para Novo Produto Fiscal -->
+            <div class="modal-overlay" id="createProdutoFiscalModal">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Novo Produto Fiscal</h3>
+                        <button class="modal-close" onclick="closeModal('createProdutoFiscalModal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Formulário será inserido aqui via JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal para Registrar Evento -->
+            <div class="modal-overlay" id="createEventoModal">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Registrar Evento</h3>
+                        <button class="modal-close" onclick="closeModal('createEventoModal')">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
