@@ -44,16 +44,10 @@ class ConfiguracaoFiscal(Base):
     telefone = Column(String(20), nullable=True)
     email = Column(String(100), nullable=True)
     
-    # Certificado Digital
-    caminho_certificado = Column(String(500), nullable=True)
-    senha_certificado = Column(String(100), nullable=True)
-    valido_ate = Column(DateTime, nullable=True)
-    
     # Sequenciais
     serie_nfe = Column(String(3), default="1", nullable=False)
     serie_nfce = Column(String(3), default="2", nullable=False)
     ambiente = Column(String(1), default="2", nullable=False)  # 1=Produção, 2=Homologação
-    token_api = Column(String(500), nullable=True)
     ultimo_numero_nfe = Column(Integer, default=0, nullable=False)
     ultimo_numero_nfce = Column(Integer, default=0, nullable=False)
     

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
-from app.models import db as get_db
+from app.models import db
 from app.decorators.decorators import admin_required
-from app.models.fiscal_models import NotaFiscalEvento
+from app.models.fiscal_models import ConfiguracaoFiscal, NotaFiscalEvento
 from app.services.fiscal_crud import (
     ConfiguracaoFiscalCRUD,
     ProdutoFiscalCRUD,
@@ -26,10 +26,10 @@ def criar_configuracao_fiscal():
     """Cria uma nova configuração fiscal"""
     try:
         dados = request.get_json()
+        print(f'Dados recebidos para criar configuração fiscal: {dados}')
         if not dados:
             return jsonify({"success": False, "message": "Dados não fornecidos"}), 400
         
-        db = get_db
         config = ConfiguracaoFiscalCRUD.criar(db.session, dados)
         
         return jsonify({
@@ -54,8 +54,7 @@ def listar_configuracoes_fiscais():
     try:
         skip = request.args.get('skip', 0, type=int)
         limit = request.args.get('limit', 100, type=int)
-        
-        db = get_db
+     
         configs = ConfiguracaoFiscalCRUD.listar_todas(db.session, skip, limit)
         
         return jsonify({
@@ -77,7 +76,6 @@ def listar_configuracoes_fiscais():
 def obter_configuracao_ativa():
     """Obtém a configuração fiscal ativa"""
     try:
-        db = get_db
         config = ConfiguracaoFiscalCRUD.obter_ativa(db)
         
         if not config:
@@ -103,15 +101,43 @@ def obter_configuracao_ativa():
 def obter_configuracao_por_id(id):
     """Obtém configuração fiscal por ID"""
     try:
-        db = get_db
         config = ConfiguracaoFiscalCRUD.obter_por_id(db.session, id)
         
         if not config:
             return jsonify({"success": False, "message": "Configuração não encontrada"}), 404
         
+        config_dict = {
+            "id": config.id,
+            "razao_social": config.razao_social,
+            "nome_fantasia": config.nome_fantasia,
+            "cnpj": config.cnpj,
+            "inscricao_estadual": config.inscricao_estadual,
+            "inscricao_municipal": config.inscricao_municipal,
+            "cnae_principal": config.cnae_principal,
+            "regime_tributario": config.regime_tributario,
+            "logradouro": config.logradouro,
+            "numero": config.numero,
+            "complemento": config.complemento,
+            "bairro": config.bairro,
+            "codigo_municipio": config.codigo_municipio,
+            "municipio": config.municipio,
+            "uf": config.uf,
+            "cep": config.cep,
+            "telefone": config.telefone,
+            "email": config.email,
+            "serie_nfe": config.serie_nfe,
+            "serie_nfce": config.serie_nfce,
+            "ambiente": config.ambiente,
+            "ultimo_numero_nfe": config.ultimo_numero_nfe,
+            "ultimo_numero_nfce": config.ultimo_numero_nfce,
+            "ativo": config.ativo,
+            "criado_em": config.criado_em.isoformat() if config.criado_em else None,
+            "atualizado_em": config.atualizado_em.isoformat() if config.atualizado_em else None
+        }
+        
         return jsonify({
             "success": True,
-            "data": config.__dict__
+            "data": config_dict
         }), 200
         
     except Exception as e:
@@ -126,7 +152,6 @@ def atualizar_configuracao(id):
         if not dados:
             return jsonify({"success": False, "message": "Dados não fornecidos"}), 400
         
-        db = get_db
         config = ConfiguracaoFiscalCRUD.atualizar(db.session, id, dados)
         
         if not config:
@@ -149,7 +174,6 @@ def atualizar_configuracao(id):
 def incrementar_numero_nfe(id):
     """Incrementa número da NFe"""
     try:
-        db = get_db
         numero = ConfiguracaoFiscalCRUD.incrementar_numero_nfe(db.session, id)
         
         return jsonify({
@@ -168,7 +192,6 @@ def incrementar_numero_nfe(id):
 def incrementar_numero_nfce(id):
     """Incrementa número da NFCe"""
     try:
-        db = get_db
         numero = ConfiguracaoFiscalCRUD.incrementar_numero_nfce(db.session, id)
         
         return jsonify({
@@ -198,7 +221,7 @@ def criar_produto_fiscal():
         if 'produto_id' not in dados:
             return jsonify({"success": False, "message": "ID do produto é obrigatório"}), 400
         
-        db = get_db
+         
         produto_fiscal = ProdutoFiscalCRUD.criar(db.session, dados)
         
         return jsonify({
@@ -221,7 +244,7 @@ def criar_produto_fiscal():
 def obter_produto_fiscal_por_id(id):
     """Obtém dados fiscais do produto por ID"""
     try:
-        db = get_db
+         
         produto_fiscal = ProdutoFiscalCRUD.obter_por_id(db.session, id)
         
         if not produto_fiscal:
@@ -240,7 +263,7 @@ def obter_produto_fiscal_por_id(id):
 def obter_produto_fiscal_por_produto(produto_id):
     """Obtém dados fiscais por ID do produto"""
     try:
-        db = get_db
+         
         produto_fiscal = ProdutoFiscalCRUD.obter_por_produto_id(db.session, produto_id)
         
         if not produto_fiscal:
@@ -263,7 +286,7 @@ def atualizar_produto_fiscal(id):
         if not dados:
             return jsonify({"success": False, "message": "Dados não fornecidos"}), 400
         
-        db = get_db
+         
         produto_fiscal = ProdutoFiscalCRUD.atualizar(db.session, id, dados)
         
         if not produto_fiscal:
@@ -289,7 +312,7 @@ def homologar_produto_fiscal(id):
         dados = request.get_json()
         justificativa = dados.get('justificativa') if dados else None
         
-        db = get_db
+         
         produto_fiscal = ProdutoFiscalCRUD.homologar(db.session, id, justificativa)
         
         if not produto_fiscal:
@@ -316,7 +339,7 @@ def listar_produtos_fiscais_homologados():
         skip = request.args.get('skip', 0, type=int)
         limit = request.args.get('limit', 100, type=int)
         
-        db = get_db
+         
         produtos = ProdutoFiscalCRUD.listar_homologados(db.session, skip, limit)
         
         return jsonify({
@@ -349,7 +372,7 @@ def criar_transportadora():
         if not dados.get('cnpj') and not dados.get('cpf'):
             return jsonify({"success": False, "message": "CNPJ ou CPF é obrigatório"}), 400
         
-        db = get_db
+         
         transportadora = TransportadoraCRUD.criar(db.session, dados)
         
         return jsonify({
@@ -376,7 +399,7 @@ def listar_transportadoras():
         skip = request.args.get('skip', 0, type=int)
         limit = request.args.get('limit', 100, type=int)
         
-        db = get_db
+         
         transportadoras = TransportadoraCRUD.listar_ativas(db.session, skip, limit)
         
         return jsonify({
@@ -399,7 +422,7 @@ def listar_transportadoras():
 def obter_transportadora(id):
     """Obtém transportadora por ID"""
     try:
-        db = get_db
+         
         transportadora = TransportadoraCRUD.obter_por_id(db.session, id)
         
         if not transportadora:
@@ -425,7 +448,7 @@ def buscar_transportadoras():
         skip = request.args.get('skip', 0, type=int)
         limit = request.args.get('limit', 50, type=int)
         
-        db = get_db
+         
         transportadoras = TransportadoraCRUD.buscar_por_nome(db.session, nome, skip, limit)
         
         return jsonify({
@@ -452,7 +475,7 @@ def atualizar_transportadora(id):
         if not dados:
             return jsonify({"success": False, "message": "Dados não fornecidos"}), 400
         
-        db = get_db
+         
         transportadora = TransportadoraCRUD.atualizar(db.session, id, dados)
         
         if not transportadora:
@@ -486,7 +509,7 @@ def criar_veiculo():
         if 'placa' not in dados:
             return jsonify({"success": False, "message": "Placa é obrigatória"}), 400
         
-        db = get_db
+         
         veiculo = VeiculoTransporteCRUD.criar(db.session, dados)
         
         return jsonify({
@@ -513,7 +536,7 @@ def listar_veiculos():
         skip = request.args.get('skip', 0, type=int)
         limit = request.args.get('limit', 100, type=int)
         
-        db = get_db
+         
         veiculos = VeiculoTransporteCRUD.listar_ativos(db.session, skip, limit)
         
         return jsonify({
@@ -535,7 +558,7 @@ def listar_veiculos():
 def obter_veiculo(id):
     """Obtém veículo por ID"""
     try:
-        db = get_db
+         
         veiculo = VeiculoTransporteCRUD.obter_por_id(db.session, id)
         
         if not veiculo:
@@ -554,7 +577,7 @@ def obter_veiculo(id):
 def obter_veiculo_por_placa(placa):
     """Obtém veículo por placa"""
     try:
-        db = get_db
+         
         veiculo = VeiculoTransporteCRUD.obter_por_placa(db.session, placa)
         
         if not veiculo:
@@ -573,7 +596,7 @@ def obter_veiculo_por_placa(placa):
 def listar_veiculos_por_transportadora(transportadora_id):
     """Lista veículos de uma transportadora"""
     try:
-        db = get_db
+         
         veiculos = VeiculoTransporteCRUD.listar_por_transportadora(db.session, transportadora_id)
         
         return jsonify({
@@ -598,7 +621,7 @@ def atualizar_veiculo(id):
         if not dados:
             return jsonify({"success": False, "message": "Dados não fornecidos"}), 400
         
-        db = get_db
+         
         veiculo = VeiculoTransporteCRUD.atualizar(db.session, id, dados)
         
         if not veiculo:
@@ -628,7 +651,7 @@ def listar_historico_nota(nota_fiscal_id):
         skip = request.args.get('skip', 0, type=int)
         limit = request.args.get('limit', 100, type=int)
         
-        db = get_db
+         
         historicos = NotaFiscalHistoricoCRUD.listar_por_nota(db.session, nota_fiscal_id, skip, limit)
         
         return jsonify({
@@ -660,7 +683,7 @@ def registrar_historico():
             if field not in dados:
                 return jsonify({"success": False, "message": f"Campo {field} é obrigatório"}), 400
         
-        db = get_db
+         
         historico = NotaFiscalHistoricoCRUD.criar(db.session, dados)
         
         return jsonify({
@@ -687,7 +710,7 @@ def registrar_historico():
 def listar_eventos_nota(nota_fiscal_id):
     """Lista eventos de uma nota fiscal"""
     try:
-        db = get_db
+         
         eventos = NotaFiscalEventoCRUD.listar_por_nota(db.session, nota_fiscal_id)
         
         return jsonify({
@@ -719,7 +742,7 @@ def registrar_cancelamento():
             if field not in dados:
                 return jsonify({"success": False, "message": f"Campo {field} é obrigatório"}), 400
         
-        db = get_db
+         
         evento = NotaFiscalEventoCRUD.registrar_cancelamento(
             db.session,
             dados['nota_fiscal_id'],
@@ -755,7 +778,7 @@ def registrar_carta_correcao():
             if field not in dados:
                 return jsonify({"success": False, "message": f"Campo {field} é obrigatório"}), 400
         
-        db = get_db
+         
         evento = NotaFiscalEventoCRUD.registrar_carta_correcao(
             db.session,
             dados['nota_fiscal_id'],
@@ -787,7 +810,7 @@ def marcar_evento_processado(id):
         sucesso = dados.get('sucesso', True)
         xml_retorno = dados.get('xml_retorno')
         
-        db = get_db
+         
         evento = NotaFiscalEventoCRUD.marcar_processado(db.session, id, sucesso, xml_retorno)
         
         if not evento:
@@ -819,7 +842,7 @@ def criar_volumes_nota(nota_fiscal_id):
         if not dados:
             return jsonify({"success": False, "message": "Dados não fornecidos"}), 400
         
-        db = get_db
+         
         
         # Verifica se é um único volume ou múltiplos
         if isinstance(dados, dict):
@@ -851,7 +874,7 @@ def criar_volumes_nota(nota_fiscal_id):
 def listar_volumes_nota(nota_fiscal_id):
     """Lista volumes de uma nota fiscal"""
     try:
-        db = get_db
+         
         volumes = NotaFiscalVolumeCRUD.listar_por_nota(db.session, nota_fiscal_id)
         
         return jsonify({
@@ -878,7 +901,7 @@ def atualizar_volume(id):
         if not dados:
             return jsonify({"success": False, "message": "Dados não fornecidos"}), 400
         
-        db = get_db
+         
         volume = NotaFiscalVolumeCRUD.atualizar(db.session, id, dados)
         
         if not volume:
@@ -902,7 +925,7 @@ def atualizar_volume(id):
 def excluir_volume(id):
     """Exclui volume da nota fiscal"""
     try:
-        db = get_db
+         
         sucesso = NotaFiscalVolumeCRUD.excluir(db.session, id)
         
         if not sucesso:
@@ -925,7 +948,7 @@ def excluir_volume(id):
 def manager_obter_configuracao_ativa():
     """Obtém configuração fiscal ativa usando FiscalManager"""
     try:
-        db = get_db
+         
         manager = FiscalManager(db)
         config = manager.obter_configuracao_ativa()
         
@@ -950,7 +973,7 @@ def manager_obter_configuracao_ativa():
 def manager_obter_produto_fiscal(produto_id):
     """Obtém dados fiscais de um produto usando FiscalManager"""
     try:
-        db = get_db
+         
         manager = FiscalManager(db)
         produto_fiscal = manager.obter_produto_fiscal(produto_id)
         
@@ -974,7 +997,7 @@ def manager_buscar_transportadora_por_documento():
         if not documento:
             return jsonify({"success": False, "message": "Parâmetro 'documento' é obrigatório"}), 400
         
-        db = get_db
+         
         manager = FiscalManager(db)
         transportadora = manager.buscar_transportadora_por_documento(documento)
         
@@ -1008,7 +1031,7 @@ def manager_registrar_evento_nota():
             if field not in dados:
                 return jsonify({"success": False, "message": f"Campo {field} é obrigatório"}), 400
         
-        db = get_db
+         
         manager = FiscalManager(db)
         evento = manager.registrar_evento_nota(
             dados['nota_fiscal_id'],
@@ -1040,7 +1063,7 @@ def listar_eventos():
         tipo_evento = request.args.get('tipo_evento')
         processado = request.args.get('processado', type=bool)
         
-        db = get_db
+         
         # Crie um query base
         query = db.session.query(NotaFiscalEvento)
         
@@ -1069,3 +1092,28 @@ def listar_eventos():
         
     except Exception as e:
         return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+    
+
+@fiscal_bp.route('/health', methods=['GET'])
+@admin_required
+def health_check():
+    """Endpoint para verificar se as rotas fiscais estão funcionando"""
+    try:
+        # Teste básico de conexão com banco
+        count_configs = db.session.query(ConfiguracaoFiscal).count()
+        
+        return jsonify({
+            "success": True,
+            "message": "Rotas fiscais operacionais",
+            "data": {
+                "configuracoes_count": count_configs,
+                "status": "online"
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Erro de saúde: {str(e)}",
+            "status": "offline"
+        }), 500

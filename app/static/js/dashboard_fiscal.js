@@ -390,6 +390,12 @@ function getConfigForm(config = {}) {
                 </div>
                 
                 <div class="form-group">
+                    <label class="form-label" for="codigo_municipio">Código do Município (IBGE) *</label>
+                    <input type="text" id="codigo_municipio" name="codigo_municipio" class="form-input" 
+                        value="${config.codigo_municipio || ''}" required>
+                </div>
+
+                <div class="form-group">
                     <label class="form-label" for="uf">UF *</label>
                     <input type="text" id="uf" name="uf" class="form-input" 
                            value="${config.uf || ''}" maxlength="2" required>

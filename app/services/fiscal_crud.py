@@ -19,6 +19,7 @@ from app.models.fiscal_models import (
     NotaFiscalVolume
 )
 from app.models.entities import NotaFiscal, Usuario
+from app.utils.fiscal.helpers import NFeHelpers
 
 
 # ============================================
@@ -27,40 +28,42 @@ from app.models.entities import NotaFiscal, Usuario
 class ConfiguracaoFiscalCRUD:
     """CRUD para Configurações Fiscais da Empresa"""
     
+    # Modelo associado a esta classe CRUD
+    model = ConfiguracaoFiscal
+    
     @staticmethod
     def criar(db: Session, dados: Dict[str, Any]) -> ConfiguracaoFiscal:
         """
         Cria uma nova configuração fiscal
         """
         try:
+            # Trata os dados antes de criar
+            dados_tratados = NFeHelpers.tratar_dados_configuracao(dados)
+            
             config = ConfiguracaoFiscal(
-                razao_social=dados['razao_social'],
-                nome_fantasia=dados.get('nome_fantasia'),
-                cnpj=dados['cnpj'],
-                inscricao_estadual=dados.get('inscricao_estadual'),
-                inscricao_municipal=dados.get('inscricao_municipal'),
-                cnae_principal=dados.get('cnae_principal'),
-                regime_tributario=dados.get('regime_tributario'),
-                logradouro=dados['logradouro'],
-                numero=dados['numero'],
-                complemento=dados.get('complemento'),
-                bairro=dados['bairro'],
-                codigo_municipio=dados['codigo_municipio'],
-                municipio=dados['municipio'],
-                uf=dados['uf'],
-                cep=dados['cep'],
-                telefone=dados.get('telefone'),
-                email=dados.get('email'),
-                caminho_certificado=dados.get('caminho_certificado'),
-                senha_certificado=dados.get('senha_certificado'),
-                valido_ate=dados.get('valido_ate'),
-                serie_nfe=dados.get('serie_nfe', '1'),
-                serie_nfce=dados.get('serie_nfce', '2'),
-                ambiente=dados.get('ambiente', '2'),
-                token_api=dados.get('token_api'),
-                ultimo_numero_nfe=dados.get('ultimo_numero_nfe', 0),
-                ultimo_numero_nfce=dados.get('ultimo_numero_nfce', 0),
-                ativo=dados.get('ativo', True)
+                razao_social=dados_tratados['razao_social'],
+                nome_fantasia=dados_tratados.get('nome_fantasia'),
+                cnpj=dados_tratados['cnpj'],
+                inscricao_estadual=dados_tratados.get('inscricao_estadual'),
+                inscricao_municipal=dados_tratados.get('inscricao_municipal'),
+                cnae_principal=dados_tratados.get('cnae_principal'),
+                regime_tributario=dados_tratados.get('regime_tributario'),
+                logradouro=dados_tratados['logradouro'],
+                numero=dados_tratados['numero'],
+                complemento=dados_tratados.get('complemento'),
+                bairro=dados_tratados['bairro'],
+                codigo_municipio=dados_tratados.get('codigo_municipio'),
+                municipio=dados_tratados.get('municipio'),
+                uf=dados_tratados.get('uf'),
+                cep=dados_tratados['cep'],
+                telefone=dados_tratados.get('telefone'),
+                email=dados_tratados.get('email'),
+                serie_nfe=dados_tratados.get('serie_nfe', '1'),
+                serie_nfce=dados_tratados.get('serie_nfce', '2'),
+                ambiente=dados_tratados.get('ambiente', '2'),
+                ultimo_numero_nfe=dados_tratados.get('ultimo_numero_nfe', 0),
+                ultimo_numero_nfce=dados_tratados.get('ultimo_numero_nfce', 0),
+                ativo=dados_tratados.get('ativo', True)
             )
             
             db.add(config)
@@ -68,7 +71,7 @@ class ConfiguracaoFiscalCRUD:
             db.refresh(config)
             return config
             
-        except IntegrityError as e:
+        except ValueError as e:
             db.rollback()
             raise ValueError(f"Erro ao criar configuração fiscal: {str(e)}")
         except Exception as e:
@@ -90,7 +93,7 @@ class ConfiguracaoFiscalCRUD:
         return db.query(ConfiguracaoFiscal).filter(ConfiguracaoFiscal.cnpj == cnpj).first()
     
     @staticmethod
-    def obter_ativa(db: Session) -> Optional[ConfiguracaoFiscal]:
+    def obter_ativa(db) -> Optional[ConfiguracaoFiscal]:
         """
         Obtém a configuração fiscal ativa
         """
@@ -180,6 +183,8 @@ class ConfiguracaoFiscalCRUD:
 class ProdutoFiscalCRUD:
     """CRUD para Dados Fiscais de Produtos"""
     
+    model = ProdutoFiscal
+    
     @staticmethod
     def criar(db: Session, dados: Dict[str, Any]) -> ProdutoFiscal:
         """
@@ -257,6 +262,22 @@ class ProdutoFiscalCRUD:
         """
         return db.query(ProdutoFiscal).filter(
             ProdutoFiscal.homologado == True
+        ).offset(skip).limit(limit).all()
+    
+    @staticmethod
+    def listar_todos(db: Session, skip: int = 0, limit: int = 100) -> List[ProdutoFiscal]:
+        """
+        Lista todos os produtos fiscais
+        """
+        return db.query(ProdutoFiscal).offset(skip).limit(limit).all()
+    
+    @staticmethod
+    def listar_nao_homologados(db: Session, skip: int = 0, limit: int = 100) -> List[ProdutoFiscal]:
+        """
+        Lista produtos fiscais não homologados
+        """
+        return db.query(ProdutoFiscal).filter(
+            ProdutoFiscal.homologado == False
         ).offset(skip).limit(limit).all()
     
     @staticmethod
@@ -350,6 +371,8 @@ class ProdutoFiscalCRUD:
 # ============================================
 class TransportadoraCRUD:
     """CRUD para Transportadoras"""
+    
+    model = Transportadora
     
     @staticmethod
     def criar(db: Session, dados: Dict[str, Any]) -> Transportadora:
@@ -492,6 +515,8 @@ class TransportadoraCRUD:
 class VeiculoTransporteCRUD:
     """CRUD para Veículos de Transporte"""
     
+    model = VeiculoTransporte
+    
     @staticmethod
     def criar(db: Session, dados: Dict[str, Any]) -> VeiculoTransporte:
         """
@@ -607,6 +632,8 @@ class VeiculoTransporteCRUD:
 class NotaFiscalHistoricoCRUD:
     """CRUD para Histórico de Alterações da Nota Fiscal"""
     
+    model = NotaFiscalHistorico
+    
     @staticmethod
     def criar(db: Session, dados: Dict[str, Any]) -> NotaFiscalHistorico:
         """
@@ -706,6 +733,8 @@ class NotaFiscalHistoricoCRUD:
 class NotaFiscalEventoCRUD:
     """CRUD para Eventos da Nota Fiscal"""
     
+    model = NotaFiscalEvento
+    
     @staticmethod
     def criar(db: Session, dados: Dict[str, Any]) -> NotaFiscalEvento:
         """
@@ -763,6 +792,23 @@ class NotaFiscalEventoCRUD:
         return db.query(NotaFiscalEvento).filter(
             NotaFiscalEvento.nota_fiscal_id == nota_fiscal_id
         ).order_by(NotaFiscalEvento.data_registro).all()
+    
+    @staticmethod
+    def listar_todos(db: Session, skip: int = 0, limit: int = 100, 
+                    tipo_evento: str = None, processado: bool = None) -> List[NotaFiscalEvento]:
+        """
+        Lista todos os eventos com filtros opcionais
+        """
+        query = db.query(NotaFiscalEvento)
+        
+        if tipo_evento:
+            query = query.filter(NotaFiscalEvento.tipo_evento == tipo_evento)
+        
+        if processado is not None:
+            query = query.filter(NotaFiscalEvento.processado == processado)
+        
+        return query.order_by(NotaFiscalEvento.data_registro.desc())\
+                   .offset(skip).limit(limit).all()
     
     @staticmethod
     def obter_ultimo_evento(db: Session, nota_fiscal_id: int, tipo_evento: str = None) -> Optional[NotaFiscalEvento]:
@@ -855,6 +901,8 @@ class NotaFiscalEventoCRUD:
 # ============================================
 class NotaFiscalVolumeCRUD:
     """CRUD para Volumes/Remessas da Nota Fiscal"""
+    
+    model = NotaFiscalVolume
     
     @staticmethod
     def criar(db: Session, dados: Dict[str, Any]) -> NotaFiscalVolume:
@@ -987,33 +1035,24 @@ class FiscalManager:
     Facade para gerenciamento fiscal unificado
     """
     
-    def __init__(self, db: Session):
+    def __init__(self, db):
         self.db = db
-        
-        # Inicializa os CRUDs
-        self.configuracoes = ConfiguracaoFiscalCRUD()
-        self.produtos_fiscais = ProdutoFiscalCRUD()
-        self.transportadoras = TransportadoraCRUD()
-        self.veiculos = VeiculoTransporteCRUD()
-        self.historico = NotaFiscalHistoricoCRUD()
-        self.eventos = NotaFiscalEventoCRUD()
-        self.volumes = NotaFiscalVolumeCRUD()
     
     # Métodos de conveniência
     def obter_configuracao_ativa(self) -> Optional[ConfiguracaoFiscal]:
         """Obtém a configuração fiscal ativa"""
-        return self.configuracoes.obter_ativa(self.db)
+        return ConfiguracaoFiscalCRUD.obter_ativa(self.db)
     
     def obter_produto_fiscal(self, produto_id: int) -> Optional[ProdutoFiscal]:
         """Obtém dados fiscais de um produto"""
-        return self.produtos_fiscais.obter_por_produto_id(self.db, produto_id)
+        return ProdutoFiscalCRUD.obter_por_produto_id(self.db.session, produto_id)
     
     def buscar_transportadora_por_documento(self, documento: str) -> Optional[Transportadora]:
         """Busca transportadora por CNPJ ou CPF"""
         if len(documento) == 11:
-            return self.transportadoras.obter_por_cpf(self.db, documento)
+            return TransportadoraCRUD.obter_por_cpf(self.db.session, documento)
         else:
-            return self.transportadoras.obter_por_cnpj(self.db, documento)
+            return TransportadoraCRUD.obter_por_cnpj(self.db.session, documento)
     
     def registrar_evento_nota(self, nota_id: int, tipo: str, descricao: str, **kwargs) -> NotaFiscalEvento:
         """Registra um evento para uma nota fiscal"""
@@ -1023,4 +1062,4 @@ class FiscalManager:
             'descricao_evento': descricao,
             **kwargs
         }
-        return self.eventos.criar(self.db, dados)
+        return NotaFiscalEventoCRUD.criar(self.db.session, dados)

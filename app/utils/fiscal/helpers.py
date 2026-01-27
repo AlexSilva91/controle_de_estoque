@@ -1,17 +1,22 @@
-# app/utils/fiscal/helpers.py
-
 """
-Funções auxiliares para preparação de dados da NF-e
+app/utils/fiscal/helpers.py
+
+Funções auxiliares para preparação e tratamento de dados da NF-e
 """
 
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 from decimal import Decimal
 import json
+import re
 
 
 class NFeHelpers:
-    """Funções auxiliares para montagem de NF-e"""
+    """Funções auxiliares para montagem e tratamento de dados da NF-e"""
+    
+    # ============================================
+    # CONSTANTES E MAPEAMENTOS
+    # ============================================
     
     # Códigos de CST ICMS comuns
     CST_ICMS = {
@@ -95,20 +100,353 @@ class NFeHelpers:
         "NAO_PRESENCIAL_OUTROS": 9
     }
     
+    # Mapeamento de códigos de UF (IBGE)
+    UF_MAP = {
+        '11': 'RO', '12': 'AC', '13': 'AM', '14': 'RR', '15': 'PA',
+        '16': 'AP', '17': 'TO', '21': 'MA', '22': 'PI', '23': 'CE',
+        '24': 'RN', '25': 'PB', '26': 'PE', '27': 'AL', '28': 'SE',
+        '29': 'BA', '31': 'MG', '32': 'ES', '33': 'RJ', '35': 'SP',
+        '41': 'PR', '42': 'SC', '43': 'RS', '50': 'MS', '51': 'MT',
+        '52': 'GO', '53': 'DF'
+    }
+    
+    # Padrões de regex para validação
+    CNPJ_PATTERN = re.compile(r'^\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}$')
+    CPF_PATTERN = re.compile(r'^\d{3}\.\d{3}\.\d{3}-\d{2}$')
+    CNPJ_CPF_PATTERN = re.compile(r'^\d{11,14}$')  # Apenas dígitos
+    CEP_PATTERN = re.compile(r'^\d{5}-?\d{3}$')
+    TELEFONE_PATTERN = re.compile(r'^\(\d{2}\)\s?\d{4,5}-?\d{4}$')
+    EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    PLACA_PATTERN = re.compile(r'^[A-Z]{3}[0-9]{4}$|^[A-Z]{3}[0-9][A-Z][0-9]{2}$')
+    
+    # ============================================
+    # FUNÇÕES DE FORMATAÇÃO E LIMPEZA
+    # ============================================
+    
     @staticmethod
-    def formatar_cpf_cnpj(documento: str) -> str:
-        """Remove formatação de CPF/CNPJ"""
-        return ''.join(filter(str.isdigit, documento))
+    def limpar_cnpj_cpf(documento: str) -> str:
+        """Remove formatação de CNPJ/CPF, retorna apenas dígitos"""
+        if not documento:
+            return ""
+        return ''.join(filter(str.isdigit, str(documento)))
+    
+    @staticmethod
+    def formatar_cnpj(cnpj: str) -> str:
+        """Formata CNPJ no padrão 00.000.000/0000-00"""
+        cnpj_limpo = NFeHelpers.limpar_cnpj_cpf(cnpj)
+        if len(cnpj_limpo) != 14:
+            return cnpj_limpo
+        
+        return f"{cnpj_limpo[:2]}.{cnpj_limpo[2:5]}.{cnpj_limpo[5:8]}/{cnpj_limpo[8:12]}-{cnpj_limpo[12:]}"
+    
+    @staticmethod
+    def formatar_cpf(cpf: str) -> str:
+        """Formata CPF no padrão 000.000.000-00"""
+        cpf_limpo = NFeHelpers.limpar_cnpj_cpf(cpf)
+        if len(cpf_limpo) != 11:
+            return cpf_limpo
+        
+        return f"{cpf_limpo[:3]}.{cpf_limpo[3:6]}.{cpf_limpo[6:9]}-{cpf_limpo[9:]}"
     
     @staticmethod
     def formatar_cep(cep: str) -> str:
-        """Remove formatação de CEP"""
-        return ''.join(filter(str.isdigit, cep))
+        """Formata CEP no padrão 00000-000"""
+        cep_limpo = ''.join(filter(str.isdigit, str(cep)))
+        if len(cep_limpo) == 8:
+            return f"{cep_limpo[:5]}-{cep_limpo[5:]}"
+        return cep_limpo
     
     @staticmethod
     def formatar_telefone(telefone: str) -> str:
-        """Remove formatação de telefone"""
-        return ''.join(filter(str.isdigit, telefone))
+        """Formata telefone no padrão (00) 0000-0000 ou (00) 00000-0000"""
+        telefone_limpo = ''.join(filter(str.isdigit, str(telefone)))
+        
+        if len(telefone_limpo) == 10:  # Telefone fixo
+            return f"({telefone_limpo[:2]}) {telefone_limpo[2:6]}-{telefone_limpo[6:]}"
+        elif len(telefone_limpo) == 11:  # Celular
+            return f"({telefone_limpo[:2]}) {telefone_limpo[2:7]}-{telefone_limpo[7:]}"
+        
+        return telefone_limpo
+    
+    @staticmethod
+    def normalizar_texto(texto: str) -> str:
+        """
+        Normaliza texto: remove espaços extras, converte para maiúsculas
+        """
+        if not texto:
+            return ""
+        
+        # Remove espaços extras no início e fim
+        texto = texto.strip()
+        # Remove múltiplos espaços
+        texto = ' '.join(texto.split())
+        # Converte para maiúsculas
+        return texto.upper()
+    
+    # ============================================
+    # FUNÇÕES DE VALIDAÇÃO
+    # ============================================
+    
+    @staticmethod
+    def validar_cnpj(cnpj: str) -> bool:
+        """Valida CNPJ (formato e dígitos verificadores)"""
+        cnpj_limpo = NFeHelpers.limpar_cnpj_cpf(cnpj)
+        
+        if len(cnpj_limpo) != 14:
+            return False
+        
+        # Elimina CNPJs inválidos conhecidos
+        if cnpj_limpo in (c * 14 for c in "0123456789"):
+            return False
+        
+        # Valida primeiro dígito verificador
+        peso = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+        soma = 0
+        for i in range(12):
+            soma += int(cnpj_limpo[i]) * peso[i]
+        
+        resto = soma % 11
+        digito1 = 0 if resto < 2 else 11 - resto
+        
+        if digito1 != int(cnpj_limpo[12]):
+            return False
+        
+        # Valida segundo dígito verificador
+        peso = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+        soma = 0
+        for i in range(13):
+            soma += int(cnpj_limpo[i]) * peso[i]
+        
+        resto = soma % 11
+        digito2 = 0 if resto < 2 else 11 - resto
+        
+        return digito2 == int(cnpj_limpo[13])
+    
+    @staticmethod
+    def validar_cpf(cpf: str) -> bool:
+        """Valida CPF (formato e dígitos verificadores)"""
+        cpf_limpo = NFeHelpers.limpar_cnpj_cpf(cpf)
+        
+        if len(cpf_limpo) != 11:
+            return False
+        
+        # Elimina CPFs inválidos conhecidos
+        if cpf_limpo in (c * 11 for c in "0123456789"):
+            return False
+        
+        # Valida primeiro dígito verificador
+        soma = 0
+        peso = 10
+        for i in range(9):
+            soma += int(cpf_limpo[i]) * peso
+            peso -= 1
+        
+        resto = soma % 11
+        digito1 = 0 if resto < 2 else 11 - resto
+        
+        if digito1 != int(cpf_limpo[9]):
+            return False
+        
+        # Valida segundo dígito verificador
+        soma = 0
+        peso = 11
+        for i in range(10):
+            soma += int(cpf_limpo[i]) * peso
+            peso -= 1
+        
+        resto = soma % 11
+        digito2 = 0 if resto < 2 else 11 - resto
+        
+        return digito2 == int(cpf_limpo[10])
+    
+    @staticmethod
+    def validar_ncm(ncm: str) -> bool:
+        """Valida formato do NCM (8 dígitos)"""
+        ncm_limpo = ''.join(filter(str.isdigit, ncm))
+        return len(ncm_limpo) == 8
+    
+    @staticmethod
+    def validar_cfop(cfop: str) -> bool:
+        """Valida formato do CFOP (4 dígitos)"""
+        cfop_limpo = ''.join(filter(str.isdigit, str(cfop)))
+        return len(cfop_limpo) == 4
+    
+    @staticmethod
+    def validar_placa(placa: str) -> bool:
+        """Valida formato da placa (antigo ou Mercosul)"""
+        placa_limpa = placa.upper().replace('-', '').replace(' ', '')
+        return bool(NFeHelpers.PLACA_PATTERN.match(placa_limpa))
+    
+    # ============================================
+    # FUNÇÕES DE TRATAMENTO DE DADOS
+    # ============================================
+    
+    @staticmethod
+    def tratar_dados_configuracao(dados: Dict[str, Any]) -> Dict[str, Any]:
+        """Trata dados de configuração fiscal antes de salvar"""
+        dados_tratados = dados.copy()
+        
+        # Limpa CNPJ
+        if 'cnpj' in dados_tratados:
+            cnpj_limpo = NFeHelpers.limpar_cnpj_cpf(dados_tratados['cnpj'])
+            if len(cnpj_limpo) == 14 and NFeHelpers.validar_cnpj(cnpj_limpo):
+                dados_tratados['cnpj'] = cnpj_limpo
+            else:
+                raise ValueError(f"CNPJ inválido: {dados_tratados['cnpj']}")
+        
+        # Limpa CEP
+        if 'cep' in dados_tratados:
+            dados_tratados['cep'] = NFeHelpers.limpar_cnpj_cpf(dados_tratados['cep'])
+        
+        # Normaliza textos
+        campos_texto = [
+            'razao_social', 'nome_fantasia', 'logradouro', 'complemento',
+            'bairro', 'municipio', 'email'
+        ]
+        
+        for campo in campos_texto:
+            if campo in dados_tratados and dados_tratados[campo]:
+                dados_tratados[campo] = NFeHelpers.normalizar_texto(dados_tratados[campo])
+        
+        # Converte UF para maiúsculas
+        if 'uf' in dados_tratados:
+            dados_tratados['uf'] = dados_tratados['uf'].upper()[:2]
+        
+        # Garante valores padrão
+        defaults = {
+            'serie_nfe': '1',
+            'serie_nfce': '2',
+            'ambiente': '2',
+            'ultimo_numero_nfe': 0,
+            'ultimo_numero_nfce': 0,
+            'ativo': True
+        }
+        
+        for campo, valor_padrao in defaults.items():
+            if campo not in dados_tratados:
+                dados_tratados[campo] = valor_padrao
+        
+        return dados_tratados
+    
+    @staticmethod
+    def tratar_dados_transportadora(dados: Dict[str, Any]) -> Dict[str, Any]:
+        """Trata dados de transportadora antes de salvar"""
+        dados_tratados = dados.copy()
+        
+        # Limpa CNPJ/CPF
+        if 'cnpj' in dados_tratados and dados_tratados['cnpj']:
+            cnpj_limpo = NFeHelpers.limpar_cnpj_cpf(dados_tratados['cnpj'])
+            if len(cnpj_limpo) == 14 and NFeHelpers.validar_cnpj(cnpj_limpo):
+                dados_tratados['cnpj'] = cnpj_limpo
+            else:
+                raise ValueError(f"CNPJ inválido: {dados_tratados['cnpj']}")
+        
+        if 'cpf' in dados_tratados and dados_tratados['cpf']:
+            cpf_limpo = NFeHelpers.limpar_cnpj_cpf(dados_tratados['cpf'])
+            if len(cpf_limpo) == 11 and NFeHelpers.validar_cpf(cpf_limpo):
+                dados_tratados['cpf'] = cpf_limpo
+            else:
+                raise ValueError(f"CPF inválido: {dados_tratados['cpf']}")
+        
+        # Limpa CEP
+        if 'cep' in dados_tratados and dados_tratados['cep']:
+            dados_tratados['cep'] = NFeHelpers.limpar_cnpj_cpf(dados_tratados['cep'])
+        
+        # Normaliza textos
+        campos_texto = [
+            'razao_social', 'nome_fantasia', 'logradouro', 'complemento',
+            'bairro', 'municipio', 'email', 'rntc'
+        ]
+        
+        for campo in campos_texto:
+            if campo in dados_tratados and dados_tratados[campo]:
+                dados_tratados[campo] = NFeHelpers.normalizar_texto(dados_tratados[campo])
+        
+        # Converte UF para maiúsculas
+        if 'uf' in dados_tratados:
+            dados_tratados['uf'] = dados_tratados['uf'].upper()[:2]
+        
+        if 'uf_veiculo' in dados_tratados and dados_tratados['uf_veiculo']:
+            dados_tratados['uf_veiculo'] = dados_tratados['uf_veiculo'].upper()[:2]
+        
+        # Formata placa
+        if 'placa_veiculo' in dados_tratados and dados_tratados['placa_veiculo']:
+            placa = dados_tratados['placa_veiculo'].upper().replace('-', '').replace(' ', '')
+            dados_tratados['placa_veiculo'] = placa
+        
+        # Garante valor padrão
+        if 'modalidade_frete' not in dados_tratados:
+            dados_tratados['modalidade_frete'] = '0'
+        
+        return dados_tratados
+    
+    @staticmethod
+    def tratar_dados_veiculo(dados: Dict[str, Any]) -> Dict[str, Any]:
+        """Trata dados de veículo de transporte antes de salvar"""
+        dados_tratados = dados.copy()
+        
+        # Formata placa
+        if 'placa' in dados_tratados:
+            placa = dados_tratados['placa'].upper().replace('-', '').replace(' ', '')
+            dados_tratados['placa'] = placa
+            
+            # Valida placa
+            if not NFeHelpers.validar_placa(placa):
+                raise ValueError(f"Placa inválida: {placa}")
+        
+        # Converte UF para maiúsculas
+        if 'uf' in dados_tratados:
+            dados_tratados['uf'] = dados_tratados['uf'].upper()[:2]
+        
+        # Normaliza texto
+        campos_texto = ['proprietario', 'tipo_veiculo', 'rntc']
+        for campo in campos_texto:
+            if campo in dados_tratados and dados_tratados[campo]:
+                dados_tratados[campo] = NFeHelpers.normalizar_texto(dados_tratados[campo])
+        
+        return dados_tratados
+    
+    @staticmethod
+    def formatar_dados_para_frontend(dados: Dict[str, Any], tipo: str = 'configuracao') -> Dict[str, Any]:
+        """Formata dados para exibição no frontend"""
+        dados_formatados = dados.copy()
+        
+        # Aplica formatação baseada no tipo
+        if tipo == 'configuracao':
+            if 'cnpj' in dados_formatados:
+                dados_formatados['cnpj'] = NFeHelpers.formatar_cnpj(dados_formatados['cnpj'])
+            
+            if 'cep' in dados_formatados:
+                dados_formatados['cep'] = NFeHelpers.formatar_cep(dados_formatados['cep'])
+            
+            if 'telefone' in dados_formatados:
+                dados_formatados['telefone'] = NFeHelpers.formatar_telefone(dados_formatados['telefone'])
+        
+        elif tipo == 'transportadora':
+            if 'cnpj' in dados_formatados and dados_formatados['cnpj']:
+                dados_formatados['cnpj'] = NFeHelpers.formatar_cnpj(dados_formatados['cnpj'])
+            
+            if 'cpf' in dados_formatados and dados_formatados['cpf']:
+                dados_formatados['cpf'] = NFeHelpers.formatar_cpf(dados_formatados['cpf'])
+            
+            if 'cep' in dados_formatados and dados_formatados['cep']:
+                dados_formatados['cep'] = NFeHelpers.formatar_cep(dados_formatados['cep'])
+            
+            if 'telefone' in dados_formatados and dados_formatados['telefone']:
+                dados_formatados['telefone'] = NFeHelpers.formatar_telefone(dados_formatados['telefone'])
+        
+        # Converte datetime para string
+        for key, value in dados_formatados.items():
+            if isinstance(value, datetime):
+                dados_formatados[key] = value.isoformat()
+            elif isinstance(value, Decimal):
+                dados_formatados[key] = float(value)
+        
+        return dados_formatados
+    
+    # ============================================
+    # FUNÇÕES ESPECÍFICAS PARA MONTAGEM DE NF-E
+    # ============================================
     
     @staticmethod
     def calcular_valor_total_produto(
@@ -126,23 +464,8 @@ class NFeHelpers:
     
     @staticmethod
     def formatar_data_sefaz(data: datetime) -> str:
-        """
-        Formata data para o padrão SEFAZ
-        Formato: 2024-08-25T15:00:00-03:00
-        """
+        """Formata data para o padrão SEFAZ: 2024-08-25T15:00:00-03:00"""
         return data.isoformat()
-    
-    @staticmethod
-    def validar_ncm(ncm: str) -> bool:
-        """Valida formato do NCM (8 dígitos)"""
-        ncm_limpo = ''.join(filter(str.isdigit, ncm))
-        return len(ncm_limpo) == 8
-    
-    @staticmethod
-    def validar_cfop(cfop: str) -> bool:
-        """Valida formato do CFOP (4 dígitos)"""
-        cfop_limpo = ''.join(filter(str.isdigit, str(cfop)))
-        return len(cfop_limpo) == 4
     
     @staticmethod
     def gerar_produto_simples(
@@ -161,16 +484,13 @@ class NFeHelpers:
         aliquota_pis: float = 0,
         aliquota_cofins: float = 0
     ) -> Dict[str, Any]:
-        """
-        Gera estrutura simplificada de um produto
-        Útil para operações básicas
-        """
+        """Gera estrutura simplificada de um produto"""
         valor_total = NFeHelpers.calcular_valor_total_produto(
             quantidade, valor_unitario, desconto
         )
         
         return {
-            "NmProduto": nome,
+            "NmProduto": NFeHelpers.normalizar_texto(nome),
             "CodProdutoServico": codigo,
             "EAN": "",
             "NCM": ncm,
@@ -236,9 +556,7 @@ class NFeHelpers:
         descricao: str = "",
         troco: float = 0
     ) -> Dict[str, Any]:
-        """
-        Gera estrutura simplificada de um pagamento
-        """
+        """Gera estrutura simplificada de um pagamento"""
         return {
             "IndicadorPagamento": 0,  # 0=Pagamento à vista, 1=Pagamento à prazo
             "Descricao": descricao or f"Pagamento - {forma_pagamento}",
@@ -265,43 +583,39 @@ class NFeHelpers:
         email: str = "",
         telefone: str = ""
     ) -> Dict[str, Any]:
-        """
-        Gera estrutura simplificada de cliente
-        """
+        """Gera estrutura simplificada de cliente"""
         # Determina se é pessoa física ou jurídica
-        doc_limpo = NFeHelpers.formatar_cpf_cnpj(cpf_cnpj)
+        doc_limpo = NFeHelpers.limpar_cnpj_cpf(cpf_cnpj)
         indicador_ie = 9 if len(doc_limpo) == 11 else 9  # 9=Não Contribuinte
         
         return {
             "CpfCnpj": doc_limpo,
-            "NmCliente": nome,
+            "NmCliente": NFeHelpers.normalizar_texto(nome),
             "IndicadorIe": indicador_ie,
             "Ie": "",
             "IsUf": "",
             "Endereco": {
-                "Cep": NFeHelpers.formatar_cep(cep),
-                "Logradouro": logradouro,
+                "Cep": NFeHelpers.limpar_cnpj_cpf(cep),
+                "Logradouro": NFeHelpers.normalizar_texto(logradouro),
                 "Complemento": "",
                 "Numero": numero,
-                "Bairro": bairro,
+                "Bairro": NFeHelpers.normalizar_texto(bairro),
                 "CodMunicipio": cod_municipio,
-                "Municipio": municipio,
+                "Municipio": NFeHelpers.normalizar_texto(municipio),
                 "Uf": uf.upper() if uf else "",
                 "CodPais": 1058,
                 "Pais": "BRASIL"
             },
             "Contato": {
-                "Telefone": NFeHelpers.formatar_telefone(telefone),
-                "Email": email,
+                "Telefone": NFeHelpers.limpar_cnpj_cpf(telefone),
+                "Email": email.lower() if email else "",
                 "Fax": ""
             }
         }
     
     @staticmethod
     def calcular_totais_nota(produtos: List[Dict[str, Any]]) -> Dict[str, float]:
-        """
-        Calcula os totais da nota baseado na lista de produtos
-        """
+        """Calcula os totais da nota baseado na lista de produtos"""
         total_produtos = 0
         total_desconto = 0
         total_frete = 0
@@ -325,32 +639,58 @@ class NFeHelpers:
             "total_outras_despesas": round(total_outras_despesas, 2),
             "total_nota": round(total_nota, 2)
         }
+    
+    # ============================================
+    # FUNÇÕES AUXILIARES
+    # ============================================
+    
+    @staticmethod
+    def extrair_uf_por_codigo_municipio(codigo_municipio: str) -> Optional[str]:
+        """Extrai UF a partir do código do município (IBGE)"""
+        if not codigo_municipio or len(codigo_municipio) < 2:
+            return None
+        
+        uf_code = codigo_municipio[:2]
+        return NFeHelpers.UF_MAP.get(uf_code)
 
 
-# # Exemplo de uso
-# if __name__ == "__main__":
-#     # Exemplo de criação de produto simplificado
-#     produto = NFeHelpers.gerar_produto_simples(
-#         nome="Mouse Gamer RGB",
-#         codigo="MOUSE001",
-#         quantidade=2,
-#         valor_unitario=89.90,
-#         cfop=5102,
-#         ncm="84716060"
-#     )
-    
-#     # Exemplo de criação de cliente simplificado
-#     cliente = NFeHelpers.gerar_cliente_simples(
-#         cpf_cnpj="123.456.789-00",
-#         nome="João da Silva",
-#         cep="30112-000",
-#         logradouro="Rua Exemplo",
-#         numero="123",
-#         bairro="Centro",
-#         municipio="Belo Horizonte",
-#         uf="MG",
-#         email="joao@email.com",
-#         telefone="(31) 3333-4444"
-#     )
-    
-#     print(f"Helpers carregados com sucesso!\n{json.dumps(produto, indent=2, ensure_ascii=False)}\n{json.dumps(cliente, indent=2, ensure_ascii=False)}")
+# ============================================
+# FUNÇÕES DE CONVENIÊNCIA (standalone)
+# ============================================
+
+def limpar_cnpj(cnpj: str) -> str:
+    """Remove formatação de CNPJ"""
+    return NFeHelpers.limpar_cnpj_cpf(cnpj)
+
+def formatar_cnpj(cnpj: str) -> str:
+    """Formata CNPJ no padrão 00.000.000/0000-00"""
+    return NFeHelpers.formatar_cnpj(cnpj)
+
+def validar_cnpj(cnpj: str) -> bool:
+    """Valida CNPJ (formato e dígitos verificadores)"""
+    return NFeHelpers.validar_cnpj(cnpj)
+
+def limpar_cpf(cpf: str) -> str:
+    """Remove formatação de CPF"""
+    return NFeHelpers.limpar_cnpj_cpf(cpf)
+
+def formatar_cpf(cpf: str) -> str:
+    """Formata CPF no padrão 000.000.000-00"""
+    return NFeHelpers.formatar_cpf(cpf)
+
+def validar_cpf(cpf: str) -> bool:
+    """Valida CPF (formato e dígitos verificadores)"""
+    return NFeHelpers.validar_cpf(cpf)
+
+def formatar_cep(cep: str) -> str:
+    """Formata CEP no padrão 00000-000"""
+    return NFeHelpers.formatar_cep(cep)
+
+def formatar_telefone(telefone: str) -> str:
+    """Formata telefone no padrão (00) 0000-0000 ou (00) 00000-0000"""
+    return NFeHelpers.formatar_telefone(telefone)
+
+def normalizar_texto(texto: str) -> str:
+    """Normaliza texto: remove espaços extras, converte para maiúsculas"""
+    return NFeHelpers.normalizar_texto(texto)
+
