@@ -6051,7 +6051,7 @@ def get_caixa_financeiro(caixa_id):
             
             formas_pagamento = []
             if nota.pagamentos:
-                formas_pagamento = [p.forma_pagamento.value for p in nota.pagamentos]
+                formas_pagamento = list(set([p.forma_pagamento.value for p in nota.pagamentos]))
             
             financeiros_nota = (
                 session.query(Financeiro)
@@ -6093,7 +6093,7 @@ def get_caixa_financeiro(caixa_id):
                     .filter_by(conta_id=mov.conta_receber_id)
                     .all()
                 )
-                formas_pagamento = [p.forma_pagamento.value for p in pagamentos]
+                formas_pagamento = list(set([p.forma_pagamento.value for p in pagamentos]))
 
             dados.append(
                 {
@@ -6148,6 +6148,7 @@ def get_caixa_financeiro(caixa_id):
         )
     finally:
         session.close()
+        
         
 @admin_bp.route("/caixas/<int:caixa_id>/financeiro/movimentacoes/pdf")
 @login_required
