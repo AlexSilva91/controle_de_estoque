@@ -63,6 +63,167 @@ class ConfiguracaoFiscal(Base):
 
 
 # --------------------
+# 1. CONFIGURAÇÕES FISCAIS DO CLIENTE
+# --------------------
+class ClienteFiscal(Base):
+    __tablename__ = "clientes_fiscal"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # Identificação
+    cpf_cnpj = Column(String(14), nullable=False, unique=True, index=True)
+    nome_cliente = Column(String(150), nullable=False)
+    nome_fantasia = Column(String(150), nullable=True)
+    
+    # Dados Fiscais
+    indicador_ie = Column(Integer, nullable=False, default=9)  # 1=Contribuinte, 2=Isento, 9=Não Contribuinte
+    inscricao_estadual = Column(String(14), nullable=True)
+    inscricao_municipal = Column(String(15), nullable=False)
+    inscricao_suframa = Column(String(9), nullable=False)
+    
+    # Endereço
+    cep = Column(String(8), nullable=False)
+    logradouro = Column(String(200), nullable=False)
+    numero = Column(String(20), nullable=False)
+    complemento = Column(String(100), nullable=True)
+    bairro = Column(String(100), nullable=False)
+    codigo_municipio = Column(String(7), nullable=False)
+    municipio = Column(String(100), nullable=False)
+    uf = Column(String(2), nullable=False)
+    codigo_pais = Column(Integer, nullable=False, default=1058)
+    pais = Column(String(60), nullable=False, default="BRASIL")
+    
+    # Contato
+    telefone = Column(String(20), nullable=False)
+    celular = Column(String(20), nullable=False)
+    email = Column(String(100), nullable=False)
+    fax = Column(String(20), nullable=False)
+    
+    # Informações Adicionais
+    observacoes = Column(Text, nullable=False)
+    tipo_cliente = Column(String(20), nullable=False)  # fisica, juridica
+    regime_tributario = Column(String(2), nullable=False)  # 1=Simples, 2=Normal, 3=MEI
+    
+    # Controle
+    ativo = Column(Boolean, default=True, nullable=False)
+    criado_em = Column(DateTime, default=datetime.now, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    sincronizado = Column(Boolean, default=False, nullable=False)
+
+    
+    def to_dict(self):
+        """Converte o cliente para dicionário"""
+        return {
+            # Identificação
+            "id": self.id,
+            "cpf_cnpj": self.cpf_cnpj,
+            "nome_cliente": self.nome_cliente,
+            "nome_fantasia": self.nome_fantasia,
+            
+            # Dados Fiscais
+            "indicador_ie": self.indicador_ie,
+            "inscricao_estadual": self.inscricao_estadual,
+            "inscricao_municipal": self.inscricao_municipal,
+            "inscricao_suframa": self.inscricao_suframa,
+            
+            # Endereço
+            "endereco": {
+                "cep": self.cep,
+                "logradouro": self.logradouro,
+                "numero": self.numero,
+                "complemento": self.complemento,
+                "bairro": self.bairro,
+                "codigo_municipio": self.codigo_municipio,
+                "municipio": self.municipio,
+                "uf": self.uf,
+                "codigo_pais": self.codigo_pais,
+                "pais": self.pais
+            },
+            
+            # Contato
+            "contato": {
+                "telefone": self.telefone,
+                "celular": self.celular,
+                "email": self.email,
+                "fax": self.fax
+            },
+            
+            # Informações Adicionais
+            "observacoes": self.observacoes,
+            "tipo_cliente": self.tipo_cliente,
+            "regime_tributario": self.regime_tributario,
+            
+            # Controle
+            "ativo": self.ativo,
+            "criado_em": self.criado_em.isoformat() if self.criado_em else None,
+            "atualizado_em": self.atualizado_em.isoformat() if self.atualizado_em else None,
+            "sincronizado": self.sincronizado
+        }
+    
+    def to_nfe_dict(self):
+        """Converte para formato esperado pela NFe (compatível com seu exemplo)"""
+        return {
+            "CpfCnpj": self.cpf_cnpj,
+            "NmCliente": self.nome_cliente,
+            "IndicadorIe": self.indicador_ie,
+            "Ie": self.inscricao_estadual or "",
+            "IsUf": self.uf,
+            "Endereco": {
+                "Cep": self.cep,
+                "Logradouro": self.logradouro,
+                "Complemento": self.complemento or "",
+                "Numero": self.numero,
+                "Bairro": self.bairro,
+                "CodMunicipio": self.codigo_municipio,
+                "Municipio": self.municipio,
+                "Uf": self.uf,
+                "CodPais": self.codigo_pais,
+                "Pais": self.pais
+            },
+            "Contato": {
+                "Telefone": self.telefone or "",
+                "Email": self.email or "",
+                "Fax": self.fax or ""
+            }
+        }
+    
+    @staticmethod
+    def from_dict(dados):
+        """Cria um cliente a partir de um dicionário"""
+        endereco = dados.get("Endereco", {}) if "Endereco" in dados else dados.get("endereco", {})
+        contato = dados.get("Contato", {}) if "Contato" in dados else dados.get("contato", {})
+        
+        return ClienteFiscal(
+            cpf_cnpj=dados.get("CpfCnpj") or dados.get("cpf_cnpj", ""),
+            nome_cliente=dados.get("NmCliente") or dados.get("nome_cliente", ""),
+            nome_fantasia=dados.get("nome_fantasia"),
+            indicador_ie=dados.get("IndicadorIe") or dados.get("indicador_ie", 9),
+            inscricao_estadual=dados.get("Ie") or dados.get("inscricao_estadual"),
+            inscricao_municipal=dados.get("inscricao_municipal"),
+            inscricao_suframa=dados.get("inscricao_suframa"),
+            cep=endereco.get("Cep") or endereco.get("cep", ""),
+            logradouro=endereco.get("Logradouro") or endereco.get("logradouro", ""),
+            numero=endereco.get("Numero") or endereco.get("numero", ""),
+            complemento=endereco.get("Complemento") or endereco.get("complemento"),
+            bairro=endereco.get("Bairro") or endereco.get("bairro", ""),
+            codigo_municipio=endereco.get("CodMunicipio") or endereco.get("codigo_municipio", ""),
+            municipio=endereco.get("Municipio") or endereco.get("municipio", ""),
+            uf=endereco.get("Uf") or endereco.get("uf", ""),
+            codigo_pais=endereco.get("CodPais") or endereco.get("codigo_pais", 1058),
+            pais=endereco.get("Pais") or endereco.get("pais", "BRASIL"),
+            telefone=contato.get("Telefone") or contato.get("telefone"),
+            celular=contato.get("celular"),
+            email=contato.get("Email") or contato.get("email"),
+            fax=contato.get("Fax") or contato.get("fax"),
+            observacoes=dados.get("observacoes"),
+            tipo_cliente=dados.get("tipo_cliente"),
+            regime_tributario=dados.get("regime_tributario")
+        )
+    
+    def __repr__(self):
+        return f"<Cliente(id={self.id}, cpf_cnpj={self.cpf_cnpj}, nome={self.nome_cliente[:30]}...)>"
+
+# --------------------
 # 2. DADOS FISCAIS DO PRODUTO (Mapeamento)
 # --------------------
 class ProdutoFiscal(Base):
