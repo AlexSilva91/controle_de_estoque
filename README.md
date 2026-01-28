@@ -38,7 +38,7 @@ Projetado para uso em lojas e pequenos comércios, oferece controle financeiro, 
 | **🎨 Front-end** | ![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white) ![CSS3](https://img.shields.io/badge/CSS3-1572B6?logo=css3&logoColor=white) ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black) |
 | **⚙️ Back-end** | ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54) ![Flask](https://img.shields.io/badge/flask-%23000.svg?style=for-the-badge&logo=flask&logoColor=white) |
 | **🗄️ Banco de Dados** | ![MySQL](https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white) |
-| **🔌 APIs** | ![REST](https://img.shields.io/badge/REST-009688?logo=fastapi&logoColor=white) Flask Blueprint (`operador`, `admin`, `auth`) |
+| **🔌 APIs** | ![REST](https://img.shields.io/badge/REST-009688?logo=fastapi&logoColor=white) Flask Blueprint (`operador`, `admin`, `auth`, `fiscal`) |
 | **🧩 Outros** | ![Fetch API](https://img.shields.io/badge/Fetch_API-303030?logo=javascript&logoColor=white) ![Jinja2](https://img.shields.io/badge/Jinja2-B41717?logo=jinja&logoColor=white) ![ReportLab](https://img.shields.io/badge/ReportLab-FF6F00?logo=python&logoColor=white) ![Gunicorn](https://img.shields.io/badge/gunicorn-%298729.svg?style=for-the-badge&logo=gunicorn&logoColor=white) ![Nginx](https://img.shields.io/badge/nginx-%23009639.svg?style=for-the-badge&logo=nginx&logoColor=white)|
 
 ---
@@ -51,9 +51,12 @@ controle_de_estoque
 ├─ app
 │  ├─ __init__.py
 │  ├─ bot
+│  │  ├─ __init__.py
 │  │  └─ bot_movimentacao.py
-│  ├─ crud.py
 │  ├─ database.py
+│  ├─ decorators
+│  │  ├─ __init__.py
+│  │  └─ decorators.py
 │  ├─ init_db.py
 │  ├─ integrations
 │  │  ├─ __init__.py
@@ -66,14 +69,20 @@ controle_de_estoque
 │  │  ├─ audit_events.py
 │  │  ├─ audit_mixin.py
 │  │  ├─ base.py
-│  │  └─ entities.py
+│  │  ├─ entities.py
+│  │  └─ fiscal_models.py
 │  ├─ routes
 │  │  ├─ __init__.py
 │  │  ├─ admin.py
+│  │  ├─ admin_fiscal.py
 │  │  ├─ auth.py
 │  │  ├─ home.py
 │  │  └─ operador.py
 │  ├─ schemas.py
+│  ├─ services
+│  │  ├─ cliente_fiscal_crud.py
+│  │  ├─ crud.py
+│  │  └─ fiscal_crud.py
 │  ├─ static
 │  │  ├─ assets
 │  │  │  ├─ clients_icon.png
@@ -93,26 +102,24 @@ controle_de_estoque
 │  │  │  ├─ formas_pagamento.css
 │  │  │  ├─ lotes.css
 │  │  │  ├─ style.css
+│  │  │  ├─ style_dashboard_fiscal.css
 │  │  │  ├─ style_login.css
 │  │  │  └─ styles_operador.css
-│  │  ├─ js
-│  │  │  ├─ auditoria.js
-│  │  │  ├─ lotes.js
-│  │  │  ├─ script.js
-│  │  │  ├─ script_contas_usuario.js
-│  │  │  ├─ script_formas_pagamento.js
-│  │  │  ├─ script_login.js
-│  │  │  ├─ script_lotes.js
-│  │  │  └─ script_operador.js
-│  │  └─ uploads
-│  │     ├─ avatars
-│  │     ├─ docs
-│  │     ├─ produtos
-│  │     └─ temp
+│  │  └─ js
+│  │     ├─ auditoria.js
+│  │     ├─ dashboard_fiscal.js
+│  │     ├─ lotes.js
+│  │     ├─ script.js
+│  │     ├─ script_contas_usuario.js
+│  │     ├─ script_formas_pagamento.js
+│  │     ├─ script_login.js
+│  │     ├─ script_lotes.js
+│  │     └─ script_operador.js
 │  ├─ templates
 │  │  ├─ auditoria.html
 │  │  ├─ contas_usuario.html
 │  │  ├─ dashboard_admin.html
+│  │  ├─ dashboard_fiscal.html
 │  │  ├─ dashboard_operador.html
 │  │  ├─ errors
 │  │  │  ├─ 400.html
