@@ -307,7 +307,7 @@ class ClienteFiscalCRUD:
                 .all()
     
     @staticmethod
-    def contar_total(db: Session, ativo: bool = True) -> int:
+    def contar_total(db: Session, ativo: bool | None = None) -> int:
         """
         Conta o total de clientes
         
@@ -319,11 +319,12 @@ class ClienteFiscalCRUD:
             int: Total de clientes
         """
         query = db.query(ClienteFiscal)
-        
-        if ativo:
-            query = query.filter(ClienteFiscal.ativo == True)
-            
+
+        if ativo is not None:
+            query = query.filter(ClienteFiscal.ativo == ativo)
+
         return query.count()
+
     
     @staticmethod
     def atualizar(db: Session, id: int, dados: Dict[str, Any]) -> Optional[ClienteFiscal]:
