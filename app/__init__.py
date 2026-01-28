@@ -99,33 +99,38 @@ def configure_logging(app: Flask):
 # ==========================
 def create_upload_folders(app: Flask):
     """
-    Cria automaticamente todas as pastas necessárias para upload de arquivos.
+    Cria automaticamente todas as pastas necessárias para upload de arquivos
+    no diretório raiz (fora da pasta app).
     """
     try:
-        upload_base = os.path.join(app.static_folder, "uploads")
+        upload_base = app.config.get("UPLOAD_BASE_DIR")
+        
+        if not upload_base:
+            upload_base = os.path.join(app.static_folder, "uploads")
+            app.logger.warning("UPLOAD_BASE_DIR não configurado, usando diretório antigo")
 
         folders_to_create = [
             upload_base,
-            os.path.join(upload_base, "produtos"),
-            os.path.join(upload_base, "avatars"),
-            os.path.join(upload_base, "docs"),
-            os.path.join(upload_base, "temp"),
-            os.path.join(upload_base, "produtos", "temp"),
-            os.path.join(BASEDIR, "logs", "uploads"),
+            app.config.get("UPLOAD_FOLDER", os.path.join(upload_base, "produtos")),
+            app.config.get("AVATAR_FOLDER", os.path.join(upload_base, "avatars")),
+            app.config.get("DOCS_FOLDER", os.path.join(upload_base, "docs")),
+            app.config.get("TEMP_FOLDER", os.path.join(upload_base, "temp")),
+            os.path.join(upload_base, "logs", "uploads"),
         ]
 
         for folder in folders_to_create:
             try:
                 os.makedirs(folder, exist_ok=True)
+                app.logger.info(f"Pasta criada/verificada: {folder}")
             except Exception as e:
                 app.logger.error(f"Erro ao criar pasta {folder}: {e}")
 
-        # Verificar permissões de escrita
         test_file = os.path.join(upload_base, "test_write.txt")
         try:
             with open(test_file, "w") as f:
                 f.write("test")
             os.remove(test_file)
+            app.logger.info("Permissões de escrita verificadas com sucesso")
         except Exception as e:
             app.logger.warning(
                 f"Aviso: Problema com permissões de escrita nas pastas de upload: {e}"
@@ -196,7 +201,8 @@ def create_app(config_name="development") -> Flask:
     # Uploads públicos
     @app.route("/uploads/<path:filename>")
     def uploaded_file(filename):
-        return send_from_directory(os.path.join(app.static_folder, "uploads"), filename)
+        upload_base = app.config.get("UPLOAD_BASE_DIR", os.path.join(app.static_folder, "uploads"))
+        return send_from_directory(upload_base, filename)
 
     # Rotas de teste
     @app.route("/test-400")

@@ -11,7 +11,7 @@ tests
 estoque_racoes_backup_2025-08-04.sql
 script_operador2.js
 backups
-app/static/uploads
+uploads
 logs
 enviar_nfe_final.py
 xmls/

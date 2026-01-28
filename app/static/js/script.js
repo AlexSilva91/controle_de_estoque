@@ -754,10 +754,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 const ultimoDia = new Date(anoNum, mesNum, 0); // Dia 0 do próximo mês = último dia do mês atual
                 const endDate = ultimoDia.toISOString().split('T')[0];
 
-                console.log(`Mês: ${mesNum}, Ano: ${anoNum}`);
-                console.log(`Primeiro dia: ${startDate}`);
-                console.log(`Último dia: ${endDate}`);
-                console.log(`Dias no mês: ${ultimoDia.getDate()}`);
 
                 // Determinar o tipo baseado no dataset clicado
                 let tipo;
@@ -937,11 +933,6 @@ document.addEventListener('DOMContentLoaded', function () {
                   formasPagamentoOriginais.get(formaPagamentoDisplay);
 
                 if (formaPagamentoOriginal) {
-                  console.log(
-                    `Forma de pagamento clicada: ${formaPagamentoDisplay} -> ${formaPagamentoOriginal}`
-                  );
-
-                  // Redirecionar para a página de formas de pagamento com o filtro aplicado
                   window.location.href = `/admin/formas-pagamento?forma_pagamento=${encodeURIComponent(
                     formaPagamentoOriginal
                   )}`;
@@ -1593,7 +1584,6 @@ document.addEventListener('DOMContentLoaded', function () {
           primeiraAba.click();
         }
       } catch (error) {
-        console.error('Erro ao buscar venda:', error);
         alert('Erro ao buscar venda. Verifique o console para mais detalhes.');
       }
     });
@@ -2786,7 +2776,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
       setupPopupEventListeners(popupId);
     } catch (err) {
-      console.error('Erro ao carregar detalhes da conta:', err);
       showFlashMessage('error', 'Erro ao carregar detalhes da conta');
 
       showErrorPopup('Erro ao carregar detalhes da conta. Por favor, tente novamente.');
@@ -3457,7 +3446,6 @@ document.addEventListener('DOMContentLoaded', function () {
           mostrarFlashMessage('Relatório sendo gerado...', 'success');
           
       } catch (error) {
-          console.error('Erro ao gerar relatório:', error);
           mostrarFlashMessage('Erro ao gerar relatório', 'error');
       } finally {
           setTimeout(() => {
@@ -3914,11 +3902,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
                   // Configurar eventos
                   setupDescontoEvents();
-                  setupFotoPreview('editFoto', 'editFotoPreview', 'editFotoPreviewImg');
+
+                  // Configurar preview ANTES de configurar outros eventos
+                  const fotoInput = document.getElementById('editFoto');
+                  if (fotoInput) {
+                      setupFotoPreview('editFoto', 'editFotoPreview', 'editFotoPreviewImg');
+                      
+                      // Resetar o preview ao abrir o modal
+                      const previewContainer = document.getElementById('editFotoPreview');
+                      if (previewContainer) {
+                          previewContainer.style.display = 'none';
+                      }
+                  }
 
                   // Configurar evento para checkbox de deletar foto
                   const deleteFotoCheckbox = document.getElementById('deleteFoto');
-                  const fotoInput = document.getElementById('editFoto');
 
                   if (deleteFotoCheckbox && fotoInput) {
                       deleteFotoCheckbox.addEventListener('change', function () {
@@ -3926,7 +3924,9 @@ document.addEventListener('DOMContentLoaded', function () {
                               fotoInput.disabled = true;
                               fotoInput.value = '';
                               const preview = document.getElementById('editFotoPreview');
-                              if (preview) preview.style.display = 'none';
+                              if (preview) {
+                                  preview.style.display = 'none';
+                              }
                           } else {
                               fotoInput.disabled = false;
                           }
@@ -3944,41 +3944,46 @@ document.addEventListener('DOMContentLoaded', function () {
               throw new Error('Erro ao carregar dados do produto');
           }
       } catch (error) {
-          console.error('Erro ao abrir modal de edição:', error);
           showFlashMessage('error', 'Erro ao carregar dados do produto');
       }
   }
 
   function setupFileUpload(inputId) {
-      const fileInput = document.getElementById(inputId);
-      const fileUploadArea = fileInput?.closest('.file-upload-area');
+    const fileInput = document.getElementById(inputId);
+    const fileUploadArea = fileInput?.closest('.file-upload-area');
 
-      if (!fileUploadArea) return;
+    if (!fileUploadArea) return;
 
-      // Highlight quando arrasta arquivo sobre a área
-      fileUploadArea.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          fileUploadArea.classList.add('dragover');
-      });
+    // Evita propagação do clique para não abrir duas vezes
+    fileInput.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
 
-      fileUploadArea.addEventListener('dragleave', () => {
-          fileUploadArea.classList.remove('dragover');
-      });
+    // Highlight quando arrasta arquivo sobre a área
+    fileUploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        fileUploadArea.classList.add('dragover');
+    });
 
-      fileUploadArea.addEventListener('drop', (e) => {
-          e.preventDefault();
-          fileUploadArea.classList.remove('dragover');
+    fileUploadArea.addEventListener('dragleave', () => {
+        fileUploadArea.classList.remove('dragover');
+    });
 
-          if (e.dataTransfer.files.length) {
-              fileInput.files = e.dataTransfer.files;
-              fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-      });
+    fileUploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        fileUploadArea.classList.remove('dragover');
 
-      // Clique na área para abrir o seletor de arquivos
-      fileUploadArea.addEventListener('click', () => {
-          fileInput.click();
-      });
+        if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+
+    // Clique na área para abrir o seletor de arquivos
+    fileUploadArea.addEventListener('click', (e) => {
+        if (e.target === fileInput) return;
+        fileInput.click();
+    });
   }
 
   function setupDescontoEvents() {
@@ -4184,24 +4189,57 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function setupFotoPreview(inputId, previewContainerId, previewImgId) {
-      const input = document.getElementById(inputId);
-      const previewContainer = document.getElementById(previewContainerId);
-      const previewImg = document.getElementById(previewImgId);
-      
-      if (input && previewContainer && previewImg) {
-          input.addEventListener('change', function() {
-              if (this.files && this.files[0]) {
-                  const reader = new FileReader();
-                  
-                  reader.onload = function(e) {
-                      previewImg.src = e.target.result;
-                      previewContainer.style.display = 'block';
-                  }
-                  
-                  reader.readAsDataURL(this.files[0]);
-              }
-          });
-      }
+    const input = document.getElementById(inputId);
+    const previewContainer = document.getElementById(previewContainerId);
+    const previewImg = document.getElementById(previewImgId);
+    
+    if (!input || !previewContainer || !previewImg) {
+        return;
+    }
+    
+    // Limpar qualquer evento anterior
+    const newInput = input.cloneNode(true);
+    input.parentNode.replaceChild(newInput, input);
+    
+    // Configurar novo listener
+    newInput.addEventListener('change', function() {
+        
+        if (this.files && this.files[0]) {
+            // Validar tamanho do arquivo (máximo 5MB)
+            if (this.files[0].size > 5 * 1024 * 1024) {
+                showFlashMessage('error', 'Arquivo muito grande. Máximo 5MB permitido.');
+                this.value = '';
+                previewContainer.style.display = 'none';
+                return;
+            }
+            
+            // Validar tipo de arquivo
+            const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+            if (!validTypes.includes(this.files[0].type)) {
+                showFlashMessage('error', 'Formato de imagem não suportado. Use JPG, PNG, GIF ou WEBP.');
+                this.value = '';
+                previewContainer.style.display = 'none';
+                return;
+            }
+            
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                previewContainer.style.display = 'block';
+            }
+            
+            reader.onerror = function() {
+                showFlashMessage('error', 'Erro ao carregar imagem para preview');
+                previewContainer.style.display = 'none';
+            }
+            
+            reader.readAsDataURL(this.files[0]);
+        } else {
+            previewContainer.style.display = 'none';
+        }
+    });
+    
   }
 
   document.getElementById('searchProduto')?.addEventListener('input', loadProdutosData);
@@ -6796,7 +6834,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFlashMessage('error', response.error || 'Erro ao carregar recebimentos');
       }
     } catch (error) {
-      console.error(error);
       showFlashMessage('error', 'Erro ao carregar recebimentos');
     } finally {
       showLoading(false);
@@ -7831,7 +7868,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar caixas abertos:', error);
+      console.error('Erro ao carregar caixas abertos');
     }
   }
 
@@ -9030,13 +9067,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Configurar eventos de movimentação
   function setupMovimentacaoEvents() {
-    console.log('Configurando eventos de movimentação...');
-
     const confirmarBtn = document.getElementById('confirmarMovimentacao');
     if (confirmarBtn) {
       // Usar onclick diretamente para evitar problemas com event listeners
       confirmarBtn.onclick = processarMovimentacao;
-      console.log('Evento do botão confirmarMovimentacao configurado');
     }
   }
 
@@ -9209,7 +9243,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Inicializar eventos quando o DOM estiver carregado
   document.addEventListener('DOMContentLoaded', function () {
-    console.log('DOM Carregado - Inicializando eventos...');
 
     setupTransferenciaEvents();
     setupMovimentacaoEvents();

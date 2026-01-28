@@ -10,17 +10,27 @@ class Config:
     DEBUG = False
     TESTING = False
 
-    # Configurações para upload de fotos
-    UPLOAD_FOLDER = os.path.join(basedir, "app", "static", "uploads", "produtos")
+    # ==========================
+    # CONFIGURAÇÕES DE UPLOAD (FORA DA PASTA APP)
+    # ==========================
+    # Diretório base para uploads (agora no diretório raiz)
+    UPLOAD_BASE_DIR = os.path.join(basedir, "uploads")
+    
+    # Pastas específicas
+    UPLOAD_FOLDER = os.path.join(UPLOAD_BASE_DIR, "produtos")
+    AVATAR_FOLDER = os.path.join(UPLOAD_BASE_DIR, "avatars")
+    DOCS_FOLDER = os.path.join(UPLOAD_BASE_DIR, "docs")
+    TEMP_FOLDER = os.path.join(UPLOAD_BASE_DIR, "temp")
+    
     ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB máximo
 
-    # Subpastas organizadas por tipo
-    UPLOAD_SUBFOLDERS = {
-        "produtos": "produtos",
-        "avatars": "avatars",
-        "docs": "docs",
-        "temp": "temp",
+    # Dicionário para referência fácil
+    UPLOAD_PATHS = {
+        "produtos": UPLOAD_FOLDER,
+        "avatars": AVATAR_FOLDER,
+        "docs": DOCS_FOLDER,
+        "temp": TEMP_FOLDER,
     }
 
     # --- CONFIGURAÇÕES BRASIL NFe (API FISCAL) ---
