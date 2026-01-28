@@ -2,7 +2,8 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 from app.models import db
 from app.decorators.decorators import admin_required
-from app.models.fiscal_models import ConfiguracaoFiscal, NotaFiscalEvento
+from app.models.fiscal_models import ClienteFiscal, ConfiguracaoFiscal, NotaFiscalEvento
+from app.services.cliente_fiscal_crud import ClienteFiscalCRUD
 from app.services.fiscal_crud import (
     ConfiguracaoFiscalCRUD,
     ProdutoFiscalCRUD,
@@ -1506,3 +1507,498 @@ def health_check():
             "message": f"Erro de saúde: {str(e)}",
             "status": "offline"
         }), 500
+        
+# ============================================
+# 8. ROTAS CLIENTE FISCAL
+# ============================================
+
+@fiscal_bp.route('/clientes-fiscais', methods=['POST'])
+@admin_required
+def criar_cliente_fiscal():
+    """Cria um novo cliente fiscal"""
+    try:
+        dados = request.get_json()
+        if not dados:
+            return jsonify({"success": False, "message": "Dados não fornecidos"}), 400
+        
+        # Validações básicas
+        if 'cpf_cnpj' not in dados:
+            return jsonify({"success": False, "message": "CPF/CNPJ é obrigatório"}), 400
+        if 'nome_cliente' not in dados:
+            return jsonify({"success": False, "message": "Nome do cliente é obrigatório"}), 400
+        if 'cep' not in dados:
+            return jsonify({"success": False, "message": "CEP é obrigatório"}), 400
+        
+        cliente = ClienteFiscalCRUD.criar(db.session, dados)
+        
+        return jsonify({
+            "success": True,
+            "message": "Cliente fiscal criado com sucesso",
+            "data": {
+                "id": cliente.id,
+                "cpf_cnpj": cliente.cpf_cnpj,
+                "nome_cliente": cliente.nome_cliente
+            }
+        }), 201
+        
+    except ValueError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/clientes-fiscais', methods=['GET'])
+@admin_required
+def listar_clientes_fiscais():
+    """Lista todos os clientes fiscais"""
+    try:
+        skip = request.args.get('skip', 0, type=int)
+        limit = request.args.get('limit', 100, type=int)
+        ativo = request.args.get('ativo', type=lambda v: v.lower() == 'true')
+        tipo_cliente = request.args.get('tipo_cliente')
+        uf = request.args.get('uf')
+        
+        # Aplica filtros
+        if tipo_cliente:
+            clientes = ClienteFiscalCRUD.listar_por_tipo(
+                db.session, tipo_cliente, ativo, skip, limit
+            )
+        elif uf:
+            clientes = ClienteFiscalCRUD.listar_por_uf(
+                db.session, uf, ativo, skip, limit
+            )
+        else:
+            clientes = ClienteFiscalCRUD.listar_todos(db.session, ativo, skip, limit)
+        
+        return jsonify({
+            "success": True,
+            "data": [{
+                "id": c.id,
+                "cpf_cnpj": c.cpf_cnpj,
+                "nome_cliente": c.nome_cliente,
+                "nome_fantasia": c.nome_fantasia,
+                "tipo_cliente": c.tipo_cliente,
+                "inscricao_estadual": c.inscricao_estadual,
+                "municipio": c.municipio,
+                "uf": c.uf,
+                "telefone": c.telefone,
+                "email": c.email,
+                "ativo": c.ativo,
+                "sincronizado": c.sincronizado,
+                "criado_em": c.criado_em.isoformat() if c.criado_em else None
+            } for c in clientes]
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/clientes-fiscais/<int:id>', methods=['GET'])
+@admin_required
+def obter_cliente_fiscal_por_id(id):
+    """Obtém cliente fiscal por ID"""
+    try:
+        cliente = ClienteFiscalCRUD.obter_por_id(db.session, id)
+        
+        if not cliente:
+            return jsonify({"success": False, "message": "Cliente fiscal não encontrado"}), 404
+        
+        return jsonify({
+            "success": True,
+            "data": {
+                # Identificação
+                "id": cliente.id,
+                "cpf_cnpj": cliente.cpf_cnpj,
+                "nome_cliente": cliente.nome_cliente,
+                "nome_fantasia": cliente.nome_fantasia,
+                
+                # Dados Fiscais
+                "indicador_ie": cliente.indicador_ie,
+                "inscricao_estadual": cliente.inscricao_estadual,
+                "inscricao_municipal": cliente.inscricao_municipal,
+                "inscricao_suframa": cliente.inscricao_suframa,
+                
+                # Endereço
+                "endereco": {
+                    "cep": cliente.cep,
+                    "logradouro": cliente.logradouro,
+                    "numero": cliente.numero,
+                    "complemento": cliente.complemento,
+                    "bairro": cliente.bairro,
+                    "codigo_municipio": cliente.codigo_municipio,
+                    "municipio": cliente.municipio,
+                    "uf": cliente.uf,
+                    "codigo_pais": cliente.codigo_pais,
+                    "pais": cliente.pais
+                },
+                
+                # Contato
+                "contato": {
+                    "telefone": cliente.telefone,
+                    "celular": cliente.celular,
+                    "email": cliente.email,
+                    "fax": cliente.fax
+                },
+                
+                # Informações Adicionais
+                "observacoes": cliente.observacoes,
+                "tipo_cliente": cliente.tipo_cliente,
+                "regime_tributario": cliente.regime_tributario,
+                
+                # Controle
+                "ativo": cliente.ativo,
+                "sincronizado": cliente.sincronizado,
+                "criado_em": cliente.criado_em.isoformat() if cliente.criado_em else None,
+                "atualizado_em": cliente.atualizado_em.isoformat() if cliente.atualizado_em else None
+            }
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        print(f"Erro detalhado: {traceback.format_exc()}")
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/clientes-fiscais/cpf-cnpj/<string:documento>', methods=['GET'])
+@admin_required
+def obter_cliente_fiscal_por_cpf_cnpj(documento):
+    """Obtém cliente fiscal por CPF/CNPJ"""
+    try:
+        cliente = ClienteFiscalCRUD.obter_por_cpf_cnpj(db.session, documento)
+        
+        if not cliente:
+            return jsonify({"success": False, "message": "Cliente fiscal não encontrado"}), 404
+        
+        return jsonify({
+            "success": True,
+            "data": cliente.to_dict()
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/clientes-fiscais/buscar', methods=['GET'])
+@admin_required
+def buscar_clientes_fiscais():
+    """Busca clientes fiscais por nome ou documento"""
+    try:
+        termo = request.args.get('termo', '')
+        limit = request.args.get('limit', 20, type=int)
+        
+        if not termo:
+            return jsonify({"success": False, "message": "Parâmetro 'termo' é obrigatório"}), 400
+        
+        # Tenta buscar por documento primeiro
+        if termo.isdigit():
+            cliente = ClienteFiscalCRUD.obter_por_cpf_cnpj(db.session, termo)
+            if cliente:
+                return jsonify({
+                    "success": True,
+                    "data": [cliente.to_dict()]
+                }), 200
+        
+        # Busca por nome
+        clientes = ClienteFiscalCRUD.buscar_por_nome(db.session, termo, limit=limit)
+        print(f'Clientes encontrados: {clientes}')
+        return jsonify({
+            "success": True,
+            "data": [c.to_dict() for c in clientes]
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/clientes-fiscais/<int:id>', methods=['PUT'])
+@admin_required
+def atualizar_cliente_fiscal(id):
+    """Atualiza um cliente fiscal"""
+    try:
+        dados = request.get_json()
+        if not dados:
+            return jsonify({"success": False, "message": "Dados não fornecidos"}), 400
+        
+        cliente = ClienteFiscalCRUD.atualizar(db.session, id, dados)
+        
+        if not cliente:
+            return jsonify({"success": False, "message": "Cliente fiscal não encontrado"}), 404
+        
+        return jsonify({
+            "success": True,
+            "message": "Cliente fiscal atualizado com sucesso",
+            "data": {
+                "id": cliente.id,
+                "cpf_cnpj": cliente.cpf_cnpj,
+                "nome_cliente": cliente.nome_cliente
+            }
+        }), 200
+        
+    except ValueError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/clientes-fiscais/<int:id>', methods=['DELETE'])
+@admin_required
+def excluir_cliente_fiscal(id):
+    """Desativa (soft delete) um cliente fiscal"""
+    try:
+        sucesso = ClienteFiscalCRUD.excluir(db.session, id, soft_delete=True)
+        
+        if not sucesso:
+            return jsonify({"success": False, "message": "Cliente fiscal não encontrado"}), 404
+        
+        return jsonify({
+            "success": True,
+            "message": "Cliente fiscal desativado com sucesso"
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/clientes-fiscais/<int:id>/reativar', methods=['POST'])
+@admin_required
+def reativar_cliente_fiscal(id):
+    """Reativa um cliente fiscal desativado"""
+    try:
+        cliente = ClienteFiscalCRUD.reativar(db.session, id)
+        
+        if not cliente:
+            return jsonify({"success": False, "message": "Cliente fiscal não encontrado"}), 404
+        
+        return jsonify({
+            "success": True,
+            "message": "Cliente fiscal reativado com sucesso",
+            "data": {
+                "id": cliente.id,
+                "cpf_cnpj": cliente.cpf_cnpj,
+                "nome_cliente": cliente.nome_cliente,
+                "ativo": cliente.ativo
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/clientes-fiscais/<int:id>/validar-nfe', methods=['GET'])
+@admin_required
+def validar_cliente_fiscal_nfe(id):
+    """Valida dados do cliente para emissão de NFe"""
+    try:
+        cliente = ClienteFiscalCRUD.obter_por_id(db.session, id)
+        
+        if not cliente:
+            return jsonify({"success": False, "message": "Cliente fiscal não encontrado"}), 404
+        
+        validacao = ClienteFiscalCRUD.validar_dados_nfe(cliente)
+        
+        return jsonify({
+            "success": True,
+            "data": {
+                "cliente_id": cliente.id,
+                "cliente_nome": cliente.nome_cliente,
+                "validacao": validacao,
+                "valido_para_nfe": len(validacao['erros']) == 0
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/clientes-fiscais/<int:id>/marcar-sincronizado', methods=['POST'])
+@admin_required
+def marcar_cliente_sincronizado(id):
+    """Marca cliente como sincronizado"""
+    try:
+        cliente = ClienteFiscalCRUD.marcar_sincronizado(db.session, id)
+        
+        if not cliente:
+            return jsonify({"success": False, "message": "Cliente fiscal não encontrado"}), 404
+        
+        return jsonify({
+            "success": True,
+            "message": "Cliente marcado como sincronizado",
+            "data": {
+                "id": cliente.id,
+                "cpf_cnpj": cliente.cpf_cnpj,
+                "sincronizado": cliente.sincronizado
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/clientes-fiscais/sincronizados/marcar-multiplos', methods=['POST'])
+@admin_required
+def marcar_multiplos_clientes_sincronizados():
+    """Marca múltiplos clientes como sincronizados"""
+    try:
+        dados = request.get_json()
+        if not dados or 'ids' not in dados:
+            return jsonify({"success": False, "message": "Lista de IDs é obrigatória"}), 400
+        
+        ids = dados['ids']
+        if not isinstance(ids, list):
+            return jsonify({"success": False, "message": "IDs deve ser uma lista"}), 400
+        
+        sucesso = ClienteFiscalCRUD.marcar_todos_sincronizados(db.session, ids)
+        
+        if not sucesso:
+            return jsonify({"success": False, "message": "Erro ao marcar clientes como sincronizados"}), 500
+        
+        return jsonify({
+            "success": True,
+            "message": f"{len(ids)} cliente(s) marcado(s) como sincronizado(s)"
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/clientes-fiscais/importar', methods=['POST'])
+@admin_required
+def importar_cliente_fiscal():
+    """Importa cliente a partir de dicionário no formato padrão"""
+    try:
+        dados = request.get_json()
+        if not dados:
+            return jsonify({"success": False, "message": "Dados não fornecidos"}), 400
+        
+        cliente = ClienteFiscalCRUD.importar_de_dict(db.session, dados)
+        
+        if isinstance(cliente, ClienteFiscal):
+            action = "atualizado" if 'id' in request.get_json() else "criado"
+        else:
+            action = "importado"
+        
+        return jsonify({
+            "success": True,
+            "message": f"Cliente fiscal {action} com sucesso",
+            "data": {
+                "id": cliente.id,
+                "cpf_cnpj": cliente.cpf_cnpj,
+                "nome_cliente": cliente.nome_cliente,
+                "tipo_cliente": cliente.tipo_cliente
+            }
+        }), 201
+        
+    except ValueError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/clientes-fiscais/estatisticas', methods=['GET'])
+@admin_required
+def obter_estatisticas_clientes():
+    """Obtém estatísticas dos clientes fiscais"""
+    try:
+        total_clientes = ClienteFiscalCRUD.contar_total(db.session, ativo=True)
+        total_inativos = ClienteFiscalCRUD.contar_total(db.session, ativo=False)
+        total_pessoas_fisicas = db.session.query(ClienteFiscal).filter(
+            ClienteFiscal.tipo_cliente == 'fisica',
+            ClienteFiscal.ativo == True
+        ).count()
+        total_pessoas_juridicas = db.session.query(ClienteFiscal).filter(
+            ClienteFiscal.tipo_cliente == 'juridica',
+            ClienteFiscal.ativo == True
+        ).count()
+        nao_sincronizados = db.session.query(ClienteFiscal).filter(
+            ClienteFiscal.sincronizado == False,
+            ClienteFiscal.ativo == True
+        ).count()
+        
+        # Contagem por UF
+        uf_counts = db.session.query(
+            ClienteFiscal.uf,
+            db.func.count(ClienteFiscal.id).label('total')
+        ).filter(
+            ClienteFiscal.ativo == True
+        ).group_by(ClienteFiscal.uf).all()
+        
+        return jsonify({
+            "success": True,
+            "data": {
+                "totais": {
+                    "ativos": total_clientes,
+                    "inativos": total_inativos,
+                    "pessoas_fisicas": total_pessoas_fisicas,
+                    "pessoas_juridicas": total_pessoas_juridicas,
+                    "nao_sincronizados": nao_sincronizados
+                },
+                "por_uf": [{"uf": uf, "total": total} for uf, total in uf_counts],
+                "por_regime": {
+                    "simples": db.session.query(ClienteFiscal).filter(
+                        ClienteFiscal.regime_tributario == '1',
+                        ClienteFiscal.ativo == True
+                    ).count(),
+                    "normal": db.session.query(ClienteFiscal).filter(
+                        ClienteFiscal.regime_tributario == '2',
+                        ClienteFiscal.ativo == True
+                    ).count(),
+                    "mei": db.session.query(ClienteFiscal).filter(
+                        ClienteFiscal.regime_tributario == '3',
+                        ClienteFiscal.ativo == True
+                    ).count()
+                }
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/clientes-fiscais/listar-nao-sincronizados', methods=['GET'])
+@admin_required
+def listar_clientes_nao_sincronizados():
+    """Lista clientes que não foram sincronizados"""
+    try:
+        skip = request.args.get('skip', 0, type=int)
+        limit = request.args.get('limit', 50, type=int)
+        
+        clientes = ClienteFiscalCRUD.listar_nao_sincronizados(db.session, skip, limit)
+        
+        return jsonify({
+            "success": True,
+            "data": [{
+                "id": c.id,
+                "cpf_cnpj": c.cpf_cnpj,
+                "nome_cliente": c.nome_cliente,
+                "tipo_cliente": c.tipo_cliente,
+                "municipio": c.municipio,
+                "uf": c.uf,
+                "criado_em": c.criado_em.isoformat() if c.criado_em else None,
+                "atualizado_em": c.atualizado_em.isoformat() if c.atualizado_em else None
+            } for c in clientes]
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/clientes-fiscais/exportar-nfe/<int:id>', methods=['GET'])
+@admin_required
+def exportar_cliente_para_nfe(id):
+    """Exporta cliente no formato esperado pela NFe"""
+    try:
+        cliente = ClienteFiscalCRUD.obter_por_id(db.session, id)
+        
+        if not cliente:
+            return jsonify({"success": False, "message": "Cliente fiscal não encontrado"}), 404
+        
+        # Valida antes de exportar
+        validacao = ClienteFiscalCRUD.validar_dados_nfe(cliente)
+        
+        if len(validacao['erros']) > 0:
+            return jsonify({
+                "success": False,
+                "message": "Cliente com dados inválidos para NFe",
+                "data": {
+                    "cliente_id": cliente.id,
+                    "cliente_nome": cliente.nome_cliente,
+                    "erros": validacao['erros'],
+                    "warnings": validacao['warnings']
+                }
+            }), 400
+        
+        nfe_data = cliente.to_nfe_dict()
+        
+        return jsonify({
+            "success": True,
+            "data": nfe_data
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
