@@ -84,6 +84,7 @@ function updatePageTitle(section) {
         'produtos-fiscais': 'Produtos Fiscais',
         'transportadoras': 'Transportadoras',
         'veiculos': 'Veículos de Transporte',
+        'clientes-fiscais': 'Clientes Fiscais',  // NOVO
         'historico': 'Histórico de Notas',
         'eventos': 'Eventos de Notas',
         'volumes': 'Volumes de Notas'
@@ -172,6 +173,11 @@ async function loadSectionData(section) {
                 if (document.getElementById('transportadora_id')) {
                     carregarTransportadorasParaSelect('transportadora_id');
                 }
+                break;
+            case 'clientes-fiscais':
+                data = await fetchData(`${API_BASE}/clientes-fiscais`);
+                renderClientesFiscais(data.data || []);
+                setupClientesFiscaisTabs();
                 break;
             // Adicionar outros casos conforme necessário
         }
@@ -2407,3 +2413,849 @@ function createModal(id, title, content) {
     return modal;
 }
 
+// ============================================
+// FUNÇÕES PARA CLIENTES FISCAIS
+// ============================================
+
+// Configurar tabs de clientes fiscais
+function setupClientesFiscaisTabs() {
+    const tabs = document.querySelectorAll('#clientes-fiscais .tab');
+    
+    tabs.forEach(tab => {
+        tab.addEventListener('click', async () => {
+            const tabId = tab.getAttribute('data-tab');
+            
+            // Atualizar tabs ativas
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Mostrar conteúdo da tab
+            document.querySelectorAll('#clientes-fiscais .tab-content').forEach(content => {
+                content.style.display = 'none';
+            });
+            document.getElementById(tabId).style.display = 'block';
+            
+            // Carregar dados específicos da tab
+            switch(tabId) {
+                case 'clientes-estatisticas':
+                    await carregarEstatisticasClientes();
+                    break;
+                case 'clientes-nao-sincronizados':
+                    await carregarClientesNaoSincronizados();
+                    break;
+            }
+        });
+    });
+}
+
+// Renderizar lista de clientes fiscais
+function renderClientesFiscais(clientes) {
+    const container = document.getElementById('clientes-list');
+    
+    if (!clientes || clientes.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-users"></i>
+                <h3>Nenhum cliente fiscal encontrado</h3>
+                <p>Clique em "Novo Cliente Fiscal" para começar</p>
+                <button class="btn btn-primary mt-2" onclick="showCreateClienteFiscalForm()">
+                    <i class="fas fa-plus"></i> Novo Cliente Fiscal
+                </button>
+            </div>
+        `;
+        return;
+    }
+
+    let html = `
+        <div class="table-container">
+            <div class="table-header">
+                <h3 class="table-title">Clientes Fiscais</h3>
+                <div class="table-actions">
+                    <button class="btn btn-primary" onclick="showCreateClienteFiscalForm()">
+                        <i class="fas fa-plus"></i> Novo Cliente Fiscal
+                    </button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome</th>
+                            <th>CPF/CNPJ</th>
+                            <th>Tipo</th>
+                            <th>Município/UF</th>
+                            <th>Telefone</th>
+                            <th>Status</th>
+                            <th>Sincronizado</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    clientes.forEach(cliente => {
+        // Formatar CPF/CNPJ
+        let documento = cliente.cpf_cnpj || '';
+        if (documento.length === 11) {
+            documento = formatCPF(documento);
+        } else if (documento.length === 14) {
+            documento = formatCNPJ(documento);
+        }
+        
+        // Formatar tipo
+        const tipo = cliente.tipo_cliente === 'fisica' ? 'Pessoa Física' : 'Pessoa Jurídica';
+        
+        // Formatar sincronizado
+        const sincronizadoStatus = cliente.sincronizado ? 'Sim' : 'Não';
+        const sincronizadoClass = cliente.sincronizado ? 'status-ativo' : 'status-inativo';
+
+        html += `
+            <tr>
+                <td>${cliente.id}</td>
+                <td>${cliente.nome_cliente}</td>
+                <td>${documento}</td>
+                <td>${tipo}</td>
+                <td>${cliente.municipio || ''}${cliente.uf ? '/' + cliente.uf : ''}</td>
+                <td>${cliente.telefone ? formatTelefone(cliente.telefone) : '-'}</td>
+                <td>
+                    <span class="status-badge ${cliente.ativo ? 'status-ativo' : 'status-inativo'}">
+                        ${cliente.ativo ? 'Ativo' : 'Inativo'}
+                    </span>
+                </td>
+                <td>
+                    <span class="status-badge ${sincronizadoClass}">
+                        ${sincronizadoStatus}
+                    </span>
+                </td>
+                <td>
+                    <div class="btn-group">
+                        <button class="btn btn-secondary btn-sm" onclick="editClienteFiscal(${cliente.id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        ${!cliente.sincronizado ? `
+                            <button class="btn btn-success btn-sm" onclick="marcarClienteSincronizado(${cliente.id})">
+                                <i class="fas fa-sync"></i>
+                            </button>
+                        ` : ''}
+                        <button class="btn btn-danger btn-sm" onclick="deleteClienteFiscal(${cliente.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+// Mostrar formulário de criação de cliente fiscal
+function showCreateClienteFiscalForm() {
+    const modal = document.getElementById('createClienteFiscalModal');
+    modal.querySelector('.modal-body').innerHTML = getClienteFiscalForm();
+    modal.classList.add('active');
+}
+
+// Obter formulário de cliente fiscal
+function getClienteFiscalForm(cliente = {}) {
+    const isEdit = !!cliente.id;
+    
+    return `
+        <form id="clienteFiscalForm" onsubmit="handleClienteFiscalSubmit(event, ${cliente.id || ''})">
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <h4>Identificação</h4>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="cpf_cnpj">CPF/CNPJ *</label>
+                    <input type="text" id="cpf_cnpj" name="cpf_cnpj" class="form-input" 
+                           value="${cliente.cpf_cnpj || ''}" required
+                           oninput="formatarDocumento(this)"
+                           placeholder="Digite CPF ou CNPJ">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="nome_cliente">Nome Completo/Razão Social *</label>
+                    <input type="text" id="nome_cliente" name="nome_cliente" class="form-input" 
+                           value="${cliente.nome_cliente || ''}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="nome_fantasia">Nome Fantasia</label>
+                    <input type="text" id="nome_fantasia" name="nome_fantasia" class="form-input" 
+                           value="${cliente.nome_fantasia || ''}">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="tipo_cliente">Tipo de Cliente *</label>
+                    <select id="tipo_cliente" name="tipo_cliente" class="form-input form-select" required>
+                        <option value="">Selecione</option>
+                        <option value="fisica" ${cliente.tipo_cliente === 'fisica' ? 'selected' : ''}>Pessoa Física</option>
+                        <option value="juridica" ${cliente.tipo_cliente === 'juridica' ? 'selected' : ''}>Pessoa Jurídica</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="regime_tributario">Regime Tributário *</label>
+                    <select id="regime_tributario" name="regime_tributario" class="form-input form-select" required>
+                        <option value="">Selecione</option>
+                        <option value="1" ${cliente.regime_tributario === '1' ? 'selected' : ''}>Simples Nacional</option>
+                        <option value="2" ${cliente.regime_tributario === '2' ? 'selected' : ''}>Normal (Lucro Presumido/Real)</option>
+                        <option value="3" ${cliente.regime_tributario === '3' ? 'selected' : ''}>MEI</option>
+                    </select>
+                </div>
+                
+                <div class="form-group full-width">
+                    <h4>Dados Fiscais</h4>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="indicador_ie">Indicador IE *</label>
+                    <select id="indicador_ie" name="indicador_ie" class="form-input form-select" required>
+                        <option value="">Selecione</option>
+                        <option value="1" ${cliente.indicador_ie === 1 ? 'selected' : ''}>Contribuinte ICMS</option>
+                        <option value="2" ${cliente.indicador_ie === 2 ? 'selected' : ''}>Isento de Inscrição</option>
+                        <option value="9" ${cliente.indicador_ie === 9 ? 'selected' : ''}>Não Contribuinte</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="inscricao_estadual">Inscrição Estadual</label>
+                    <input type="text" id="inscricao_estadual" name="inscricao_estadual" class="form-input" 
+                           value="${cliente.inscricao_estadual || ''}">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="inscricao_municipal">Inscrição Municipal *</label>
+                    <input type="text" id="inscricao_municipal" name="inscricao_municipal" class="form-input" 
+                           value="${cliente.inscricao_municipal || ''}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="inscricao_suframa">Inscrição SUFRAMA *</label>
+                    <input type="text" id="inscricao_suframa" name="inscricao_suframa" class="form-input" 
+                           value="${cliente.inscricao_suframa || ''}" required>
+                </div>
+                
+                <div class="form-group full-width">
+                    <h4>Endereço</h4>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="cep">CEP *</label>
+                    <input type="text" id="cep" name="cep" class="form-input" 
+                           value="${cliente.endereco?.cep || cliente.cep || ''}" required
+                           oninput="formatarCEP(this)"
+                           placeholder="00000-000">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="logradouro">Logradouro *</label>
+                    <input type="text" id="logradouro" name="logradouro" class="form-input" 
+                           value="${cliente.endereco?.logradouro || cliente.logradouro || ''}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="numero">Número *</label>
+                    <input type="text" id="numero" name="numero" class="form-input" 
+                           value="${cliente.endereco?.numero || cliente.numero || ''}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="complemento">Complemento</label>
+                    <input type="text" id="complemento" name="complemento" class="form-input" 
+                           value="${cliente.endereco?.complemento || cliente.complemento || ''}">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="bairro">Bairro *</label>
+                    <input type="text" id="bairro" name="bairro" class="form-input" 
+                           value="${cliente.endereco?.bairro || cliente.bairro || ''}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="municipio">Município *</label>
+                    <input type="text" id="municipio" name="municipio" class="form-input" 
+                           value="${cliente.endereco?.municipio || cliente.municipio || ''}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="codigo_municipio">Código do Município (IBGE) *</label>
+                    <input type="text" id="codigo_municipio" name="codigo_municipio" class="form-input" 
+                           value="${cliente.endereco?.codigo_municipio || cliente.codigo_municipio || ''}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="uf">UF *</label>
+                    <select id="uf" name="uf" class="form-input form-select" required>
+                        <option value="">Selecione</option>
+                        ${getUFOptions(cliente.endereco?.uf || cliente.uf || '')}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="codigo_pais">Código País *</label>
+                    <input type="number" id="codigo_pais" name="codigo_pais" class="form-input" 
+                           value="${cliente.endereco?.codigo_pais || cliente.codigo_pais || '1058'}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="pais">País *</label>
+                    <input type="text" id="pais" name="pais" class="form-input" 
+                           value="${cliente.endereco?.pais || cliente.pais || 'BRASIL'}" required>
+                </div>
+                
+                <div class="form-group full-width">
+                    <h4>Contato</h4>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="telefone">Telefone *</label>
+                    <input type="text" id="telefone" name="telefone" class="form-input" 
+                           value="${cliente.contato?.telefone || cliente.telefone || ''}" required
+                           oninput="formatarTelefone(this)">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="celular">Celular *</label>
+                    <input type="text" id="celular" name="celular" class="form-input" 
+                           value="${cliente.contato?.celular || cliente.celular || ''}" required
+                           oninput="formatarTelefone(this)">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="email">Email *</label>
+                    <input type="email" id="email" name="email" class="form-input" 
+                           value="${cliente.contato?.email || cliente.email || ''}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="fax">Fax</label>
+                    <input type="text" id="fax" name="fax" class="form-input" 
+                           value="${cliente.contato?.fax || cliente.fax || ''}">
+                </div>
+                
+                <div class="form-group full-width">
+                    <h4>Informações Adicionais</h4>
+                </div>
+                
+                <div class="form-group full-width">
+                    <label class="form-label" for="observacoes">Observações</label>
+                    <textarea id="observacoes" name="observacoes" class="form-input" rows="3"
+                              placeholder="Informações adicionais sobre o cliente...">${cliente.observacoes || ''}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="ativo">Status</label>
+                    <select id="ativo" name="ativo" class="form-input form-select">
+                        <option value="true" ${cliente.ativo !== false ? 'selected' : ''}>Ativo</option>
+                        <option value="false" ${cliente.ativo === false ? 'selected' : ''}>Inativo</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="sincronizado">Sincronizado</label>
+                    <select id="sincronizado" name="sincronizado" class="form-input form-select">
+                        <option value="false" ${!cliente.sincronizado ? 'selected' : ''}>Não Sincronizado</option>
+                        <option value="true" ${cliente.sincronizado ? 'selected' : ''}>Sincronizado</option>
+                    </select>
+                </div>
+                
+                <div class="form-group full-width">
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('createClienteFiscalModal')">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> ${isEdit ? 'Atualizar' : 'Salvar'} Cliente
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    `;
+}
+
+// Funções auxiliares para formatação
+function formatarDocumento(input) {
+    let valor = input.value.replace(/\D/g, '');
+    
+    if (valor.length <= 11) {
+        // Formata CPF
+        input.value = valor.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    } else {
+        // Formata CNPJ
+        input.value = valor.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+    }
+}
+
+function formatarCEP(input) {
+    let valor = input.value.replace(/\D/g, '');
+    if (valor.length > 5) {
+        input.value = valor.replace(/(\d{5})(\d{3})/, '$1-$2');
+    }
+}
+
+function formatarTelefone(input) {
+    let valor = input.value.replace(/\D/g, '');
+    
+    if (valor.length === 10) {
+        input.value = valor.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+    } else if (valor.length === 11) {
+        input.value = valor.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    }
+}
+
+// Manipular envio do formulário de cliente fiscal
+async function handleClienteFiscalSubmit(event, id = null) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+    
+    // Remover formatação dos campos
+    data.cpf_cnpj = data.cpf_cnpj.replace(/\D/g, '');
+    data.cep = data.cep.replace(/\D/g, '');
+    data.telefone = data.telefone.replace(/\D/g, '');
+    data.celular = data.celular.replace(/\D/g, '');
+    data.fax = data.fax ? data.fax.replace(/\D/g, '') : '';
+    
+    // Converter string para boolean e number
+    data.ativo = data.ativo === 'true';
+    data.sincronizado = data.sincronizado === 'true';
+    data.indicador_ie = parseInt(data.indicador_ie);
+    data.codigo_pais = parseInt(data.codigo_pais);
+    
+    // Converter string vazia para null
+    Object.keys(data).forEach(key => {
+        if (data[key] === '') {
+            data[key] = null;
+        }
+    });
+    
+    try {
+        let response;
+        if (id) {
+            // Atualização
+            response = await fetchData(`${API_BASE}/clientes-fiscais/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+            showAlert('Cliente fiscal atualizado com sucesso!', 'success');
+        } else {
+            // Criação
+            response = await fetchData(`${API_BASE}/clientes-fiscais`, {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            showAlert('Cliente fiscal criado com sucesso!', 'success');
+        }
+        
+        closeModal('createClienteFiscalModal');
+        loadSectionData(currentSection);
+    } catch (error) {
+        showAlert(id ? 'Erro ao atualizar cliente fiscal' : 'Erro ao criar cliente fiscal', 'danger');
+        console.error('Erro detalhado:', error);
+    }
+}
+
+// Editar cliente fiscal
+async function editClienteFiscal(id) {
+    try {
+        const response = await fetchData(`${API_BASE}/clientes-fiscais/${id}`);
+        const cliente = response.data;
+        
+        // Formatar campos para exibição
+        if (cliente.cpf_cnpj) {
+            if (cliente.cpf_cnpj.length === 11) {
+                cliente.cpf_cnpj = formatCPF(cliente.cpf_cnpj);
+            } else if (cliente.cpf_cnpj.length === 14) {
+                cliente.cpf_cnpj = formatCNPJ(cliente.cpf_cnpj);
+            }
+        }
+        
+        if (cliente.cep) {
+            cliente.cep = formatCEP(cliente.cep);
+        }
+        
+        if (cliente.telefone) {
+            cliente.telefone = formatTelefone(cliente.telefone);
+        }
+        
+        if (cliente.celular) {
+            cliente.celular = formatTelefone(cliente.celular);
+        }
+        
+        const modal = document.getElementById('createClienteFiscalModal');
+        modal.querySelector('.modal-title').textContent = 'Editar Cliente Fiscal';
+        modal.querySelector('.modal-body').innerHTML = getClienteFiscalForm(cliente);
+        
+        modal.classList.add('active');
+    } catch (error) {
+        showAlert('Erro ao carregar cliente fiscal', 'danger');
+    }
+}
+
+// Excluir cliente fiscal
+async function deleteClienteFiscal(id) {
+    if (!confirm('Tem certeza que deseja desativar este cliente fiscal?')) {
+        return;
+    }
+    
+    try {
+        await fetchData(`${API_BASE}/clientes-fiscais/${id}`, {
+            method: 'DELETE'
+        });
+        
+        showAlert('Cliente fiscal desativado com sucesso!', 'success');
+        loadSectionData(currentSection);
+    } catch (error) {
+        showAlert('Erro ao desativar cliente fiscal', 'danger');
+    }
+}
+
+// Marcar cliente como sincronizado
+async function marcarClienteSincronizado(id) {
+    if (!confirm('Deseja marcar este cliente como sincronizado?')) {
+        return;
+    }
+    
+    try {
+        await fetchData(`${API_BASE}/clientes-fiscais/${id}/marcar-sincronizado`, {
+            method: 'POST'
+        });
+        
+        showAlert('Cliente marcado como sincronizado com sucesso!', 'success');
+        loadSectionData(currentSection);
+    } catch (error) {
+        showAlert('Erro ao marcar cliente como sincronizado', 'danger');
+    }
+}
+
+// Buscar clientes fiscais
+async function buscarClientesFiscais() {
+    try {
+        const termo = document.getElementById('buscar-cliente-fiscal').value.trim();
+        
+        if (!termo) {
+            showAlert('Digite um termo para buscar', 'warning');
+            return;
+        }
+        
+        const response = await fetchData(`${API_BASE}/clientes-fiscais/buscar?termo=${encodeURIComponent(termo)}&limit=20`);
+        const clientes = response.data || [];
+        const container = document.getElementById('resultados-busca-clientes-fiscais');
+        
+        if (!clientes.length) {
+            container.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    Nenhum cliente encontrado para "${termo}"
+                </div>
+            `;
+            return;
+        }
+        
+        let html = `
+            <div class="table-container">
+                <h4>Resultados da Busca (${clientes.length} encontrados)</h4>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nome</th>
+                                <th>CPF/CNPJ</th>
+                                <th>Tipo</th>
+                                <th>Município/UF</th>
+                                <th>Telefone</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+        
+        clientes.forEach(cliente => {
+            let documento = cliente.cpf_cnpj || '';
+            if (documento.length === 11) {
+                documento = formatCPF(documento);
+            } else if (documento.length === 14) {
+                documento = formatCNPJ(documento);
+            }
+            
+            const tipo = cliente.tipo_cliente === 'fisica' ? 'Pessoa Física' : 'Pessoa Jurídica';
+            
+            html += `
+                <tr>
+                    <td>${cliente.id}</td>
+                    <td>${cliente.nome_cliente}</td>
+                    <td>${documento}</td>
+                    <td>${tipo}</td>
+                    <td>${cliente.endereco.municipio || ''}${cliente.endereco.uf ? '/' + cliente.endereco.uf : ''}</td>
+                    <td>${cliente.contato.celular ? formatTelefone(cliente.contato.celular) : '-'}</td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" onclick="editClienteFiscal(${cliente.id})">
+                            <i class="fas fa-edit"></i> Editar
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        
+    } catch (error) {
+        showAlert('Erro ao buscar clientes fiscais', 'danger');
+    }
+}
+
+// Carregar estatísticas de clientes
+async function carregarEstatisticasClientes() {
+    try {
+        const response = await fetchData(`${API_BASE}/clientes-fiscais/estatisticas`);
+        const estatisticas = response.data;
+        
+        const container = document.getElementById('estatisticas-clientes');
+        
+        let html = `
+            <div class="dashboard-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Clientes Ativos</h3>
+                        <div class="card-icon">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="card-stat">${estatisticas.totais.ativos || 0}</div>
+                        <p>Clientes ativos no sistema</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Clientes Inativos</h3>
+                        <div class="card-icon">
+                            <i class="fas fa-user-times"></i>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="card-stat">${estatisticas.totais.inativos || 0}</div>
+                        <p>Clientes inativos no sistema</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Pessoas Físicas</h3>
+                        <div class="card-icon">
+                            <i class="fas fa-user"></i>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="card-stat">${estatisticas.totais.pessoas_fisicas || 0}</div>
+                        <p>Clientes pessoas físicas</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Pessoas Jurídicas</h3>
+                        <div class="card-icon">
+                            <i class="fas fa-building"></i>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="card-stat">${estatisticas.totais.pessoas_juridicas || 0}</div>
+                        <p>Clientes pessoas jurídicas</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-container mt-4">
+                <h3>Distribuição por UF</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>UF</th>
+                            <th>Total de Clientes</th>
+                            <th>Percentual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        const totalGeral = estatisticas.totais.ativos + estatisticas.totais.inativos;
+        
+        estatisticas.por_uf.forEach(item => {
+            const percentual = totalGeral > 0 ? ((item.total / totalGeral) * 100).toFixed(1) : 0;
+            
+            html += `
+                <tr>
+                    <td>${item.uf}</td>
+                    <td>${item.total}</td>
+                    <td>${percentual}%</td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        
+    } catch (error) {
+        showAlert('Erro ao carregar estatísticas de clientes', 'danger');
+    }
+}
+
+// Carregar clientes não sincronizados
+async function carregarClientesNaoSincronizados() {
+    try {
+        const response = await fetchData(`${API_BASE}/clientes-fiscais/listar-nao-sincronizados`);
+        const clientes = response.data || [];
+        
+        const container = document.getElementById('lista-clientes-nao-sincronizados');
+        
+        if (!clientes.length) {
+            container.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i>
+                    Todos os clientes estão sincronizados!
+                </div>
+            `;
+            return;
+        }
+        
+        let html = `
+            <div class="table-container">
+                <div class="table-header">
+                    <h3 class="table-title">Clientes Não Sincronizados</h3>
+                    <div class="table-actions">
+                        <button class="btn btn-success" onclick="marcarTodosSincronizados()">
+                            <i class="fas fa-sync"></i> Marcar Todos Sincronizados
+                        </button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>
+                                    <input type="checkbox" id="select-all-clientes" onchange="selecionarTodosClientes(this.checked)">
+                                </th>
+                                <th>ID</th>
+                                <th>Nome</th>
+                                <th>CPF/CNPJ</th>
+                                <th>Tipo</th>
+                                <th>Município/UF</th>
+                                <th>Criado em</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+        
+        clientes.forEach(cliente => {
+            let documento = cliente.cpf_cnpj || '';
+            if (documento.length === 11) {
+                documento = formatCPF(documento);
+            } else if (documento.length === 14) {
+                documento = formatCNPJ(documento);
+            }
+            
+            const tipo = cliente.tipo_cliente === 'fisica' ? 'Pessoa Física' : 'Pessoa Jurídica';
+            
+            html += `
+                <tr>
+                    <td>
+                        <input type="checkbox" class="cliente-checkbox" value="${cliente.id}">
+                    </td>
+                    <td>${cliente.id}</td>
+                    <td>${cliente.nome_cliente}</td>
+                    <td>${documento}</td>
+                    <td>${tipo}</td>
+                    <td>${cliente.municipio || ''}${cliente.uf ? '/' + cliente.uf : ''}</td>
+                    <td>${formatDate(cliente.criado_em)}</td>
+                    <td>
+                        <div class="btn-group">
+                            <button class="btn btn-secondary btn-sm" onclick="editClienteFiscal(${cliente.id})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-success btn-sm" onclick="marcarClienteSincronizado(${cliente.id})">
+                                <i class="fas fa-sync"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        
+    } catch (error) {
+        showAlert('Erro ao carregar clientes não sincronizados', 'danger');
+    }
+}
+
+// Selecionar todos os clientes
+function selecionarTodosClientes(checked) {
+    const checkboxes = document.querySelectorAll('.cliente-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = checked;
+    });
+}
+
+// Marcar todos os clientes selecionados como sincronizados
+async function marcarTodosSincronizados() {
+    const checkboxes = document.querySelectorAll('.cliente-checkbox:checked');
+    const ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
+    
+    if (ids.length === 0) {
+        showAlert('Selecione pelo menos um cliente para marcar como sincronizado', 'warning');
+        return;
+    }
+    
+    if (!confirm(`Deseja marcar ${ids.length} cliente(s) como sincronizado(s)?`)) {
+        return;
+    }
+    
+    try {
+        await fetchData(`${API_BASE}/clientes-fiscais/sincronizados/marcar-multiplos`, {
+            method: 'POST',
+            body: JSON.stringify({ ids: ids })
+        });
+        
+        showAlert(`${ids.length} cliente(s) marcado(s) como sincronizado(s) com sucesso!`, 'success');
+        await carregarClientesNaoSincronizados();
+    } catch (error) {
+        showAlert('Erro ao marcar clientes como sincronizados', 'danger');
+    }
+}

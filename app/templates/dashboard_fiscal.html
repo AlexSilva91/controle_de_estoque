@@ -64,6 +64,12 @@
                             Veículos
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a href="#clientes-fiscais" class="nav-link" data-section="clientes-fiscais">
+                            <i class="fas fa-users"></i>
+                            Clientes Fiscais
+                        </a>
+                    </li>
                 </ul>
             </div>
 
@@ -300,7 +306,48 @@
                     <div id="lista-veiculos-transp" class="mt-3"></div>
                 </div>
             </section>
+            <!-- Seção Clientes Fiscais -->
+            <section id="clientes-fiscais" class="section" style="display: none;">
+                <div class="tabs">
+                    <button class="tab active" data-tab="clientes-list">Listar Clientes</button>
+                    <button class="tab" data-tab="clientes-buscar">Buscar Clientes</button>
+                    <button class="tab" data-tab="clientes-estatisticas">Estatísticas</button>
+                    <button class="tab" data-tab="clientes-nao-sincronizados">Não Sincronizados</button>
+                </div>
 
+                <!-- Lista de Clientes -->
+                <div class="tab-content" id="clientes-list" style="display: block;">
+                    <!-- Conteúdo carregado dinamicamente via JavaScript -->
+                </div>
+
+                <!-- Buscar Clientes -->
+                <div class="tab-content" id="clientes-buscar" style="display: none;">
+                    <div class="search-container">
+                        <div class="form-group">
+                            <input type="text" id="buscar-cliente-fiscal" class="form-input" 
+                                placeholder="Buscar por nome, CPF/CNPJ...">
+                            <button class="btn btn-primary" onclick="buscarClientesFiscais()">
+                                <i class="fas fa-search"></i> Buscar
+                            </button>
+                        </div>
+                        <div id="resultados-busca-clientes-fiscais" class="mt-3"></div>
+                    </div>
+                </div>
+
+                <!-- Estatísticas -->
+                <div class="tab-content" id="clientes-estatisticas" style="display: none;">
+                    <div id="estatisticas-clientes">
+                        <!-- Carregado via JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Clientes Não Sincronizados -->
+                <div class="tab-content" id="clientes-nao-sincronizados" style="display: none;">
+                    <div id="lista-clientes-nao-sincronizados">
+                        <!-- Carregado via JavaScript -->
+                    </div>
+                </div>
+            </section>
             <!-- Histórico Section -->
             <section id="historico" class="section" style="display: none;">
                 <div class="tabs">
@@ -524,7 +571,20 @@
                     </div>
                 </div>
             </div>
-
+            <!-- Modal para Novo Cliente Fiscal -->
+            <div class="modal-overlay" id="createClienteFiscalModal">
+                <div class="modal modal-lg">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Novo Cliente Fiscal</h3>
+                        <button class="modal-close" onclick="closeModal('createClienteFiscalModal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Formulário será inserido aqui via JavaScript -->
+                    </div>
+                </div>
+            </div>
             <!-- Modal para Registrar Evento -->
             <div class="modal-overlay" id="createEventoModal">
                 <div class="modal">
