@@ -140,7 +140,7 @@ def setup_security_headers(app):
         
         # Log para debug
         if app.debug:
-            current_app.logger.info("✅ CSP Universal aplicado")
+            current_app.logger.info("CSP Universal aplicado")
             current_app.logger.debug(f"CSP: {csp_header[:200]}...")
         
         return response
