@@ -121,9 +121,6 @@ class ClienteFiscalCRUD:
             Optional[ClienteFiscal]: Cliente encontrado ou None
         """
         query = db.query(ClienteFiscal).filter(ClienteFiscal.id == id)
-        
-        if ativo:
-            query = query.filter(ClienteFiscal.ativo == True)
             
         return query.first()
     
@@ -144,9 +141,6 @@ class ClienteFiscalCRUD:
         cpf_cnpj_limpo = ''.join(filter(str.isdigit, cpf_cnpj))
         
         query = db.query(ClienteFiscal).filter(ClienteFiscal.cpf_cnpj == cpf_cnpj_limpo)
-        
-        if ativo:
-            query = query.filter(ClienteFiscal.ativo == True)
             
         return query.first()
     
@@ -172,9 +166,6 @@ class ClienteFiscalCRUD:
                 ClienteFiscal.nome_fantasia.ilike(f"%{nome}%")
             )
         )
-        
-        if ativo:
-            query = query.filter(ClienteFiscal.ativo == True)
         
         return query.order_by(ClienteFiscal.nome_cliente)\
                    .offset(skip)\
