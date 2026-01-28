@@ -34,12 +34,12 @@ Projetado para uso em lojas e pequenos comércios, oferece controle financeiro, 
 ## 🧰 Tecnologias Utilizadas
 
 | Camada | Tecnologias |
-|--------|--------------|
+| --- | --- |
 | **🎨 Front-end** | ![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white) ![CSS3](https://img.shields.io/badge/CSS3-1572B6?logo=css3&logoColor=white) ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black) |
 | **⚙️ Back-end** | ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54) ![Flask](https://img.shields.io/badge/flask-%23000.svg?style=for-the-badge&logo=flask&logoColor=white) |
 | **🗄️ Banco de Dados** | ![MySQL](https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white) |
 | **🔌 APIs** | ![REST](https://img.shields.io/badge/REST-009688?logo=fastapi&logoColor=white) Flask Blueprint (`operador`, `admin`, `auth`, `fiscal`) |
-| **🧩 Outros** | ![Fetch API](https://img.shields.io/badge/Fetch_API-303030?logo=javascript&logoColor=white) ![Jinja2](https://img.shields.io/badge/Jinja2-B41717?logo=jinja&logoColor=white) ![ReportLab](https://img.shields.io/badge/ReportLab-FF6F00?logo=python&logoColor=white) ![Gunicorn](https://img.shields.io/badge/gunicorn-%298729.svg?style=for-the-badge&logo=gunicorn&logoColor=white) ![Nginx](https://img.shields.io/badge/nginx-%23009639.svg?style=for-the-badge&logo=nginx&logoColor=white)|
+| **🧩 Outros** | ![Fetch API](https://img.shields.io/badge/Fetch_API-303030?logo=javascript&logoColor=white) ![Jinja2](https://img.shields.io/badge/Jinja2-B41717?logo=jinja&logoColor=white) ![ReportLab](https://img.shields.io/badge/ReportLab-FF6F00?logo=python&logoColor=white) ![Gunicorn](https://img.shields.io/badge/gunicorn-%298729.svg?style=for-the-badge&logo=gunicorn&logoColor=white) ![Nginx](https://img.shields.io/badge/nginx-%23009639.svg?style=for-the-badge&logo=nginx&logoColor=white) |
 
 ---
 
@@ -170,12 +170,14 @@ controle_de_estoque
 ### 🚀 Passos de Execução
 
 1. **Clone o repositório**
+
    ```bash
    git clone git@github.com:AlexSilva91/controle_de_estoque.git
    cd controle_de_estoque
    ```
 
 2. **Crie e ative um ambiente virtual**
+
    ```bash
    python3 -m venv venv
    source venv/bin/activate     # Linux/macOS
@@ -183,17 +185,20 @@ controle_de_estoque
    ```
 
 3. **Instale as dependências**
+
    ```bash
    pip install -r requirements.txt
    ```
 
 4. **Execute o servidor**
+
    ```bash
    flask run # ou python3 wsgi.py
    ```
 
 5. **Acesse no navegador**
-   ```
+
+   ```bash
    http://127.0.0.1:5000/
    ```
 

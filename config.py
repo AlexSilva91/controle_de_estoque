@@ -13,7 +13,6 @@ class Config:
     # ==========================
     # CONFIGURAÇÕES DE UPLOAD (FORA DA PASTA APP)
     # ==========================
-    # Diretório base para uploads (agora no diretório raiz)
     UPLOAD_BASE_DIR = os.path.join(basedir, "uploads")
     
     # Pastas específicas
@@ -25,7 +24,6 @@ class Config:
     ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB máximo
 
-    # Dicionário para referência fácil
     UPLOAD_PATHS = {
         "produtos": UPLOAD_FOLDER,
         "avatars": AVATAR_FOLDER,
@@ -38,6 +36,23 @@ class Config:
     API_FISCAL_TOKEN = os.getenv("API_FISCAL_TOKEN")
     API_FISCAL_AMBIENTE = int(os.getenv("API_FISCAL_AMBIENTE", 2))
 
+    # ==========================
+    # CONFIGURAÇÕES DE SEGURANÇA
+    # ==========================
+    SECURITY_ENABLED = True
+    SECURITY_FEATURES = ['headers']
+    
+    # Rate Limiting
+    RATE_LIMIT_ENABLED = False  # Desativado inicialmente
+    RATE_LIMIT_DEFAULT = "200 per day"
+    
+    # Validação
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024
+    ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "pdf"}
+    
+    # CORS (se necessário)
+    CORS_ORIGINS = []  # Lista de origens permitidas
+
 class DevelopmentConfig(Config):
     DEBUG = True
     SQLALCHEMY_DATABASE_URI = (
@@ -47,6 +62,16 @@ class DevelopmentConfig(Config):
     )
     
     API_FISCAL_AMBIENTE = 2
+
+class TestingConfig(Config):
+    TESTING = True
+    DEBUG = True
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'  # Ou use seu banco de teste
+    SECRET_KEY = 'test-secret-key'
+    WTF_CSRF_ENABLED = False  # Desabilita CSRF para testes
+    
+    # Headers mais permissivos para testes
+    SECURITY_FEATURES = ['headers']
 
 class ProductionConfig(Config):
     SQLALCHEMY_DATABASE_URI = (
@@ -60,5 +85,6 @@ class ProductionConfig(Config):
 config = {
     "development": DevelopmentConfig,
     "production": ProductionConfig,
+    "testing": TestingConfig, 
     "default": DevelopmentConfig,
 }

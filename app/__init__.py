@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import time
 import logging
@@ -15,9 +16,81 @@ from app.utils.format_data_moeda import (
     formatar_data_br2,
 )
 from .routes import init_app
+from app.security import security
 import json
+import werkzeug.serving
+import flask
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
+
+
+# ==========================
+# MONKEY PATCH DEFINITIVO PARA REMOVER SERVER HEADER
+# ==========================
+def apply_server_header_fix():
+    """
+    Aplica monkey patch no Werkzeug e Flask para nunca enviar Server header.
+    Esta função DEVE ser chamada ANTES de criar o app Flask.
+    """
+    
+    # ============================================
+    # 1. PATCH NO WSGIRequestHandler DO WERKZEUG
+    # ============================================
+    class NoServerHeaderWSGIRequestHandler(werkzeug.serving.WSGIRequestHandler):
+        """Request Handler que NÃO envia Server header"""
+        
+        def send_response(self, code, message=None):
+            """Envia resposta sem Server header"""
+            super().send_response(code, message)
+            
+            # Remove Server header ANTES de enviar
+            if 'Server' in self.headers:
+                del self.headers['Server']
+        
+        def version_string(self):
+            """Override para retornar string de versão vazia"""
+            return ""
+        
+        def log_request(self, code='-', size='-'):
+            """Override do logging simplificado"""
+            if hasattr(self, 'log'):
+                self.log('info', '"%s" %s %s',
+                        self.requestline, str(code), str(size))
+    
+    # Aplica o patch globalmente
+    werkzeug.serving.WSGIRequestHandler = NoServerHeaderWSGIRequestHandler
+    
+    # ============================================
+    # 2. PATCH NA CLASSE Response DO WERKZEUG
+    # ============================================
+    from werkzeug.wrappers import Response
+    
+    original_response_init = Response.__init__
+    
+    def patched_response_init(self, *args, **kwargs):
+        # Chama o construtor original
+        original_response_init(self, *args, **kwargs)
+        
+        # Remove Server header imediatamente após criação
+        self.headers.pop('Server', None)
+        self.headers.pop('X-Powered-By', None)
+    
+    Response.__init__ = patched_response_init
+    
+    # ============================================
+    # 3. PATCH NO make_response DO FLASK
+    # ============================================
+    original_make_response = flask.make_response
+    
+    def patched_make_response(*args, **kwargs):
+        response = original_make_response(*args, **kwargs)
+        response.headers.pop('Server', None)
+        response.headers.pop('X-Powered-By', None)
+        return response
+    
+    flask.make_response = patched_make_response
+    
+    return True
 
 
 # ==========================
@@ -147,9 +220,22 @@ def create_upload_folders(app: Flask):
 # APPLICATION FACTORY
 # ==========================
 def create_app(config_name="development") -> Flask:
+    # ==========================
+    # APLICA FIX DO SERVER HEADER ANTES DE CRIAR O APP
+    # ==========================
+    apply_server_header_fix()
+    
+    # Cria o app Flask
     app = Flask(__name__)
+    
+    # Log imediatamente após criar o app
+    temp_logger = logging.getLogger(__name__)
+    temp_logger.info("✅ Monkey patch aplicado: Server header será removido")
+    
+    # Configurações
     app.config.from_object(config[config_name])
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
+    app.config['SERVER_NAME'] = None 
     app.jinja_env.cache = {}
     app.jinja_env.filters["moeda_br"] = format_currency
     app.jinja_env.filters["data_br"] = formatar_data_br
@@ -178,6 +264,64 @@ def create_app(config_name="development") -> Flask:
 
     # Rotas principais
     init_app(app)
+    
+    # ==========================
+    # MIDDLEWARES DE SEGURANÇA (ORDEM CRÍTICA)
+    # Flask executa @app.after_request na ORDEM INVERSA de definição
+    # ==========================
+    
+    # 1. Cache headers (definido PRIMEIRO, executado ÚLTIMO)
+    @app.after_request
+    def add_no_cache_headers(response):
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, must-revalidate, max-age=0, private"
+        )
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+    
+    # 2. Módulo de segurança
+    security.init_app(app, features=['headers'])
+    
+    # 3. Middleware final para garantia (definido ÚLTIMO, executado PRIMEIRO)
+    @app.after_request
+    def final_security_check(response):
+        """Garantia final - remove qualquer header que tenha escapado"""
+        # Remove headers que expõem informações
+        headers_to_remove = ['Server', 'X-Powered-By', 'X-Runtime']
+        for header in headers_to_remove:
+            response.headers.pop(header, None)
+        
+        # Verifica se todos os headers de segurança estão presentes
+        required_headers = {
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'SAMEORIGIN',
+            'X-XSS-Protection': '1; mode=block',
+            'Referrer-Policy': 'strict-origin-when-cross-origin',
+            'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+        }
+        
+        for header, value in required_headers.items():
+            if response.headers.get(header) != value:
+                response.headers[header] = value
+        
+        # Garante CSP
+        if not response.headers.get('Content-Security-Policy'):
+            csp_parts = [
+                "default-src 'self'",
+                "script-src 'self' 'unsafe-inline'",
+                "style-src 'self' 'unsafe-inline'",
+                "img-src 'self' data: blob:",
+                "font-src 'self'",
+                "connect-src 'self'",
+                "frame-ancestors 'self'",
+                "object-src 'none'",
+                "base-uri 'self'",
+                "form-action 'self'",
+            ]
+            response.headers['Content-Security-Policy'] = '; '.join(csp_parts)
+        
+        return response
 
     # Favicon
     @app.route("/favicon.ico")
@@ -187,16 +331,6 @@ def create_app(config_name="development") -> Flask:
             "favicon.ico",
             mimetype="image/vnd.microsoft.icon",
         )
-
-    # Cache headers
-    @app.after_request
-    def add_no_cache_headers(response):
-        response.headers["Cache-Control"] = (
-            "no-store, no-cache, must-revalidate, max-age=0, private"
-        )
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
-        return response
 
     # Uploads públicos
     @app.route("/uploads/<path:filename>")
@@ -257,6 +391,69 @@ def create_app(config_name="development") -> Flask:
 
         return json.dumps(status, indent=2)
 
+    @app.route('/security-test')
+    def security_test():
+        """Rota para testar headers de segurança - retorna JSON correto"""
+        from flask import jsonify, request
+        import json
+        
+        # Faz uma requisição interna para verificar os headers
+        with app.test_client() as client:
+            test_response = client.get('/')
+        
+        security_info = {
+            'test': 'Security Headers Verification',
+            'timestamp': datetime.now().isoformat(),
+            'note': 'Check actual response headers with: curl -I http://localhost:5000',
+            'expected_headers': {
+                'X-Content-Type-Options': 'nosniff',
+                'X-Frame-Options': 'SAMEORIGIN', 
+                'X-XSS-Protection': '1; mode=block',
+                'Referrer-Policy': 'strict-origin-when-cross-origin',
+                'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+                'Content-Security-Policy': 'Present',
+                'Server': 'Hidden (should not appear)',
+                'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0, private',
+            },
+            'actual_headers_from_root': dict(test_response.headers),
+            'your_request': {
+                'ip': request.remote_addr,
+                'user_agent': request.headers.get('User-Agent'),
+                'method': request.method,
+                'path': request.path,
+            },
+            'security_score': {
+                'total_headers': 8,
+                'present_headers': sum(1 for h in [
+                    'X-Content-Type-Options',
+                    'X-Frame-Options', 
+                    'X-XSS-Protection',
+                    'Referrer-Policy',
+                    'Permissions-Policy',
+                    'Content-Security-Policy',
+                    'Cache-Control'
+                ] if test_response.headers.get(h)),
+                'server_exposed': 'Server' in test_response.headers
+            }
+        }
+        
+        # Retorna como JSON correto usando jsonify
+        return jsonify(security_info)
+
+    @app.context_processor
+    def inject_security_status():
+        """Injeta status de segurança no template (apenas para admin)"""
+        def check_security_headers():
+            from flask import request
+            return {
+                'X-Content-Type-Options': request.headers.get('X-Content-Type-Options'),
+                'X-Frame-Options': request.headers.get('X-Frame-Options'),
+                'X-XSS-Protection': request.headers.get('X-XSS-Protection'),
+                'Content-Security-Policy': request.headers.get('Content-Security-Policy'),
+            }
+        
+        return dict(security_headers=check_security_headers)
+    
     # ==========================
     # ERROR HANDLERS
     # ==========================
