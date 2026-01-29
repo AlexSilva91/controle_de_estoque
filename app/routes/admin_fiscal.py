@@ -1006,6 +1006,7 @@ def criar_veiculo():
     """Cria um novo veículo de transporte"""
     try:
         dados = request.get_json()
+        print(dados)
         if not dados:
             return jsonify({"success": False, "message": "Dados não fornecidos"}), 400
         

@@ -273,8 +273,17 @@ class NFeHelpers:
     
     @staticmethod
     def validar_placa(placa: str) -> bool:
-        """Valida formato da placa (antigo ou Mercosul)"""
+        """Valida formato da placa (antigo ou Mercosul) usando o padrão correto"""
+        if not placa:
+            return False
+        
         placa_limpa = placa.upper().replace('-', '').replace(' ', '')
+        
+        # Deve ter exatamente 7 caracteres
+        if len(placa_limpa) != 7:
+            return False
+        
+        # Padrão exato: antigo (ABC1234) ou Mercosul (ABC1D23)
         return bool(NFeHelpers.PLACA_PATTERN.match(placa_limpa))
     
     # ============================================
@@ -386,13 +395,26 @@ class NFeHelpers:
         dados_tratados = dados.copy()
         
         # Formata placa
-        if 'placa' in dados_tratados:
+        if 'placa' in dados_tratados and dados_tratados['placa']:
             placa = dados_tratados['placa'].upper().replace('-', '').replace(' ', '')
+            
+            # Tenta corrigir placas de 6 caracteres para 7
+            if len(placa) == 6:
+                # Pode ser formato antigo incompleto: ABC123 -> ABC0123
+                # Verifica se os primeiros 3 são letras e os últimos 3 são números
+                if placa[:3].isalpha() and placa[3:].isdigit():
+                    placa = placa[:3] + '0' + placa[3:]  # ABC123 -> ABC0123
+                    print(f"[INFO] Placa corrigida de 6 para 7 caracteres: {placa}")
+            
             dados_tratados['placa'] = placa
             
-            # Valida placa
+            # Valida placa após possível correção
             if not NFeHelpers.validar_placa(placa):
-                raise ValueError(f"Placa inválida: {placa}")
+                raise ValueError(
+                    f"Placa inválida: {placa}. "
+                    f"Formato esperado: 3 letras + 4 números (ex: ABC1234) "
+                    f"ou 3 letras + 1 número + 1 letra + 2 números (ex: ABC1D23)."
+                )
         
         # Converte UF para maiúsculas
         if 'uf' in dados_tratados:
