@@ -554,8 +554,7 @@ class VeiculoTransporteCRUD:
         try:
             # Trata os dados antes de criar
             dados_tratados = NFeHelpers.tratar_dados_veiculo(dados)
-            
-            # Converte campos específicos
+
             capacidade_carga = dados_tratados.get('capacidade_carga')
             if capacidade_carga is not None:
                 try:

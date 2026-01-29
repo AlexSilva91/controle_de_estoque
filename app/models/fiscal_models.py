@@ -161,18 +161,16 @@ class ClienteFiscal(Base):
         }
     
     def to_nfe_dict(self):
-        """Converte para formato esperado pela NFe (compatível com seu exemplo)"""
-        return {
+        cliente = {
             "CpfCnpj": self.cpf_cnpj,
             "NmCliente": self.nome_cliente,
             "IndicadorIe": self.indicador_ie,
             "Ie": self.inscricao_estadual or "",
-            "IsUf": self.uf,
             "Endereco": {
                 "Cep": self.cep,
                 "Logradouro": self.logradouro,
-                "Complemento": self.complemento or "",
                 "Numero": self.numero,
+                "Complemento": self.complemento or "",
                 "Bairro": self.bairro,
                 "CodMunicipio": self.codigo_municipio,
                 "Municipio": self.municipio,
@@ -182,10 +180,20 @@ class ClienteFiscal(Base):
             },
             "Contato": {
                 "Telefone": self.telefone or "",
-                "Email": self.email or "",
-                "Fax": self.fax or ""
+                "Email": self.email or ""
             }
         }
+
+        if (
+            self.uf == "AM"
+            and self.inscricao_suframa
+            and self.inscricao_suframa.isdigit()
+            and len(self.inscricao_suframa) == 9
+        ):
+            cliente["Isuf"] = self.inscricao_suframa
+
+        return cliente
+
     
     @staticmethod
     def from_dict(dados):
@@ -247,6 +255,7 @@ class ProdutoFiscal(Base):
     # Tributação
     cst_icms = Column(String(3), nullable=True)
     cfop = Column(String(4), nullable=True)
+    csosn = Column(String(3), nullable=False, default="102", server_default="102")
     aliquota_icms = Column(DECIMAL(5, 2), nullable=True)
     cst_pis = Column(String(2), nullable=True)
     aliquota_pis = Column(DECIMAL(5, 2), nullable=True)

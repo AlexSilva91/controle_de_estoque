@@ -837,7 +837,6 @@ def criar_veiculo():
         if 'placa' not in dados:
             return jsonify({"success": False, "message": "Placa é obrigatória"}), 400
         
-         
         veiculo = VeiculoTransporteCRUD.criar(db.session, dados)
         
         return jsonify({
