@@ -1886,7 +1886,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <button class="collapsible btn btn-outline">
                         <i class="fas fa-receipt"></i> Todas as Compras 
                         <span class="purchase-count-badge">${response.todas_compras?.length || 0}</span>
-                        <span class="purchase-total-badge monetary">${response.valor_total_compras_formatado}</span>
+                        <span class="purchase-total-badge monetary">R$ ${response.valor_total_compras_formatado}</span>
                         <i class="fas fa-chevron-down toggle-icon"></i>
                     </button>
                     <div class="collapsible-content" style="display:none;">
@@ -2255,7 +2255,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             
             .purchase-total-badge {
-              background: linear-gradient(135deg, var(--secondary-color), var(--secondary-dark));
+              background: var(--primary-color);
               color: white;
               padding: 2px 10px;
               border-radius: 12px;
