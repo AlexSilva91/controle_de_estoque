@@ -6021,6 +6021,7 @@ def get_caixa_financeiro(caixa_id):
             logger.warning(f"Caixa não encontrado: ID {caixa_id}")
             return jsonify({"success": False, "error": "Caixa não encontrado"}), 404
 
+        # Buscar todas as notas fiscais do caixa
         notas_fiscais = (
             session.query(NotaFiscal)
             .filter_by(caixa_id=caixa_id)
@@ -6028,6 +6029,7 @@ def get_caixa_financeiro(caixa_id):
             .all()
         )
         
+        # Buscar movimentações diretas (sem nota fiscal)
         movimentacoes_diretas = (
             session.query(Financeiro)
             .filter_by(caixa_id=caixa_id)
@@ -6038,48 +6040,103 @@ def get_caixa_financeiro(caixa_id):
         )
 
         dados = []
+        notas_processadas = {}
         
-        notas_processadas = set()
-        
+        # Processar cada nota fiscal
         for nota in notas_fiscais:
-            notas_processadas.add(nota.id)
-            
+            # Se já processamos esta nota, pular
+            if nota.id in notas_processadas:
+                continue
+                
             cliente_nome = None
             if nota.cliente_id:
                 cliente = session.query(Cliente).get(nota.cliente_id)
                 cliente_nome = cliente.nome if cliente else None
             
-            formas_pagamento = []
-            if nota.pagamentos:
-                formas_pagamento = list(set([p.forma_pagamento.value for p in nota.pagamentos]))
+            # Buscar todos os pagamentos da nota
+            pagamentos_nota = (
+                session.query(PagamentoNotaFiscal)
+                .filter_by(nota_fiscal_id=nota.id)
+                .all()
+            )
             
+            # Agrupar formas de pagamento e valores
+            formas_pagamento_dict = {}
+            for pagamento in pagamentos_nota:
+                forma = pagamento.forma_pagamento.value
+                if forma not in formas_pagamento_dict:
+                    formas_pagamento_dict[forma] = Decimal('0')
+                formas_pagamento_dict[forma] += pagamento.valor
+            
+            # Converter para lista formatada
+            formas_pagamento_formatadas = [
+                f"{forma}: R$ {float(valor):.2f}"
+                for forma, valor in formas_pagamento_dict.items()
+            ]
+            
+            # Buscar todos os registros financeiros da nota
             financeiros_nota = (
                 session.query(Financeiro)
                 .filter_by(nota_fiscal_id=nota.id)
                 .filter(Financeiro.categoria != CategoriaFinanceira.estorno)
-                .order_by(Financeiro.data.desc())
                 .all()
             )
             
-            if financeiros_nota:
-                for fin in financeiros_nota:
-                    dados.append(
-                        {
-                            "id": fin.id,
-                            "data": fin.data.isoformat(),
-                            "tipo": fin.tipo.value,
-                            "categoria": fin.categoria.value if fin.categoria else None,
-                            "valor": float(fin.valor),
-                            "descricao": fin.descricao or f"Venda NF #{nota.id}",
-                            "nota_fiscal_id": nota.id,
-                            "cliente_id": nota.cliente_id,
-                            "conta_receber_id": fin.conta_receber_id,
-                            "cliente_nome": cliente_nome,
-                            "formas_pagamento": formas_pagamento,
-                            "nota_fiscal_status": nota.status.value if nota.status else None,
-                        }
-                    )
-        
+            # Calcular valores consolidados
+            valor_total_nota = sum(fin.valor for fin in financeiros_nota)
+            valor_desconto_nota = sum(
+                fin.valor_desconto or Decimal('0') 
+                for fin in financeiros_nota
+            )
+            
+            # Determinar categoria principal
+            # Se tem venda a prazo, mostra como venda_aprazo, senão como venda
+            categorias = [fin.categoria for fin in financeiros_nota]
+            categoria_principal = (
+                CategoriaFinanceira.venda_aprazo.value 
+                if CategoriaFinanceira.venda_aprazo in categorias
+                else CategoriaFinanceira.venda.value
+            )
+            
+            # Criar descrição consolidada
+            descricao_consolidada = f"Venda NF #{nota.id} - Cliente: {cliente_nome or 'Não identificado'}"
+            if formas_pagamento_formatadas:
+                descricao_consolidada += f" - Pagamentos: {', '.join(formas_pagamento_formatadas)}"
+            if nota.observacao:
+                descricao_consolidada += f" - Obs: {nota.observacao}"
+            
+            # Usar o primeiro registro financeiro como base (todos têm mesma data)
+            data_referencia = financeiros_nota[0].data if financeiros_nota else nota.data_emissao
+            
+            # Adicionar registro consolidado
+            dados.append(
+                {
+                    "id": f"nota_{nota.id}",  # ID especial para nota
+                    "data": data_referencia.isoformat(),
+                    "tipo": TipoMovimentacao.entrada.value,
+                    "categoria": categoria_principal,
+                    "valor": float(valor_total_nota),
+                    "valor_desconto": float(valor_desconto_nota),
+                    "descricao": descricao_consolidada,
+                    "nota_fiscal_id": nota.id,
+                    "cliente_id": nota.cliente_id,
+                    "cliente_nome": cliente_nome,
+                    "formas_pagamento": list(formas_pagamento_dict.keys()),  # Apenas as formas
+                    "formas_pagamento_detalhadas": formas_pagamento_formatadas,  # Com valores
+                    "nota_fiscal_status": nota.status.value if nota.status else None,
+                    "valor_total_nota": float(nota.valor_total),
+                    "valor_recebido_nota": float(nota.valor_recebido) if nota.valor_recebido else 0,
+                    "troco_nota": float(nota.troco) if nota.troco else 0,
+                    "consolidado": True,  # Indica que é um registro consolidado
+                    "quantidade_pagamentos": len(pagamentos_nota),
+                    "data_emissao": nota.data_emissao.isoformat(),
+                }
+            )
+            
+            # Marcar nota como processada
+            notas_processadas[nota.id] = True
+
+        # Processar movimentações diretas (não relacionadas a notas fiscais)
         for mov in movimentacoes_diretas:
             cliente_nome = None
             if mov.cliente_id:
@@ -6102,18 +6159,22 @@ def get_caixa_financeiro(caixa_id):
                     "tipo": mov.tipo.value,
                     "categoria": mov.categoria.value if mov.categoria else None,
                     "valor": float(mov.valor),
-                    "descricao": mov.descricao,
+                    "descricao": mov.descricao or f"Movimentação direta - {mov.categoria.value if mov.categoria else 'Sem categoria'}",
                     "nota_fiscal_id": mov.nota_fiscal_id,
                     "cliente_id": mov.cliente_id,
                     "conta_receber_id": mov.conta_receber_id,
                     "cliente_nome": cliente_nome,
                     "formas_pagamento": formas_pagamento,
+                    "formas_pagamento_detalhadas": formas_pagamento,  # Para consistência
                     "nota_fiscal_status": None,  
+                    "consolidado": False,  # Não é consolidado
                 }
             )
         
+        # Ordenar por data
         dados.sort(key=lambda x: x["data"], reverse=True)
         
+        # Calcular totais (usando função existente)
         totais = calcular_formas_pagamento(caixa_id, session)
 
         logger.info(f"Dados financeiros do caixa ID {caixa_id} recuperados com sucesso")
@@ -6131,6 +6192,7 @@ def get_caixa_financeiro(caixa_id):
                     "contas_prazo_recebidas": totais["contas_prazo_recebidas"],
                 },
                 "vendas_por_forma_pagamento": totais["vendas_por_forma_pagamento"],
+                "notas_consolidadas": len(notas_processadas),
             }
         )
 
@@ -6147,8 +6209,7 @@ def get_caixa_financeiro(caixa_id):
             500,
         )
     finally:
-        session.close()
-        
+        session.close()  
         
 @admin_bp.route("/caixas/<int:caixa_id>/financeiro/movimentacoes/pdf")
 @login_required

@@ -53,6 +53,7 @@ class StatusCaixa(str, enum.Enum):
 
 class CategoriaFinanceira(str, enum.Enum):
     venda = "venda"
+    venda_aprazo = "venda_aprazo" 
     compra = "compra"
     despesa = "despesa"
     estorno = "estorno"
