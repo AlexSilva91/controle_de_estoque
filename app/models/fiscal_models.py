@@ -238,7 +238,6 @@ class ProdutoFiscal(Base):
     __tablename__ = "produtos_fiscais"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False, unique=True)
     
     # Dados Fiscais
     codigo_ncm = Column(String(8), nullable=True)
@@ -266,6 +265,8 @@ class ProdutoFiscal(Base):
     informacoes_fisco = Column(Text, nullable=True)
     informacoes_complementares = Column(Text, nullable=True)
     
+    status = Column(Boolean, default=True, nullable=False)
+    
     # Status
     homologado = Column(Boolean, default=False, nullable=False)
     data_homologacao = Column(DateTime, nullable=True)
@@ -276,8 +277,7 @@ class ProdutoFiscal(Base):
     atualizado_em = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     sincronizado = Column(Boolean, default=False, nullable=False)
     
-    # Relacionamento (opcional, se quiser acessar o produto)
-    produto = relationship("Produto", backref="dados_fiscais")
+    produtos = relationship("Produto", secondary="produto_fiscal_produto_association", backref="produtos_fiscais")
     
     def to_dict(self):
         """Converte todos os campos do ProdutoFiscal para um dicionário"""
@@ -323,6 +323,7 @@ class ProdutoFiscal(Base):
             
             # Status
             "homologado": self.homologado,
+            "status": self.status,
             "data_homologacao": self.data_homologacao.isoformat() if self.data_homologacao else None,
             "justificativa_homologacao": self.justificativa_homologacao,
             

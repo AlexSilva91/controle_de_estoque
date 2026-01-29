@@ -264,25 +264,27 @@ def incrementar_numero_nfce(id):
 @fiscal_bp.route('/produtos-fiscais', methods=['POST'])
 @admin_required
 def criar_produto_fiscal():
-    """Cria dados fiscais para um produto"""
+    """Cria dados fiscais para um produto com múltiplos produtos associados"""
     try:
         dados = request.get_json()
         if not dados:
             return jsonify({"success": False, "message": "Dados não fornecidos"}), 400
         
-        if 'produto_id' not in dados:
-            return jsonify({"success": False, "message": "ID do produto é obrigatório"}), 400
+        # Verifica se há produtos para associar
+        produto_ids = dados.get('produto_ids', [])
+        if not produto_ids:
+            return jsonify({"success": False, "message": "Lista de IDs de produtos é obrigatória"}), 400
         
-         
-        produto_fiscal = ProdutoFiscalCRUD.criar(db.session, dados)
+        # Cria o produto fiscal com os produtos associados
+        produto_fiscal = ProdutoFiscalCRUD.criar_produto_fiscal(db.session, dados, produto_ids)
         
         return jsonify({
             "success": True,
-            "message": "Dados fiscais criados com sucesso",
+            "message": "Produto fiscal criado com sucesso",
             "data": {
                 "id": produto_fiscal.id,
-                "produto_id": produto_fiscal.produto_id,
-                "codigo_ncm": produto_fiscal.codigo_ncm
+                "codigo_ncm": produto_fiscal.codigo_ncm,
+                "produtos_associados": produto_ids
             }
         }), 201
         
@@ -291,68 +293,76 @@ def criar_produto_fiscal():
     except Exception as e:
         return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
 
-
 @fiscal_bp.route('/produtos-fiscais', methods=['GET'])
 @admin_required
 def listar_produtos_fiscais():
-    """Lista todos os produtos fiscais"""
+    """Lista todos os produtos fiscais com seus produtos associados"""
     try:
         skip = request.args.get('skip', 0, type=int)
         limit = request.args.get('limit', 100, type=int)
         
-        produtos = ProdutoFiscalCRUD.listar_todos(db.session, skip, limit)
+        produtos_fiscais = ProdutoFiscalCRUD.listar_todos(db.session, skip, limit)
+        
+        resultado = []
+        for pf in produtos_fiscais:
+            # Obtém os produtos associados
+            produtos_associados_ids = ProdutoFiscalCRUD.obter_produtos_associados(db.session, pf.id)
+            
+            # Busca nomes dos produtos
+            nomes_produtos = {}
+            if produtos_associados_ids:
+                produtos = db.session.query(Produto.id, Produto.nome)\
+                                    .filter(Produto.id.in_(produtos_associados_ids))\
+                                    .all()
+                nomes_produtos = {p.id: p.nome or f"Produto {p.id}" for p in produtos}
+            
+            resultado.append({
+                "id": pf.id,
+                "codigo_ncm": pf.codigo_ncm,
+                "codigo_cest": pf.codigo_cest,
+                "origem": pf.origem,
+                "tipo_item": pf.tipo_item,
+                "cst_icms": pf.cst_icms,
+                "cfop": pf.cfop,
+                "aliquota_icms": float(pf.aliquota_icms) if pf.aliquota_icms else None,
+                "cst_pis": pf.cst_pis,
+                "aliquota_pis": float(pf.aliquota_pis) if pf.aliquota_pis else None,
+                "cst_cofins": pf.cst_cofins,
+                "aliquota_cofins": float(pf.aliquota_cofins) if pf.aliquota_cofins else None,
+                "status": pf.status,
+                "homologado": pf.homologado,
+                "data_homologacao": pf.data_homologacao.isoformat() if pf.data_homologacao else None,
+                "criado_em": pf.criado_em.isoformat() if pf.criado_em else None,
+                "atualizado_em": pf.atualizado_em.isoformat() if pf.atualizado_em else None,
+                "quantidade_produtos_associados": len(produtos_associados_ids),
+                "produtos_associados_ids": produtos_associados_ids,
+                "produtos_associados_nomes": nomes_produtos  # Adicionado aqui
+            })
         
         return jsonify({
             "success": True,
-            "data": [{
-                "id": p.id,
-                "produto_id": p.produto_id,
-                "produto_nome": p.produto.nome if p.produto else None, 
-                "codigo_ncm": p.codigo_ncm,
-                "codigo_cest": p.codigo_cest,
-                "origem": p.origem,
-                "tipo_item": p.tipo_item,
-                "cst_icms": p.cst_icms,
-                "cfop": p.cfop,
-                "aliquota_icms": float(p.aliquota_icms) if p.aliquota_icms else None,
-                "cst_pis": p.cst_pis,
-                "aliquota_pis": float(p.aliquota_pis) if p.aliquota_pis else None,
-                "cst_cofins": p.cst_cofins,
-                "aliquota_cofins": float(p.aliquota_cofins) if p.aliquota_cofins else None,
-                "homologado": p.homologado,
-                "data_homologacao": p.data_homologacao.isoformat() if p.data_homologacao else None,
-                "criado_em": p.criado_em.isoformat() if p.criado_em else None,
-                "atualizado_em": p.atualizado_em.isoformat() if p.atualizado_em else None
-            } for p in produtos]
+            "data": resultado
         }), 200
         
     except Exception as e:
         return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
-
+    
 @fiscal_bp.route('/produtos-fiscais/<int:id>', methods=['GET'])
 @admin_required
 def obter_produto_fiscal_por_id(id):
-    """Obtém dados fiscais do produto por ID com todos os campos"""
+    """Obtém dados fiscais do produto por ID com todos os campos e produtos associados"""
     try:
         produto_fiscal = ProdutoFiscalCRUD.obter_por_id(db.session, id)
         if not produto_fiscal:
             return jsonify({"success": False, "message": "Dados fiscais não encontrados"}), 404
         
-        # Obter dados do produto relacionado
-        produto = produto_fiscal.produto
-        produto_codigo = produto.codigo if produto else None
-        produto_unidade = produto.unidade if produto else None
-        produto_valor_unitario = float(produto.valor_unitario) if produto and produto.valor_unitario else None
+        # Obtém os produtos associados
+        produtos_associados_ids = ProdutoFiscalCRUD.obter_produtos_associados(db.session, id)
         
         return jsonify({
             "success": True,
             "data": {
                 "id": produto_fiscal.id,
-                "produto_id": produto_fiscal.produto_id,
-                "produto_nome": produto.nome if produto else None,
-                "produto_codigo": produto_codigo,
-                "produto_unidade": produto_unidade,
-                "produto_valor_unitario": produto_valor_unitario,
                 "codigo_ncm": produto_fiscal.codigo_ncm,
                 "codigo_cest": produto_fiscal.codigo_cest,
                 "codigo_ean": produto_fiscal.codigo_ean,
@@ -371,11 +381,13 @@ def obter_produto_fiscal_por_id(id):
                 "informacoes_fisco": produto_fiscal.informacoes_fisco,
                 "informacoes_complementares": produto_fiscal.informacoes_complementares,
                 "homologado": produto_fiscal.homologado,
+                "status": produto_fiscal.status,
                 "data_homologacao": produto_fiscal.data_homologacao.isoformat() if produto_fiscal.data_homologacao else None,
                 "justificativa_homologacao": produto_fiscal.justificativa_homologacao,
                 "criado_em": produto_fiscal.criado_em.isoformat() if produto_fiscal.criado_em else None,
                 "atualizado_em": produto_fiscal.atualizado_em.isoformat() if produto_fiscal.atualizado_em else None,
-                "sincronizado": produto_fiscal.sincronizado
+                "sincronizado": produto_fiscal.sincronizado,
+                "produtos_associados_ids": produtos_associados_ids
             }
         }), 200
         
@@ -399,16 +411,8 @@ def listar_produtos_sistema():
         
         produtos_data = []
         for p in produtos:
-            tem_dados_fiscais = False
-            produto_fiscal_id = None
-            
-            if hasattr(p, 'dados_fiscais'):
-                if isinstance(p.dados_fiscais, list) and len(p.dados_fiscais) > 0:
-                    tem_dados_fiscais = True
-                    produto_fiscal_id = p.dados_fiscais[0].id
-                elif p.dados_fiscais is not None and hasattr(p.dados_fiscais, 'id'):
-                    tem_dados_fiscais = True
-                    produto_fiscal_id = p.dados_fiscais.id
+            # Obtém produtos fiscais associados
+            produtos_fiscais = ProdutoFiscalCRUD.obter_produtos_fiscais_por_produto(db.session, p.id)
             
             produto_data = {
                 "id": p.id,
@@ -424,8 +428,9 @@ def listar_produtos_sistema():
                 "estoque_deposito": float(p.estoque_deposito) if p.estoque_deposito else 0,
                 "estoque_fabrica": float(p.estoque_fabrica) if p.estoque_fabrica else 0,
                 "ativo": p.ativo if hasattr(p, 'ativo') else True,
-                "tem_dados_fiscais": tem_dados_fiscais,
-                "produto_fiscal_id": produto_fiscal_id
+                "tem_produtos_fiscais": len(produtos_fiscais) > 0,
+                "quantidade_produtos_fiscais": len(produtos_fiscais),
+                "produtos_fiscais_ids": [pf.id for pf in produtos_fiscais]
             }
             produtos_data.append(produto_data)
         
@@ -445,17 +450,35 @@ def listar_produtos_sistema():
 @fiscal_bp.route('/produtos-fiscais/produto/<int:produto_id>', methods=['GET'])
 @admin_required
 def obter_produto_fiscal_por_produto(produto_id):
-    """Obtém dados fiscais por ID do produto"""
+    """Obtém produtos fiscais por ID do produto"""
     try:
-         
-        produto_fiscal = ProdutoFiscalCRUD.obter_por_produto_id(db.session, produto_id)
+        # Obtém todos os produtos fiscais associados ao produto
+        produtos_fiscais = ProdutoFiscalCRUD.obter_produtos_fiscais_por_produto(db.session, produto_id)
         
-        if not produto_fiscal:
-            return jsonify({"success": False, "message": "Dados fiscais não encontrados"}), 404
+        if not produtos_fiscais:
+            return jsonify({"success": False, "message": "Nenhum produto fiscal encontrado"}), 404
+        
+        resultado = []
+        for pf in produtos_fiscais:
+            resultado.append({
+                "id": pf.id,
+                "codigo_ncm": pf.codigo_ncm,
+                "codigo_cest": pf.codigo_cest,
+                "origem": pf.origem,
+                "tipo_item": pf.tipo_item,
+                "cst_icms": pf.cst_icms,
+                "cfop": pf.cfop,
+                "aliquota_icms": float(pf.aliquota_icms) if pf.aliquota_icms else None,
+                "homologado": pf.homologado,
+                "status":pf.status,
+                "data_homologacao": pf.data_homologacao.isoformat() if pf.data_homologacao else None
+            })
         
         return jsonify({
             "success": True,
-            "data": produto_fiscal.__dict__
+            "produto_id": produto_id,
+            "quantidade_produtos_fiscais": len(produtos_fiscais),
+            "data": resultado
         }), 200
         
     except Exception as e:
@@ -464,24 +487,35 @@ def obter_produto_fiscal_por_produto(produto_id):
 @fiscal_bp.route('/produtos-fiscais/<int:id>', methods=['PUT'])
 @admin_required
 def atualizar_produto_fiscal(id):
-    """Atualiza dados fiscais do produto"""
+    """Atualiza dados fiscais do produto e seus produtos associados"""
     try:
         dados = request.get_json()
+        print(dados)
         if not dados:
             return jsonify({"success": False, "message": "Dados não fornecidos"}), 400
         
-         
-        produto_fiscal = ProdutoFiscalCRUD.atualizar(db.session, id, dados)
+        # Se houver produto_ids, atualiza os produtos associados
+        produto_ids = dados.get('produto_ids')
+        
+        # Remove produto_ids dos dados para não tentar atualizar no produto fiscal
+        dados_fiscais = {k: v for k, v in dados.items() if k != 'produto_ids'}
+        
+        # Atualiza o produto fiscal e produtos associados
+        produto_fiscal = ProdutoFiscalCRUD.atualizar_produto_fiscal(db.session, id, dados_fiscais, produto_ids)
         
         if not produto_fiscal:
             return jsonify({"success": False, "message": "Dados fiscais não encontrados"}), 404
         
+        # Obtém os produtos associados atualizados
+        produtos_associados = ProdutoFiscalCRUD.obter_produtos_associados(db.session, id)
+        
         return jsonify({
             "success": True,
-            "message": "Dados fiscais atualizados com sucesso",
+            "message": "Produto fiscal atualizado com sucesso",
             "data": {
                 "id": produto_fiscal.id,
-                "produto_id": produto_fiscal.produto_id
+                "codigo_ncm": produto_fiscal.codigo_ncm,
+                "produtos_associados_ids": produtos_associados
             }
         }), 200
         
@@ -496,7 +530,6 @@ def homologar_produto_fiscal(id):
         dados = request.get_json()
         justificativa = dados.get('justificativa') if dados else None
         
-         
         produto_fiscal = ProdutoFiscalCRUD.homologar(db.session, id, justificativa)
         
         if not produto_fiscal:
@@ -523,18 +556,23 @@ def listar_produtos_fiscais_homologados():
         skip = request.args.get('skip', 0, type=int)
         limit = request.args.get('limit', 100, type=int)
         
-         
-        produtos = ProdutoFiscalCRUD.listar_homologados(db.session, skip, limit)
+        produtos = ProdutoFiscalCRUD.listar_todos(db.session, skip, limit)
+        produtos_homologados = [p for p in produtos if p.homologado]
+        
+        resultado = []
+        for p in produtos_homologados:
+            produtos_associados = ProdutoFiscalCRUD.obter_produtos_associados(db.session, p.id)
+            resultado.append({
+                "id": p.id,
+                "codigo_ncm": p.codigo_ncm,
+                "cst_icms": p.cst_icms,
+                "data_homologacao": p.data_homologacao.isoformat() if p.data_homologacao else None,
+                "quantidade_produtos_associados": len(produtos_associados)
+            })
         
         return jsonify({
             "success": True,
-            "data": [{
-                "id": p.id,
-                "produto_id": p.produto_id,
-                "codigo_ncm": p.codigo_ncm,
-                "cst_icms": p.cst_icms,
-                "data_homologacao": p.data_homologacao
-            } for p in produtos]
+            "data": resultado
         }), 200
         
     except Exception as e:
@@ -548,20 +586,39 @@ def listar_produtos_nao_homologados():
         skip = request.args.get('skip', 0, type=int)
         limit = request.args.get('limit', 100, type=int)
         
-        produtos = ProdutoFiscalCRUD.listar_nao_homologados(db.session, skip, limit)
+        produtos = ProdutoFiscalCRUD.listar_todos(db.session, skip, limit)
+        produtos_nao_homologados = [p for p in produtos if not p.homologado]
         
-        return jsonify({
-            "success": True,
-            "data": [{
+        resultado = []
+        for p in produtos_nao_homologados:
+            produtos_associados = ProdutoFiscalCRUD.obter_produtos_associados(db.session, p.id)
+            
+            # Busca nomes dos produtos associados
+            produtos_com_nomes = []
+            if produtos_associados:
+                produtos_info = db.session.query(Produto.id, Produto.nome)\
+                                         .filter(Produto.id.in_(produtos_associados))\
+                                         .all()
+                produtos_com_nomes = [
+                    {"id": prod.id, "nome": prod.nome or f"Produto {prod.id}"}
+                    for prod in produtos_info
+                ]
+            
+            resultado.append({
                 "id": p.id,
-                "produto_id": p.produto_id,
                 "codigo_ncm": p.codigo_ncm,
                 "codigo_cest": p.codigo_cest,
                 "origem": p.origem,
                 "cfop": p.cfop,
                 "cst_icms": p.cst_icms,
-                "homologado": p.homologado
-            } for p in produtos]
+                "homologado": p.homologado,
+                "quantidade_produtos_associados": len(produtos_associados),
+                "produtos_associados": produtos_com_nomes  # Agora com nomes
+            })
+        
+        return jsonify({
+            "success": True,
+            "data": resultado
         }), 200
         
     except Exception as e:
@@ -572,19 +629,26 @@ def listar_produtos_nao_homologados():
 def buscar_produtos_por_ncm(ncm):
     """Busca produtos fiscais por NCM"""
     try:
-        produtos = ProdutoFiscalCRUD.obter_por_ncm(db.session, ncm)
+        # Filtra por NCM
+        filtros = {'ncm': ncm}
+        produtos_fiscais = ProdutoFiscalCRUD.buscar_por_filtros(db.session, filtros)
         
-        return jsonify({
-            "success": True,
-            "data": [{
+        resultado = []
+        for p in produtos_fiscais:
+            produtos_associados = ProdutoFiscalCRUD.obter_produtos_associados(db.session, p.id)
+            resultado.append({
                 "id": p.id,
-                "produto_id": p.produto_id,
                 "codigo_ncm": p.codigo_ncm,
                 "codigo_cest": p.codigo_cest,
                 "origem": p.origem,
                 "cst_icms": p.cst_icms,
-                "homologado": p.homologado
-            } for p in produtos]
+                "homologado": p.homologado,
+                "quantidade_produtos_associados": len(produtos_associados)
+            })
+        
+        return jsonify({
+            "success": True,
+            "data": resultado
         }), 200
         
     except Exception as e:
@@ -592,21 +656,132 @@ def buscar_produtos_por_ncm(ncm):
     
 @fiscal_bp.route('/produtos-fiscais/<int:id>', methods=['DELETE'])
 @admin_required
-def excluir_produto_fiscal(id):
-    """Exclui dados fiscais do produto"""
+def desativar_produto_fiscal(id):
+    """Exclui dados fiscais do produto e suas associações"""
     try:
-        sucesso = ProdutoFiscalCRUD.excluir(db.session, id)
+        sucesso = ProdutoFiscalCRUD.desativar_produto_fiscal(db.session, id)
         
         if not sucesso:
             return jsonify({"success": False, "message": "Dados fiscais não encontrados"}), 404
         
         return jsonify({
             "success": True,
-            "message": "Dados fiscais excluídos com sucesso"
+            "message": "Produto fiscal excluído com sucesso"
         }), 200
         
     except Exception as e:
         return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
+
+@fiscal_bp.route('/produtos-fiscais/<int:id>/produtos', methods=['GET'])
+@admin_required
+def listar_produtos_do_produto_fiscal(id):
+    """Lista todos os produtos associados a um produto fiscal específico"""
+    try:
+        # Obtém os IDs dos produtos associados
+        produtos_associados_ids = ProdutoFiscalCRUD.obter_produtos_associados(db.session, id)
+        
+        if not produtos_associados_ids:
+            return jsonify({
+                "success": True,
+                "produto_fiscal_id": id,
+                "data": []
+            }), 200
+        
+        # Converter para lista de inteiros
+        produtos_ids = []
+        for produto_id in produtos_associados_ids:
+            try:
+                produtos_ids.append(int(produto_id))
+            except (ValueError, TypeError):
+                continue  # Ignora valores inválidos
+        
+        # Buscar apenas os IDs e nomes dos produtos
+        produtos = db.session.query(Produto.id, Produto.nome, Produto.codigo)\
+                            .filter(Produto.id.in_(produtos_ids))\
+                            .all()
+        
+        # Formatar dados
+        produtos_data = []
+        for p in produtos:
+            produto_data = {
+                "id": p.id,
+                "nome": p.nome or "",
+                "codigo": p.codigo or ""
+            }
+            produtos_data.append(produto_data)
+        
+        # Garantir que retorna todos os IDs, mesmo que algum produto não exista mais
+        ids_encontrados = [p["id"] for p in produtos_data]
+        for produto_id in produtos_ids:
+            if produto_id not in ids_encontrados:
+                produtos_data.append({
+                    "id": produto_id,
+                    "nome": "Produto não encontrado",
+                    "codigo": ""
+                })
+        
+        return jsonify({
+            "success": True,
+            "produto_fiscal_id": id,
+            "data": produtos_data
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False, 
+            "message": f"Erro interno: {str(e)}"
+        }), 500
+
+@fiscal_bp.route('/produtos/<int:id>', methods=['GET'])
+@admin_required
+def obter_produto_por_id(id):
+    """Obtém um produto específico pelo ID"""
+    try:
+        produto = db.session.query(Produto).filter(Produto.id == id).first()
+        
+        if not produto:
+            return jsonify({
+                "success": False,
+                "message": f"Produto com ID {id} não encontrado"
+            }), 404
+        
+        # Obtém produtos fiscais associados
+        produtos_fiscais = ProdutoFiscalCRUD.obter_produtos_fiscais_por_produto(db.session, id)
+        
+        produto_data = {
+            "id": produto.id,
+            "codigo": produto.codigo or "",
+            "nome": produto.nome or "",
+            "tipo": produto.tipo or "",
+            "marca": produto.marca or "",
+            "unidade": produto.unidade.value if hasattr(produto.unidade, 'value') else str(produto.unidade) if produto.unidade else None,
+            "valor_unitario": float(produto.valor_unitario) if produto.valor_unitario else None,
+            "valor_unitario_compra": float(produto.valor_unitario_compra) if produto.valor_unitario_compra else None,
+            "foto": produto.foto or "",
+            "estoque_loja": float(produto.estoque_loja) if produto.estoque_loja else 0,
+            "estoque_deposito": float(produto.estoque_deposito) if produto.estoque_deposito else 0,
+            "estoque_fabrica": float(produto.estoque_fabrica) if produto.estoque_fabrica else 0,
+            "ativo": produto.ativo if hasattr(produto, 'ativo') else True,
+            "tem_produtos_fiscais": len(produtos_fiscais) > 0,
+            "quantidade_produtos_fiscais": len(produtos_fiscais),
+            "produtos_fiscais_ids": [pf.id for pf in produtos_fiscais]
+        }
+        
+        return jsonify({
+            "success": True,
+            "data": produto_data
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False, 
+            "message": f"Erro interno: {str(e)}"
+        }), 500
+
 # ============================================
 # 3. ROTAS TRANSPORTADORA
 # ============================================

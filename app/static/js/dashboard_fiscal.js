@@ -596,7 +596,6 @@ function setupProdutosFiscaisTabs() {
             if (tabId === 'produtos-nao-homologados') {
                 await carregarProdutosNaoHomologados();
             }
-            // Para 'produtos-buscar', o formulário já está disponível
         });
     });
 }
@@ -633,11 +632,12 @@ function renderProdutosFiscais(produtos) {
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>Produto</th>
                             <th>NCM</th>
                             <th>CEST</th>
+                            <th>Produtos Associados</th>
                             <th>Origem</th>
                             <th>CST ICMS</th>
+                            <th>Status</th>
                             <th>Homologado</th>
                             <th>Ações</th>
                         </tr>
@@ -654,14 +654,48 @@ function renderProdutosFiscais(produtos) {
             default: origem = produto.origem || 'N/A';
         }
 
+        // Formatar produtos associados
+        const qtdProdutos = produto.quantidade_produtos_associados || 0;
+        const produtosIds = produto.produtos_associados_ids || [];
+        const produtosNomes = produto.produtos_associados_nomes || {};
+        
+        let produtosHtml = '-';
+        if (qtdProdutos > 0) {
+            // Pegar os primeiros 3 produtos para mostrar
+            const produtosParaMostrar = produtosIds.slice(0, 3).map(id => {
+                const nome = produtosNomes[id] || `Produto ${id}`;
+                return { id, nome };
+            });
+            
+            produtosHtml = `
+                <div class="produtos-associados-preview">
+                    <span class="produtos-count-badge">${qtdProdutos} ${qtdProdutos === 1 ? 'produto' : 'produtos'}</span>
+                    <div class="produtos-lista-mini">
+                        ${produtosParaMostrar.map(prod => `
+                            <div class="produto-mini-item" title="${prod.nome}">
+                                <span class="produto-mini-nome">${prod.nome}</span>
+                                <span class="produto-mini-id">(ID: ${prod.id})</span>
+                            </div>
+                        `).join('')}
+                        ${produtosIds.length > 3 ? `<span class="produtos-mais">+${produtosIds.length - 3} mais</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
         html += `
             <tr>
                 <td>${produto.id}</td>
-                <td>${produto.produto_nome || '-'}</td>
                 <td>${produto.codigo_ncm || '-'}</td>
                 <td>${produto.codigo_cest || '-'}</td>
+                <td>${produtosHtml}</td>
                 <td>${origem}</td>
                 <td>${produto.cst_icms || '-'}</td>
+                <td>
+                    <span class="status-badge ${produto.status ? 'status-ativo' : 'status-inativo'}">
+                        ${produto.status ? 'Ativo' : 'Inativo'}
+                    </span>
+                </td>
                 <td>
                     <span class="status-badge ${produto.homologado ? 'status-ativo' : 'status-inativo'}">
                         ${produto.homologado ? 'Sim' : 'Não'}
@@ -696,6 +730,50 @@ function renderProdutosFiscais(produtos) {
     container.innerHTML = html;
 }
 
+function renderProdutosSelecionados(produtosSelecionados) {
+    if (!produtosSelecionados || produtosSelecionados.length === 0) {
+        return '<div class="empty-state-sm">Nenhum produto selecionado</div>';
+    }
+    
+    // Garantir que temos uma array
+    const produtosArray = Array.isArray(produtosSelecionados) ? produtosSelecionados : [produtosSelecionados];
+    
+    return `
+        <div class="produtos-selecionados-grid">
+            ${produtosArray.map(prod => {
+                // Se for um objeto com id e nome
+                if (typeof prod === 'object' && prod !== null) {
+                    const id = prod.id;
+                    const nome = prod.nome || prod.codigo || `ID: ${id}`;
+                    return `
+                        <div class="produto-selecionado-item" data-produto-id="${id}" id="produtoSelecionado${id}">
+                            <span class="produto-selecionado-nome">${nome}</span>
+                            <button type="button" class="btn-remove-produto" onclick="removerProdutoSelecionado(${id})">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    `;
+                }
+                
+                // Se for apenas um ID numérico (fallback)
+                if (typeof prod === 'number' || (typeof prod === 'string' && !isNaN(prod))) {
+                    const id = parseInt(prod);
+                    return `
+                        <div class="produto-selecionado-item" data-produto-id="${id}" id="produtoSelecionado${id}">
+                            <span class="produto-selecionado-id">ID: ${id}</span>
+                            <button type="button" class="btn-remove-produto" onclick="removerProdutoSelecionado(${id})">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    `;
+                }
+                
+                return ''; // Ignorar valores inválidos
+            }).filter(html => html !== '').join('')}
+        </div>
+    `;
+}
+
 // Carregar produtos não homologados
 async function carregarProdutosNaoHomologados() {
     try {
@@ -721,10 +799,10 @@ async function carregarProdutosNaoHomologados() {
                     <table>
                         <thead>
                             <tr>
-                                <th>ID</th>
-                                <th>Produto ID</th>
+                                <th>ID Fiscal</th>
                                 <th>NCM</th>
                                 <th>CEST</th>
+                                <th>Produtos Associados</th>
                                 <th>Origem</th>
                                 <th>CFOP</th>
                                 <th>Ações</th>
@@ -742,12 +820,35 @@ async function carregarProdutosNaoHomologados() {
                 default: origem = produto.origem || 'N/A';
             }
 
+            // Formatar produtos associados
+            const produtosAssociados = produto.produtos_associados || [];
+            let produtosHtml = '-';
+            
+            if (produtosAssociados.length > 0) {
+                // Pegar os primeiros 2 produtos para mostrar
+                const produtosParaMostrar = produtosAssociados.slice(0, 2);
+                
+                produtosHtml = `
+                    <div class="produtos-associados-preview">
+                        <span class="produtos-count-badge">${produtosAssociados.length} produtos</span>
+                        <div class="produtos-lista-mini">
+                            ${produtosParaMostrar.map(prod => `
+                                <div class="produto-mini-item" title="${prod.nome}">
+                                    <span class="produto-mini-nome">${prod.nome}</span>
+                                </div>
+                            `).join('')}
+                            ${produtosAssociados.length > 2 ? `<span class="produtos-mais">+${produtosAssociados.length - 2} mais</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
             html += `
                 <tr>
                     <td>${produto.id}</td>
-                    <td>${produto.produto_id || '-'}</td>
                     <td>${produto.codigo_ncm || '-'}</td>
                     <td>${produto.codigo_cest || '-'}</td>
+                    <td>${produtosHtml}</td>
                     <td>${origem}</td>
                     <td>${produto.cfop || '-'}</td>
                     <td>
@@ -784,37 +885,69 @@ async function carregarProdutosNaoHomologados() {
 // Mostrar formulário de criação de produto fiscal
 async function showCreateProdutoFiscalForm() {
     const modal = document.getElementById('createProdutoFiscalModal');
+    modal.querySelector('.modal-title').textContent = 'Novo Produto Fiscal';
     modal.querySelector('.modal-body').innerHTML = getProdutoFiscalForm();
     modal.classList.add('active');
     
-    await carregarProdutosParaSelectParaCadastro();
+    // Resetar seleção
+    produtosSelecionadosIds = new Set();
+    
 }
+
 // Obter formulário de produto fiscal
 function getProdutoFiscalForm(produto = {}) {
     const isEdit = !!produto.id;
+    const produtosSelecionados = produto.produtos_associados_ids || [];
+    const produtosNomes = produto.produtos_associados_nomes || {};
+    
+    // Preparar array de produtos com nomes se disponíveis
+    const produtosComNomes = produtosSelecionados.map(id => {
+        return {
+            id: id,
+            nome: produtosNomes[id] || `ID: ${id}`
+        };
+    });
+    
     return `
         <form id="produtoFiscalForm" onsubmit="handleProdutoFiscalSubmit(event, ${produto.id || ''})">
             <div class="form-grid">
-                <div class="form-group">
-                    <label class="form-label" for="produto_id">Produto *</label>
-                    ${isEdit ? 
-                        `<div class="produto-info-display">
-                            <div class="produto-id-badge">ID: ${produto.produto_id || 'N/A'}</div>
-                            <div class="produto-nome-text">${produto.produto_nome || 'Não encontrado'}</div>
-                            <div class="produto-detalhes">
-                                <span>Código: ${produto.produto_codigo || 'N/A'}</span>
-                                <span>•</span>
-                                <span>Unidade: ${produto.produto_unidade || 'N/A'}</span>
-                                <span>•</span>
-                                <span>Valor: R$ ${(produto.produto_valor_unitario || 0).toFixed(2)}</span>
+                <div class="form-group full-width">
+                    <label class="form-label">Produtos Associados *</label>
+                    <div class="produtos-multiselect-container">
+                        <div class="produtos-selecionados-display" id="produtosSelecionadosDisplay">
+                            ${isEdit ? renderProdutosSelecionados(produtosComNomes) : 
+                              '<div class="empty-state-sm">Nenhum produto selecionado</div>'}
+                        </div>
+                        
+                        <div class="produtos-search-toggle">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                    onclick="toggleListaProdutos()" id="toggleProdutosBtn">
+                                <i class="fas fa-chevron-down"></i> Mostrar lista de produtos
+                            </button>
+                        </div>
+                        
+                        <div class="produtos-search-container collapsed" id="produtosSearchContainer">
+                            <div class="search-header">
+                                <input type="text" 
+                                       id="produtoSearchInput" 
+                                       class="form-input search-input" 
+                                       placeholder="Buscar produtos por nome, código ou ID..."
+                                       onkeyup="filtrarProdutosParaSelecao(this.value)">
+                                <button type="button" class="btn-close-search" onclick="toggleListaProdutos()">
+                                    <i class="fas fa-times"></i>
+                                </button>
                             </div>
-                         </div>
-                         <input type="hidden" id="produto_id" name="produto_id" value="${produto.produto_id || ''}">` :
-                        `<select id="produto_id" name="produto_id" class="form-input form-select" required>
-                            <option value="">Selecione um produto...</option>
-                         </select>`
-                    }
-                    <small class="form-text">${isEdit ? 'Produto não pode ser alterado após criação' : 'Escolha um produto do sistema (apenas produtos sem dados fiscais aparecerão)'}</small>
+                            <div class="produtos-list-container" id="produtosListContainer">
+                                <div class="loading-state">Carregando produtos...</div>
+                            </div>
+                            <div class="search-footer">
+                                <small>Selecione um ou mais produtos para associar a este produto fiscal</small>
+                            </div>
+                        </div>
+                        
+                        <input type="hidden" id="produtosSelecionadosIds" name="produto_ids" 
+                               value="${produtosSelecionados.join(',')}">
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -1050,7 +1183,13 @@ function getProdutoFiscalForm(produto = {}) {
                         <option value="true" ${produto.homologado ? 'selected' : ''}>Homologado</option>
                     </select>
                 </div>
-                
+                <div class="form-group">
+                    <label class="form-label" for="status">Status de Homologação</label>
+                    <select id="status" name="status" class="form-input form-select">
+                        <option value="false" ${!produto.status ? 'selected' : ''}>Inativo</option>
+                        <option value="true" ${produto.status ? 'selected' : ''}>Ativo</option>
+                    </select>
+                </div>
                 <div class="form-group full-width">
                     <div class="form-actions">
                         <button type="button" class="btn btn-secondary" onclick="closeModal('createProdutoFiscalModal')">
@@ -1119,57 +1258,236 @@ async function carregarProdutosParaSelectParaCadastro() {
     }
 }
 
-async function carregarProdutosParaSelect() {
+let todosProdutos = [];
+let produtosSelecionadosIds = new Set();
+
+// Função para carregar todos os produtos para seleção
+async function carregarProdutosParaSelecao() {
     try {
-        const select = document.getElementById('produto_id');
-        if (!select) {
-            console.warn('Select produto_id não encontrado - elemento não existe no DOM');
-            return;
-        }
+        const response = await fetchData(`${API_BASE}/produtos?incluir_inativos=true`);
+        todosProdutos = response.data || [];
         
-        // Se já tem produtos carregados (mais de 1 opção), não carregar novamente
-        if (select.options && select.options.length > 1) {
-            return;
-        }
-        
-        // Para edição, carregar todos os produtos
-        const response = await fetchData(`${API_BASE}/produtos`);
-        const produtos = response.data || [];
-        
-        if (!produtos.length) {
-            const option = document.createElement('option');
-            option.value = '';
-            option.textContent = 'Nenhum produto disponível';
-            select.appendChild(option);
-            return;
-        }
-        
-        produtos.forEach(produto => {
-            const option = document.createElement('option');
-            option.value = produto.id;
-            option.textContent = `${produto.nome} (ID: ${produto.id}, Código: ${produto.codigo || 'N/A'})`;
-            
-            // Se for edição e este for o produto correto, marcar como selecionado
-            if (window.currentEditingProdutoId && produto.tem_dados_fiscais && 
-                produto.produto_fiscal_id == window.currentEditingProdutoId) {
-                option.selected = true;
+        // Se for edição, carrega os produtos já selecionados
+        if (window.currentEditingProdutoFiscal) {
+            try {
+                const produtosSelecionadosResponse = await fetchData(
+                    `${API_BASE}/produtos-fiscais/${window.currentEditingProdutoFiscal.id}/produtos`
+                );
+                
+                if (produtosSelecionadosResponse.success && produtosSelecionadosResponse.data) {
+                    // Extrair IDs dos objetos retornados
+                    const ids = produtosSelecionadosResponse.data.map(prod => prod.id);
+                    produtosSelecionadosIds = new Set(ids);
+                    atualizarDisplayProdutosSelecionados();
+                }
+            } catch (error) {
+                console.warn('Erro ao carregar produtos associados:', error);
+                produtosSelecionadosIds = new Set();
             }
-            
-            select.appendChild(option);
-        });
+        } else {
+            produtosSelecionadosIds = new Set();
+        }
+        
+        renderListaProdutosParaSelecao(todosProdutos);
         
     } catch (error) {
-        console.error('Erro ao carregar produtos para select (edição):', error);
-        const select = document.getElementById('produto_id');
-        if (select && select.options) {
-            while (select.options.length > 1) {
-                select.remove(1);
-            }
-            const option = document.createElement('option');
-            option.value = '';
-            option.textContent = 'Erro ao carregar produtos';
-            select.appendChild(option);
+        console.error('Erro ao carregar produtos para seleção:', error);
+        document.getElementById('produtosListContainer').innerHTML = `
+            <div class="error-state">Erro ao carregar produtos</div>
+        `;
+    }
+}
+
+// Renderizar lista de produtos para seleção
+function renderListaProdutosParaSelecao(produtos) {
+    const container = document.getElementById('produtosListContainer');
+    
+    if (!produtos || produtos.length === 0) {
+        container.innerHTML = '<div class="empty-state-sm">Nenhum produto disponível</div>';
+        return;
+    }
+    
+    const html = `
+        <div class="produtos-lista">
+            <div class="produtos-lista-header">
+                <span class="total-produtos">${produtos.length} produtos encontrados</span>
+                <span class="selecionados-count">
+                    <i class="fas fa-check-circle"></i>
+                    ${produtosSelecionadosIds.size} selecionados
+                </span>
+            </div>
+            ${produtos.map(produto => {
+                const estaSelecionado = produtosSelecionadosIds.has(produto.id);
+                const jaAssociado = produto.tem_produtos_fiscais || produto.tem_dados_fiscais || false;
+                
+                return `
+                    <div class="produto-item ${estaSelecionado ? 'selecionado' : ''} ${jaAssociado && !estaSelecionado ? 'ja-associado' : ''}" 
+                         data-produto-id="${produto.id}"
+                         onclick="toggleSelecaoProduto(${produto.id}, '${produto.nome}', ${jaAssociado})">
+                        <div class="produto-item-check">
+                            <i class="fas fa-check ${estaSelecionado ? 'visible' : ''}"></i>
+                        </div>
+                        <div class="produto-item-info">
+                            <div class="produto-item-nome">
+                                ${produto.nome || 'Sem nome'}
+                                ${!produto.ativo ? '<span class="produto-inativo-badge">Inativo</span>' : ''}
+                            </div>
+                            <div class="produto-item-detalhes">
+                                <span>ID: ${produto.id}</span>
+                                <span>Código: ${produto.codigo || 'N/A'}</span>
+                                <span>Estoque: ${(produto.estoque_loja || 0).toFixed(2)}</span>
+                            </div>
+                        </div>
+                        ${jaAssociado && !estaSelecionado ? 
+                          '<span class="produto-ja-associado-badge" title="Este produto já está associado a outro produto fiscal">Já associado</span>' : ''}
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+// Filtrar produtos para seleção
+function filtrarProdutosParaSelecao(termo) {
+    if (!todosProdutos || todosProdutos.length === 0) return;
+    
+    if (!termo || termo.trim() === '') {
+        renderListaProdutosParaSelecao(todosProdutos);
+        return;
+    }
+    
+    const termoLower = termo.toLowerCase();
+    const produtosFiltrados = todosProdutos.filter(produto => {
+        return (
+            (produto.nome && produto.nome.toLowerCase().includes(termoLower)) ||
+            (produto.codigo && produto.codigo.toLowerCase().includes(termoLower)) ||
+            produto.id.toString().includes(termo)
+        );
+    });
+    
+    renderListaProdutosParaSelecao(produtosFiltrados);
+}
+
+// Alternar seleção de produto
+function toggleSelecaoProduto(produtoId, produtoNome, jaAssociado) {
+    if (jaAssociado && !produtosSelecionadosIds.has(produtoId)) {
+        showAlert('Este produto já está associado a outro produto fiscal', 'warning');
+        return;
+    }
+    
+    if (produtosSelecionadosIds.has(produtoId)) {
+        produtosSelecionadosIds.delete(produtoId);
+    } else {
+        produtosSelecionadosIds.add(produtoId);
+    }
+    
+    const produtoElement = document.querySelector(`.produto-item[data-produto-id="${produtoId}"]`);
+    if (produtoElement) {
+        produtoElement.classList.toggle('selecionado');
+        const checkIcon = produtoElement.querySelector('.fa-check');
+        checkIcon.classList.toggle('visible');
+        
+        const selecionadosCount = document.querySelector('.selecionados-count');
+        if (selecionadosCount) {
+            selecionadosCount.innerHTML = `
+                <i class="fas fa-check-circle"></i>
+                ${produtosSelecionadosIds.size} selecionados
+            `;
         }
+    }
+    
+    atualizarInputProdutosSelecionados();
+    atualizarDisplayProdutosSelecionados();
+    
+    // Opcional: Fechar a lista após selecionar um produto
+    // fecharListaProdutos();
+}
+
+// Remover produto selecionado
+function removerProdutoSelecionado(produtoId) {
+    produtosSelecionadosIds.delete(produtoId);
+    
+    const produtoElement = document.querySelector(`.produto-item[data-produto-id="${produtoId}"]`);
+    if (produtoElement) {
+        produtoElement.classList.remove('selecionado');
+        const checkIcon = produtoElement.querySelector('.fa-check');
+        if (checkIcon) checkIcon.classList.remove('visible');
+        
+        // Atualizar contador
+        const selecionadosCount = document.querySelector('.selecionados-count');
+        if (selecionadosCount) {
+            selecionadosCount.innerHTML = `
+                <i class="fas fa-check-circle"></i>
+                ${produtosSelecionadosIds.size} selecionados
+            `;
+        }
+    }
+    
+    atualizarInputProdutosSelecionados();
+    atualizarDisplayProdutosSelecionados();
+}
+
+// Atualizar input hidden com IDs selecionados
+function atualizarInputProdutosSelecionados() {
+    const input = document.getElementById('produtosSelecionadosIds');
+    if (input) {
+        input.value = Array.from(produtosSelecionadosIds).join(',');
+    }
+}
+
+// Atualizar display de produtos selecionados
+async function atualizarDisplayProdutosSelecionados() {
+    const display = document.getElementById('produtosSelecionadosDisplay');
+    if (!display) return;
+    
+    if (produtosSelecionadosIds.size === 0) {
+        display.innerHTML = '<div class="empty-state-sm">Nenhum produto selecionado</div>';
+        return;
+    }
+    
+    const produtosSelecionadosArray = Array.from(produtosSelecionadosIds);
+    
+    if (window.currentEditingProdutoFiscal && window.currentEditingProdutoFiscal.produto) {
+        const produtosNomes = window.currentEditingProdutoFiscal.produto.produtos_associados_nomes || {};
+        
+        const produtosComNomes = produtosSelecionadosArray.map(id => {
+            return {
+                id: id,
+                nome: produtosNomes[id] || `ID: ${id}`
+            };
+        });
+        
+        display.innerHTML = renderProdutosSelecionados(produtosComNomes);
+        return;
+    }
+    
+    try {
+        const detalhesPromises = produtosSelecionadosArray.map(id => 
+            fetchData(`${API_BASE}/produtos/${id}`).catch(() => null)
+        );
+        
+        const resultados = await Promise.all(detalhesPromises);
+        
+        const produtosComDetalhes = resultados.map((result, index) => {
+            const id = produtosSelecionadosArray[index];
+            if (result && result.success && result.data) {
+                return {
+                    id: id,
+                    nome: result.data.nome || '',
+                    codigo: result.data.codigo || ''
+                };
+            }
+            return { id: id, nome: `ID: ${id}` };
+        });
+        
+        display.innerHTML = renderProdutosSelecionados(produtosComDetalhes);
+        
+    } catch (error) {
+        // Fallback: mostrar apenas IDs
+        console.warn('Não foi possível buscar detalhes dos produtos:', error);
+        display.innerHTML = renderProdutosSelecionados(produtosSelecionadosArray);
     }
 }
 
@@ -1181,18 +1499,33 @@ async function handleProdutoFiscalSubmit(event, id = null) {
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
     
-    // Converter valores booleanos
+    // Converter produto_ids de string para array
+    if (data.produto_ids) {
+        data.produto_ids = data.produto_ids.split(',')
+            .map(id => parseInt(id.trim()))
+            .filter(id => !isNaN(id));
+    } else {
+        data.produto_ids = [];
+    }
+    
+    // Validar que há pelo menos um produto selecionado
+    if (!data.produto_ids || data.produto_ids.length === 0) {
+        showAlert('Selecione pelo menos um produto', 'warning');
+        return;
+    }
+    
+    // Converter outros valores (mantém o mesmo processamento para outros campos)
     data.homologado = data.homologado === 'true';
     
     // Converter string vazia para null
     Object.keys(data).forEach(key => {
-        if (data[key] === '') {
+        if (data[key] === '' && key !== 'produto_ids') {
             data[key] = null;
         }
     });
     
     // Converter números
-    const numericFields = ['produto_id', 'valor_unitario_trib', 'aliquota_icms', 'aliquota_pis', 'aliquota_cofins'];
+    const numericFields = ['valor_unitario_trib', 'aliquota_icms', 'aliquota_pis', 'aliquota_cofins'];
     numericFields.forEach(field => {
         if (data[field] !== null) {
             data[field] = parseFloat(data[field]);
@@ -1219,19 +1552,10 @@ async function handleProdutoFiscalSubmit(event, id = null) {
         
         closeModal('createProdutoFiscalModal');
         
-        // Recarregar dados baseado na aba atual
-        const section = currentSection;
-        if (section === 'produtos-fiscais') {
-            // Recarregar lista principal
-            const produtosResponse = await fetchData(`${API_BASE}/produtos-fiscais`);
-            renderProdutosFiscais(produtosResponse.data || []);
-            
-            // Recarregar não homologados se estiver naquela aba
-            const tabAtiva = document.querySelector('#produtos-fiscais .tab.active');
-            if (tabAtiva && tabAtiva.getAttribute('data-tab') === 'produtos-nao-homologados') {
-                await carregarProdutosNaoHomologados();
-            }
-        }
+        produtosSelecionadosIds = new Set();
+        window.currentEditingProdutoFiscal = null;
+        
+        await recarregarProdutosFiscais();
         
     } catch (error) {
         showAlert(id ? 'Erro ao atualizar produto fiscal' : 'Erro ao criar produto fiscal', 'danger');
@@ -1239,24 +1563,85 @@ async function handleProdutoFiscalSubmit(event, id = null) {
     }
 }
 
+async function recarregarProdutosFiscais() {
+    try {
+        // Verificar qual aba está ativa
+        const abaAtiva = document.querySelector('#produtos-fiscais .tab.active');
+        if (abaAtiva) {
+            const tabId = abaAtiva.getAttribute('data-tab');
+            
+            if (tabId === 'produtos-nao-homologados') {
+                await carregarProdutosNaoHomologados();
+            } else {
+                // Recarregar a lista principal
+                const response = await fetchData(`${API_BASE}/produtos-fiscais`);
+                renderProdutosFiscais(response.data || []);
+            }
+        } else {
+            // Se não houver aba ativa, carregar lista principal
+            const response = await fetchData(`${API_BASE}/produtos-fiscais`);
+            renderProdutosFiscais(response.data || []);
+        }
+        
+        // Também recarregar a aba de busca se estiver visível
+        if (document.getElementById('resultados-busca-produtos-fiscais')) {
+            const termo = document.getElementById('buscar-produto-fiscal').value;
+            if (termo) {
+                await buscarProdutosFiscais();
+            }
+        }
+        
+    } catch (error) {
+        console.error('Erro ao recarregar produtos fiscais:', error);
+        showAlert('Erro ao recarregar produtos fiscais', 'danger');
+    }
+}
+
 // Editar produto fiscal
 async function editProdutoFiscal(id) {
     try {
-        window.currentEditingProdutoId = id;
-        
         const response = await fetchData(`${API_BASE}/produtos-fiscais/${id}`);
         const produto = response.data;
+        
+        let produtosAssociados = [];
+        let produtosAssociadosNomes = {};
+        
+        try {
+            const produtosResponse = await fetchData(`${API_BASE}/produtos-fiscais/${id}/produtos`);
+            if (produtosResponse.success && produtosResponse.data) {
+                produtosAssociados = produtosResponse.data.map(prod => prod.id);
+                
+                produtosAssociadosNomes = {};
+                produtosResponse.data.forEach(prod => {
+                    produtosAssociadosNomes[prod.id] = prod.nome || `Produto ${prod.id}`;
+                });
+            }
+        } catch (error) {
+            console.warn('Erro ao carregar produtos associados, usando array vazio:', error);
+        }
+        
+        produtosSelecionadosIds = new Set(produtosAssociados);
+        
+        window.currentEditingProdutoFiscal = { 
+            id: id,
+            produto: {
+                ...produto,
+                produtos_associados_ids: produtosAssociados,
+                produtos_associados_nomes: produtosAssociadosNomes
+            }
+        };
+        
         const modal = document.getElementById('createProdutoFiscalModal');
         modal.querySelector('.modal-title').textContent = 'Editar Produto Fiscal';
-        modal.querySelector('.modal-body').innerHTML = getProdutoFiscalForm(produto);
         
+        produto.produtos_associados_ids = produtosAssociados;
+        produto.produtos_associados_nomes = produtosAssociadosNomes;
+        
+        modal.querySelector('.modal-body').innerHTML = getProdutoFiscalForm(produto);
         modal.classList.add('active');
         
-        setTimeout(async () => {
-            await carregarProdutosParaSelect();
-        }, 100);
-        
     } catch (error) {
+        console.error('Erro ao editar produto fiscal:', error);
         showAlert('Erro ao carregar produto fiscal', 'danger');
     }
 }
@@ -1286,6 +1671,18 @@ async function deleteProdutoFiscal(id) {
     } catch (error) {
         showAlert('Erro ao excluir produto fiscal', 'danger');
     }
+}
+
+async function buscarDetalhesProduto(produtoId) {
+    try {
+        const response = await fetchData(`${API_BASE}/produtos/${produtoId}`);
+        if (response.success && response.data) {
+            return response.data;
+        }
+    } catch (error) {
+        console.warn(`Não foi possível buscar detalhes do produto ${produtoId}:`, error);
+    }
+    return null;
 }
 
 // Buscar produtos fiscais
@@ -1347,7 +1744,7 @@ async function buscarProdutosFiscais() {
 }
 
 // Exibir resultado da busca
-function exibirResultadoBusca(produtos) {
+async function exibirResultadoBusca(produtos) {
     const container = document.getElementById('resultados-busca-produtos-fiscais');
     
     if (!produtos || produtos.length === 0) {
@@ -1360,17 +1757,56 @@ function exibirResultadoBusca(produtos) {
         return;
     }
     
+    // Buscar nomes dos produtos associados para cada resultado
+    const produtosComNomes = await Promise.all(
+        produtos.map(async (produto) => {
+            // Se o produto já tem produtos_associados com nomes, use-os
+            if (produto.produtos_associados && Array.isArray(produto.produtos_associados)) {
+                return produto;
+            }
+            
+            // Caso contrário, buscar nomes
+            const produtosAssociadosIds = produto.produtos_associados_ids || [];
+            if (produtosAssociadosIds.length === 0) {
+                return {...produto, produtos_associados: []};
+            }
+            
+            try {
+                // Buscar detalhes dos produtos
+                const detalhesPromises = produtosAssociadosIds.map(id => 
+                    fetchData(`${API_BASE}/produtos/${id}`).catch(() => null)
+                );
+                
+                const resultados = await Promise.all(detalhesPromises);
+                
+                const produtosComDetalhes = resultados
+                    .filter(result => result && result.success && result.data)
+                    .map(result => ({
+                        id: result.data.id,
+                        nome: result.data.nome || `Produto ${result.data.id}`
+                    }));
+                
+                return {
+                    ...produto,
+                    produtos_associados: produtosComDetalhes
+                };
+            } catch (error) {
+                return {...produto, produtos_associados: []};
+            }
+        })
+    );
+    
     let html = `
         <div class="table-container">
-            <h4>Resultados da Busca (${produtos.length} encontrados)</h4>
+            <h4>Resultados da Busca (${produtosComNomes.length} encontrados)</h4>
             <div class="table-responsive">
                 <table>
                     <thead>
                         <tr>
-                            <th>ID</th>
-                            <th>Produto ID</th>
+                            <th>ID Fiscal</th>
                             <th>NCM</th>
                             <th>CEST</th>
+                            <th>Produtos Associados</th>
                             <th>Origem</th>
                             <th>CST ICMS</th>
                             <th>Homologado</th>
@@ -1380,7 +1816,7 @@ function exibirResultadoBusca(produtos) {
                     <tbody>
     `;
     
-    produtos.forEach(produto => {
+    produtosComNomes.forEach(produto => {
         let origem = '';
         switch(produto.origem) {
             case '0': origem = 'Nacional'; break;
@@ -1388,12 +1824,35 @@ function exibirResultadoBusca(produtos) {
             default: origem = produto.origem || 'N/A';
         }
         
+        // Formatar produtos associados
+        const produtosAssociados = produto.produtos_associados || [];
+        let produtosHtml = '-';
+        
+        if (produtosAssociados.length > 0) {
+            // Pegar os primeiros 2 produtos para mostrar
+            const produtosParaMostrar = produtosAssociados.slice(0, 2);
+            
+            produtosHtml = `
+                <div class="produtos-associados-preview">
+                    <span class="produtos-count-badge">${produtosAssociados.length} produtos</span>
+                    <div class="produtos-lista-mini">
+                        ${produtosParaMostrar.map(prod => `
+                            <div class="produto-mini-item" title="${prod.nome}">
+                                <span class="produto-mini-nome">${prod.nome}</span>
+                            </div>
+                        `).join('')}
+                        ${produtosAssociados.length > 2 ? `<span class="produtos-mais">+${produtosAssociados.length - 2} mais</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
         html += `
             <tr>
                 <td>${produto.id}</td>
-                <td>${produto.produto_id || '-'}</td>
                 <td>${produto.codigo_ncm || '-'}</td>
                 <td>${produto.codigo_cest || '-'}</td>
+                <td>${produtosHtml}</td>
                 <td>${origem}</td>
                 <td>${produto.cst_icms || '-'}</td>
                 <td>
@@ -1466,7 +1925,6 @@ async function homologarProdutoSubmit(event) {
                 const produtosResponse = await fetchData(`${API_BASE}/produtos-fiscais`);
                 renderProdutosFiscais(produtosResponse.data || []);
                 
-                // Atualizar lista de não homologados
                 await carregarProdutosNaoHomologados();
             }
         } else {
@@ -1478,6 +1936,41 @@ async function homologarProdutoSubmit(event) {
     }
 }
 
+// Função para alternar a visibilidade da lista de produtos
+function toggleListaProdutos() {
+    const container = document.getElementById('produtosSearchContainer');
+    const toggleBtn = document.getElementById('toggleProdutosBtn');
+    
+    if (!container || !toggleBtn) return;
+    
+    const icon = toggleBtn.querySelector('i');
+    
+    if (container.classList.contains('collapsed')) {
+        container.classList.remove('collapsed');
+        container.classList.add('expanded');
+        toggleBtn.innerHTML = '<i class="fas fa-chevron-up"></i> Ocultar lista de produtos';
+        
+        const listContainer = document.getElementById('produtosListContainer');
+        if (listContainer && listContainer.innerHTML.includes('Carregando produtos')) {
+            carregarProdutosParaSelecao();
+        }
+    } else {
+        container.classList.remove('expanded');
+        container.classList.add('collapsed');
+        toggleBtn.innerHTML = '<i class="fas fa-chevron-down"></i> Mostrar lista de produtos';
+    }
+}
+
+function fecharListaProdutos() {
+    const container = document.getElementById('produtosSearchContainer');
+    const toggleBtn = document.getElementById('toggleProdutosBtn');
+    
+    if (container && toggleBtn && !container.classList.contains('collapsed')) {
+        container.classList.remove('expanded');
+        container.classList.add('collapsed');
+        toggleBtn.innerHTML = '<i class="fas fa-chevron-down"></i> Mostrar lista de produtos';
+    }
+}
 
 // ============================================
 // FUNÇÕES PARA TRANSPORTADORAS

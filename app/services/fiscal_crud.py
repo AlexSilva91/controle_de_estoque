@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 from sqlalchemy import and_, or_
+from app.models.associations import ProdutoFiscalProduto
 from app.models.fiscal_models import (
     ConfiguracaoFiscal,
     ProdutoFiscal,
@@ -204,26 +205,15 @@ class ConfiguracaoFiscalCRUD:
 # 2. CRUD PRODUTO FISCAL
 # ============================================
 class ProdutoFiscalCRUD:
-    """CRUD para Dados Fiscais de Produtos"""
-    
-    model = ProdutoFiscal
+    """CRUD para Dados Fiscais de Produtos com suporte a múltiplos produtos"""
     
     @staticmethod
-    def criar(db: Session, dados: Dict[str, Any]) -> ProdutoFiscal:
+    def criar_produto_fiscal(db: Session, dados: Dict[str, Any], produto_ids: List[int] = None) -> ProdutoFiscal:
         """
-        Cria dados fiscais para um produto
+        Cria um produto fiscal e associa múltiplos produtos
         """
         try:
-            # Verifica se já existe
-            existente = db.query(ProdutoFiscal).filter(
-                ProdutoFiscal.produto_id == dados['produto_id']
-            ).first()
-            
-            if existente:
-                raise ValueError(f"Já existem dados fiscais para o produto ID {dados['produto_id']}")
-            
             produto_fiscal = ProdutoFiscal(
-                produto_id=dados['produto_id'],
                 codigo_ncm=dados.get('codigo_ncm'),
                 codigo_cest=dados.get('codigo_cest'),
                 codigo_ean=dados.get('codigo_ean'),
@@ -245,50 +235,69 @@ class ProdutoFiscalCRUD:
             )
             
             db.add(produto_fiscal)
+            db.flush()  
+            
+            if produto_ids:
+                ProdutoFiscalCRUD._associar_produtos(db, produto_fiscal.id, produto_ids)
+            
             db.commit()
             db.refresh(produto_fiscal)
             return produto_fiscal
             
         except IntegrityError as e:
             db.rollback()
-            raise ValueError(f"Erro ao criar dados fiscais do produto: {str(e)}")
+            raise ValueError(f"Erro ao criar produto fiscal: {str(e)}")
     
     @staticmethod
-    def obter_por_id(db: Session, id: int) -> Optional[ProdutoFiscal]:
+    def _associar_produtos(db: Session, produto_fiscal_id: int, produto_ids: List[int]):
+        """Associa múltiplos produtos a um produto fiscal"""
+        for produto_id in produto_ids:
+            assoc = ProdutoFiscalProduto(
+                produto_fiscal_id=produto_fiscal_id,
+                produto_id=produto_id
+            )
+            db.add(assoc)
+    
+    @staticmethod
+    def obter_por_id(db: Session, id: int, carregar_produtos: bool = False) -> Optional[ProdutoFiscal]:
         """
-        Obtém dados fiscais por ID com produto carregado
+        Obtém produto fiscal por ID
         """
-        return db.query(ProdutoFiscal)\
-            .options(joinedload(ProdutoFiscal.produto))\
-            .filter(ProdutoFiscal.id == id)\
-            .first()
+        query = db.query(ProdutoFiscal).filter(ProdutoFiscal.id == id)
         
-    @staticmethod
-    def obter_por_produto_id(db: Session, produto_id: int) -> Optional[ProdutoFiscal]:
-        """
-        Obtém dados fiscais por ID do produto
-        """
-        return db.query(ProdutoFiscal).filter(
-            ProdutoFiscal.produto_id == produto_id
-        ).first()
+        if carregar_produtos:
+            pass
+        
+        return query.first()
     
     @staticmethod
-    def obter_por_ncm(db: Session, ncm: str) -> List[ProdutoFiscal]:
+    def obter_produtos_associados(db: Session, produto_fiscal_id: int) -> List[int]:
         """
-        Obtém produtos fiscais por NCM
+        Obtém IDs dos produtos associados a um produto fiscal
         """
-        return db.query(ProdutoFiscal).filter(
-            ProdutoFiscal.codigo_ncm == ncm
+        associacoes = db.query(ProdutoFiscalProduto).filter(
+            ProdutoFiscalProduto.produto_fiscal_id == produto_fiscal_id
         ).all()
+        
+        return [assoc.produto_id for assoc in associacoes]
     
     @staticmethod
-    def listar_homologados(db: Session, skip: int = 0, limit: int = 100) -> List[ProdutoFiscal]:
+    def obter_produtos_fiscais_por_produto(db: Session, produto_id: int) -> List[ProdutoFiscal]:
         """
-        Lista produtos fiscais homologados
+        Obtém todos os produtos fiscais associados a um produto
         """
+        associacoes = db.query(ProdutoFiscalProduto).filter(
+            ProdutoFiscalProduto.produto_id == produto_id
+        ).all()
+        
+        produto_fiscal_ids = [assoc.produto_fiscal_id for assoc in associacoes]
+        
+        if not produto_fiscal_ids:
+            return []
+        
         return db.query(ProdutoFiscal).filter(
-            ProdutoFiscal.homologado == True
-        ).offset(skip).limit(limit).all()
+            ProdutoFiscal.id.in_(produto_fiscal_ids)
+        ).all()
     
     @staticmethod
     def listar_todos(db: Session, skip: int = 0, limit: int = 100) -> List[ProdutoFiscal]:
@@ -296,47 +305,33 @@ class ProdutoFiscalCRUD:
         Lista todos os produtos fiscais
         """
         return db.query(ProdutoFiscal)\
-            .options(joinedload(ProdutoFiscal.produto))\
             .offset(skip)\
             .limit(limit)\
             .all()
     
     @staticmethod
-    def listar_nao_homologados(db: Session, skip: int = 0, limit: int = 100) -> List[ProdutoFiscal]:
+    def atualizar_produto_fiscal(db: Session, id: int, dados: Dict[str, Any], 
+                                produto_ids: List[int] = None) -> Optional[ProdutoFiscal]:
         """
-        Lista produtos fiscais não homologados
-        """
-        return db.query(ProdutoFiscal).filter(
-            ProdutoFiscal.homologado == False
-        ).offset(skip).limit(limit).all()
-    
-    @staticmethod
-    def listar_por_ids(db: Session, produto_ids: List[int]) -> List[ProdutoFiscal]:
-        """
-        Lista dados fiscais para uma lista de IDs de produtos
-        """
-        return db.query(ProdutoFiscal).filter(
-            ProdutoFiscal.produto_id.in_(produto_ids)
-        ).all()
-    
-    @staticmethod
-    def atualizar(db: Session, id: int, dados: Dict[str, Any]) -> Optional[ProdutoFiscal]:
-        """
-        Atualiza dados fiscais do produto
+        Atualiza produto fiscal e seus produtos associados
         """
         produto_fiscal = ProdutoFiscalCRUD.obter_por_id(db, id)
         if not produto_fiscal:
             return None
         
         try:
+            # Atualiza campos do produto fiscal
             campos_atualizaveis = [
                 'codigo_ncm', 'codigo_cest', 'codigo_ean', 'codigo_gtin_trib',
                 'unidade_tributaria', 'valor_unitario_trib', 'origem', 'tipo_item',
                 'cst_icms', 'cfop', 'aliquota_icms', 'cst_pis', 'aliquota_pis',
                 'cst_cofins', 'aliquota_cofins', 'informacoes_fisco',
-                'informacoes_complementares', 'homologado'
+                'informacoes_complementares', 'homologado', 'status'
             ]
             
+            if 'status' in dados:
+                dados['status'] = str(dados['status']).lower() in ('true', '1', 'yes')
+
             for key, value in dados.items():
                 if key in campos_atualizaveis and value is not None:
                     setattr(produto_fiscal, key, value)
@@ -345,6 +340,10 @@ class ProdutoFiscalCRUD:
                 produto_fiscal.data_homologacao = datetime.now()
                 produto_fiscal.justificativa_homologacao = dados.get('justificativa_homologacao')
             
+            # Atualiza produtos associados se fornecidos
+            if produto_ids is not None:
+                ProdutoFiscalCRUD._atualizar_produtos_associados(db, id, produto_ids)
+            
             produto_fiscal.atualizado_em = datetime.now()
             db.commit()
             db.refresh(produto_fiscal)
@@ -352,30 +351,101 @@ class ProdutoFiscalCRUD:
             
         except Exception as e:
             db.rollback()
-            raise Exception(f"Erro ao atualizar dados fiscais: {str(e)}")
+            raise Exception(f"Erro ao atualizar produto fiscal: {str(e)}")
     
     @staticmethod
-    def excluir(db: Session, id: int) -> bool:
-        """
-        Exclui dados fiscais do produto
-        """
-        produto_fiscal = ProdutoFiscalCRUD.obter_por_id(db, id)
-        if not produto_fiscal:
-            return False
+    def _atualizar_produtos_associados(db: Session, produto_fiscal_id: int, novos_produto_ids: List[int]):
+        """Atualiza os produtos associados a um produto fiscal"""
+        # Remove associações existentes
+        db.query(ProdutoFiscalProduto).filter(
+            ProdutoFiscalProduto.produto_fiscal_id == produto_fiscal_id
+        ).delete()
         
+        # Adiciona novas associações
+        for produto_id in novos_produto_ids:
+            assoc = ProdutoFiscalProduto(
+                produto_fiscal_id=produto_fiscal_id,
+                produto_id=produto_id
+            )
+            db.add(assoc)
+    
+    @staticmethod
+    def adicionar_produtos(db: Session, produto_fiscal_id: int, produto_ids: List[int]) -> bool:
+        """
+        Adiciona produtos a um produto fiscal existente
+        """
         try:
-            db.delete(produto_fiscal)
+            for produto_id in produto_ids:
+                # Verifica se já existe associação
+                existente = db.query(ProdutoFiscalProduto).filter(
+                    ProdutoFiscalProduto.produto_fiscal_id == produto_fiscal_id,
+                    ProdutoFiscalProduto.produto_id == produto_id
+                ).first()
+                
+                if not existente:
+                    assoc = ProdutoFiscalProduto(
+                        produto_fiscal_id=produto_fiscal_id,
+                        produto_id=produto_id
+                    )
+                    db.add(assoc)
+            
             db.commit()
             return True
             
         except Exception as e:
             db.rollback()
-            raise Exception(f"Erro ao excluir dados fiscais: {str(e)}")
+            raise Exception(f"Erro ao adicionar produtos: {str(e)}")
     
+    @staticmethod
+    def remover_produtos(db: Session, produto_fiscal_id: int, produto_ids: List[int]) -> bool:
+        """
+        Remove produtos de um produto fiscal
+        """
+        try:
+            db.query(ProdutoFiscalProduto).filter(
+                ProdutoFiscalProduto.produto_fiscal_id == produto_fiscal_id,
+                ProdutoFiscalProduto.produto_id.in_(produto_ids)
+            ).delete()
+            
+            db.commit()
+            return True
+            
+        except Exception as e:
+            db.rollback()
+            raise Exception(f"Erro ao remover produtos: {str(e)}")
+
+    @staticmethod
+    def desativar_produto_fiscal(db: Session, id: int) -> dict:
+        """
+        Desativa um produto fiscal (soft delete)
+        """
+        try:
+            produto_fiscal = ProdutoFiscalCRUD.obter_por_id(db, id)
+            if not produto_fiscal:
+                return {"success": False, "message": "Produto fiscal não encontrado"}
+            
+            if not produto_fiscal.ativo:
+                return {"success": False, "message": "Produto fiscal já está desativado"}
+            
+            produto_fiscal.ativo = False
+            produto_fiscal.atualizado_em = datetime.now()
+            
+            db.commit()
+            
+            return {
+                "success": True, 
+                "message": "Produto fiscal desativado com sucesso",
+                "data": {"id": id, "ativo": False}
+            }
+            
+        except Exception as e:
+            db.rollback()
+            return {"success": False, "message": f"Erro ao desativar produto fiscal: {str(e)}"}
+        
     @staticmethod
     def homologar(db: Session, id: int, justificativa: str = None) -> Optional[ProdutoFiscal]:
         """
-        Homologa os dados fiscais do produto
+        Homologa um produto fiscal
         """
         produto_fiscal = ProdutoFiscalCRUD.obter_por_id(db, id)
         if not produto_fiscal:
@@ -393,8 +463,28 @@ class ProdutoFiscalCRUD:
             
         except Exception as e:
             db.rollback()
-            raise Exception(f"Erro ao homologar produto: {str(e)}")
-
+            raise Exception(f"Erro ao homologar produto fiscal: {str(e)}")
+    
+    @staticmethod
+    def buscar_por_filtros(db: Session, filtros: Dict[str, Any]) -> List[ProdutoFiscal]:
+        """
+        Busca produtos fiscais por filtros
+        """
+        query = db.query(ProdutoFiscal)
+        
+        if 'ncm' in filtros and filtros['ncm']:
+            query = query.filter(ProdutoFiscal.codigo_ncm == filtros['ncm'])
+        
+        if 'cest' in filtros and filtros['cest']:
+            query = query.filter(ProdutoFiscal.codigo_cest == filtros['cest'])
+        
+        if 'homologado' in filtros:
+            query = query.filter(ProdutoFiscal.homologado == filtros['homologado'])
+        
+        if 'origem' in filtros and filtros['origem']:
+            query = query.filter(ProdutoFiscal.origem == filtros['origem'])
+        
+        return query.all()
 
 # ============================================
 # 3. CRUD TRANSPORTADORA
