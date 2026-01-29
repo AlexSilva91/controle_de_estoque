@@ -921,33 +921,82 @@ def obter_detalhes_cliente(cliente_id):
         if not cliente:
             return jsonify({"success": False, "message": "Cliente não encontrado"}), 404
 
-        notas_fiscais = NotaFiscal.query.filter_by(cliente_id=cliente_id).all()
+        notas_fiscais = NotaFiscal.query.filter_by(cliente_id=cliente_id).order_by(NotaFiscal.data_emissao.desc()).all()
 
         produtos_comprados = []
         produtos_quantidade = {}
+        
+        todas_compras = []
+        
+        soma_total_compras = 0.0
+        soma_total_itens = 0
+        quantidade_compras_validas = 0
 
         for nota in notas_fiscais:
+            if nota.status == StatusNota.cancelada:
+                continue  
+            
+            valor_total_nota = float(nota.valor_total)
+            if valor_total_nota <= 0:  
+                continue
+            
+            nota_info = {
+                "id": nota.id,
+                "numero_nf": nota.numero_nf or f"NF{nota.id:06d}",
+                "chave_acesso": nota.chave_acesso,
+                "data_emissao": nota.data_emissao.isoformat(),
+                "data_emissao_br": formatar_data_br(nota.data_emissao),
+                "valor_total": valor_total_nota,
+                "valor_total_formatado": format_currency(nota.valor_total),
+                "valor_desconto": float(nota.valor_desconto),
+                "valor_desconto_formatado": format_currency(nota.valor_desconto),
+                "forma_pagamento": nota.forma_pagamento.value if nota.forma_pagamento else None,
+                "status": nota.status.value,
+                "a_prazo": nota.a_prazo,
+                "operador_id": nota.operador_id,
+                "caixa_id": nota.caixa_id,
+                "itens": [],
+                "quantidade_itens": len(nota.itens),
+                "quantidade_itens_validos": 0, 
+            }
+            
+            itens_validos_nota = 0
+            
             for item in nota.itens:
                 valor_unit = float(item.valor_unitario)
                 valor_total = float(item.valor_total)
-
-                produtos_comprados.append(
-                    {
-                        "id": item.produto.id,
-                        "nome": item.produto.nome,
-                        "quantidade": float(item.quantidade),
-                        "quantidade_formatada": format_number(item.quantidade),
-                        "valor_unitario": valor_unit,
-                        "valor_unitario_formatado": format_currency(valor_unit),
-                        "valor_total": valor_total,
-                        "valor_total_formatado": format_currency(valor_total),
-                        "data_compra": nota.data_emissao.isoformat(),
-                        "data_compra_br": formatar_data_br(nota.data_emissao),
-                        "unidade": (
-                            item.produto.unidade.value if item.produto.unidade else "un"
-                        ),
-                    }
-                )
+                
+                if valor_total <= 0:  
+                    continue
+                
+                produto_info = {
+                    "id": item.produto.id,
+                    "nome": item.produto.nome,
+                    "quantidade": float(item.quantidade),
+                    "quantidade_formatada": format_number(item.quantidade),
+                    "valor_unitario": valor_unit,
+                    "valor_unitario_formatado": format_currency(valor_unit),
+                    "valor_total": valor_total,
+                    "valor_total_formatado": format_currency(valor_total),
+                    "data_compra": nota.data_emissao.isoformat(),
+                    "data_compra_br": formatar_data_br(nota.data_emissao),
+                    "unidade": (
+                        item.produto.unidade.value if item.produto.unidade else "un"
+                    ),
+                    "nota_fiscal_id": nota.id,  
+                    "nota_status": nota.status.value,  
+                }
+                
+                produtos_comprados.append(produto_info)
+                
+            
+                nota_info["itens"].append({
+                    **produto_info,
+                    "nota_fiscal_id": nota.id,  
+                })
+                
+                itens_validos_nota += 1
+                soma_total_itens += 1
 
                 if item.produto.id in produtos_quantidade:
                     produtos_quantidade[item.produto.id]["quantidade_total"] += float(
@@ -965,6 +1014,25 @@ def obter_detalhes_cliente(cliente_id):
                             item.produto.unidade.value if item.produto.unidade else "un"
                         ),
                     }
+            
+            if not nota_info["itens"]:
+                continue  
+                
+            nota_info["quantidade_itens_validos"] = itens_validos_nota
+            
+            if nota.pagamentos:
+                nota_info["pagamentos"] = [{
+                    "forma_pagamento": p.forma_pagamento.value,
+                    "valor": float(p.valor),
+                    "valor_formatado": format_currency(p.valor),
+                    "data": p.data.isoformat() if p.data else None,
+                    "data_br": formatar_data_br(p.data) if p.data else None
+                } for p in nota.pagamentos]
+            
+            todas_compras.append(nota_info)
+            
+            soma_total_compras += valor_total_nota
+            quantidade_compras_validas += 1
 
         produtos_mais_comprados = sorted(
             produtos_quantidade.values(),
@@ -993,6 +1061,7 @@ def obter_detalhes_cliente(cliente_id):
                 "data_emissao": conta.data_emissao.isoformat(),
                 "data_emissao_br": formatar_data_br(conta.data_emissao),
                 "status": conta.status.value,
+                "nota_fiscal_id": conta.nota_fiscal_id,
             }
 
             if conta.status == StatusPagamento.quitado:
@@ -1000,7 +1069,6 @@ def obter_detalhes_cliente(cliente_id):
             else:
                 contas_abertas.append(info)
 
-        valor_total_compras = sum(float(nota.valor_total) for nota in notas_fiscais)
         valor_total_divida = sum(float(c.valor_original) for c in contas_receber)
         valor_total_aberto = sum(float(c.valor_aberto) for c in contas_receber)
         valor_total_pago = (
@@ -1036,9 +1104,10 @@ def obter_detalhes_cliente(cliente_id):
                 "produtos_mais_comprados": produtos_mais_comprados,
                 "contas_abertas": contas_abertas,
                 "contas_quitadas": contas_quitadas,
-                "total_compras": len(notas_fiscais),
-                "valor_total_compras": valor_total_compras,
-                "valor_total_compras_formatado": format_currency(valor_total_compras),
+                "total_compras": quantidade_compras_validas,  # ATUALIZADO: Usa a quantidade de compras válidas
+                "total_compras_formatado": f"{quantidade_compras_validas} compra{'s' if quantidade_compras_validas != 1 else ''}",
+                "valor_total_compras": soma_total_compras,  # ATUALIZADO: Soma das compras válidas
+                "valor_total_compras_formatado": format_currency(soma_total_compras),
                 "dividas": {
                     "valor_total_divida": valor_total_divida,
                     "valor_total_divida_formatado": format_currency(valor_total_divida),
@@ -1049,13 +1118,29 @@ def obter_detalhes_cliente(cliente_id):
                     "porcentagem_pago": porcentagem_pago,
                     "porcentagem_aberto": porcentagem_aberto,
                 },
+                "todas_compras": todas_compras,
+                "estatisticas_compras": {
+                    "quantidade_total_compras": quantidade_compras_validas,
+                    "quantidade_total_compras_formatado": f"{quantidade_compras_validas} compra{'s' if quantidade_compras_validas != 1 else ''}",
+                    "soma_total_valor": soma_total_compras,
+                    "soma_total_valor_formatado": format_currency(soma_total_compras),
+                    "quantidade_total_itens": soma_total_itens,
+                    "quantidade_total_itens_formatado": f"{soma_total_itens} item{'ns' if soma_total_itens != 1 else ''}",
+                    "valor_medio_compra": soma_total_compras / quantidade_compras_validas if quantidade_compras_validas > 0 else 0,
+                    "valor_medio_compra_formatado": format_currency(soma_total_compras / quantidade_compras_validas) if quantidade_compras_validas > 0 else format_currency(0),
+                    "itens_medio_compra": soma_total_itens / quantidade_compras_validas if quantidade_compras_validas > 0 else 0,
+                    "itens_medio_compra_formatado": f"{soma_total_itens / quantidade_compras_validas:.1f} itens" if quantidade_compras_validas > 0 else "0 itens",
+                    "primeira_compra": todas_compras[-1]["data_emissao_br"] if todas_compras else "-",
+                    "ultima_compra": todas_compras[0]["data_emissao_br"] if todas_compras else "-",
+                    "compras_a_prazo": sum(1 for compra in todas_compras if compra.get("a_prazo", False)),
+                    "compras_a_vista": sum(1 for compra in todas_compras if not compra.get("a_prazo", False)),
+                }
             }
         )
 
     except Exception as e:
         logger.error(f"Erro ao obter detalhes do cliente: {str(e)}")
         return jsonify({"success": False, "message": str(e)}), 400
-
 
 @admin_bp.route("/cliente/contas/<int:conta_id>/detalhes", methods=["GET"])
 @login_required

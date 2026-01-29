@@ -6762,3 +6762,472 @@ th.sortable.sort-desc::after {
     padding: 0.25em 0.6em;
     border-radius: var(--border-radius-sm);
 }
+/* Estilos para a seção de Todas as Compras */
+.all-purchases-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    margin-top: var(--space-sm);
+}
+
+.purchase-card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--space-lg);
+    background: var(--card-bg);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.3s ease;
+}
+
+.purchase-card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-light);
+    background: var(--card-hover);
+    transform: translateY(-2px);
+}
+
+.purchase-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-md);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.purchase-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.purchase-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+}
+
+.purchase-title i {
+    color: var(--primary-color);
+    font-size: var(--font-size-lg);
+}
+
+.purchase-date {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+    font-weight: var(--font-weight-regular);
+    background: var(--bg-secondary);
+    padding: 4px 8px;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+}
+
+.purchase-total {
+    font-weight: var(--font-weight-bold);
+    font-size: var(--font-size-lg);
+    color: var(--secondary-color);
+    background: rgba(0, 206, 201, 0.1);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid rgba(0, 206, 201, 0.3);
+}
+
+.purchase-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-lg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    padding: var(--space-sm);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+}
+
+.info-item .label {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    margin-bottom: var(--space-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: var(--font-weight-medium);
+}
+
+.info-item .value {
+    font-weight: var(--font-weight-medium);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.status-emitida {
+    background: linear-gradient(135deg, rgba(0, 184, 148, 0.2), rgba(0, 140, 109, 0.3));
+    color: var(--success-color);
+    border: 1px solid rgba(0, 184, 148, 0.4);
+    box-shadow: 0 2px 4px rgba(0, 184, 148, 0.2);
+}
+
+.status-cancelada {
+    background: linear-gradient(135deg, rgba(214, 48, 49, 0.2), rgba(176, 35, 36, 0.3));
+    color: var(--danger-color);
+    border: 1px solid rgba(214, 48, 49, 0.4);
+    box-shadow: 0 2px 4px rgba(214, 48, 49, 0.2);
+}
+
+.purchase-items h5 {
+    margin-bottom: var(--space-md);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-md);
+}
+
+.purchase-items h5 i {
+    color: var(--success-color);
+    background: rgba(0, 184, 148, 0.1);
+    padding: 6px;
+    border-radius: 50%;
+}
+
+.purchase-items-table {
+    font-size: var(--font-size-sm);
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.purchase-items-table th {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-weight: var(--font-weight-semibold);
+    padding: var(--space-md);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.purchase-items-table td {
+    padding: var(--space-sm);
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.purchase-items-table tr:last-child td {
+    border-bottom: none;
+}
+
+.purchase-items-table tr:hover {
+    background: var(--card-hover);
+}
+
+.purchase-items-table .monetary {
+    color: var(--secondary-color);
+    font-weight: var(--font-weight-medium);
+}
+
+.purchase-payments {
+    margin-top: var(--space-lg);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--border-color);
+}
+
+.purchase-payments h5 {
+    margin-bottom: var(--space-md);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-md);
+}
+
+.purchase-payments h5 i {
+    color: var(--accent-color);
+    background: rgba(253, 121, 168, 0.1);
+    padding: 6px;
+    border-radius: 50%;
+}
+
+.payments-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.payment-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-sm);
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+
+.payment-item:hover {
+    background: var(--card-hover);
+    border-color: var(--primary-light);
+    transform: translateX(4px);
+}
+
+.payment-method {
+    font-weight: var(--font-weight-medium);
+    color: var(--text-primary);
+    background: rgba(108, 92, 231, 0.1);
+    padding: 4px 10px;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid rgba(108, 92, 231, 0.3);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.payment-value {
+    font-weight: var(--font-weight-bold);
+    color: var(--success-color);
+    font-size: var(--font-size-md);
+}
+
+.payment-date {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+    padding: 3px 8px;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+}
+
+/* Indicador de pagamento a prazo */
+.payment-prazo {
+    background: rgba(253, 203, 110, 0.1);
+    border-color: rgba(253, 203, 110, 0.3);
+}
+
+.payment-prazo .payment-method {
+    background: rgba(253, 203, 110, 0.2);
+    border-color: rgba(253, 203, 110, 0.4);
+    color: var(--warning-color);
+}
+
+/* Badge para nota a prazo */
+.prazo-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(253, 203, 110, 0.2), rgba(232, 169, 62, 0.3));
+    color: var(--warning-color);
+    padding: 3px 8px;
+    border-radius: var(--border-radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    margin-left: var(--space-sm);
+    border: 1px solid rgba(253, 203, 110, 0.4);
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+    .purchase-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-sm);
+    }
+    
+    .purchase-info {
+        grid-template-columns: 1fr;
+        gap: var(--space-sm);
+    }
+    
+    .payment-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-xs);
+    }
+    
+    .purchase-title {
+        flex-wrap: wrap;
+    }
+    
+    .purchase-items-table {
+        font-size: var(--font-size-xs);
+    }
+    
+    .purchase-items-table th,
+    .purchase-items-table td {
+        padding: var(--space-xs) var(--space-sm);
+    }
+}
+
+@media (max-width: 480px) {
+    .purchase-card {
+        padding: var(--space-md);
+    }
+    
+    .purchase-items-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+}
+/* Estilos para as compras colapsáveis */
+.purchase-collapsible {
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    padding: 0;
+    transition: all 0.3s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.purchase-collapsible:hover {
+    opacity: 0.9;
+}
+
+.purchase-collapsible.active .purchase-toggle-icon {
+    transform: rotate(180deg);
+    color: var(--primary-color);
+}
+
+.purchase-total-arrow {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.purchase-toggle-icon {
+    transition: transform 0.3s ease;
+    margin-left: var(--space-sm);
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.purchase-collapsible-content {
+    padding-top: var(--space-lg);
+    animation: slideDown 0.3s ease;
+    border-top: 1px solid var(--border-color);
+    margin-top: var(--space-md);
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.collapsible-purchase.expanded {
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary-light);
+    background: var(--card-hover);
+}
+
+/* Ajustes no purchase-header quando é clicável */
+.purchase-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.purchase-header:hover .purchase-title i,
+.purchase-header:hover .purchase-total {
+    color: var(--primary-light);
+}
+
+/* Ajustes para garantir que o conteúdo seja exibido corretamente */
+.purchase-info,
+.purchase-items,
+.purchase-payments {
+    padding: 0 var(--space-sm);
+}
+
+/* Remover borda inferior do header quando expandido */
+.collapsible-purchase.expanded .purchase-header {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+/* Ajustes responsivos */
+@media (max-width: 768px) {
+    .purchase-collapsible {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-sm);
+    }
+    
+    .purchase-total-arrow {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+/* Estilos para os badges no botão Todas as Compras */
+.purchase-count-badge {
+    background: var(--primary-color);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 600;
+    margin: 0 6px;
+}
+
+.purchase-total-badge {
+    background: linear-gradient(135deg, var(--secondary-color), var(--secondary-dark));
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.9em;
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.purchase-total-badge.monetary {
+    color: white !important;
+}
+.status-header-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 15px;
+    font-size: 0.75em;
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    margin-left: var(--space-sm);
+    border: 1px solid;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.status-header-emitida {
+    background: linear-gradient(135deg, rgba(0, 184, 148, 0.3), rgba(0, 140, 109, 0.4));
+    color: var(--success-color);
+    border-color: rgba(0, 184, 148, 0.5);
+}
+
+.status-header-cancelada {
+    background: linear-gradient(135deg, rgba(214, 48, 49, 0.3), rgba(176, 35, 36, 0.4));
+    color: var(--danger-color);
+    border-color: rgba(214, 48, 49, 0.5);
+}

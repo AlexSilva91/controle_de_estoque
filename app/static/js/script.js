@@ -1775,321 +1775,572 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   async function openDetalhesClienteModal(clienteId) {
-    const content = document.getElementById('detalhesClienteContent');
-    const button = document.querySelector(`button.detalhes-cliente[data-id="${clienteId}"]`);
-    
-    // Desabilitar e animar o botão clicado
-    if (button) {
-        const originalHTML = button.innerHTML;
-        const originalTitle = button.title;
-        
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-        button.title = 'Buscando informações...';
-        button.disabled = true;
-        button.classList.add('loading');
-    }
-    
-    const loadingOverlay = document.createElement('div');
-    loadingOverlay.className = 'modal-loading-overlay';
-    loadingOverlay.innerHTML = `
-        <i class="fas fa-spinner modal-loading-spinner"></i>
-        <div class="modal-loading-text">Buscando informações do cliente...</div>
-    `;
-    
-    content.innerHTML = '';
-    content.appendChild(loadingOverlay);
+      const content = document.getElementById('detalhesClienteContent');
+      const button = document.querySelector(`button.detalhes-cliente[data-id="${clienteId}"]`);
+      
+      // Desabilitar e animar o botão clicado
+      if (button) {
+          const originalHTML = button.innerHTML;
+          const originalTitle = button.title;
+          
+          button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+          button.title = 'Buscando informações...';
+          button.disabled = true;
+          button.classList.add('loading');
+      }
+      
+      const loadingOverlay = document.createElement('div');
+      loadingOverlay.className = 'modal-loading-overlay';
+      loadingOverlay.innerHTML = `
+          <i class="fas fa-spinner modal-loading-spinner"></i>
+          <div class="modal-loading-text">Buscando informações do cliente...</div>
+      `;
+      
+      content.innerHTML = '';
+      content.appendChild(loadingOverlay);
 
-    try {
-      const response = await fetchWithErrorHandling(
-        `/admin/clientes/${clienteId}/detalhes`
-      );
-      loadingOverlay.remove();
-      if (!response.success) {
-            content.innerHTML = `
-                <div class="error-message">
-                    <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #dc3545; margin-bottom: 20px;"></i>
-                    <h3>Erro ao carregar detalhes</h3>
-                    <p>${response.message || 'Não foi possível carregar as informações do cliente.'}</p>
-                    <button class="btn btn-primary mt-3" onclick="openDetalhesClienteModal('${clienteId}')">
-                        <i class="fas fa-redo"></i> Tentar novamente
+      try {
+        const response = await fetchWithErrorHandling(
+          `/admin/clientes/${clienteId}/detalhes`
+        );
+        loadingOverlay.remove();
+        if (!response.success) {
+              content.innerHTML = `
+                  <div class="error-message">
+                      <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #dc3545; margin-bottom: 20px;"></i>
+                      <h3>Erro ao carregar detalhes</h3>
+                      <p>${response.message || 'Não foi possível carregar as informações do cliente.'}</p>
+                      <button class="btn btn-primary mt-3" onclick="openDetalhesClienteModal('${clienteId}')">
+                          <i class="fas fa-redo"></i> Tentar novamente
+                      </button>
+                  </div>
+              `;
+              return;
+          }
+
+        const c = response.cliente;
+
+        let html = `
+                <div class="details-main-info">
+                    <h3 class="section-title">Informações do Cliente</h3>
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <label>Nome:</label>
+                            <div class="value">${c.nome || '-'}</div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Documento:</label>
+                            <div class="value">${c.documento || '-'}</div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Telefone:</label>
+                            <div class="value">${c.telefone || '-'}</div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Email:</label>
+                            <div class="value">${c.email || '-'}</div>
+                        </div>
+                        <div class="detail-item full-width">
+                            <label>Endereço:</label>
+                            <div class="value">${c.endereco || '-'}</div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Total de Compras:</label>
+                            <div class="value">${response.total_compras}</div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Valor Total:</label>
+                            <div class="value monetary">${
+                              response.valor_total_compras_formatado
+                            }</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="details-main-info">
+                    <h3 class="section-title">Situação Financeira</h3>
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <label>Dívida Total:</label>
+                            <div class="value monetary">${
+                              response.dividas.valor_total_divida_formatado
+                            }</div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Total em Aberto:</label>
+                            <div class="value monetary" style="color:#ff4d4d; font-weight:bold;">
+                                ${response.dividas.valor_total_aberto_formatado}
+                            </div>
+                        </div>
+                        <div class="detail-item">
+                            <label>Total Pago:</label>
+                            <div class="value monetary" style="color:#0a7600; font-weight:bold;">
+                                ${response.dividas.valor_total_pago_formatado}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NOVA SEÇÃO: TODAS AS COMPRAS -->
+                <div class="collapsible-section">
+                    <button class="collapsible btn btn-outline">
+                        <i class="fas fa-receipt"></i> Todas as Compras 
+                        <span class="purchase-count-badge">${response.todas_compras?.length || 0}</span>
+                        <span class="purchase-total-badge monetary">${response.valor_total_compras_formatado}</span>
+                        <i class="fas fa-chevron-down toggle-icon"></i>
                     </button>
+                    <div class="collapsible-content" style="display:none;">
+                        ${
+                          response.todas_compras && response.todas_compras.length
+                            ? `
+                            <div class="all-purchases-container">
+                                ${response.todas_compras.map(compra => `
+                                    <div class="purchase-card collapsible-purchase">
+                                        <button class="purchase-header purchase-collapsible">
+                                            <div class="purchase-title">
+                                                <i class="fas fa-file-invoice-dollar purchase-icon"></i>
+                                                <span>Nº ${compra.numero_nf}</span>
+                                                <span class="purchase-date">${compra.data_emissao_br}</span>
+                                                ${compra.a_prazo ? '<span class="prazo-badge"><i class="fas fa-clock"></i> A Prazo</span>' : ''}
+                                                <!-- STATUS ADICIONADO AQUI -->
+                                                <span class="status-header-badge ${compra.status === 'emitida' ? 'status-header-emitida' : 'status-header-cancelada'}">
+                                                    ${compra.status === 'emitida' ? 'Emitida' : 'Cancelada'}
+                                                </span>
+                                            </div>
+                                            <div class="purchase-total-arrow">
+                                                <div class="purchase-total">
+                                                    Total: <span class="monetary">${compra.valor_total_formatado}</span>
+                                                </div>
+                                                <i class="fas fa-chevron-down purchase-toggle-icon"></i>
+                                            </div>
+                                        </button>
+                                        <div class="purchase-collapsible-content" style="display:none;">
+                                            <div class="purchase-info">
+                                                <div class="info-item">
+                                                    <span class="label">Forma de Pagamento:</span>
+                                                    <span class="value">${compra.forma_pagamento || 'Não informado'}</span>
+                                                </div>
+                                                <div class="info-item">
+                                                    <span class="label">Status:</span>
+                                                    <span class="value status-badge ${compra.status === 'emitida' ? 'status-emitida' : 'status-cancelada'}">
+                                                        ${compra.status === 'emitida' ? 'Emitida' : 'Cancelada'}
+                                                    </span>
+                                                </div>
+                                                <div class="info-item">
+                                                    <span class="label">Itens:</span>
+                                                    <span class="value">${compra.quantidade_itens}</span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="purchase-items">
+                                                <h5><i class="fas fa-box"></i> Produtos da Compra:</h5>
+                                                <table class="table compact-table purchase-items-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Produto</th>
+                                                            <th>Qtd</th>
+                                                            <th>Un</th>
+                                                            <th>Valor Unit.</th>
+                                                            <th>Total</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        ${compra.itens.map(item => `
+                                                            <tr>
+                                                                <td>${item.nome}</td>
+                                                                <td>${item.quantidade_formatada}</td>
+                                                                <td>${item.unidade}</td>
+                                                                <td class="monetary">${item.valor_unitario_formatado}</td>
+                                                                <td class="monetary">${item.valor_total_formatado}</td>
+                                                            </tr>
+                                                        `).join('')}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            
+                                            ${compra.pagamentos && compra.pagamentos.length
+                                              ? `
+                                              <div class="purchase-payments">
+                                                  <h5><i class="fas fa-credit-card"></i> Pagamentos:</h5>
+                                                  <div class="payments-list">
+                                                      ${compra.pagamentos.map(pag => `
+                                                          <div class="payment-item${compra.a_prazo ? ' payment-prazo' : ''}">
+                                                              <span class="payment-method">${pag.forma_pagamento}</span>
+                                                              <span class="payment-value monetary">${pag.valor_formatado}</span>
+                                                              <span class="payment-date">${pag.data_br}</span>
+                                                          </div>
+                                                      `).join('')}
+                                                  </div>
+                                              </div>
+                                              `
+                                              : ''
+                                            }
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `
+                            : '<p class="no-data-message">Nenhuma compra encontrada</p>'
+                        }
+                    </div>
+                </div>
+
+                <!-- SEÇÕES EXISTENTES (MANTIDAS) -->
+                <div class="collapsible-section">
+                    <button class="collapsible btn btn-outline">
+                        <i class="fas fa-shopping-bag"></i> Últimas compras (${
+                          response.produtos_comprados.length
+                        })
+                        <i class="fas fa-chevron-down toggle-icon"></i>
+                    </button>
+                    <div class="collapsible-content" style="display:none;">
+                        <div class="details-table-container">
+                            <table class="table compact-table">
+                                <thead>
+                                    <tr>
+                                        <th>Produto</th><th>Qtd</th><th>Un</th><th>Valor Unit.</th><th>Valor Total</th><th>Data</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${response.produtos_comprados
+                                      .map(
+                                        (p) => `
+                                        <tr>
+                                            <td>${p.nome}</td>
+                                            <td>${p.quantidade_formatada}</td>
+                                            <td>${p.unidade}</td>
+                                            <td class="monetary">${p.valor_unitario_formatado}</td>
+                                            <td class="monetary">${p.valor_total_formatado}</td>
+                                            <td>${p.data_compra_br}</td>
+                                        </tr>
+                                    `
+                                      )
+                                      .join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="collapsible-section">
+                    <button class="collapsible btn btn-outline">
+                        <i class="fas fa-trophy"></i> Top Produtos Mais Comprados (${
+                          response.produtos_mais_comprados.length
+                        })
+                        <i class="fas fa-chevron-down toggle-icon"></i>
+                    </button>
+                    <div class="collapsible-content" style="display:none;">
+                        <div class="details-table-container">
+                            <table class="table compact-table">
+                                <thead>
+                                    <tr>
+                                        <th>Produto</th><th>Quantidade Total</th><th>Unidade</th><th>Vezes Comprado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${response.produtos_mais_comprados
+                                      .map(
+                                        (p) => `
+                                        <tr>
+                                            <td>${p.nome}</td>
+                                            <td>${p.quantidade_total_formatada}</td>
+                                            <td>${p.unidade}</td>
+                                            <td>${p.vezes_comprado}x</td>
+                                        </tr>
+                                      `
+                                      )
+                                      .join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="collapsible-section">
+                    <button class="collapsible btn btn-outline">
+                        <i class="fas fa-clock"></i> Contas em Aberto (${
+                          response.contas_abertas.length
+                        })
+                        <i class="fas fa-chevron-down toggle-icon"></i>
+                    </button>
+                    <div class="collapsible-content" style="display:none;">
+                        ${
+                          response.contas_abertas.length
+                            ? `
+                            <div class="details-table-container">
+                                <table class="table compact-table contas-abertas-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Descrição</th><th>Vencimento</th><th>Valor em Aberto</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${response.contas_abertas
+                                          .map(
+                                            (ca) => `
+                                            <tr class="clickable-row" data-conta-id="${ca.id}" title="Clique para ver detalhes da conta">
+                                                <td>${ca.descricao}</td>
+                                                <td>${ca.data_vencimento_br}</td>
+                                                <td class="monetary">${ca.valor_aberto_formatado}</td>
+                                            </tr>
+                                          `
+                                          )
+                                          .join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `
+                            : '<p class="no-data-message">Nenhuma conta em aberto</p>'
+                        }
+                    </div>
+                </div>
+
+                <div class="collapsible-section">
+                    <button class="collapsible btn btn-outline">
+                        <i class="fas fa-check-circle"></i> Contas Quitadas (${
+                          response.contas_quitadas.length
+                        })
+                        <i class="fas fa-chevron-down toggle-icon"></i>
+                    </button>
+                    <div class="collapsible-content" style="display:none;">
+                        ${
+                          response.contas_quitadas.length
+                            ? `
+                            <div class="details-table-container">
+                                <table class="table compact-table contas-quitadas-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Descrição</th><th>Pagamento</th><th>Valor Original</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${response.contas_quitadas
+                                          .map(
+                                            (cq) => `
+                                            <tr class="clickable-row" data-conta-id="${cq.id}" title="Clique para ver detalhes da conta">
+                                                <td>${cq.descricao}</td>
+                                                <td>${cq.data_emissao_br}</td>
+                                                <td class="monetary">${cq.valor_original_formatado}</td>
+                                            </tr>
+                                          `
+                                          )
+                                          .join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `
+                            : '<p class="no-data-message">Nenhuma conta quitada</p>'
+                        }
+                    </div>
                 </div>
             `;
-            return;
-        }
 
-      const c = response.cliente;
+        content.innerHTML = html;
 
-      let html = `
-              <div class="details-main-info">
-                  <h3 class="section-title">Informações do Cliente</h3>
-                  <div class="details-grid">
-                      <div class="detail-item">
-                          <label>Nome:</label>
-                          <div class="value">${c.nome || '-'}</div>
-                      </div>
-                      <div class="detail-item">
-                          <label>Documento:</label>
-                          <div class="value">${c.documento || '-'}</div>
-                      </div>
-                      <div class="detail-item">
-                          <label>Telefone:</label>
-                          <div class="value">${c.telefone || '-'}</div>
-                      </div>
-                      <div class="detail-item">
-                          <label>Email:</label>
-                          <div class="value">${c.email || '-'}</div>
-                      </div>
-                      <div class="detail-item full-width">
-                          <label>Endereço:</label>
-                          <div class="value">${c.endereco || '-'}</div>
-                      </div>
-                      <div class="detail-item">
-                          <label>Total de Compras:</label>
-                          <div class="value">${response.total_compras}</div>
-                      </div>
-                      <div class="detail-item">
-                          <label>Valor Total:</label>
-                          <div class="value monetary">${
-                            response.valor_total_compras_formatado
-                          }</div>
-                      </div>
-                  </div>
-              </div>
+        // Ativar colapsáveis principais
+        document.querySelectorAll('.collapsible').forEach((btn) => {
+          btn.addEventListener('click', function () {
+            this.classList.toggle('active');
+            const contentDiv = this.nextElementSibling;
+            const toggleIcon = this.querySelector('.toggle-icon');
 
-              <div class="details-main-info">
-                  <h3 class="section-title">Situação Financeira</h3>
-                  <div class="details-grid">
-                      <div class="detail-item">
-                          <label>Dívida Total:</label>
-                          <div class="value monetary">${
-                            response.dividas.valor_total_divida_formatado
-                          }</div>
-                      </div>
-                      <div class="detail-item">
-                          <label>Total em Aberto:</label>
-                          <div class="value monetary" style="color:#ff4d4d; font-weight:bold;">
-                              ${response.dividas.valor_total_aberto_formatado}
-                          </div>
-                      </div>
-                      <div class="detail-item">
-                          <label>Total Pago:</label>
-                          <div class="value monetary" style="color:#0a7600; font-weight:bold;">
-                              ${response.dividas.valor_total_pago_formatado}
-                          </div>
-                      </div>
-                  </div>
-              </div>
+            if (contentDiv.style.display === 'block') {
+              contentDiv.style.display = 'none';
+              toggleIcon.classList.remove('rotated');
+            } else {
+              contentDiv.style.display = 'block';
+              toggleIcon.classList.add('rotated');
 
-              <div class="collapsible-section">
-                  <button class="collapsible btn btn-outline">
-                      <i class="fas fa-shopping-bag"></i> Últimas compras (${
-                        response.produtos_comprados.length
-                      })
-                      <i class="fas fa-chevron-down toggle-icon"></i>
+              // Adicionar event listeners para as linhas clicáveis após expandir
+              setTimeout(() => {
+                addClickableRowListeners(contentDiv);
+              }, 100);
+            }
+          });
+        });
+
+        // Ativar colapsáveis das compras individuais
+        setTimeout(() => {
+          document.querySelectorAll('.purchase-collapsible').forEach((btn) => {
+            btn.addEventListener('click', function (e) {
+              e.stopPropagation(); // Impede que o evento se propague para elementos pais
+              this.classList.toggle('active');
+              const contentDiv = this.nextElementSibling;
+              const toggleIcon = this.querySelector('.purchase-toggle-icon');
+
+              if (contentDiv.style.display === 'block') {
+                contentDiv.style.display = 'none';
+                toggleIcon.classList.remove('rotated');
+                this.parentElement.classList.remove('expanded');
+              } else {
+                contentDiv.style.display = 'block';
+                toggleIcon.classList.add('rotated');
+                this.parentElement.classList.add('expanded');
+              }
+            });
+            
+            // Permitir que a seta seja clicável também
+            const arrow = btn.querySelector('.purchase-toggle-icon');
+            if (arrow) {
+              arrow.addEventListener('click', function (e) {
+                e.stopPropagation();
+                btn.click();
+              });
+            }
+          });
+
+          // Adicionar estilos de hover para as compras colapsáveis
+          const style = document.createElement('style');
+          style.textContent = `
+            .purchase-collapsible {
+              cursor: pointer;
+              width: 100%;
+              text-align: left;
+              background: transparent;
+              border: none;
+              padding: 0;
+              transition: all 0.3s ease;
+            }
+            
+            .purchase-collapsible:hover {
+              opacity: 0.9;
+            }
+            
+            .purchase-toggle-icon {
+              transition: transform 0.3s ease;
+              margin-left: var(--space-sm);
+              color: var(--text-muted);
+            }
+            
+            .purchase-toggle-icon.rotated {
+              transform: rotate(180deg);
+              color: var(--primary-color);
+            }
+            
+            .purchase-collapsible-content {
+              animation: slideDown 0.3s ease;
+            }
+            
+            @keyframes slideDown {
+              from {
+                opacity: 0;
+                transform: translateY(-10px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+            
+            .collapsible-purchase.expanded {
+              box-shadow: var(--shadow-lg);
+              border-color: var(--primary-light);
+            }
+            
+            .purchase-total-arrow {
+              display: flex;
+              align-items: center;
+              gap: var(--space-sm);
+            }
+            
+            /* Estilos para os badges no botão Todas as Compras */
+            .purchase-count-badge {
+              background: var(--primary-color);
+              color: white;
+              padding: 2px 8px;
+              border-radius: 12px;
+              font-size: 0.85em;
+              font-weight: 600;
+              margin: 0 6px;
+            }
+            
+            .purchase-total-badge {
+              background: linear-gradient(135deg, var(--secondary-color), var(--secondary-dark));
+              color: white;
+              padding: 2px 10px;
+              border-radius: 12px;
+              font-size: 0.9em;
+              font-weight: 600;
+              margin-right: 8px;
+            }
+            
+            .purchase-total-badge.monetary {
+              color: white !important;
+            }
+            
+            /* Estilos para o status no header da nota */
+            .status-header-badge {
+              display: inline-block;
+              padding: 3px 10px;
+              border-radius: 15px;
+              font-size: 0.75em;
+              font-weight: var(--font-weight-semibold);
+              letter-spacing: 0.3px;
+              text-transform: uppercase;
+              margin-left: var(--space-sm);
+              border: 1px solid;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            }
+            
+            .status-header-emitida {
+              background: linear-gradient(135deg, rgba(0, 184, 148, 0.3), rgba(0, 140, 109, 0.4));
+              color: var(--success-color);
+              border-color: rgba(0, 184, 148, 0.5);
+            }
+            
+            .status-header-cancelada {
+              background: linear-gradient(135deg, rgba(214, 48, 49, 0.3), rgba(176, 35, 36, 0.4));
+              color: var(--danger-color);
+              border-color: rgba(214, 48, 49, 0.5);
+            }
+            
+            /* Ajustes para o layout do título */
+            .purchase-title {
+              display: flex;
+              align-items: center;
+              gap: var(--space-sm);
+              flex-wrap: wrap;
+            }
+          `;
+          document.head.appendChild(style);
+        }, 100);
+
+        // Adicionar event listeners para as linhas clicáveis que já estão visíveis
+        setTimeout(() => {
+          // Verificar se alguma seção está expandida por padrão e adicionar listeners
+          document.querySelectorAll('.collapsible-content').forEach((contentDiv) => {
+            if (contentDiv.style.display === 'block') {
+              addClickableRowListeners(contentDiv);
+            }
+          });
+
+          // Adicionar estilos CSS para as linhas clicáveis
+          addClickableRowStyles();
+        }, 100);
+
+        openModal('detalhesClienteModal');
+      } catch (err) {
+        loadingOverlay.remove();
+          content.innerHTML = `
+              <div class="error-message">
+                  <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #dc3545; margin-bottom: 20px;"></i>
+                  <h3>Erro de conexão</h3>
+                  <p>Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.</p>
+                  <button class="btn btn-primary mt-3" onclick="openDetalhesClienteModal('${clienteId}')">
+                      <i class="fas fa-redo"></i> Tentar novamente
                   </button>
-                  <div class="collapsible-content" style="display:none;">
-                      <div class="details-table-container">
-                          <table class="table compact-table">
-                              <thead>
-                                  <tr>
-                                      <th>Produto</th><th>Qtd</th><th>Un</th><th>Valor Unit.</th><th>Valor Total</th><th>Data</th>
-                                  </tr>
-                              </thead>
-                              <tbody>
-                                  ${response.produtos_comprados
-                                    .map(
-                                      (p) => `
-                                      <tr>
-                                          <td>${p.nome}</td>
-                                          <td>${p.quantidade_formatada}</td>
-                                          <td>${p.unidade}</td>
-                                          <td class="monetary">${p.valor_unitario_formatado}</td>
-                                          <td class="monetary">${p.valor_total_formatado}</td>
-                                          <td>${p.data_compra_br}</td>
-                                      </tr>
-                                  `
-                                    )
-                                    .join('')}
-                              </tbody>
-                          </table>
-                      </div>
-                  </div>
-              </div>
-
-              <div class="collapsible-section">
-                  <button class="collapsible btn btn-outline">
-                      <i class="fas fa-trophy"></i> Top Produtos Mais Comprados (${
-                        response.produtos_mais_comprados.length
-                      })
-                      <i class="fas fa-chevron-down toggle-icon"></i>
-                  </button>
-                  <div class="collapsible-content" style="display:none;">
-                      <div class="details-table-container">
-                          <table class="table compact-table">
-                              <thead>
-                                  <tr>
-                                      <th>Produto</th><th>Quantidade Total</th><th>Unidade</th><th>Vezes Comprado</th>
-                                  </tr>
-                              </thead>
-                              <tbody>
-                                  ${response.produtos_mais_comprados
-                                    .map(
-                                      (p) => `
-                                      <tr>
-                                          <td>${p.nome}</td>
-                                          <td>${p.quantidade_total_formatada}</td>
-                                          <td>${p.unidade}</td>
-                                          <td>${p.vezes_comprado}x</td>
-                                      </tr>
-                                  `
-                                    )
-                                    .join('')}
-                              </tbody>
-                          </table>
-                      </div>
-                  </div>
-              </div>
-
-              <div class="collapsible-section">
-                  <button class="collapsible btn btn-outline">
-                      <i class="fas fa-clock"></i> Contas em Aberto (${
-                        response.contas_abertas.length
-                      })
-                      <i class="fas fa-chevron-down toggle-icon"></i>
-                  </button>
-                  <div class="collapsible-content" style="display:none;">
-                      ${
-                        response.contas_abertas.length
-                          ? `
-                          <div class="details-table-container">
-                              <table class="table compact-table contas-abertas-table">
-                                  <thead>
-                                      <tr>
-                                          <th>Descrição</th><th>Vencimento</th><th>Valor em Aberto</th>
-                                      </tr>
-                                  </thead>
-                                  <tbody>
-                                      ${response.contas_abertas
-                                        .map(
-                                          (ca) => `
-                                          <tr class="clickable-row" data-conta-id="${ca.id}" title="Clique para ver detalhes da conta">
-                                              <td>${ca.descricao}</td>
-                                              <td>${ca.data_vencimento_br}</td>
-                                              <td class="monetary">${ca.valor_aberto_formatado}</td>
-                                          </tr>
-                                      `
-                                        )
-                                        .join('')}
-                                  </tbody>
-                              </table>
-                          </div>
-                      `
-                          : '<p class="no-data-message">Nenhuma conta em aberto</p>'
-                      }
-                  </div>
-              </div>
-
-              <div class="collapsible-section">
-                  <button class="collapsible btn btn-outline">
-                      <i class="fas fa-check-circle"></i> Contas Quitadas (${
-                        response.contas_quitadas.length
-                      })
-                      <i class="fas fa-chevron-down toggle-icon"></i>
-                  </button>
-                  <div class="collapsible-content" style="display:none;">
-                      ${
-                        response.contas_quitadas.length
-                          ? `
-                          <div class="details-table-container">
-                              <table class="table compact-table contas-quitadas-table">
-                                  <thead>
-                                      <tr>
-                                          <th>Descrição</th><th>Pagamento</th><th>Valor Original</th>
-                                      </tr>
-                                  </thead>
-                                  <tbody>
-                                      ${response.contas_quitadas
-                                        .map(
-                                          (cq) => `
-                                          <tr class="clickable-row" data-conta-id="${cq.id}" title="Clique para ver detalhes da conta">
-                                              <td>${cq.descricao}</td>
-                                              <td>${cq.data_emissao_br}</td>
-                                              <td class="monetary">${cq.valor_original_formatado}</td>
-                                          </tr>
-                                      `
-                                        )
-                                        .join('')}
-                                  </tbody>
-                              </table>
-                          </div>
-                      `
-                          : '<p class="no-data-message">Nenhuma conta quitada</p>'
-                      }
-                  </div>
               </div>
           `;
-
-      content.innerHTML = html;
-
-      // Ativar colapsáveis
-      document.querySelectorAll('.collapsible').forEach((btn) => {
-        btn.addEventListener('click', function () {
-          this.classList.toggle('active');
-          const contentDiv = this.nextElementSibling;
-          const toggleIcon = this.querySelector('.toggle-icon');
-
-          if (contentDiv.style.display === 'block') {
-            contentDiv.style.display = 'none';
-            toggleIcon.classList.remove('rotated');
-          } else {
-            contentDiv.style.display = 'block';
-            toggleIcon.classList.add('rotated');
-
-            // Adicionar event listeners para as linhas clicáveis após expandir
-            setTimeout(() => {
-              addClickableRowListeners(contentDiv);
-            }, 100);
-          }
-        });
-      });
-
-      // Adicionar event listeners para as linhas clicáveis que já estão visíveis
-      setTimeout(() => {
-        // Verificar se alguma seção está expandida por padrão e adicionar listeners
-        document.querySelectorAll('.collapsible-content').forEach((contentDiv) => {
-          if (contentDiv.style.display === 'block') {
-            addClickableRowListeners(contentDiv);
-          }
-        });
-
-        // Adicionar estilos CSS para as linhas clicáveis
-        addClickableRowStyles();
-      }, 100);
-
-      openModal('detalhesClienteModal');
-    } catch (err) {
-      loadingOverlay.remove();
-        content.innerHTML = `
-            <div class="error-message">
-                <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #dc3545; margin-bottom: 20px;"></i>
-                <h3>Erro de conexão</h3>
-                <p>Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.</p>
-                <button class="btn btn-primary mt-3" onclick="openDetalhesClienteModal('${clienteId}')">
-                    <i class="fas fa-redo"></i> Tentar novamente
-                </button>
-            </div>
-        `;
-    }finally{
-      setTimeout(() => {
-            if (button && button.classList.contains('loading')) {
-                button.innerHTML = '<i class="fas fa-eye"></i>';
-                button.title = 'Detalhes';
-                button.disabled = false;
-                button.classList.remove('loading');
-            }
-        }, 300);
-    }
+      }finally{
+        setTimeout(() => {
+              if (button && button.classList.contains('loading')) {
+                  button.innerHTML = '<i class="fas fa-eye"></i>';
+                  button.title = 'Detalhes';
+                  button.disabled = false;
+                  button.classList.remove('loading');
+              }
+          }, 300);
+      }
   }
 
   function addClickableRowListeners(container) {
