@@ -40,8 +40,15 @@ class ConfiguracaoFiscalCRUD:
         Cria uma nova configuração fiscal
         """
         try:
-            # Trata os dados antes de criar
             dados_tratados = NFeHelpers.tratar_dados_configuracao(dados)
+            
+            ultimo_numero_nfe = dados_tratados.get('ultimo_numero_nfe', 0)
+            ultimo_numero_nfce = dados_tratados.get('ultimo_numero_nfce', 0)
+            
+            if isinstance(ultimo_numero_nfe, str):
+                ultimo_numero_nfe = int(ultimo_numero_nfe) if ultimo_numero_nfe.isdigit() else 0
+            if isinstance(ultimo_numero_nfce, str):
+                ultimo_numero_nfce = int(ultimo_numero_nfce) if ultimo_numero_nfce.isdigit() else 0
             
             config = ConfiguracaoFiscal(
                 razao_social=dados_tratados['razao_social'],
@@ -64,8 +71,8 @@ class ConfiguracaoFiscalCRUD:
                 serie_nfe=dados_tratados.get('serie_nfe', '1'),
                 serie_nfce=dados_tratados.get('serie_nfce', '2'),
                 ambiente=dados_tratados.get('ambiente', '2'),
-                ultimo_numero_nfe=dados_tratados.get('ultimo_numero_nfe', 0),
-                ultimo_numero_nfce=dados_tratados.get('ultimo_numero_nfce', 0),
+                ultimo_numero_nfe=ultimo_numero_nfe,
+                ultimo_numero_nfce=ultimo_numero_nfce,
                 ativo=dados_tratados.get('ativo', True)
             )
             
@@ -79,7 +86,8 @@ class ConfiguracaoFiscalCRUD:
             raise ValueError(f"Erro ao criar configuração fiscal: {str(e)}")
         except Exception as e:
             db.rollback()
-            raise Exception(f"Erro inesperado: {str(e)}")
+            import traceback
+            raise Exception(f"Erro inesperado ao criar configuração: {str(e)}")
     
     @staticmethod
     def obter_por_id(db: Session, id: int) -> Optional[ConfiguracaoFiscal]:

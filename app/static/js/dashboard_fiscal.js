@@ -367,6 +367,17 @@ function getConfigForm(config = {}) {
                         <option value="2" ${config.ambiente === '2' ? 'selected' : ''}>Homologação</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label class="form-label" for="status">Status</label>
+                    <select id="status" name="status" class="form-input form-select" required>
+                        <option value="1" ${(config.ativo == 1 || config.ativo === true) ? 'selected' : ''}>
+                            Ativo
+                        </option>
+                        <option value="0" ${(config.ativo == 0 || config.ativo === false) ? 'selected' : ''}>
+                            Inativo
+                        </option>
+                    </select>
+                </div>
                 
                 <div class="form-group full-width">
                     <h4>Endereço</h4>
@@ -405,7 +416,7 @@ function getConfigForm(config = {}) {
                 <div class="form-group">
                     <label class="form-label" for="codigo_municipio">Código do Município (IBGE) *</label>
                     <input type="text" id="codigo_municipio" name="codigo_municipio" class="form-input" 
-                        value="${config.codigo_municipio || ''}" required>
+                        value="${config.codigo_municipio || ''}" maxlength="7" required>
                 </div>
 
                 <div class="form-group">
@@ -3125,18 +3136,6 @@ function getClienteFiscalForm(cliente = {}) {
                     <label class="form-label" for="inscricao_estadual">Inscrição Estadual</label>
                     <input type="text" id="inscricao_estadual" name="inscricao_estadual" class="form-input" 
                            value="${cliente.inscricao_estadual || ''}">
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" for="inscricao_municipal">Inscrição Municipal *</label>
-                    <input type="text" id="inscricao_municipal" name="inscricao_municipal" class="form-input" 
-                           value="${cliente.inscricao_municipal || ''}" required>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" for="inscricao_suframa">Inscrição SUFRAMA *</label>
-                    <input type="text" id="inscricao_suframa" name="inscricao_suframa" class="form-input" 
-                           value="${cliente.inscricao_suframa || ''}" required>
                 </div>
                 
                 <div class="form-group full-width">

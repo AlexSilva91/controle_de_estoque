@@ -23,7 +23,6 @@ fiscal_bp = Blueprint('fiscal', __name__, url_prefix='/admin/fiscal')
 # ============================================
 # 1. ROTAS CONFIGURAÇÃO FISCAL
 # ============================================
-
 @fiscal_bp.route('/configuracoes', methods=['POST'])
 @admin_required
 def criar_configuracao_fiscal():
@@ -31,8 +30,14 @@ def criar_configuracao_fiscal():
     try:
         dados = request.get_json()
         print(f'Dados recebidos para criar configuração fiscal: {dados}')
+        
         if not dados:
             return jsonify({"success": False, "message": "Dados não fornecidos"}), 400
+        
+        campos_obrigatorios = ['razao_social', 'cnpj', 'logradouro', 'numero', 'bairro', 'municipio', 'uf', 'cep']
+        for campo in campos_obrigatorios:
+            if campo not in dados or not dados[campo]:
+                return jsonify({"success": False, "message": f"Campo obrigatório faltando: {campo}"}), 400
         
         config = ConfiguracaoFiscalCRUD.criar(db.session, dados)
         
@@ -49,6 +54,7 @@ def criar_configuracao_fiscal():
     except ValueError as e:
         return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:
+        import traceback
         return jsonify({"success": False, "message": f"Erro interno: {str(e)}"}), 500
 
 @fiscal_bp.route('/configuracoes', methods=['GET'])
